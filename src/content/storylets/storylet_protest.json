@@ -1,0 +1,56 @@
+{
+  "id": "storylet_protest_inequality",
+  "tags": ["protest", "social", "public_order"],
+  "requires": {
+    "districtTypes": ["commercial"],
+    "happiness": "low"
+  },
+  "provides": ["clue: protestor_list", "clue:demand_manifesto"],
+  "weight": 0.7,
+  "title": "Public Protest",
+  "description": "Citizens are protesting public inequality.",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_PROTEST"
+    },
+    {
+      "id": "listen_demands",
+      "kind": "investigate",
+      "text": "Listen to protest demands"
+    },
+    {
+      "id": "resolve",
+      "kind": "choice",
+      "choices": [
+        {
+          "id": "listen_response",
+          "label": "Address demands",
+          "effect": ["district_happiness_up"],
+          "nextStep": "resolve_listen"
+        },
+        {
+          "id": "suppress",
+          "label": "Suppress protest",
+          "effect": ["district_order_up", "happiness_down"],
+          "nextStep": "resolve_suppress"
+        }
+      ]
+    },
+    {
+      "id": "resolve_listen",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "demands_met", "label": "Demands addressed", "effect": ["district_stability_up"]}
+      ]
+    },
+    {
+      "id": "resolve_suppress",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "order_restored", "label": "Order restored", "effect": ["district_order_up"]}
+      ]
+    }
+  ]
+}

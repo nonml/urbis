@@ -1,0 +1,32 @@
+{
+  "id": "storylet_corruption_find_bribes",
+  "tags": ["corruption", "finance", "official"],
+  "requires": {
+    "districtTypes": ["commercial", "government"],
+    "requiredTraits": ["greedy", "ambitious"]
+  },
+  "provides": ["clue:financial_evidence", "clue:document"],
+  "weight": 0.8,
+  "title": "Financial Corruption",
+  "description": "An official is accepting bribes in exchange for contracts.",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_CORRUPTION_RUMOR"
+    },
+    {
+      "id": "hack_transactions",
+      "kind": "hack_node",
+      "nodeType": "TELECOM_BOX",
+      "onComplete": ["spawn_clue:transaction_log"]
+    },
+    {
+      "id": "resolve",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "corruption_exposed", "label": "Expose corruption", "effect": ["district_corruption_down"]}
+      ]
+    }
+  ]
+}

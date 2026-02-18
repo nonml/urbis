@@ -1,0 +1,78 @@
+{
+  "id": "case_sabotage",
+  "type": "casefile",
+  "title": "The Sabotage Plot",
+  "description": "Critical infrastructure has been tampered with. Stop the sabotage before it's too late.",
+  "tags": ["sabotage", "infrastructure", "urgent", "danger"],
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_SABOTAGE",
+      "text": "CRITICAL: Sabotage detected at power substation",
+      "completeOn": 1
+    },
+    {
+      "id": "clue1_evidence",
+      "kind": "hack_node",
+      "nodeType": "POWER_SUBSTATION",
+      "text": "Access substation logs to identify tampering",
+      "onComplete": ["spawn_clue:sabotage_log", "advance:tracer"],
+      "completeOn": 1
+    },
+    {
+      "id": "tracer",
+      "kind": "go_to",
+      "marker": "saboteur_location",
+      "text": "Trace to the saboteur's location",
+      "completeOn": 1
+    },
+    {
+      "id": "intercept",
+      "kind": "investigate",
+      "text": "Intercept the saboteur",
+      "completeOn": 1
+    },
+    {
+      "id": "choice_method",
+      "kind": "choice",
+      "text": "How do you stop the saboteur?",
+      "choices": [
+        {
+          "id": "arrest",
+          "label": "Arrest and prosecute",
+          "effect": ["district_order_up", "reputation_high"],
+          "nextStep": "resolve_arrest"
+        },
+        {
+          "id": "silent",
+          "label": "Silent elimination",
+          "effect": ["district_order_neutral", "heat_high"],
+          "nextStep": "resolve_silent"
+        }
+      ]
+    },
+    {
+      "id": "resolve_arrest",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "justice_served",
+          "label": "Saboteur brought to justice",
+          "effect": ["district_safety_up", "reputation_high"]
+        }
+      ]
+    },
+    {
+      "id": "resolve_silent",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "problem_disposed",
+          "label": "Problem quietly disposed of",
+          "effect": ["district_safety_up", "heat_rival_low"]
+        }
+      ]
+    }
+  ]
+}

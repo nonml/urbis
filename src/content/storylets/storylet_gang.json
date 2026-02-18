@@ -1,0 +1,37 @@
+{
+  "id": "storylet_gang_territory",
+  "tags": ["gang", "crime", "enforcement"],
+  "requires": {
+    "districtTypes": ["commercial", "residential"],
+    "crisisType": ["violence"]
+  },
+  "provides": ["clue:gang_plan", "clue:weapons_cache"],
+  "weight": 0.75,
+  "title": "Gang Territory",
+  "description": "A local gang controls a neighborhood through intimidation.",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_GANG_ACTIVITY"
+    },
+    {
+      "id": "informant",
+      "kind": "interact",
+      "interactType": "citizen",
+      "onComplete": ["spawn_clue:informant_tip"]
+    },
+    {
+      "id": "raid",
+      "kind": "investigate",
+      "text": "Raid gang stronghold"
+    },
+    {
+      "id": "resolve",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "gang_cracked", "label": "Gang dismantled", "effect": ["district_crime_down"]}
+      ]
+    }
+  ]
+}

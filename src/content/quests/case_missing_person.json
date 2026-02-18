@@ -1,0 +1,77 @@
+{
+  "id": "case_missing_person",
+  "type": "casefile",
+  "title": "The Missing Person",
+  "description": "A citizen has gone missing from their home. Investigate to find out what happened.",
+  "tags": ["missing", "cctv", "district_residential", "investigation"],
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_MISSING_PERSON",
+      "text": "Report received: Citizen missing from home",
+      "completeOn": 1
+    },
+    {
+      "id": "clue1_cctv",
+      "kind": "hack_node",
+      "nodeType": "CCTV",
+      "text": "Hack a nearby CCTV pole to find last known location",
+      "onComplete": ["spawn_clue:cctv_clip", "advance:travel_location"],
+      "completeOn": 1
+    },
+    {
+      "id": "travel_location",
+      "kind": "go_to",
+      "marker": "last_seen",
+      "text": "Travel to the last location seen on CCTV",
+      "completeOn": 1
+    },
+    {
+      "id": "investigate_site",
+      "kind": "investigate",
+      "text": "Search the area for clues",
+      "completeOn": 1
+    },
+    {
+      "id": "choice_interrogate",
+      "kind": "choice",
+      "text": "What's your next move?",
+      "choices": [
+        {
+          "id": "interrogate_witnesses",
+          "label": "Interrogate witnesses",
+          "effect": "gains_clue:witness_account",
+          "nextStep": "resolve_final"
+        },
+        {
+          "id": "check_comms",
+          "label": "Check telecom for calls",
+          "effect": "gains_clue:phone_records",
+          "nextStep": "resolve_final"
+        }
+      ]
+    },
+    {
+      "id": "resolve_final",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "missing_fugitive",
+          "label": "Citizen fled due to debt",
+          "effect": ["district_residential_stability_down", "reputation_lost"]
+        },
+        {
+          "id": "missing_kidnapped",
+          "label": "Citizen was kidnapped",
+          "effect": ["district_security_up", "heat_rival_high"]
+        },
+        {
+          "id": "missing_voluntary",
+          "label": "Citizen left voluntarily",
+          "effect": ["district_residential_stability_neutral"]
+        }
+      ]
+    }
+  ]
+}

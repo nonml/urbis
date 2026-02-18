@@ -1,0 +1,32 @@
+{
+  "id": "storylet_vandalism_public",
+  "tags": ["vandalism", "public_order", "quick"],
+  "requires": {
+    "districtTypes": ["commercial", "residential"],
+    "publicOrder": "low"
+  },
+  "provides": ["clue:vandal_tag", "clue:suspect"],
+  "weight": 0.65,
+  "title": "Public Vandalism",
+  "description": "Public property has been defaced.",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_VANDALISM"
+    },
+    {
+      "id": "check_cctv",
+      "kind": "hack_node",
+      "nodeType": "CCTV",
+      "onComplete": ["spawn_clue:vandal_footage"]
+    },
+    {
+      "id": "resolve",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "vandal_arrested", "label": "Vandal arrested", "effect": ["district_order_up"]}
+      ]
+    }
+  ]
+}

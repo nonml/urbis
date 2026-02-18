@@ -1,0 +1,37 @@
+{
+  "id": "storylet_sabotage_infra",
+  "tags": ["sabotage", "infrastructure", "urgent"],
+  "requires": {
+    "infrastructureType": ["power", "communication"],
+    "securityLevel": "medium"
+  },
+  "provides": ["clue:saboteur_trace", "clue:disrupted_plan"],
+  "weight": 0.85,
+  "title": "Infrastructure Sabotage",
+  "description": "Critical systems are being tampered with.",
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_SABOTAGE"
+    },
+    {
+      "id": "access_logs",
+      "kind": "hack_node",
+      "nodeType": "POWER_SUBSTATION",
+      "onComplete": ["spawn_clue:system_log"]
+    },
+    {
+      "id": "trace_source",
+      "kind": "investigate",
+      "text": "Trace sabotage source"
+    },
+    {
+      "id": "resolve",
+      "kind": "outcome",
+      "outcomes": [
+        {"id": "sabotage_stopped", "label": "Sabotage stopped", "effect": ["district_safety_up"]}
+      ]
+    }
+  ]
+}

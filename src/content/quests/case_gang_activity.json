@@ -1,0 +1,61 @@
+{
+  "id": "case_gang_activity",
+  "type": "casefile",
+  "title": "Gang Activity",
+  "description": "A local gang has been causing trouble. Disrupt their operations.",
+  "tags": ["gang", "crime", "district_commercial", "enforcement"],
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_GANG_ACTIVITY",
+      "text": "Reports of gang activity in the district",
+      "completeOn": 1
+    },
+    {
+      "id": "clue1_informant",
+      "kind": "interact",
+      "interactType": "citizen",
+      "text": "Find a gang informant",
+      "onComplete": ["spawn_clue:informant_tip", "advance:location"],
+      "completeOn": 1
+    },
+    {
+      "id": "location",
+      "kind": "go_to",
+      "marker": "gang_base",
+      "text": "Go to the gang's known location",
+      "completeOn": 1
+    },
+    {
+      "id": "hack_comm",
+      "kind": "hack_node",
+      "nodeType": "TELECOM_BOX",
+      "text": "Hack communications to disrupt their plans",
+      "onComplete": ["spawn_clue:planned_raid", "advance:disrupt"],
+      "completeOn": 1
+    },
+    {
+      "id": "disrupt",
+      "kind": "investigate",
+      "text": "Disrupt gang operations",
+      "completeOn": 1
+    },
+    {
+      "id": "resolve_gang",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "gang_cracked",
+          "label": "Gang leadership arrested",
+          "effect": ["district_crime_down", "security_up"]
+        },
+        {
+          "id": "gang_scattered",
+          "label": "Gang scattered but not destroyed",
+          "effect": ["district_crime_neutral"]
+        }
+      ]
+    }
+  ]
+}

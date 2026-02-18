@@ -1,0 +1,1 @@
+{"name": "city-builder", "version": "1.0.0", "description": "Dynamic City Builder", "type": "module", "scripts": {"dev": "vite", "build": "vite build", "preview": "vite preview", "test": "node scripts/smoke_test.mjs"}, "keywords": ["city-builder"], "license": "MIT", "devDependencies": {"vite": "^5.0.0"}}

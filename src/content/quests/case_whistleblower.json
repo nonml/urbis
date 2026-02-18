@@ -1,0 +1,78 @@
+{
+  "id": "case_whistleblower",
+  "type": "casefile",
+  "title": "Whistleblower Protection",
+  "description": "A citizen wants to report corruption but fears retaliation. Protect them.",
+  "tags": ["whistleblower", "protection", "justice", "investigation"],
+  "steps": [
+    {
+      "id": "start",
+      "kind": "trigger",
+      "trigger": "ANOMALY_WHISTLEBLOWER",
+      "text": "Whistleblower requests anonymity and protection",
+      "completeOn": 1
+    },
+    {
+      "id": "secure_comm",
+      "kind": "hack_node",
+      "nodeType": "TELECOM_BOX",
+      "text": "Secure communications channel for whistleblower",
+      "onComplete": ["spawn_clue:encrypted_data", "advance:location"],
+      "completeOn": 1
+    },
+    {
+      "id": "location",
+      "kind": "go_to",
+      "marker": "safe_house",
+      "text": "Go to secure location for meeting",
+      "completeOn": 1
+    },
+    {
+      "id": "gather_evidence",
+      "kind": "investigate",
+      "text": "Gather evidence from whistleblower",
+      "completeOn": 1
+    },
+    {
+      "id": "protect_source",
+      "kind": "choice",
+      "text": "How to handle whistleblower safety?",
+      "choices": [
+        {
+          "id": "witness_protection",
+          "label": "Move to safe house",
+          "effect": ["reputation_high", "whistleblower_safe"],
+          "nextStep": "resolve_protection"
+        },
+        {
+          "id": "anonymous_public",
+          "label": "Go anonymous to media",
+          "effect": ["reputation_neutral", "whistleblower_unknown"],
+          "nextStep": "resolve_anonymous"
+        }
+      ]
+    },
+    {
+      "id": "resolve_protection",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "source_saved",
+          "label": "Whistleblower protected and testimony recorded",
+          "effect": ["district_justice_up", "reputation_high"]
+        }
+      ]
+    },
+    {
+      "id": "resolve_anonymous",
+      "kind": "outcome",
+      "outcomes": [
+        {
+          "id": "story_broken",
+          "label": "Story broken anonymously",
+          "effect": ["district_transparency_up", "heat_rival_high"]
+        }
+      ]
+    }
+  ]
+}
