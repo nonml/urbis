@@ -20,6 +20,7 @@ export class Game {
         this.resources = new Resources();
         this.map = new Map(presetDef.width, presetDef.height, this.seed, this.rng);
         this.citizens = new CitizenManager(this.rng);
+        // Pass game reference (required for upgrades + future systems)
         this.buildings = new BuildingManager(this);
         this.crisisManager = new CrisisManager(this, this.rng);
         this.ui = new UIManager(this);
@@ -126,18 +127,10 @@ export class Game {
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
 
-        // Citizen updates (includes job production)
+        // Citizen updates
         const citizenResult = this.citizens.updateAll(this.map, this.buildings);
         this.resources.population = this.citizens.getPopulation();
         this.resources.housing = this.buildings.totalHousing;
-
-        // Job production (from employed citizens)
-        if (citizenResult?.jobProduction) {
-            this.resources.recordJobProduction?.(citizenResult.jobProduction);
-            this.resources.add('gold', citizenResult.jobProduction.gold || 0);
-            this.resources.add('food', citizenResult.jobProduction.food || 0);
-            this.resources.add('wood', citizenResult.jobProduction.wood || 0);
-        }
 
         // Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {

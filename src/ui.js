@@ -262,37 +262,10 @@ export class UIManager {
         const happiness = document.getElementById('stats-happiness');
         const housing = document.getElementById('stats-housing');
 
-        const jobGold = document.getElementById('stats-job-gold');
-        const jobFood = document.getElementById('stats-job-food');
-        const jobWood = document.getElementById('stats-job-wood');
-        const jobDist = document.getElementById('stats-job-dist');
-
         if (stats) stats.textContent = citizens.getPopulation();
         if (employment) employment.textContent = citizens.getEmploymentRate() + '%';
         if (happiness) happiness.textContent = citizens.getAverageHappiness() + '%';
-        if (housing) housing.textContent = `${this.game.resources.population}/${this.game.resources.housing}`;
-
-        // Job production (last computed tick)
-        const jp = this.game.resources.jobProduction || { gold: 0, food: 0, wood: 0 };
-        if (jobGold) jobGold.textContent = Math.floor(jp.gold || 0);
-        if (jobFood) jobFood.textContent = Math.floor(jp.food || 0);
-        if (jobWood) jobWood.textContent = Math.floor(jp.wood || 0);
-
-        // Job distribution
-        if (jobDist) {
-            const dist = new Map();
-            for (const c of citizens.citizens) {
-                const j = (c.job || 'unemployed');
-                dist.set(j, (dist.get(j) || 0) + 1);
-            }
-            const employed = Array.from(dist.entries()).filter(([j]) => j !== 'unemployed');
-            if (employed.length === 0) {
-                jobDist.textContent = 'No employed citizens';
-            } else {
-                employed.sort((a, b) => b[1] - a[1]);
-                jobDist.textContent = employed.map(([j, n]) => `${j}: ${n}`).join(' • ');
-            }
-        }
+        if (housing) housing.textContent = `${this.game.resources.housing}/${this.game.resources.population}`;
     }
 
     showVictory(condition, progress) {

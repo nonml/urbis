@@ -64,8 +64,15 @@ export class Renderer3D {
 
     resize() {
         const rect = this.canvas.getBoundingClientRect();
-        this.renderer.setSize(rect.width, rect.height, false);
-        this.camera.aspect = rect.width / rect.height;
+        const w = Math.max(2, Math.floor(rect.width) || 0);
+        const h = Math.max(2, Math.floor(rect.height) || 0);
+        // If canvas is temporarily 0-sized (e.g., right after overlay transitions),
+        // fall back to viewport size so WebGL doesn't end up with invalid aspect.
+        const fw = w > 2 ? w : Math.max(2, window.innerWidth);
+        const fh = h > 2 ? h : Math.max(2, window.innerHeight);
+
+        this.renderer.setSize(fw, fh, false);
+        this.camera.aspect = fw / fh;
         this.camera.updateProjectionMatrix();
     }
 

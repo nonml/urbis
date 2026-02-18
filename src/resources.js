@@ -7,12 +7,6 @@ export class Resources {
         this.population = 0;
         this.housing = 0;
         this.day = 1;
-
-        // UI / telemetry (optional)
-        this.jobProduction = { gold: 0, food: 0, wood: 0 };
-        this.totalGoldEarned = 0;
-        this.totalFoodProduced = 0;
-        this.totalWoodProduced = 0;
     }
 
     add(resource, amount) {
@@ -75,17 +69,5 @@ export class Resources {
 
     hasOvercrowding() {
         return this.population > this.housing;
-    }
-
-    recordJobProduction(production) {
-        const p = production || { gold: 0, food: 0, wood: 0 };
-        this.jobProduction = {
-            gold: p.gold || 0,
-            food: p.food || 0,
-            wood: p.wood || 0
-        };
-        this.totalGoldEarned += this.jobProduction.gold;
-        this.totalFoodProduced += this.jobProduction.food;
-        this.totalWoodProduced += this.jobProduction.wood;
     }
 }
