@@ -13,11 +13,22 @@ import { validatePlacement } from './build/placement.js';
 import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
 
+function getFallbackCanvasId(mainCanvas) {
+    return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
+}
+
+function removeFallbackCanvas(mainCanvas) {
+    const id = getFallbackCanvasId(mainCanvas);
+    const existing = document.getElementById(id);
+    if (existing) existing.remove();
+}
+
 function createRendererStub(game, canvas) {
     const stub = {
         isFallback: true,
         game,
         canvas,
+        drawCanvas: canvas,
         ctx: null,
         yaw: 0,
         pitch: -0.35,
@@ -32,18 +43,46 @@ function createRendererStub(game, canvas) {
         _lastFrameAt: 0,
         _ensureCtx() {
             if (!this.canvas) return null;
-            if (!this.ctx) this.ctx = this.canvas.getContext('2d');
+            if (!this.ctx) {
+                let ctx = this.canvas.getContext('2d');
+                if (ctx) {
+                    removeFallbackCanvas(this.canvas);
+                    this.drawCanvas = this.canvas;
+                    this.ctx = ctx;
+                    return this.ctx;
+                }
+                const parent = this.canvas.parentElement;
+                if (!parent) return null;
+                const id = getFallbackCanvasId(this.canvas);
+                let overlay = document.getElementById(id);
+                if (!overlay) {
+                    overlay = document.createElement('canvas');
+                    overlay.id = id;
+                    overlay.style.position = 'absolute';
+                    overlay.style.pointerEvents = 'none';
+                    overlay.style.zIndex = '1';
+                    parent.appendChild(overlay);
+                }
+                this.drawCanvas = overlay;
+                this.ctx = overlay.getContext('2d');
+            }
             return this.ctx;
         },
         _resizeCanvas() {
-            if (!this.canvas) return;
+            if (!this.canvas || !this.drawCanvas) return;
             const dpr = window.devicePixelRatio || 1;
             const rect = this.canvas.getBoundingClientRect();
             const w = Math.max(1, Math.floor(rect.width * dpr));
             const h = Math.max(1, Math.floor(rect.height * dpr));
-            if (this.canvas.width !== w || this.canvas.height !== h) {
-                this.canvas.width = w;
-                this.canvas.height = h;
+            if (this.drawCanvas !== this.canvas) {
+                this.drawCanvas.style.left = `${this.canvas.offsetLeft}px`;
+                this.drawCanvas.style.top = `${this.canvas.offsetTop}px`;
+                this.drawCanvas.style.width = `${rect.width}px`;
+                this.drawCanvas.style.height = `${rect.height}px`;
+            }
+            if (this.drawCanvas.width !== w || this.drawCanvas.height !== h) {
+                this.drawCanvas.width = w;
+                this.drawCanvas.height = h;
             }
         },
         _resolveView() {
@@ -91,9 +130,9 @@ function createRendererStub(game, canvas) {
             this._view = view;
 
             ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
             ctx.fillStyle = '#0f1c1a';
-            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.fillRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
 
             for (let y = 0; y < view.tilesY; y++) {
                 for (let x = 0; x < view.tilesX; x++) {
@@ -264,6 +303,7 @@ export class UIManager {
             if (!Renderer3D) throw new Error('Renderer3D export missing.');
             this.renderer3d = new Renderer3D(this.game, this.canvas);
             this.renderer3d.isFallback = false;
+            removeFallbackCanvas(this.canvas);
             this.applySettings();
         } catch (e) {
             this.useCompatibilityRenderer(e);
