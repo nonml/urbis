@@ -15,6 +15,7 @@ import { BreachMinigame } from './ui/breach_minigame.js';
 
 function createRendererStub(game, canvas) {
     const stub = {
+        isFallback: true,
         game,
         canvas,
         ctx: null,
@@ -258,15 +259,26 @@ export class UIManager {
 
     async loadRenderer3D() {
         try {
+            const gl = this.canvas?.getContext?.('webgl2') || this.canvas?.getContext?.('webgl') || this.canvas?.getContext?.('experimental-webgl');
+            if (!gl) throw new Error('WebGL context unavailable.');
             const mod = await import('./renderer3d.js');
             const Renderer3D = mod?.Renderer3D;
             if (!Renderer3D) throw new Error('Renderer3D export missing.');
             this.renderer3d = new Renderer3D(this.game, this.canvas);
+            this.renderer3d.isFallback = false;
             this.applySettings();
         } catch (e) {
-            console.error('[UI] 3D renderer unavailable, continuing with fallback:', e);
-            this.showMessage('3D renderer unavailable; running in compatibility mode.', 'crisis');
+            this.useCompatibilityRenderer(e);
         }
+    }
+
+    useCompatibilityRenderer(reason = null) {
+        if (!this.renderer3d?.isFallback) {
+            console.error('[UI] 3D renderer unavailable, switching to compatibility mode:', reason);
+        }
+        this.renderer3d = createRendererStub(this.game, this.canvas);
+        this.applySettings();
+        this.showMessage('3D renderer unavailable; running in compatibility mode.', 'crisis');
     }
 
     onWorldRebuilt() {
@@ -591,7 +603,12 @@ export class UIManager {
         }
         if (this.caseFileUI?.open) this.caseFileUI.refresh();
         this.factionsPanel?.update();
-        this.renderer3d.render();
+        try {
+            this.renderer3d.render();
+        } catch (e) {
+            this.useCompatibilityRenderer(e);
+            this.renderer3d.render();
+        }
     }
 
     updateHackScan() {
