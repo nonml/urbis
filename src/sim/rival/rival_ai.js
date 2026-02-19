@@ -18,9 +18,13 @@ export const RIVAL_CONFIG = {
 
 // Rival AI class
 export class RivalAI {
-    constructor(seed) {
-        this.rngSeed = seed;
-        this.rng = new RNG((seed ^ 0xA5A5A5A5) >>> 0);
+    constructor(rng) {
+        // Accept either a seed (number) or an RNG instance
+        if (rng instanceof RNG) {
+            this.rng = rng;
+        } else {
+            this.rng = new RNG((rng ^ 0xA5A5A5A5) >>> 0);
+        }
         this.lastActionTick = 0;
         this.actionHistory = [];
         this.nextActionDelay = RIVAL_CONFIG.actionInterval;

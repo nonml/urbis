@@ -6,7 +6,6 @@ import { UIManager } from './ui.js';
 import { loadQuestsFromDirectory } from './content/loader.js';
 import { loadStoryletsFromDirectory } from './content/loader.js';
 import { loadOutcomes } from './content/loader.js';
-import { CaseGenerator } from './sim/cases/case_generator.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js';
 
 // Display version
@@ -17,9 +16,60 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+function ensureLoadingOverlay() {
+    let overlay = document.getElementById('loading-overlay');
+    if (overlay) return overlay;
+
+    overlay = document.createElement('div');
+    overlay.id = 'loading-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        inset: 0;
+        background: rgba(6, 16, 26, 0.85);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        z-index: 12000;
+        color: #e6f2ff;
+        font-family: 'Courier New', monospace;
+    `;
+    overlay.innerHTML = `
+        <div style="width:min(420px, 92vw); padding:20px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.35)">
+            <div id="loading-label" style="margin-bottom:8px;">Preparing city...</div>
+            <div style="height:10px; background:rgba(255,255,255,0.15); border-radius:99px; overflow:hidden;">
+                <div id="loading-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2fbf71,#54d3ff); transition: width 120ms ease;"></div>
+            </div>
+            <div id="loading-percent" style="margin-top:8px; font-size:12px; opacity:0.9;">0%</div>
+        </div>
+    `;
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function updateLoading(progress, label) {
+    const overlay = ensureLoadingOverlay();
+    const fill = overlay.querySelector('#loading-fill');
+    const percent = overlay.querySelector('#loading-percent');
+    const labelEl = overlay.querySelector('#loading-label');
+    overlay.style.display = 'flex';
+    if (fill) fill.style.width = `${Math.max(0, Math.min(100, progress))}%`;
+    if (percent) percent.textContent = `${Math.round(progress)}%`;
+    if (labelEl && label) labelEl.textContent = label;
+}
+
+function hideLoading() {
+    const overlay = ensureLoadingOverlay();
+    overlay.style.display = 'none';
+}
+
+function nextFrame() {
+    return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
 // Global functions for HTML onclick handlers
 window.startGame = async function() {
     const menu = document.getElementById('main-menu-overlay');
+    updateLoading(5, 'Preparing session...');
     console.log('[StartGame] Menu element:', menu);
     if (menu) {
         menu.classList.add('hidden');
@@ -29,32 +79,45 @@ window.startGame = async function() {
     const preset = document.getElementById('map-size')?.value || 'CITY';
     const seedStr = document.getElementById('world-seed')?.value?.trim();
     const seed = seedStr ? parseInt(seedStr, 10) : undefined;
+    const mode = document.getElementById('game-mode')?.value || 'standard';
 
-    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined });
+    await nextFrame();
+    updateLoading(35, 'Generating world...');
+    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
+    updateLoading(60, 'Booting systems...');
     window.perfOverlay = new PerfOverlay(window.game);
     window.devMenu = new DevMenu(window.game);
     window.devMenu.enable();
-
+    updateLoading(85, 'Streaming initial chunks...');
     window.game.init();
+    updateLoading(100, 'Ready');
+    setTimeout(() => hideLoading(), 150);
 };
 
 window.restartGame = async function() {
     document.getElementById('victory-overlay').classList.add('hidden');
+    updateLoading(5, 'Restarting...');
 
     const preset = document.getElementById('map-size')?.value || 'CITY';
     const seedStr = document.getElementById('world-seed')?.value?.trim();
     const seed = seedStr ? parseInt(seedStr, 10) : undefined;
+    const mode = document.getElementById('game-mode')?.value || 'standard';
 
-    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined });
+    await nextFrame();
+    updateLoading(35, 'Generating world...');
+    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
 
     // Create performance overlay
+    updateLoading(60, 'Booting systems...');
     window.perfOverlay = new PerfOverlay(window.game);
 
     // Create dev menu (enabled by default for development)
     window.devMenu = new DevMenu(window.game);
     window.devMenu.enable();
-
+    updateLoading(85, 'Streaming initial chunks...');
     window.game.init();
+    updateLoading(100, 'Ready');
+    setTimeout(() => hideLoading(), 150);
 };
 
 window.showStartScreen = function() {
@@ -120,8 +183,11 @@ async function loadQuestContent() {
 
     // Load case templates
     const caseResult = await loadQuestsFromDirectory('/src/content/quests');
-    window.game.content = { quests: caseResult.quests };
+    window.game.content = { quests: caseResult.quests, questErrors: caseResult.errors || [] };
     console.log(`Loaded ${caseResult.quests.length} quest templates`);
+    if (caseResult.errors?.length) {
+        window.game.ui?.showMessage(`Quest load warnings: ${caseResult.errors.length} invalid files skipped.`, 'crisis');
+    }
 
     // Load storylets
     const storyletResult = await loadStoryletsFromDirectory('/src/content/storylets');
@@ -133,18 +199,14 @@ async function loadQuestContent() {
     window.game.content.outcomes = outcomeResult.outcomes;
     console.log(`Loaded ${outcomeResult.outcomes.length} outcomes`);
 
-    // Initialize case generator
-    window.game.caseGenerator = new CaseGenerator(window.game);
-    window.game.caseGenerator.loadStorylets(window.game.content.storylets || []);
-    window.game.caseGenerator.loadCaseTemplates(window.game.content.quests || []);
-
-    // Generate initial cases (main + minor)
-    const cases = window.game.caseGenerator.generateCasesFromState();
-    for (const quest of cases) {
-        window.game.questEngine.addQuest(quest);
+    // Seed initial case files if missing (managed through CaseManager).
+    if ((window.game.state.cases?.active || []).length === 0 && window.game.spawnCase) {
+        window.game.spawnCase('missing_person');
+        window.game.spawnCase('corruption');
+        window.game.spawnCase('extortion');
     }
 
-    console.log(`Game initialized with ${cases.length} case(s)`);
+    console.log(`Game initialized with ${(window.game.state.cases?.active || []).length} active case(s)`);
 }
 
 // Add global keyboard shortcuts

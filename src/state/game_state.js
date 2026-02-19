@@ -1,6 +1,7 @@
 // GameState - Single source of truth for all serializable game state
 import { DIFFICULTY, RIVAL_CONFIG } from '../constants.js';
 import { randomSeed32, randomId } from '../rng.js';
+import { createRNGStreamSeeds } from '../rng_streams.js';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -14,6 +15,7 @@ export const CURRENT_SCHEMA_VERSION = 1;
 export function createNewGameState(options = {}) {
     const mapPreset = options.mapPreset || 'CITY';
     const seed = (options.seed ?? randomSeed32()) >>> 0;
+    const rngStreamSeeds = createRNGStreamSeeds(seed);
 
     return {
         schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -24,6 +26,7 @@ export function createNewGameState(options = {}) {
             mapHeight: mapPreset === 'SMALL' ? 40 : mapPreset === 'CITY' ? 96 : 256,
             createdAt: Date.now(),
             runId: randomId('run'),
+            rngStreams: rngStreamSeeds,
         },
         time: {
             tick: 0,
@@ -68,10 +71,19 @@ export function createNewGameState(options = {}) {
             completed: [],
         },
         cases: {
+            active: [],
+            completed: [],
             evidence: [],
+            nextCaseSeed: 1,
         },
         factions: {
             list: [],
+        },
+        world: {
+            anomalies: [],
+            blackouts: [],
+            trafficSwitches: [],
+            unlockedDoors: [],
         },
         player: {
             x: 0,
@@ -81,6 +93,7 @@ export function createNewGameState(options = {}) {
             yaw: 0,
             pitch: -0.35,
             heat: 0, // Player heat/wanted level
+            heatState: 'calm',
             exposure: 0, // How exposed the player is to rivals
             reputation: 50 // Player reputation with citizens
         },
@@ -99,6 +112,22 @@ export function createNewGameState(options = {}) {
             unlocked: [],
             completedCases: 0,
             districtStability: {}
+        },
+        progress: {
+            mode: 'standard',
+            runFlags: {},
+            unlocks: {
+                buildings: [],
+                hacks: [],
+            },
+            rewardLog: {},
+            goalState: {
+                winStreakTicks: 0,
+                bankruptTicks: 0,
+                revoltTicks: 0,
+                ended: false,
+                endState: null
+            }
         },
         difficulty: DIFFICULTY.NORMAL,
     };

@@ -4,6 +4,11 @@
   "title": "The Corruption Trail",
   "description": "Rumors of officials taking bribes have surfaced. Follow the money to expose the network.",
   "tags": ["corruption", "finance", "officials", "investigation"],
+  "rewards": [
+    { "type": "add_resource", "resource": "gold", "amount": 60 },
+    { "type": "unlock_building", "buildingId": "cctv-network" },
+    { "type": "unlock_hack", "hackId": "district_blackout_ping" }
+  ],
   "steps": [
     {
       "id": "start",

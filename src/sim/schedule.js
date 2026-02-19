@@ -1,6 +1,5 @@
 // Daily schedule system - manages citizen movement and activities
-import { Pathfinding } from './pathfinding.js';
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN } from '../constants.js';
+import { NavGrid } from './nav/nav_grid.js';
 
 // Day phases (0.0 to 1.0 normalized time)
 export const DAY_PHASES = {
@@ -15,12 +14,16 @@ export const DAY_PHASES = {
  * Schedule system for citizens
  */
 export class ScheduleManager {
-    constructor(width, height) {
-        this.pathfinding = new Pathfinding(width, height);
+    constructor(width, height, map = null, buildings = null) {
         this.width = width;
         this.height = height;
         this.currentPhase = DAY_PHASES.NIGHT;
         this.phaseTimer = 0;
+        this.nav = map ? new NavGrid(map) : null;
+        this._lastBuildingCount = -1;
+        if (this.nav && buildings) {
+            this.syncNavBuildings(buildings);
+        }
     }
 
     /**
@@ -55,29 +58,18 @@ export class ScheduleManager {
     updateCitizenSchedule(citizen, gameData, timeOfDay) {
         const { map, buildings } = gameData;
         const currentPhase = this.getPhaseAt(timeOfDay);
+        this.ensureNav(map, buildings);
 
         // Determine target based on phase
         let target = this.getTargetLocation(citizen, currentPhase, map, buildings);
 
         if (target && (citizen.x !== target.x || citizen.y !== target.y)) {
-            // Try to move toward target using pathfinding
-            const tileGrid = [];
-            for (let y = 0; y < map.height; y++) {
-                for (let x = 0; x < map.width; x++) {
-                    tileGrid.push(map.grid[y][x]);
-                }
-            }
-
-            const pathResult = this.pathfinding.findPath(tileGrid, citizen.x, citizen.y, target.x, target.y);
-
-            if (pathResult.success && pathResult.path.length > 0) {
+            // Try to move toward target using deterministic nav grid pathfinding.
+            const path = this.findPath({ x: citizen.x, y: citizen.y }, target);
+            if (path.length > 1) {
                 // Move to next position in path
-                const nextPos = pathResult.path[0];
-                const tileIndex = nextPos.y * this.width + nextPos.x;
-                const terrain = tileGrid[tileIndex];
-
-                // Only move if tile is walkable
-                if (terrain !== TERRAIN_WATER) {
+                const nextPos = path[1];
+                if (this.isWalkable(nextPos.x, nextPos.y)) {
                     citizen.x = nextPos.x;
                     citizen.y = nextPos.y;
                     return { moved: true, target, phase: currentPhase.name };
@@ -86,6 +78,32 @@ export class ScheduleManager {
         }
 
         return { moved: false, target, phase: currentPhase.name };
+    }
+
+    ensureNav(map, buildings) {
+        if (!this.nav && map) {
+            this.nav = new NavGrid(map);
+            this._lastBuildingCount = -1;
+        }
+        this.syncNavBuildings(buildings);
+    }
+
+    syncNavBuildings(buildings) {
+        if (!this.nav || !buildings) return;
+        const count = buildings.buildings?.length ?? 0;
+        if (count === this._lastBuildingCount) return;
+        this.nav.setBlockedTilesFromBuildings(buildings.buildings || []);
+        this._lastBuildingCount = count;
+    }
+
+    isWalkable(x, y) {
+        if (!this.nav) return false;
+        return this.nav.isWalkable(x, y);
+    }
+
+    findPath(a, b) {
+        if (!this.nav) return [];
+        return this.nav.findPath(a, b);
     }
 
     /**
@@ -232,7 +250,9 @@ export class ScheduleManager {
      * Clear pathfinding cache (e.g., when map changes)
      */
     clearCache() {
-        this.pathfinding.clearCache();
+        if (this.nav) {
+            this.nav.cache.clear();
+        }
     }
 }
 

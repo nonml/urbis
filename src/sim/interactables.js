@@ -1,11 +1,12 @@
 // Interactables system - hacking nodes for Watch Dogs-style micro-loops
 import { RNG } from '../rng.js';
+import { eventBus, EVENT_TYPES } from './events.js';
 
 // Interactable types
 export const INTERACTABLE_TYPES = {
-    POWER_SUBSTATION: { name: 'Power Substation', difficulty: 1, icon: '⚡' },
-    CCTV_POLE: { name: 'CCTV Pole', difficulty: 2, icon: '📷' },
-    TELECOM_BOX: { name: 'Telecom Box', difficulty: 3, icon: '📡' },
+    POWER_SUBSTATION: { name: 'Power Substation', difficulty: 1, icon: '⚡', owners: ['city', 'corp'] },
+    CCTV_POLE: { name: 'CCTV Pole', difficulty: 2, icon: '📷', owners: ['city', 'police', 'corp'] },
+    TELECOM_BOX: { name: 'Telecom Box', difficulty: 3, icon: '📡', owners: ['corp', 'gang'] },
 };
 
 // Interactable state
@@ -23,18 +24,29 @@ export const INTERACTABLE_STATES = {
 export function createInteractable(x, y, districtId, typeKey, seed) {
     const rng = new RNG(seed + x + y * 1000);
     const type = INTERACTABLE_TYPES[typeKey];
+    const ownerFaction = type.owners[rng.int(0, type.owners.length - 1)];
+    const securityLevel = Math.max(1, Math.min(5, type.difficulty + rng.int(0, 2)));
     return {
         id: `node-${x}-${y}-${rng.int(0, 9999)}`,
         type: typeKey,
         name: type.name,
+        icon: type.icon,
+        pos: { x, y },
         x,
         y,
         districtId,
+        securityLevel,
+        ownerFaction,
         difficulty: type.difficulty + Math.floor(rng.float(0, 2)), // Base difficulty + variance
         cooldown: 100, // Ticks before re-hackable
         lastUsedTick: -1000, // Start ready
         state: INTERACTABLE_STATES.AVAILABLE,
         progress: 0,
+        discovered: false,
+        cameraActiveUntil: 0,
+        trafficToggledUntil: 0,
+        doorUnlockedUntil: 0,
+        blackoutPingUntil: 0,
         rewardGold: type.difficulty * 5 + rng.int(5, 15),
         rewardInfo: type.difficulty > 2 ? `Intelligence from ${type.name}` : null,
     };
@@ -50,6 +62,7 @@ export class InteractableManager {
         this.seed = seed;
         this.interactables = [];
         this.rng = new RNG(seed + 999);
+        this.cooldowns = new Map(); // id -> availableAtTick
     }
 
     /**
@@ -147,19 +160,36 @@ export class InteractableManager {
      * Check if player is near an interactable
      */
     getNearbyInteractable(playerX, playerY, maxDistance = 3) {
+        const list = this.scanNearby(playerX, playerY, maxDistance)
+            .filter((node) => this.isAvailable(node));
+        return list[0] || null;
+    }
+
+    scanNearby(playerX, playerY, maxDistance = 25) {
+        const scanned = [];
         for (const node of this.interactables) {
             const dist = Math.abs(playerX - node.x) + Math.abs(playerY - node.y);
-            if (dist <= maxDistance && this.isAvailable(node)) {
-                return node;
-            }
+            if (dist > maxDistance) continue;
+            node.discovered = true;
+            node.distance = dist;
+            scanned.push(node);
         }
-        return null;
+        scanned.sort((a, b) => {
+            if (a.distance !== b.distance) return a.distance - b.distance;
+            if (a.securityLevel !== b.securityLevel) return a.securityLevel - b.securityLevel;
+            return a.id.localeCompare(b.id);
+        });
+        return scanned;
     }
 
     /**
      * Check if interactable is available for hacking
      */
     isAvailable(interactable) {
+        const blockedUntil = this.cooldowns.get(interactable.id);
+        if (blockedUntil !== undefined && interactable.manager?.game?.state?.time?.tick < blockedUntil) {
+            return false;
+        }
         return interactable.state === INTERACTABLE_STATES.AVAILABLE ||
                interactable.state === INTERACTABLE_STATES.SUCCESS ||
                interactable.state === INTERACTABLE_STATES.FAILED;
@@ -175,18 +205,7 @@ export class InteractableManager {
         interactable.state = INTERACTABLE_STATES.HACKING;
         interactable.progress = 0;
         interactable.hackStartTick = tick;
-        interactable.hackDifficulty = difficultyOverride || interactable.difficulty;
-
-        // Add heat gain to player for hacking
-        // Check game reference on manager first, then on interactable
-        const game = interactable.game || (interactable.manager?.game);
-        if (game?.state?.player) {
-            const heatGain = Math.floor(interactable.difficulty * 3);
-            game.state.player.heat = (game.state.player.heat || 0) + heatGain;
-            if (game.ui) {
-                game.ui.showMessage(`⚠️ Heat increased by ${heatGain} from hacking!`, 'warning');
-            }
-        }
+        interactable.hackDifficulty = difficultyOverride || interactable.securityLevel || interactable.difficulty;
     }
 
     /**
@@ -209,14 +228,15 @@ export class InteractableManager {
 
         interactable.progress += progressRate;
 
-        // Simple hacking minigame: hold for time based on difficulty
-        // Difficulty 1 = 5 ticks, Difficulty 3 = 15 ticks
+        // Security level scales completion length.
         const targetProgress = interactable.hackDifficulty * 5;
 
         if (interactable.progress >= targetProgress) {
             interactable.state = INTERACTABLE_STATES.SUCCESS;
             interactable.lastUsedTick = tick;
             interactable.cooldown = Math.max(50, interactable.cooldown - 10); // Success reduces cooldown
+            eventBus.emit(EVENT_TYPES.PLAYER_HACKED_NODE, { interactable, success: true });
+            eventBus.emit(EVENT_TYPES.INTERACTABLE_SUCCESS, { interactable });
 
             // Show success feedback
             if (game?.ui?.renderer3d) {
@@ -226,6 +246,8 @@ export class InteractableManager {
             interactable.state = INTERACTABLE_STATES.FAILED;
             interactable.lastUsedTick = tick;
             interactable.cooldown = Math.min(200, interactable.cooldown + 20); // Failure increases cooldown
+            eventBus.emit(EVENT_TYPES.PLAYER_HACKED_NODE, { interactable, success: false });
+            eventBus.emit(EVENT_TYPES.INTERACTABLE_FAILED, { interactable });
 
             // Show failure feedback
             if (game?.ui?.renderer3d) {
@@ -243,7 +265,48 @@ export class InteractableManager {
         if (interactable.state === INTERACTABLE_STATES.HACKING) {
             interactable.state = INTERACTABLE_STATES.FAILED;
             interactable.lastUsedTick = interactable.hackStartTick;
+            eventBus.emit(EVENT_TYPES.PLAYER_HACKED_NODE, { interactable, success: false });
+            eventBus.emit(EVENT_TYPES.INTERACTABLE_FAILED, { interactable });
         }
+    }
+
+    setCooldown(interactable, untilTick) {
+        this.cooldowns.set(interactable.id, untilTick);
+    }
+
+    performHackAction(interactable, action, tick) {
+        const game = interactable.game || (interactable.manager?.game);
+        if (!game) return { ok: false, reason: 'Missing game context.' };
+        const world = game.state.world || (game.state.world = { anomalies: [] });
+        const actions = {
+            camera_takeover: () => {
+                interactable.cameraActiveUntil = tick + 8;
+                game.ui?.renderer3d?.setCameraHackView?.(interactable.x, interactable.y, 8);
+                return { loud: false, msg: 'Camera takeover active.' };
+            },
+            traffic_light_switch: () => {
+                interactable.trafficToggledUntil = tick + 10;
+                world.trafficSwitches = world.trafficSwitches || [];
+                world.trafficSwitches.push({ x: interactable.x, y: interactable.y, untilTick: tick + 10 });
+                return { loud: true, msg: 'Traffic lights switched.' };
+            },
+            door_unlock: () => {
+                interactable.doorUnlockedUntil = tick + 12;
+                world.unlockedDoors = world.unlockedDoors || [];
+                world.unlockedDoors.push({ x: interactable.x, y: interactable.y, untilTick: tick + 12 });
+                return { loud: false, msg: 'Nearby doors unlocked.' };
+            },
+            district_blackout_ping: () => {
+                interactable.blackoutPingUntil = tick + 6;
+                world.blackouts = world.blackouts || [];
+                world.blackouts.push({ districtId: interactable.districtId, untilTick: tick + 6 });
+                return { loud: true, msg: 'District blackout pinged.' };
+            },
+        };
+        const run = actions[action];
+        if (!run) return { ok: false, reason: `Unknown action: ${action}` };
+        const result = run();
+        return { ok: true, ...result, action };
     }
 
     /**
@@ -256,6 +319,7 @@ export class InteractableManager {
                 if (ticksSinceUse >= node.cooldown) {
                     node.state = INTERACTABLE_STATES.AVAILABLE;
                     node.progress = 0;
+                    eventBus.emit(EVENT_TYPES.INTERACTABLE_AVAILABLE, { interactable: node });
                 }
             }
         }

@@ -1,10 +1,8 @@
 // Quest Engine - Executes quests step-by-step, event-driven
-import { eventBus, Events } from '../events.js';
-import { getInteractableTypeInfo, getInteractableStateName } from '../interactables.js';
+import { eventBus, EVENT_TYPES } from '../events.js';
+import { getInteractableTypeInfo } from '../interactables.js';
+import { RewardSystem } from '../rewards/reward_system.js';
 
-/**
- * Quest step kinds and their handlers
- */
 export const STEP_KINDS = {
     TRIGGER: 'trigger',
     HACK_NODE: 'hack_node',
@@ -17,47 +15,63 @@ export const STEP_KINDS = {
     SPAWN_CLUE: 'spawn_clue'
 };
 
-/**
- * Creates a new quest instance from a quest definition
- * @param {Object} questDef - Quest definition from JSON
- * @param {Object} context - Runtime context (citizens, districts, etc.)
- * @returns {Object} Quest instance
- */
-export function createQuestInstance(questDef, context) {
-    // Resolve any placeholders in the quest definition
-    const resolvedSteps = questDef.steps.map(step => resolveStep(step, context));
+const NODE_TYPE_ALIASES = {
+    CCTV: 'CCTV_POLE',
+    CCTV_POLE: 'CCTV_POLE',
+    TELECOM: 'TELECOM_BOX',
+    TELECOM_BOX: 'TELECOM_BOX',
+    POWER: 'POWER_SUBSTATION',
+    POWER_SUBSTATION: 'POWER_SUBSTATION',
+};
+
+function now() {
+    return Date.now();
+}
+
+function normalizeNodeType(value) {
+    if (!value) return value;
+    return NODE_TYPE_ALIASES[value] || value;
+}
+
+export function createQuestInstance(questDef, context = {}) {
+    const resolvedSteps = (questDef.steps || []).map((step) => resolveStep(step, context));
 
     return {
         id: questDef.id,
         title: questDef.title || questDef.id,
         description: questDef.description || '',
         type: questDef.type || 'casefile',
-        tags: questDef.tags || [],
-        status: 'active', // active, blocked, completed, failed
+        tags: Array.isArray(questDef.tags) ? questDef.tags : [],
+        trigger: questDef.trigger || null,
+        rewards: Array.isArray(questDef.rewards) ? questDef.rewards : [],
+        status: 'active',
         currentStepIndex: 0,
         steps: resolvedSteps,
         completedSteps: [],
         blockedReason: null,
-        context: context || {},
+        context: { ...context },
         data: {
             clues: [],
             choices: [],
             markers: [],
-            evidence: []
+            evidence: [],
+            flags: {},
+            triggers: {},
+            choicePending: null,
+            outcome: null,
         },
-        createdAt: Date.now(),
-        lastUpdated: Date.now()
+        createdAt: now(),
+        lastUpdated: now()
     };
 }
 
-/**
- * Resolves placeholders in a step definition
- */
 function resolveStep(step, context) {
-    // Clone the step
     const resolved = { ...step };
 
-    // Resolve marker if it references a district or building
+    if (step.kind === STEP_KINDS.HACK_NODE) {
+        resolved.nodeType = normalizeNodeType(step.nodeType);
+    }
+
     if (step.marker && context) {
         if (step.marker === 'last_seen' && context.lastSeenLocation) {
             resolved.targetX = context.lastSeenLocation.x;
@@ -68,157 +82,146 @@ function resolveStep(step, context) {
         }
     }
 
-    // Resolve interact type
-    if (step.interactType === 'citizen' && context.citizens) {
-        // Find a random citizen as target
-        if (context.citizens.length > 0) {
-            const rng = context?.rng;
-            const idx = rng ? rng.int(0, context.citizens.length - 1) : (() => {
-                const cryptoObj = globalThis.crypto;
-                if (cryptoObj && cryptoObj.getRandomValues) {
-                    const buf = new Uint32Array(1);
-                    cryptoObj.getRandomValues(buf);
-                    return buf[0] % context.citizens.length;
-                }
-                return 0;
-            })();
-            resolved.targetCitizen = context.citizens[idx];
-        }
-    }
-
     return resolved;
 }
 
-/**
- * Quest Engine class
- */
 export class QuestEngine {
     constructor(game) {
         this.game = game;
         this.activeQuests = [];
         this.completedQuests = [];
-        this.rng = game.rng;
+        this.rng = game.rngStreams?.quest || game.rng;
+        this.rewardSystem = new RewardSystem(game);
         this.setupEventListeners();
     }
 
-    /**
-     * Setup event listeners for quest progression
-     */
     setupEventListeners() {
-        // Listen for player hacking nodes
-        eventBus.on('player_hacked_node', (data) => {
+        eventBus.on(EVENT_TYPES.PLAYER_HACKED_NODE, (data) => {
             this.handleHackedNode(data.interactable, data.success);
         }, this);
 
-        // Listen for player entering districts
-        eventBus.on('player_entered_district', (data) => {
+        eventBus.on(EVENT_TYPES.PLAYER_ENTERED_DISTRICT, (data) => {
             this.handleEnteredDistrict(data.districtId);
         }, this);
 
-        // Listen for anomalies (quest triggers)
-        eventBus.on('anomaly_found', (data) => {
+        eventBus.on(EVENT_TYPES.ANOMALY_FOUND, (data) => {
             this.handleAnomaly(data.anomalyType, data.details);
         }, this);
 
-        // Listen for player decisions
-        eventBus.on('player_decision', (data) => {
+        eventBus.on(EVENT_TYPES.PLAYER_DECISION, (data) => {
             this.handlePlayerDecision(data);
         }, this);
 
-        // Listen for interactables becoming available
-        eventBus.on('interactable_available', (data) => {
+        eventBus.on(EVENT_TYPES.INTERACTABLE_AVAILABLE, (data) => {
             this.handleInteractableAvailable(data.interactable);
         }, this);
     }
 
-    /**
-     * Creates and adds a new quest
-     * @param {Object} questDef - Quest definition
-     * @param {Object} context - Runtime context
-     * @returns {Object} The created quest instance
-     */
     addQuest(questDef, context = {}) {
         const ctx = { ...context, rng: this.rng };
         const quest = createQuestInstance(questDef, ctx);
         this.activeQuests.push(quest);
 
-        // Emit quest started event
-        eventBus.emit('quest_started', {
+        eventBus.emit(EVENT_TYPES.QUEST_STARTED, {
             questId: quest.id,
             questTitle: quest.title,
-            tick: Date.now()
+            tick: now()
         });
 
-        // Try to advance the quest
-        this.tryAdvanceQuest(quest);
+        // Auto-run trigger if provided at top-level.
+        if (quest.trigger) {
+            quest.data.triggers[quest.trigger] = false;
+        }
 
+        this.tryAdvanceQuest(quest);
         return quest;
     }
 
-    /**
-     * Finds a quest by ID
-     */
     getQuestById(id) {
-        return this.activeQuests.find(q => q.id === id) ||
-               this.completedQuests.find(q => q.id === id);
+        return this.activeQuests.find((q) => q.id === id) ||
+               this.completedQuests.find((q) => q.id === id);
     }
 
-    /**
-     * Advances a quest by one step
-     * @param {Object} quest - Quest instance
-     * @returns {boolean} True if advanced, false otherwise
-     */
-    advanceQuest(quest) {
-        if (quest.currentStepIndex >= quest.steps.length) {
-            quest.status = 'completed';
+    getStepById(quest, stepId) {
+        if (!quest || !stepId) return null;
+        return quest.steps.find((s) => s.id === stepId) || null;
+    }
+
+    jumpToStep(quest, stepId) {
+        if (!quest || !stepId) return false;
+        const idx = quest.steps.findIndex((s) => s.id === stepId);
+        if (idx < 0) return false;
+        quest.currentStepIndex = idx;
+        quest.lastUpdated = now();
+        return true;
+    }
+
+    finishQuest(quest, outcome = 'success') {
+        quest.status = 'completed';
+        quest.currentStepIndex = quest.steps.length;
+
+        if (!this.completedQuests.find((q) => q.id === quest.id)) {
             this.completedQuests.push(quest);
-            eventBus.emit('quest_completed', {
-                questId: quest.id,
-                outcome: 'success',
-                tick: Date.now()
-            });
+        }
+        this.activeQuests = this.activeQuests.filter((q) => q.id !== quest.id);
+
+        const rewardResult = this.rewardSystem.applyRewards(quest, quest.rewards);
+        if (rewardResult.applied && this.game.ui?.showMessage) {
+            const label = rewardResult.summary.length ? rewardResult.summary.join(' | ') : 'No rewards';
+            this.game.ui.showMessage(`Quest rewards: ${label}`, 'success');
+            this.game.ui.setupBuildingPanel?.();
+        }
+
+        eventBus.emit(EVENT_TYPES.QUEST_COMPLETED, {
+            questId: quest.id,
+            outcome,
+            tick: now()
+        });
+    }
+
+    advanceQuest(quest) {
+        if (!quest || quest.status === 'completed' || quest.status === 'failed') return false;
+
+        if (quest.currentStepIndex >= quest.steps.length) {
+            this.finishQuest(quest, 'success');
             return false;
         }
 
         const currentStep = quest.steps[quest.currentStepIndex];
         const result = this.executeStep(quest, currentStep);
+        if (!result?.done) return false;
 
-        if (result) {
-            quest.currentStepIndex++;
-            quest.lastUpdated = Date.now();
-            eventBus.emit('quest_step_completed', {
+        if (!quest.completedSteps.includes(currentStep.id)) {
+            quest.completedSteps.push(currentStep.id);
+            eventBus.emit(EVENT_TYPES.QUEST_STEP_COMPLETED, {
                 questId: quest.id,
                 stepId: currentStep.id,
-                tick: Date.now()
+                tick: now()
             });
-            return true;
         }
 
-        return false;
+        if (result.nextStepId) {
+            this.jumpToStep(quest, result.nextStepId);
+        } else {
+            quest.currentStepIndex++;
+        }
+
+        quest.lastUpdated = now();
+
+        if (quest.currentStepIndex >= quest.steps.length) {
+            this.finishQuest(quest, 'success');
+        }
+
+        return true;
     }
 
-    /**
-     * Tries to advance quest - handles auto-advancing steps
-     * @param {Object} quest
-     * @returns {boolean} True if step was advanced
-     */
     tryAdvanceQuest(quest) {
-        // If current step is auto-advancing, do it
-        const currentStep = quest.steps[quest.currentStepIndex];
-
-        if (currentStep && currentStep.autoAdvance) {
-            return this.advanceQuest(quest);
-        }
-
+        const currentStep = quest?.steps?.[quest.currentStepIndex];
+        if (!currentStep) return false;
+        if (currentStep.autoAdvance) return this.advanceQuest(quest);
         return false;
     }
 
-    /**
-     * Executes a quest step
-     * @param {Object} quest - Quest instance
-     * @param {Object} step - Step to execute
-     * @returns {boolean} True if step completed successfully
-     */
     executeStep(quest, step) {
         switch (step.kind) {
             case STEP_KINDS.TRIGGER:
@@ -240,447 +243,411 @@ export class QuestEngine {
             case STEP_KINDS.SPAWN_CLUE:
                 return this.handleSpawnClueStep(quest, step);
             default:
-                console.warn(`Unknown step kind: ${step.kind}`);
-                return true; // Skip unknown steps
+                return { done: true };
         }
     }
 
-    /**
-     * Handles trigger steps (waiting for event)
-     */
     handleTriggerStep(quest, step) {
-        // Check if trigger condition is met
-        if (quest.data.triggers && quest.data.triggers[step.trigger]) {
-            return true;
-        }
-        // Mark this trigger as waiting
-        if (!quest.data.triggers) quest.data.triggers = {};
-        quest.data.triggers[step.trigger] = false;
-        return false;
+        const triggered = !!quest.data.triggers?.[step.trigger];
+        return { done: triggered };
     }
 
-    /**
-     * Handles hack node steps
-     */
     handleHackNodeStep(quest, step) {
-        // Check if node has been hacked
-        const node = this.findNodeByType(step.nodeType);
-
+        const wantedType = normalizeNodeType(step.nodeType);
+        const node = this.findNodeByType(wantedType);
         if (node && node.state === 'success') {
-            // Execute onComplete effects
-            if (step.onComplete) {
+            if (Array.isArray(step.onComplete)) {
                 for (const effect of step.onComplete) {
-                    if (effect.startsWith('spawn_clue:')) {
-                        const clueId = effect.split(':')[1];
-                        quest.data.clues.push({
-                            id: clueId,
-                            nodeId: node.id,
-                            timestamp: Date.now()
-                        });
-                    }
+                    this.applyEffect(effect, quest);
                 }
             }
-            return true;
+            return { done: true };
         }
 
-        // If player is near a hackable node, prompt them
-        const nearbyNode = this.game.interactables.getNearbyInteractable(
+        const nearbyNode = this.game.interactables?.getNearbyInteractable?.(
             this.game.state.player.x,
             this.game.state.player.y
         );
 
-        if (nearbyNode && nearbyNode.state === 'available' &&
-            nearbyNode.type === step.nodeType) {
-            // Prompt player to hack this node
-            this.game.ui.showMessage(`Press SPACE to hack the ${getInteractableTypeInfo(nearbyNode.type).name}...`, 'normal');
-            this.game.ui.showActionPrompt('Hack', () => {
-                this.game.interactables.startHack(nearbyNode, this.game.state.time.tick);
-            });
+        if (nearbyNode && normalizeNodeType(nearbyNode.type) === wantedType && nearbyNode.state === 'available') {
+            this.game.ui?.showMessage?.(`Press E to hack ${getInteractableTypeInfo(nearbyNode.type).name}.`, 'normal');
         }
 
-        return false;
+        return { done: false };
     }
 
-    /**
-     * Handles go_to steps
-     */
     handleGoToStep(quest, step) {
-        if (step.targetX !== undefined && step.targetY !== undefined) {
-            const playerX = this.game.state.player.x;
-            const playerY = this.game.state.player.y;
-            const dist = Math.abs(playerX - step.targetX) + Math.abs(playerY - step.targetY);
-
-            // Create a world marker
-            if (!quest.data.markers.find(m => m.stepId === step.id)) {
-                quest.data.markers.push({
-                    stepId: step.id,
-                    x: step.targetX,
-                    y: step.targetY,
-                    type: 'waypoint'
-                });
+        if (Number.isFinite(step.targetX) && Number.isFinite(step.targetY)) {
+            const dist = Math.abs(this.game.state.player.x - step.targetX) + Math.abs(this.game.state.player.y - step.targetY);
+            if (!quest.data.markers.find((m) => m.stepId === step.id)) {
+                quest.data.markers.push({ stepId: step.id, x: step.targetX, y: step.targetY, type: 'waypoint' });
             }
-
-            // Check if player arrived
-            if (dist <= 2) {
-                return true;
-            }
+            return { done: dist <= 2 };
         }
-
-        return false;
+        return { done: false };
     }
 
-    /**
-     * Handles choice steps
-     */
     handleChoiceStep(quest, step) {
-        // Store choices for player to pick
-        quest.data.choices = step.choices || [];
+        quest.data.choices = Array.isArray(step.choices) ? step.choices : [];
+        if (quest.data.choicePending === step.id) return { done: false };
 
-        // Show choice prompt
-        this.game.ui.showQuestChoice(step.text, step.choices, (choice) => {
-            eventBus.emit('player_decision', {
+        quest.data.choicePending = step.id;
+        this.game.ui?.showQuestChoice?.(step.text || 'Choose', quest.data.choices, (choice) => {
+            eventBus.emit(EVENT_TYPES.PLAYER_DECISION, {
                 questId: quest.id,
+                stepId: step.id,
                 choiceId: choice.id,
-                choiceLabel: choice.label,
-                effect: choice.effect
+                choice,
             });
         });
 
-        return false; // Wait for player choice
+        return { done: false };
     }
 
-    /**
-     * Handles investigate steps
-     */
     handleInvestigateStep(quest, step) {
-        // Check if player is at target location
-        if (quest.data.targetLocation) {
-            const playerX = this.game.state.player.x;
-            const playerY = this.game.state.player.y;
-            const targetX = quest.data.targetLocation.x;
-            const targetY = quest.data.targetLocation.y;
-            const dist = Math.abs(playerX - targetX) + Math.abs(playerY - targetY);
-
-            if (dist <= 2) {
-                return true;
-            }
+        if (step.requiresEvidenceId) {
+            const caseId = this.game.caseManager?.getCaseIdByQuest?.(quest.id);
+            const has = this.game.evidenceSystem?.hasEvidence?.(caseId, step.requiresEvidenceId);
+            if (!has) return { done: false };
         }
+        const target = quest.data.targetLocation || (Number.isFinite(step.targetX) && Number.isFinite(step.targetY)
+            ? { x: step.targetX, y: step.targetY }
+            : null);
 
-        return false;
+        if (!target) return { done: true };
+
+        const dist = Math.abs(this.game.state.player.x - target.x) + Math.abs(this.game.state.player.y - target.y);
+        return { done: dist <= 2 };
     }
 
-    /**
-     * Handles interact steps (with citizens)
-     */
     handleInteractStep(quest, step) {
-        if (step.targetCitizen) {
-            // Check if player is near the citizen
-            const cx = step.targetCitizen.x;
-            const cy = step.targetCitizen.y;
-            const px = this.game.state.player.x;
-            const py = this.game.state.player.y;
-            const dist = Math.abs(px - cx) + Math.abs(py - cy);
-
-            if (dist <= 2) {
-                return true;
-            }
-        }
-
-        return false;
+        const citizen = step.targetCitizen;
+        if (!citizen) return { done: false };
+        const dist = Math.abs(this.game.state.player.x - citizen.x) + Math.abs(this.game.state.player.y - citizen.y);
+        return { done: dist <= 2 };
     }
 
-    /**
-     * Handles outcome steps (quest resolution)
-     */
     handleOutcomeStep(quest, step) {
-        // Apply the outcome effects
-        if (step.outcomes && step.outcomes.length > 0) {
-            // Pick first outcome or the one matching the context
+        if (step.outcomes?.length) {
             const outcome = step.outcomes[0];
             this.applyOutcome(outcome);
             quest.data.outcome = outcome;
         }
-        return true;
+        return { done: true };
     }
 
-    /**
-     * Handles conditional steps
-     */
     handleConditionalStep(quest, step) {
-        if (!step.condition) return true;
-
-        // Evaluate condition
-        const result = this.evaluateCondition(step.condition);
-        if (result) {
-            return true;
-        }
-        return false;
+        const passed = this.evaluateCondition(step.condition, quest);
+        const nextStepId = passed ? step.thenStep : step.elseStep;
+        return { done: true, nextStepId };
     }
 
-    /**
-     * Handles spawn_clue steps
-     */
     handleSpawnClueStep(quest, step) {
-        // Clue already added by hack_node step
-        return true;
+        const clueId = step.clueId || step.id;
+        if (!quest.data.clues.find((c) => c.id === clueId)) {
+            quest.data.clues.push({ id: clueId, timestamp: now() });
+        }
+        return { done: true };
     }
 
-    /**
-     * Handles player decision (from choice step)
-     */
     handlePlayerDecision(data) {
         const quest = this.getQuestById(data.questId);
-        if (!quest) return;
+        if (!quest || quest.status !== 'active') return;
 
-        // Apply effect
-        if (data.effect) {
-            this.applyEffect(data.effect, quest);
+        const step = this.getStepById(quest, data.stepId);
+        const choice = data.choice || step?.choices?.find((c) => c.id === data.choiceId);
+        if (!choice) return;
+
+        if (choice.effect) this.applyEffect(choice.effect, quest);
+        if (Array.isArray(choice.effects)) {
+            for (const effect of choice.effects) this.applyEffect(effect, quest);
+        }
+        if (Array.isArray(choice.setFlags)) {
+            for (const f of choice.setFlags) {
+                if (typeof f === 'string') quest.data.flags[f] = true;
+            }
+        }
+        if (choice.runFlags && typeof choice.runFlags === 'object') {
+            const runFlags = this.game.state.progress?.runFlags || (this.game.state.progress.runFlags = {});
+            for (const [k, v] of Object.entries(choice.runFlags)) runFlags[k] = v;
+        }
+        if (Number.isFinite(choice.heatDelta) && this.game.heatSystem?.addHeat) {
+            this.game.heatSystem.addHeat(choice.heatDelta);
+        }
+        if (Number.isFinite(choice.reputationDelta)) {
+            const prev = this.game.state.player.reputation || 0;
+            this.game.state.player.reputation = Math.max(0, Math.min(100, prev + choice.reputationDelta));
         }
 
-        // Advance to next step
-        if (quest.currentStepIndex < quest.steps.length) {
+        quest.data.choicePending = null;
+
+        if (choice.nextStep && this.jumpToStep(quest, choice.nextStep)) {
+            this.advanceQuest(quest);
+            return;
+        }
+
+        this.advanceQuest(quest);
+    }
+
+    handleHackedNode(interactable, success) {
+        if (!success || !interactable) return;
+
+        for (const quest of this.activeQuests) {
+            const step = quest.steps[quest.currentStepIndex];
+            if (!step || step.kind !== STEP_KINDS.HACK_NODE) continue;
+            const wanted = normalizeNodeType(step.nodeType);
+            if (normalizeNodeType(interactable.type) !== wanted) continue;
             this.advanceQuest(quest);
         }
     }
 
-    /**
-     * Handles hacker node completion
-     */
-    handleHackedNode(interactable, success) {
-        // Update quest steps waiting for this node
-        for (const quest of this.activeQuests) {
-            for (const step of quest.steps) {
-                if (step.kind === STEP_KINDS.HACK_NODE &&
-                    step.nodeType === interactable.type &&
-                    !quest.completedSteps.includes(step.id)) {
-                    // Mark step complete
-                    quest.completedSteps.push(step.id);
-                    eventBus.emit('quest_step_completed', {
-                        questId: quest.id,
-                        stepId: step.id,
-                        tick: Date.now()
-                    });
-                }
-            }
-        }
-    }
-
-    /**
-     * Handles player entering a district
-     */
     handleEnteredDistrict(districtId) {
-        // Update quests with district requirements
         for (const quest of this.activeQuests) {
-            for (const step of quest.steps) {
-                if (step.kind === STEP_KINDS.GO_TO &&
-                    step.marker === 'last_seen' &&
-                    !quest.completedSteps.includes(step.id)) {
-                    // Update marker if needed
-                    const district = this.game.map.getDistrictAt(0, 0); // Placeholder
-                    if (district && district.id === districtId) {
-                        quest.data.lastDistrict = districtId;
-                    }
-                }
-            }
+            quest.data.lastDistrict = districtId;
         }
     }
 
-    /**
-     * Handles anomaly detection (quest trigger)
-     */
     handleAnomaly(anomalyType, details) {
-        // Check if any quest has this trigger
         for (const quest of this.activeQuests) {
-            for (const step of quest.steps) {
-                if (step.kind === STEP_KINDS.TRIGGER &&
-                    step.trigger === anomalyType &&
-                    !quest.completedSteps.includes(step.id)) {
-                    // Trigger step complete
-                    if (!quest.data.triggers) quest.data.triggers = {};
-                    quest.data.triggers[anomalyType] = true;
-                }
+            const step = quest.steps[quest.currentStepIndex];
+            if (!step || step.kind !== STEP_KINDS.TRIGGER) continue;
+            if (step.trigger === anomalyType) {
+                quest.data.triggers[anomalyType] = true;
+                this.advanceQuest(quest);
             }
         }
 
-        // Emit anomaly found event
-        eventBus.emit('anomaly_found', {
-            anomalyType,
-            details,
-            tick: Date.now()
-        });
+        // If no active quest was waiting, keep anomaly in state only.
+        const anomalies = this.game.state.world?.anomalies || [];
+        if (!anomalies.find((a) => a.type === anomalyType && a.tick === (this.game.state.time?.tick || 0))) {
+            // no-op; anomaly detectors already append to world list.
+        }
+        void details;
     }
 
-    /**
-     * Handles interactable becoming available
-     */
     handleInteractableAvailable(interactable) {
-        // Check if any quest step is waiting for this node
+        if (!interactable) return;
         for (const quest of this.activeQuests) {
-            for (const step of quest.steps) {
-                if (step.kind === STEP_KINDS.HACK_NODE &&
-                    step.nodeType === interactable.type &&
-                    !quest.completedSteps.includes(step.id)) {
-                    // Check if node is at correct location
-                    const dist = Math.abs(this.game.state.player.x - interactable.x) +
-                                Math.abs(this.game.state.player.y - interactable.y);
-
-                    if (dist <= 5) {
-                        this.game.ui.showMessage(`Hacking node available: ${interactable.name}`, 'normal');
-                    }
-                }
+            const step = quest.steps[quest.currentStepIndex];
+            if (!step || step.kind !== STEP_KINDS.HACK_NODE) continue;
+            if (normalizeNodeType(step.nodeType) !== normalizeNodeType(interactable.type)) continue;
+            const dist = Math.abs(this.game.state.player.x - interactable.x) + Math.abs(this.game.state.player.y - interactable.y);
+            if (dist <= 5) {
+                this.game.ui?.showMessage?.(`Node available for quest: ${interactable.name}`, 'normal');
             }
         }
     }
 
-    /**
-     * Finds a node by type
-     */
     findNodeByType(nodeType) {
-        return this.game.interactables.interactables.find(
-            n => n.type === nodeType && n.state === 'success'
-        );
+        const wanted = normalizeNodeType(nodeType);
+        return this.game.interactables?.interactables?.find((n) => normalizeNodeType(n.type) === wanted && n.state === 'success');
     }
 
-    /**
-     * Evaluates a condition
-     */
-    evaluateCondition(condition) {
+    evaluateCondition(condition, quest) {
         if (!condition) return true;
 
-        // Simple condition evaluation
-        if (condition.type === 'district_type') {
-            const district = this.game.map.getDistrictAt(
-                this.game.state.player.x,
-                this.game.state.player.y
-            );
-            return district && district.theme === condition.value;
+        if (Array.isArray(condition.and)) {
+            return condition.and.every((c) => this.evaluateCondition(c, quest));
+        }
+        if (Array.isArray(condition.or)) {
+            return condition.or.some((c) => this.evaluateCondition(c, quest));
         }
 
-        if (condition.type === 'has_clue') {
+        const type = condition.type;
+        if (type === 'run_flag') {
+            const key = condition.key;
+            const expected = condition.equals ?? true;
+            const actual = this.game.state.progress?.runFlags?.[key];
+            return actual === expected;
+        }
+
+        if (type === 'quest_flag') {
+            const key = condition.key;
+            const expected = condition.equals ?? true;
+            const actual = quest?.data?.flags?.[key];
+            return actual === expected;
+        }
+
+        if (type === 'metric') {
+            const name = condition.name;
+            const op = condition.op || 'gte';
+            const value = Number(condition.value || 0);
+            let actual = 0;
+            if (name === 'heat') actual = Number(this.game.state.player.heat || 0);
+            else if (name === 'reputation') actual = Number(this.game.state.player.reputation || 0);
+            else if (name === 'happiness') actual = Number(this.game.citizens?.getAverageHappiness?.() || 0);
+            else if (name === 'district_security') actual = Number(this.game.servicesManager?.metrics?.city?.police || 0);
+
+            if (op === 'gt') return actual > value;
+            if (op === 'lt') return actual < value;
+            if (op === 'lte') return actual <= value;
+            if (op === 'eq') return actual === value;
+            return actual >= value;
+        }
+
+        if (type === 'district_type') {
+            const districtId = this.game.map.getDistrictAt(this.game.state.player.x, this.game.state.player.y);
+            const district = this.game.map.districts?.find((d) => d.id === districtId);
+            return district?.theme === condition.value;
+        }
+
+        if (type === 'has_clue') {
             return this.hasClue(condition.clueId);
         }
 
-        if (condition.type === 'quest_completed') {
+        if (type === 'quest_completed') {
             return this.getQuestById(condition.questId)?.status === 'completed';
         }
 
-        return true; // Default to true if unknown condition
+        return true;
     }
 
-    /**
-     * Checks if player has a specific clue
-     */
     hasClue(clueId) {
         for (const quest of [...this.activeQuests, ...this.completedQuests]) {
-            if (quest.data.clues.find(c => c.id === clueId)) {
-                return true;
-            }
+            if (quest.data.clues.find((c) => c.id === clueId)) return true;
         }
         return false;
     }
 
-    /**
-     * Applies an effect string (e.g., "gains_clue:witness_account")
-     */
     applyEffect(effect, quest) {
+        if (Array.isArray(effect)) {
+            for (const e of effect) this.applyEffect(e, quest);
+            return;
+        }
+
+        if (typeof effect === 'object' && effect) {
+            if (effect.runFlags && typeof effect.runFlags === 'object') {
+                const runFlags = this.game.state.progress?.runFlags || (this.game.state.progress.runFlags = {});
+                for (const [k, v] of Object.entries(effect.runFlags)) runFlags[k] = v;
+            }
+            if (effect.questFlags && typeof effect.questFlags === 'object') {
+                for (const [k, v] of Object.entries(effect.questFlags)) quest.data.flags[k] = v;
+            }
+            if (Number.isFinite(effect.heatDelta) && this.game.heatSystem?.addHeat) this.game.heatSystem.addHeat(effect.heatDelta);
+            if (Number.isFinite(effect.reputationDelta)) {
+                const prev = this.game.state.player.reputation || 0;
+                this.game.state.player.reputation = Math.max(0, Math.min(100, prev + effect.reputationDelta));
+            }
+            return;
+        }
+
         if (typeof effect !== 'string') return;
 
         if (effect.startsWith('gains_clue:')) {
             const clueId = effect.split(':')[1];
-            quest.data.clues.push({
-                id: clueId,
-                timestamp: Date.now()
-            });
+            if (!quest.data.clues.find((c) => c.id === clueId)) {
+                const clue = { id: clueId, timestamp: now() };
+                quest.data.clues.push(clue);
+                this.game.evidenceSystem?.registerClueEvidence?.(quest, clueId);
+                eventBus.emit(EVENT_TYPES.CLUE_DISCOVERED, { questId: quest.id, clue });
+            }
+            return;
+        }
+
+        if (effect.startsWith('spawn_clue:')) {
+            const clueId = effect.split(':')[1];
+            if (!quest.data.clues.find((c) => c.id === clueId)) {
+                quest.data.clues.push({ id: clueId, timestamp: now() });
+                this.game.evidenceSystem?.registerClueEvidence?.(quest, clueId);
+            }
+            return;
+        }
+
+        if (effect.startsWith('set_flag:')) {
+            const key = effect.split(':')[1];
+            if (key) this.game.state.progress.runFlags[key] = true;
+            return;
+        }
+
+        if (effect === 'reputation_high') {
+            this.game.state.player.reputation = Math.min(100, (this.game.state.player.reputation || 0) + 10);
+            return;
+        }
+        if (effect === 'reputation_lost') {
+            this.game.state.player.reputation = Math.max(0, (this.game.state.player.reputation || 0) - 10);
+            return;
+        }
+        if (effect === 'heat_rival_high') {
+            this.game.heatSystem?.addHeat?.(8);
+            return;
+        }
+        if (effect === 'heat_rival_low') {
+            this.game.heatSystem?.addHeat?.(-6);
         }
     }
 
-    /**
-     * Applies an outcome
-     */
     applyOutcome(outcome) {
-        // Apply district modifiers
+        if (!outcome) return;
+
         if (outcome.effect) {
+            this.applyEffect(outcome.effect, { data: { clues: [] } });
             if (Array.isArray(outcome.effect)) {
-                for (const mod of outcome.effect) {
-                    this.applyDistrictModifier(mod);
-                }
-            } else if (typeof outcome.effect === 'object') {
-                // Apply numeric modifiers
-                for (const [key, value] of Object.entries(outcome.effect)) {
-                    if (key.startsWith('district_')) {
-                        this.applyDistrictModifier(key, value);
-                    }
-                }
+                for (const mod of outcome.effect) this.applyDistrictModifier(mod);
             }
         }
 
-        // Apply faction impacts
         if (outcome.factionImpact) {
-            // Update faction reputation
             for (const [faction, impact] of Object.entries(outcome.factionImpact)) {
                 this.applyFactionImpact(faction, impact);
             }
         }
     }
 
-    /**
-     * Applies a district modifier
-     */
     applyDistrictModifier(modifier, value) {
-        // Parse modifier string
-        let districtId = 0; // Default to current district
+        let districtId = this.game.map.getDistrictAt(this.game.state.player.x, this.game.state.player.y);
         let modifierName = modifier;
         let modifierValue = value;
 
         if (typeof modifier === 'string') {
-            // Handle "district_name_value" format
             const parts = modifier.split('_');
             if (parts.length >= 3) {
-                modifierName = parts[2]; // e.g., "stability" from "district_residential_stability_down"
-                modifierValue = -0.1; // Default decrement
+                modifierName = parts[2];
+                modifierValue = -0.1;
                 if (parts[3] === 'up') modifierValue = 0.1;
                 if (parts[3] === 'down') modifierValue = -0.1;
+                const districtByTheme = this.game.map.districts?.find((d) => d.theme === parts[1]);
+                if (districtByTheme) districtId = districtByTheme.id;
             }
         }
 
-        // Apply to districts
         const districts = this.game.map.districts || [];
-        if (districtId < districts.length) {
-            const district = districts[districtId];
-            if (district.modifiers === undefined) district.modifiers = [];
+        const district = districts.find((d) => d.id === districtId);
+        if (!district) return;
+        district.modifiers = district.modifiers || [];
 
-            // Check if modifier already exists
-            const existing = district.modifiers.find(m => m.name === modifierName);
-            if (existing) {
-                existing.value = (existing.value || 0) + modifierValue;
-            } else {
-                district.modifiers.push({
-                    name: modifierName,
-                    value: modifierValue,
-                    appliedAt: Date.now()
-                });
-            }
-        }
+        const existing = district.modifiers.find((m) => m.name === modifierName);
+        if (existing) existing.value = (existing.value || 0) + (modifierValue || 0);
+        else district.modifiers.push({ name: modifierName, value: modifierValue || 0, appliedAt: now() });
     }
 
-    /**
-     * Applies a faction impact
-     */
     applyFactionImpact(faction, impact) {
-        // This would update faction reputation in a full implementation
-        // For now, just log it
-        console.log(`Faction impact: ${faction} ${impact > 0 ? '+' : ''}${impact}`);
+        const factions = this.game.state.factions || (this.game.state.factions = {});
+        factions.reputation = factions.reputation || {};
+
+        const applyOne = (key, delta) => {
+            const prev = Number(factions.reputation[key] || 0);
+            factions.reputation[key] = Math.max(-100, Math.min(100, prev + delta));
+        };
+
+        if (faction === 'all_factions') {
+            ['citizens', 'police', 'gangs', 'corp'].forEach((f) => applyOne(f, impact));
+            return;
+        }
+
+        applyOne(faction, impact);
     }
 
-    /**
-     * Updates all quests (called each tick)
-     */
     update() {
-        for (const quest of this.activeQuests) {
-            // Try to auto-advance quests
-            const currentStep = quest.steps[quest.currentStepIndex];
+        for (const quest of [...this.activeQuests]) {
+            if (quest.status !== 'active' && quest.status !== 'blocked') continue;
 
-            if (currentStep && currentStep.autoAdvance && currentStep.autoAdvance > 0) {
+            const currentStep = quest.steps[quest.currentStepIndex];
+            if (!currentStep) {
+                this.finishQuest(quest, 'success');
+                continue;
+            }
+
+            if (currentStep.autoAdvance && currentStep.autoAdvance > 0) {
                 quest.autoAdvanceTimer = (quest.autoAdvanceTimer || 0) + 1;
                 if (quest.autoAdvanceTimer >= currentStep.autoAdvance) {
                     this.advanceQuest(quest);
@@ -688,113 +655,100 @@ export class QuestEngine {
                 }
             }
 
-            // Check for blocked quests
-            if (quest.steps[quest.currentStepIndex] &&
-                !this.canCompleteStep(quest, quest.steps[quest.currentStepIndex])) {
+            if (!this.canCompleteStep(quest, currentStep)) {
                 if (quest.status !== 'blocked') {
                     quest.status = 'blocked';
                     quest.blockedReason = 'Waiting for player action';
-                    eventBus.emit('quest_blocked', {
+                    eventBus.emit(EVENT_TYPES.QUEST_BLOCKED, {
                         questId: quest.id,
                         reason: quest.blockedReason,
-                        tick: Date.now()
+                        tick: now()
                     });
                 }
             } else if (quest.status === 'blocked') {
                 quest.status = 'active';
                 quest.blockedReason = null;
             }
+
+            // Execute conditionally-completable steps continuously.
+            if ([STEP_KINDS.GO_TO, STEP_KINDS.INVESTIGATE, STEP_KINDS.INTERACT, STEP_KINDS.CONDITIONAL].includes(currentStep.kind)) {
+                this.advanceQuest(quest);
+            }
         }
     }
 
-    /**
-     * Checks if a step can be completed
-     */
     canCompleteStep(quest, step) {
         switch (step.kind) {
             case STEP_KINDS.TRIGGER:
-                return quest.data.triggers && quest.data.triggers[step.trigger];
+                return !!quest.data.triggers?.[step.trigger];
             case STEP_KINDS.HACK_NODE:
                 return this.findNodeByType(step.nodeType) !== undefined;
             case STEP_KINDS.GO_TO:
-                return step.targetX !== undefined && step.targetY !== undefined;
-            case STEP_KINDS.CHOICE:
-                return quest.data.choices && quest.data.choices.length > 0;
             case STEP_KINDS.INVESTIGATE:
             case STEP_KINDS.INTERACT:
-                return true; // Can always attempt
+            case STEP_KINDS.CONDITIONAL:
+                return true;
+            case STEP_KINDS.CHOICE:
+                return Array.isArray(quest.data.choices) && quest.data.choices.length > 0;
             case STEP_KINDS.OUTCOME:
-                return true; // Can always apply
             default:
                 return true;
         }
     }
 
-    /**
-     * Returns quests filtered by status
-     */
     getQuestsByStatus(status) {
-        return status === 'active'
-            ? this.activeQuests
-            : this.completedQuests;
+        return status === 'active' ? this.activeQuests : this.completedQuests;
     }
 
-    /**
-     * Serializes quest state for save
-     */
     serialize() {
         return {
-            activeQuests: this.activeQuests.map(q => ({
+            activeQuests: this.activeQuests.map((q) => ({
                 id: q.id,
                 status: q.status,
                 currentStepIndex: q.currentStepIndex,
                 completedSteps: q.completedSteps,
-                data: q.data
+                data: q.data,
+                context: q.context,
             })),
-            completedQuests: this.completedQuests.map(q => ({
+            completedQuests: this.completedQuests.map((q) => ({
                 id: q.id,
-                outcome: q.data.outcome
+                outcome: q.data.outcome,
+                data: q.data,
+                context: q.context,
             }))
         };
     }
 
-    /**
-     * Restores quest state from save
-     */
     deserialize(data) {
         if (!data) return;
+        const defs = this.game.content?.quests || [];
 
-        // Restore active quests
-        this.activeQuests = data.activeQuests.map(qData => {
-            // Find original quest definition
-            const questDef = this.game.content.quests.find(q => q.id === qData.id);
+        this.activeQuests = (data.activeQuests || []).map((qData) => {
+            const questDef = defs.find((q) => q.id === qData.id);
             if (!questDef) return null;
 
-            const quest = createQuestInstance(questDef);
+            const quest = createQuestInstance(questDef, qData.context || {});
             quest.status = qData.status;
             quest.currentStepIndex = qData.currentStepIndex;
-            quest.completedSteps = qData.completedSteps;
-            quest.data = qData.data;
-            quest.lastUpdated = Date.now();
+            quest.completedSteps = qData.completedSteps || [];
+            quest.data = { ...quest.data, ...(qData.data || {}) };
+            quest.lastUpdated = now();
             return quest;
-        }).filter(q => q !== null);
+        }).filter(Boolean);
 
-        // Restore completed quests
-        this.completedQuests = data.completedQuests.map(qData => {
-            const questDef = this.game.content.quests.find(q => q.id === qData.id);
+        this.completedQuests = (data.completedQuests || []).map((qData) => {
+            const questDef = defs.find((q) => q.id === qData.id);
             if (!questDef) return null;
 
-            const quest = createQuestInstance(questDef);
+            const quest = createQuestInstance(questDef, qData.context || {});
             quest.status = 'completed';
             quest.currentStepIndex = quest.steps.length;
+            quest.data = { ...quest.data, ...(qData.data || {}) };
             quest.data.outcome = qData.outcome;
             return quest;
-        }).filter(q => q !== null);
+        }).filter(Boolean);
     }
 
-    /**
-     * Cleans up quest state (called on new game)
-     */
     reset() {
         this.activeQuests = [];
         this.completedQuests = [];

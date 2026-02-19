@@ -13,7 +13,7 @@ export const ROAD_COLORS = {
 };
 
 /**
- * Generates a road network connecting district centers
+ * Generates a road network connecting district centers using MST
  * @param {Map} map - Map object with districts
  * @param {number} seed - Random seed
  * @returns {Object} Road network data
@@ -30,33 +30,66 @@ export function generateRoads(map, seed) {
     // Get district centers
     const centers = map.districts.map(d => ({ x: d.center.x, y: d.center.y, id: d.id }));
 
-    // Build MST-like road network connecting centers
+    // Build MST using Prim's algorithm for guaranteed connectivity
     const roads = [];
     const connected = new Set();
+    const unconnected = new Set(centers.map(c => c.id));
+
+    // Start from the first district
     connected.add(centers[0].id);
+    unconnected.delete(centers[0].id);
 
-    // Sort centers by distance from first to prioritize nearby connections
-    centers.sort((a, b) => {
-        const distA = Math.abs(a.x - centers[0].x) + Math.abs(a.y - centers[0].y);
-        const distB = Math.abs(b.x - centers[0].x) + Math.abs(b.y - centers[0].y);
-        return distA - distB;
-    });
+    // Prim's MST: repeatedly add the closest unconnected center
+    while (unconnected.size > 0) {
+        let bestFrom = null;
+        let bestTo = null;
+        let bestDist = Infinity;
 
-    // Connect centers in order
-    for (let i = 1; i < centers.length; i++) {
-        const from = centers[i - 1];
-        const to = centers[i];
-        const road = drawRoad(roadMap, sidewalkMap, width, height, from, to);
-        roads.push(road);
-        connected.add(to.id);
+        // Find the closest pair (connected, unconnected)
+        for (const connId of connected) {
+            const from = centers.find(c => c.id === connId);
+            if (!from) continue;
+
+            for (const unconnId of unconnected) {
+                const to = centers.find(c => c.id === unconnId);
+                if (!to) continue;
+
+                // Manhattan distance
+                const dist = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestFrom = from;
+                    bestTo = to;
+                }
+            }
+        }
+
+        if (bestFrom && bestTo) {
+            const road = drawRoad(roadMap, sidewalkMap, width, height, bestFrom, bestTo);
+            roads.push(road);
+            connected.add(bestTo.id);
+            unconnected.delete(bestTo.id);
+        } else {
+            break; // Should not happen
+        }
     }
 
-    // Add extra road edges for connectivity
-    for (let i = 0; i < centers.length; i++) {
-        for (let j = i + 1; j < centers.length; j++) {
-            if (rng.chance(0.3)) { // 30% chance of extra edge
-                drawRoad(roadMap, sidewalkMap, width, height, centers[i], centers[j]);
-            }
+    // Add extra road edges for loops (less for smaller maps to preserve blocks)
+    // SMALL (<50): 10%, CITY (50-100): 20%, MEGA (>100): 30%
+    const extraFactor = width < 50 ? 0.1 : width < 100 ? 0.2 : 0.3;
+    const extraEdges = Math.floor(roads.length * extraFactor);
+    let attempts = 0;
+    let added = 0;
+
+    while (added < extraEdges && attempts < roads.length * 10) {
+        attempts++;
+        const i = rng.int(0, centers.length - 1);
+        const j = rng.int(0, centers.length - 1);
+        if (i !== j) {
+            // Only add if it creates a loop (both already connected)
+            const road = drawRoad(roadMap, sidewalkMap, width, height, centers[i], centers[j]);
+            roads.push(road);
+            added++;
         }
     }
 
@@ -203,7 +236,7 @@ function generateBlocks(roadMap, sidewalkMap, width, height) {
  * @returns {number} Block ID, or -1 if on road/sidewalk
  */
 export function getBlockAt(blockMap, x, y, width) {
-    if (x < 0 || y < 0 || x >= width || y < 0 || y >= blockMap.length / width) {
+    if (x < 0 || y < 0 || x >= width || y >= blockMap.length / width) {
         return -1;
     }
     const idx = y * width + x;
@@ -230,4 +263,75 @@ export function getRoadTiles(roads, roadIndex) {
 export function getSidewalkTiles(roads, roadIndex) {
     const road = roads[roadIndex];
     return road ? road.sidewalks : [];
+}
+
+/**
+ * Checks if a position is on a road
+ * @param {Uint8Array} roadMap - Road tile map
+ * @param {number} x - X coordinate
+ * @param {number} y - Y coordinate
+ * @param {number} width - Map width
+ * @returns {boolean} True if on road
+ */
+export function isRoad(roadMap, x, y, width) {
+    if (x < 0 || y < 0 || x >= width || y >= roadMap.length / width) {
+        return false;
+    }
+    return roadMap[y * width + x] === 1;
+}
+
+/**
+ * Validates road network connectivity using BFS from each district center
+ * @param {Object} roadNetwork - Road network object
+ * @param {Array} centers - District centers
+ * @param {number} width - Map width
+ * @param {number} height - Map height
+ * @returns {Object} { connected: boolean, unreachableCount: number }
+ */
+export function validateRoadConnectivity(roadNetwork, centers, width, height) {
+    const { roadMap, sidewalkMap } = roadNetwork;
+    const visited = new Uint8Array(width * height).fill(0);
+    const queue = [];
+    const directions = [[0, 1], [0, -1], [1, 0], [-1, 0]];
+
+    // Add all road tiles to the BFS queue
+    for (let i = 0; i < roadMap.length; i++) {
+        if (roadMap[i] === 1 || sidewalkMap[i] === 1) {
+            queue.push(i);
+            visited[i] = 1;
+        }
+    }
+
+    // BFS to find all connected road tiles
+    while (queue.length > 0) {
+        const idx = queue.shift();
+        const x = idx % width;
+        const y = Math.floor(idx / width);
+
+        for (const [dx, dy] of directions) {
+            const nx = x + dx;
+            const ny = y + dy;
+            if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+                const nidx = ny * width + nx;
+                if ((roadMap[nidx] === 1 || sidewalkMap[nidx] === 1) && visited[nidx] === 0) {
+                    visited[nidx] = 1;
+                    queue.push(nidx);
+                }
+            }
+        }
+    }
+
+    // Check if all district centers are connected
+    let unreachableCount = 0;
+    for (const center of centers) {
+        const idx = center.y * width + center.x;
+        if (visited[idx] === 0) {
+            unreachableCount++;
+        }
+    }
+
+    return {
+        connected: unreachableCount === 0,
+        unreachableCount
+    };
 }

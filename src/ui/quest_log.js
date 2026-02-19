@@ -266,7 +266,8 @@ export class QuestLogUI {
 
         if (this.selectedQuestId === questId) {
             this.container.querySelector('#quest-details-title').textContent += ' (COMPLETED)';
-            this.container.querySelector('#quest-progress-fill').style.width = '100%';
+            const fill = this.container.querySelector('.quest-progress-fill');
+            if (fill) fill.style.width = '100%';
             this.container.querySelector('#quest-mark-complete').disabled = true;
         }
     }

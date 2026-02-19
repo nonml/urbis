@@ -4,14 +4,21 @@ import { Renderer3D } from './renderer3d.js';
 import { MapScreen } from './ui/map_screen.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
+import { BuildMenu } from './ui/build_menu.js';
+import { CaseFileUI } from './ui/case_file.js';
 import { createAudioManager } from './audio/audio_manager.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
+import { updatePlayerMovement, createPlayerState } from './player/controller.js';
+import { validatePlacement } from './build/placement.js';
+import { HackList } from './ui/hack_list.js';
+import { BreachMinigame } from './ui/breach_minigame.js';
 
 export class UIManager {
     constructor(game) {
         this.game = game;
         this.canvas = document.getElementById('game-canvas');
         this.selectedBuilding = null;
+        this.lastBuildAttemptAt = 0;
 
         // Settings
         this.settings = new SettingsManager(game);
@@ -32,11 +39,27 @@ export class UIManager {
         this._lastBuildingCount = 0;
         this._lastCitizenCount = 0;
 
-        // Action prompt state
+        // Action prompt state (Ticket B-3)
         this.actionPrompt = null;
         this.actionCallback = null;
+        this.currentInteractable = null; // Track the interactable being displayed
+        this.lastInteractable = null; // Track previously shown interactable
+        this.hackScanVisible = true;
+        this.scannedHackables = [];
+        this.hackList = new HackList(this.game);
+        this.breachMinigame = new BreachMinigame(this.game);
+        this._breachWasPaused = false;
+
+        // Player movement state (third-person controller)
+        this.playerState = createPlayerState();
+        this.lastMovementTime = 0;
+        this.simDt = 0.04; // Default sim tick dt (1000ms / 24 ticks per day)
+        this.questChoiceOptions = [];
+        this._keyHandlers = new Map();
 
         this.setupBuildingPanel();
+        this.buildMenu = new BuildMenu(this);
+        this.caseFileUI = new CaseFileUI(this.game);
         this.setupInfoTabs();
         this.setupInput();
         this.setupGlobalShortcuts();
@@ -76,7 +99,9 @@ export class UIManager {
         for (const [key, security] of Object.entries(BUILDING_SECURITY)) {
             // Check if player has unlocked security buildings
             const securityUnlocked = this.game.state.progression?.unlocked?.includes('security_buildings');
-            if (securityUnlocked) {
+            const rewardUnlock = this.game.state.progress?.unlocks?.buildings?.includes(key) ||
+                this.game.state.progress?.unlocks?.buildings?.includes('security_buildings');
+            if (securityUnlocked || rewardUnlock) {
                 this.createBuildingCard(grid, key, security, true);
             }
         }
@@ -103,10 +128,16 @@ export class UIManager {
             document.querySelectorAll('.building-card').forEach(o => o.classList.remove('selected'));
             card.classList.add('selected');
             this.selectedBuilding = key;
+            this.buildMenu.selectType(key);
             this.showMessage(`Selected: ${building.name}`, 'success');
             this.playUISound('click');
         });
         grid.appendChild(card);
+    }
+
+    clearBuildSelection() {
+        this.selectedBuilding = null;
+        document.querySelectorAll('.building-card').forEach((card) => card.classList.remove('selected'));
     }
 
     setupInfoTabs() {
@@ -143,19 +174,82 @@ export class UIManager {
                 this.toggleMapScreen();
             }
             if (e.key.toLowerCase() === 'e') {
-                this.handleEKey();
+                if (this.selectedBuilding) {
+                    e.preventDefault();
+                    this.buildMenu.rotateCW();
+                    this.updateBuildGhost();
+                } else {
+                    this.handleEKey();
+                }
+            }
+            if (e.key.toLowerCase() === 'h') {
+                e.preventDefault();
+                this.hackScanVisible = !this.hackScanVisible;
+                this.hackList.setVisible(this.hackScanVisible);
+                this.showMessage(`Hack scan: ${this.hackScanVisible ? 'on' : 'off'}`, 'normal');
+            }
+            if (e.key.toLowerCase() === 'q') {
+                if (this.selectedBuilding) {
+                    e.preventDefault();
+                    this.buildMenu.rotateCCW();
+                    this.updateBuildGhost();
+                }
             }
             if (e.key.toLowerCase() === 't') {
                 this.toggleTechScreen();
             }
+            if (e.key.toLowerCase() === 'c') {
+                this.caseFileUI?.toggle();
+            }
             if (e.key.toLowerCase() === 'o' && e.shiftKey) {
                 this.toggleSettings();
+            }
+            // Debug overlay shortcuts (Ticket C-1)
+            if (e.key.toLowerCase() === 'd') {
+                this.toggleDebugOverlay();
+            }
+            if (e.key.toLowerCase() === 'b') {
+                e.preventDefault();
+                const open = this.buildMenu.toggleOpen();
+                this.showMessage(open ? 'Build menu opened.' : 'Build menu closed.', 'normal');
+            }
+            if (e.key === 'Escape' && this.selectedBuilding) {
+                this.buildMenu.cancelBuildMode();
+                this.showMessage('Build mode canceled.', 'normal');
+            } else if (e.key === 'Escape' && this.breachMinigame.active) {
+                this.breachMinigame.finish(false);
+            }
+            if (e.key === 'F2') {
+                e.preventDefault();
+                this.toggleServiceOverlay();
+            }
+            if (/^[1-4]$/.test(e.key)) {
+                const overlay = document.getElementById('quest-choice-overlay');
+                if (overlay && !overlay.classList.contains('hidden') && this.questChoiceOptions?.length) {
+                    const idx = Number(e.key) - 1;
+                    const choice = this.questChoiceOptions[idx];
+                    if (choice) {
+                        e.preventDefault();
+                        this.resolveQuestChoice(choice.id);
+                    }
+                }
+            }
+            const handlers = this._keyHandlers.get(e.key.toLowerCase());
+            if (handlers) {
+                for (const fn of handlers) fn(e);
             }
         });
         // Add map screen reference
         this.mapScreen = null;
         // Add tech screen reference
         this.techScreen = null;
+    }
+
+    onKey(key, handler) {
+        const k = String(key || '').toLowerCase();
+        if (!k || typeof handler !== 'function') return;
+        if (!this._keyHandlers.has(k)) this._keyHandlers.set(k, []);
+        this._keyHandlers.get(k).push(handler);
     }
 
     setupInput() {
@@ -186,8 +280,19 @@ export class UIManager {
                 if (!tile) return;
 
                 if (this.selectedBuilding) {
-                    this.game.attemptBuild(this.selectedBuilding, tile.x, tile.y);
-                    this.renderer3d.markBuildingsDirty();
+                    const now = performance.now();
+                    if (now - this.lastBuildAttemptAt < 120) return;
+                    this.lastBuildAttemptAt = now;
+
+                    const result = this.game.attemptBuild(this.selectedBuilding, tile.x, tile.y, {
+                        rotation: this.buildMenu.rotation,
+                    });
+                    if (result.ok) {
+                        this.renderer3d.markBuildingsDirty();
+                        this.updateBuildGhost(tile);
+                    } else {
+                        this.buildMenu.updateHUD({ ok: false, reason: result.reason || 'Invalid placement.' });
+                    }
                 } else {
                     this.game.showTileInfo(tile.x, tile.y);
                     this.updateStats();
@@ -201,6 +306,10 @@ export class UIManager {
         });
 
         window.addEventListener('mousemove', (e) => {
+            if (this.selectedBuilding && !this.isRDragging) {
+                const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
+                this.updateBuildGhost(tile);
+            }
             if (!this.isRDragging) return;
             const dx = e.clientX - this.lastMouseX;
             const dy = e.clientY - this.lastMouseY;
@@ -215,46 +324,42 @@ export class UIManager {
 
     updatePlayerMovement(dtMs) {
         const dt = Math.min(0.05, dtMs / 1000);
-        const speed = this.keys.has('shift') ? 5.0 : 3.0; // tiles/sec
 
-        let mx = 0;
-        let mz = 0;
-        if (this.keys.has('w')) mz -= 1;
-        if (this.keys.has('s')) mz += 1;
-        if (this.keys.has('a')) mx -= 1;
-        if (this.keys.has('d')) mx += 1;
+        // Build input state from keys
+        const input = {
+            w: this.keys.has('w'),
+            a: this.keys.has('a'),
+            s: this.keys.has('s'),
+            d: this.keys.has('d'),
+            shift: this.keys.has('shift'),
+        };
 
-        if (mx === 0 && mz === 0) return;
+        // Update movement state
+        const result = updatePlayerMovement(
+            dt,
+            input,
+            this.renderer3d.yaw,
+            this.game.map,
+            this.game.player,
+            this.playerState
+        );
 
-        // Normalize
-        const len = Math.hypot(mx, mz);
-        mx /= len;
-        mz /= len;
+        // Sync renderer's player position if moved
+        if (result.moved) {
+            this.renderer3d.syncPlayer();
+            // Update debug info for nearest POI
+            if (this.renderer3d._debugMode === 'pois') {
+                const nearestDist = this.renderer3d.getNearestPOIDistance();
+                if (nearestDist >= 0) {
+                    // Could display nearest POI info
+                }
+            }
+        }
 
-        // Camera-relative movement
-        const yaw = this.renderer3d.yaw;
-        const cos = Math.cos(yaw);
-        const sin = Math.sin(yaw);
-        const dx = (mx * cos - mz * sin) * speed * dt;
-        const dz = (mx * sin + mz * cos) * speed * dt;
-
-        const nx = this.game.player.wx + dx;
-        const nz = this.game.player.wz + dz;
-
-        // Collision against water tiles
-        const tx = Math.floor(nx);
-        const ty = Math.floor(nz);
-        if (tx < 0 || ty < 0 || tx >= this.game.map.width || ty >= this.game.map.height) return;
-        const tile = this.game.map.getTileAt(tx, ty);
-        if (tile === 0) return; // water
-
-        this.game.player.wx = nx;
-        this.game.player.wz = nz;
-        this.game.player.x = tx;
-        this.game.player.y = ty;
+        return result;
     }
 
-    render(dt) {
+    render(dt, simDt) {
         // Rebuild instances when needed
         if (this.game.buildings.buildings.length !== this._lastBuildingCount) {
             this._lastBuildingCount = this.game.buildings.buildings.length;
@@ -265,12 +370,54 @@ export class UIManager {
             this.renderer3d.markCitizensDirty();
         }
 
-        if (!this.game.paused) {
-            this.updatePlayerMovement(dt);
+        // Update simDt for player movement physics
+        if (simDt !== undefined && simDt > 0) {
+            this.simDt = simDt;
+        }
+
+        if (!this.game.paused && !this.game.state.time.paused) {
+            // Player movement uses sim dt (fixed tick) for consistent physics
+            const movementDt = this.simDt > 0 ? this.simDt : (dt * 0.001);
+            this.updatePlayerMovement(movementDt);
             // Check for nearby interactables
             this.checkInteractableProximity();
+            this.updateHackScan();
+        } else if (this.hackScanVisible) {
+            this.updateHackScan();
         }
+        if (this.caseFileUI?.open) this.caseFileUI.refresh();
         this.renderer3d.render();
+    }
+
+    updateHackScan() {
+        if (!this.game.interactables || !this.hackList) return;
+        const nodes = this.game.interactables.scanNearby(this.game.player.x, this.game.player.y, 25);
+        this.scannedHackables = nodes;
+        const selectedId = this.currentInteractable?.id || null;
+        this.hackList.setVisible(this.hackScanVisible);
+        this.hackList.update(nodes, selectedId);
+    }
+
+    updateBuildGhost(tile = null) {
+        if (!this.selectedBuilding) {
+            this.renderer3d.clearBuildGhost();
+            return;
+        }
+        if (!tile) {
+            this.renderer3d.clearBuildGhost();
+            return;
+        }
+
+        const preview = validatePlacement(this.game, this.selectedBuilding, tile.x, tile.y, this.buildMenu.rotation);
+        this.buildMenu.setHoverTile(tile);
+        this.buildMenu.updateHUD(preview);
+        this.renderer3d.setBuildGhost(
+            this.selectedBuilding,
+            tile.x,
+            tile.y,
+            this.buildMenu.rotation,
+            preview.ok
+        );
     }
 
     updateResources(resources) {
@@ -385,6 +532,69 @@ export class UIManager {
                 jobDist.textContent = employed.map(([j, n]) => `${j}: ${n}`).join(' • ');
             }
         }
+
+        this.updateEconomyReport();
+        this.updateServicesReport();
+    }
+
+    updateEconomyReport() {
+        const statsPanel = document.getElementById('stats-panel');
+        if (!statsPanel || !this.game.getResourceReport) return;
+
+        let box = document.getElementById('economy-report');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'economy-report';
+            box.className = 'stat-item full-width';
+            box.innerHTML = `
+                <div class="stat-label">Economy (last tick)</div>
+                <div class="stat-value" id="econ-gold-row"></div>
+                <div class="stat-value" id="econ-food-row"></div>
+                <div class="stat-value" id="econ-wood-row"></div>
+            `;
+            statsPanel.appendChild(box);
+        }
+
+        const report = this.game.getResourceReport();
+        const fmt = (resName) => {
+            const row = report.report?.[resName];
+            const net = row?.net || 0;
+            const sign = net >= 0 ? '+' : '';
+            const top = row?.contributors?.[0];
+            const source = top ? `${top.source} (${top.delta >= 0 ? '+' : ''}${top.delta})` : 'n/a';
+            return `${resName.toUpperCase()}: ${sign}${net} | top: ${source}`;
+        };
+
+        const goldRow = document.getElementById('econ-gold-row');
+        const foodRow = document.getElementById('econ-food-row');
+        const woodRow = document.getElementById('econ-wood-row');
+        if (goldRow) goldRow.textContent = fmt('gold');
+        if (foodRow) foodRow.textContent = fmt('food');
+        if (woodRow) woodRow.textContent = fmt('wood');
+    }
+
+    updateServicesReport() {
+        const statsPanel = document.getElementById('stats-panel');
+        if (!statsPanel || !this.game.servicesManager) return;
+
+        let box = document.getElementById('services-report');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'services-report';
+            box.className = 'stat-item full-width';
+            box.innerHTML = `
+                <div class="stat-label">Services</div>
+                <div class="stat-value" id="svc-city-row"></div>
+            `;
+            statsPanel.appendChild(box);
+        }
+
+        const m = this.game.servicesManager.metrics.city || {};
+        const powerState = m.brownout ? 'brownout' : 'stable';
+        const row = document.getElementById('svc-city-row');
+        if (row) {
+            row.textContent = `Power ${Math.round(m.powerSupply || 0)}/${Math.round(m.powerDemand || 0)} (${powerState})`;
+        }
     }
 
     showVictory(condition, progress) {
@@ -486,29 +696,86 @@ export class UIManager {
             const node = this.game.interactables.getNearbyInteractable(
                 this.game.player.x,
                 this.game.player.y,
-                3
+                2.2 // 2.2m radius (Ticket B-3 spec)
             );
+
+            // Track the interactable for E key action
             if (node) {
+                this.currentInteractable = node;
                 const typeInfo = getInteractableTypeInfo(node.type);
                 const stateName = getInteractableStateName(node.state);
-                this.showMessage(` Nearby ${typeInfo.name}: ${stateName} (Press E to hack)`, 'normal');
+
+                // Only update DOM if interactable changed (no duplicate prompts)
+                if (this.lastInteractable !== node) {
+                    this.updateInteractPrompt(typeInfo.name, stateName, node.securityLevel);
+                    this.lastInteractable = node;
+                }
+            } else {
+                // No interactable nearby - clear prompt if it exists
+                if (this.lastInteractable) {
+                    this.clearInteractPrompt();
+                    this.lastInteractable = null;
+                }
+                this.currentInteractable = null;
             }
         }
     }
 
     handleEKey() {
-        // Handle E key for hacking interactables
-        if (this.game.interactables) {
-            const node = this.game.interactables.getNearbyInteractable(
-                this.game.player.x,
-                this.game.player.y,
-                3
-            );
-            if (node && node.state === 'available') {
-                this.game.interactables.startHack(node, this.game.state.time.tick);
-                this.showMessage(`Hacking ${getInteractableTypeInfo(node.type).name}...`, 'normal');
+        // Handle E key for hacking interactables (Ticket B-3)
+        if (this.currentInteractable) {
+            const node = this.currentInteractable;
+            if (node.state === 'available') {
+                if (this.game.state.debugEasyHack) {
+                    const result = this.game.executeHack(node, true);
+                    if (result.ok) {
+                        const actionMsg = result.actionResult?.msg || 'Hack success.';
+                        this.showMessage(`${actionMsg} (easy hack)`, 'success');
+                    }
+                    return;
+                }
+                this._breachWasPaused = this.game.state.time.paused;
+                this.game.state.time.paused = true;
+                this.breachMinigame.start(node, (success, hackedNode) => {
+                    this.game.state.time.paused = this._breachWasPaused;
+                    const result = this.game.executeHack(hackedNode, success);
+                    if (!result.ok) {
+                        this.showMessage(result.reason || 'Hack failed to execute.', 'crisis');
+                        return;
+                    }
+                    if (!success) {
+                        this.showMessage(`Breach failed. Heat +5. Cooldown applied.`, 'crisis');
+                        return;
+                    }
+                    const actionMsg = result.actionResult?.msg || 'Hack success.';
+                    const heatText = `Heat ${Math.round(result.heat || 0)}`;
+                    this.showMessage(`${actionMsg} (${heatText})`, 'success');
+                });
+            } else if (node.state === 'success' || node.state === 'failed') {
+                // Reset and try again
+                this.showMessage(`Press E to re-hack ${getInteractableTypeInfo(node.type).name}`, 'normal');
+            } else if (node.state === 'hacking') {
+                this.showMessage(`Already hacking ${getInteractableTypeInfo(node.type).name}...`, 'normal');
             }
         }
+    }
+
+    updateInteractPrompt(name, stateName, securityLevel = null) {
+        // Remove existing prompt if any
+        this.clearInteractPrompt();
+
+        // Create action prompt UI
+        const promptDiv = document.createElement('div');
+        promptDiv.id = 'action-prompt';
+        promptDiv.className = 'action-prompt';
+        const sec = Number.isFinite(securityLevel) ? ` S${securityLevel}` : '';
+        promptDiv.innerHTML = `<span class="prompt-icon">[E]</span> <span class="prompt-text">${name}${sec}</span> <span class="prompt-state">${stateName}</span>`;
+        document.body.appendChild(promptDiv);
+    }
+
+    clearInteractPrompt() {
+        const promptDiv = document.getElementById('action-prompt');
+        if (promptDiv) promptDiv.remove();
     }
 
     /**
@@ -570,14 +837,17 @@ export class UIManager {
 
         titleEl.textContent = title;
         listEl.innerHTML = '';
+        this.questChoiceOptions = Array.isArray(choices) ? choices : [];
 
-        for (const choice of choices) {
+        for (let i = 0; i < this.questChoiceOptions.length; i++) {
+            const choice = this.questChoiceOptions[i];
             const btn = document.createElement('button');
             btn.className = 'btn btn-primary';
-            btn.textContent = choice.label;
+            btn.textContent = `[${i + 1}] ${choice.label}`;
             btn.addEventListener('click', () => {
                 overlay.classList.add('hidden');
                 onChoice(choice);
+                this.questChoiceOptions = [];
             });
             listEl.appendChild(btn);
         }
@@ -591,10 +861,13 @@ export class UIManager {
      */
     resolveQuestChoice(choiceId) {
         if (this.questChoiceCallback) {
-            const choice = this.game.questEngine.getQuestById(this.selectedQuestId)?.data?.choices?.find(c => c.id === choiceId);
+            const choice = (this.questChoiceOptions || []).find((c) => c.id === choiceId);
             if (choice) {
                 this.questChoiceCallback(choice);
                 this.questChoiceCallback = null;
+                this.questChoiceOptions = [];
+                const overlay = document.getElementById('quest-choice-overlay');
+                if (overlay) overlay.classList.add('hidden');
             }
         }
     }
@@ -634,6 +907,38 @@ export class UIManager {
             this.renderer3d.setRenderScale(this.settings.get('renderScale'));
             this.renderer3d.setShowFPS(this.settings.get('showFPS'));
         }
+    }
+
+    /**
+     * Toggle debug overlay mode
+     */
+    toggleDebugOverlay() {
+        if (!this.renderer3d) return;
+        const modes = ['none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services'];
+        let currentMode = this.renderer3d._debugMode || 'none';
+        let idx = modes.indexOf(currentMode);
+        idx = (idx + 1) % modes.length;
+        this.renderer3d.setDebugMode(modes[idx]);
+        this.showMessage(`Debug overlay: ${modes[idx]}`, 'normal');
+    }
+
+    toggleServiceOverlay() {
+        const sequence = ['off', 'power', 'water', 'health', 'police'];
+        const current = this.game.servicesManager?.getOverlayService?.() || 'power';
+        const currentMode = this.renderer3d._debugMode === 'services' ? current : 'off';
+        let idx = sequence.indexOf(currentMode);
+        idx = (idx + 1) % sequence.length;
+        const next = sequence[idx];
+
+        if (next === 'off') {
+            this.renderer3d.setDebugMode('none');
+            this.showMessage('Service heatmap: off', 'normal');
+            return;
+        }
+
+        this.game.servicesManager?.setOverlayService?.(next);
+        this.renderer3d.setDebugMode('services');
+        this.showMessage(`Service heatmap: ${next}`, 'normal');
     }
 }
 

@@ -1,0 +1,7 @@
+{
+  "id": "template_missing_person_v1",
+  "type": "missing_person",
+  "chapters": 3,
+  "branchAt": 2,
+  "tags": ["missing", "residential", "investigation"]
+}

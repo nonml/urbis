@@ -4,6 +4,11 @@
   "title": "The Missing Person",
   "description": "A citizen has gone missing from their home. Investigate to find out what happened.",
   "tags": ["missing", "cctv", "district_residential", "investigation"],
+  "rewards": [
+    { "type": "add_resource", "resource": "gold", "amount": 40 },
+    { "type": "unlock_building", "buildingId": "police-station" },
+    { "type": "unlock_hack", "hackId": "traffic_light_switch" }
+  ],
   "steps": [
     {
       "id": "start",

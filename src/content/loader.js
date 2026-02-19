@@ -1,5 +1,6 @@
 // Content loader - loads and validates quest/storylet JSON files
 import { getSchemaVersion, migrateState, validateGameState } from '../state/game_state.js';
+import { validateQuestDefinition } from './quests/schema.js';
 
 /**
  * Loads JSON content from a URL with error handling
@@ -31,44 +32,8 @@ export async function loadJsonFile(url) {
  * @returns {Object} { valid: boolean, errors: string[] }
  */
 export function validateQuest(quest) {
-    const errors = [];
-
-    // Required top-level fields
-    const requiredFields = ['id', 'type', 'steps'];
-    for (const field of requiredFields) {
-        if (!quest[field]) {
-            errors.push(`Missing required field: ${field}`);
-        }
-    }
-
-    // Type validation
-    if (quest.type && !['casefile', 'storylet', 'subcase'].includes(quest.type)) {
-        errors.push(`Invalid type: ${quest.type}. Must be 'casefile', 'storylet', or 'subcase'`);
-    }
-
-    // Steps validation
-    if (quest.steps && !Array.isArray(quest.steps)) {
-        errors.push('Steps must be an array');
-    } else if (quest.steps) {
-        const validStepKinds = ['trigger', 'hack_node', 'go_to', 'choice', 'investigate', 'interact', 'outcome', 'conditional', 'spawn_clue'];
-
-        quest.steps.forEach((step, index) => {
-            if (!step.kind) {
-                errors.push(`Step ${index}: Missing 'kind' field`);
-            } else if (!validStepKinds.includes(step.kind)) {
-                errors.push(`Step ${index}: Invalid kind '${step.kind}'. Valid: ${validStepKinds.join(', ')}`);
-            }
-
-            if (!step.id) {
-                errors.push(`Step ${index}: Missing 'id' field`);
-            }
-        });
-    }
-
-    return {
-        valid: errors.length === 0,
-        errors
-    };
+    const v = validateQuestDefinition(quest);
+    return { valid: v.valid, errors: v.errors, warnings: v.warnings };
 }
 
 /**
@@ -134,6 +99,9 @@ export async function loadQuestsFromDirectory(baseDir) {
                 const validation = validateQuest(content);
                 if (validation.valid) {
                     quests.push(content);
+                    if (validation.warnings?.length) {
+                        loadErrors.push({ file, errors: validation.warnings.map((w) => `warning: ${w}`) });
+                    }
                 } else {
                     loadErrors.push({ file, errors: validation.errors });
                 }

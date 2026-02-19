@@ -4,6 +4,7 @@ import { RNG, randomSeed32 } from './rng.js';
 import { generateDistricts, getDistrictAt, getDistrictName } from './gen/districts.js';
 import { generateRoads, getBlockAt } from './gen/roads.js';
 import { generateParcels, getParcelAt, getParcelById, isTileInParcel } from './gen/parcels.js';
+import { spawnPOIs } from './gen/pois.js';
 
 class SimpleNoise {
     constructor(seed = 123) {
@@ -98,14 +99,23 @@ export class Map {
 
         // Generate parcels
         this.generateParcels();
+
+        // Generate POIs
+        this.generatePOIs(this.seed + 4);
     }
 
     generateDistricts() {
-        // Determine district count based on map size
+        // Determine district count based on map size (Ticket C-1 spec)
+        // SMALL: 4-6, CITY: 8-12, MEGA: 14-20
         const area = this.width * this.height;
-        let districtCount = 3;
-        if (area > 10000) districtCount = 5;  // MEGA
-        else if (area > 5000) districtCount = 4;  // CITY
+        let districtCount;
+        if (area <= 2000) {
+            districtCount = 5;  // SMALL: middle of 4-6 range
+        } else if (area <= 10000) {
+            districtCount = 10;  // CITY: middle of 8-12 range
+        } else {
+            districtCount = 17;  // MEGA: middle of 14-20 range
+        }
 
         const result = generateDistricts(this.width, this.height, this.seed + 1, districtCount);
         this.districts = result.districts;
@@ -251,6 +261,11 @@ export class Map {
         const result = generateParcels(this, this.seed + 3);
         this.parcels = result.parcels;
         this.parcelMap = result.parcelMap;
+    }
+
+    generatePOIs(seed) {
+        const result = spawnPOIs(this, seed);
+        this.pois = result.pois;
     }
 
     getParcelAt(x, y) {

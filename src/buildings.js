@@ -1,5 +1,15 @@
 // Building management system
-import { BUILDING_TYPES, BUILDING_HOUSE, BUILDING_FARM, BUILDING_LUMBER_MILL, BUILDING_MARKET, BUILDING_TOWN_HALL, UPGRADE_COSTS, BUILDING_LEVELS } from './constants.js';
+import {
+    BUILDING_TYPES,
+    BUILDING_SECURITY,
+    BUILDING_HOUSE,
+    BUILDING_FARM,
+    BUILDING_LUMBER_MILL,
+    BUILDING_MARKET,
+    BUILDING_TOWN_HALL,
+    UPGRADE_COSTS,
+    BUILDING_LEVELS
+} from './constants.js';
 
 export class BuildingManager {
     constructor(game) {
@@ -12,8 +22,8 @@ export class BuildingManager {
         this.totalGoldIncome = 0;
     }
 
-    build(type, x, y, level = 1) {
-        const buildingData = BUILDING_TYPES[type];
+    build(type, x, y, level = 1, rotation = 0) {
+        const buildingData = BUILDING_TYPES[type] || BUILDING_SECURITY[type];
         if (!buildingData) return null;
 
         const levelData = BUILDING_LEVELS[level] || BUILDING_LEVELS[1];
@@ -28,6 +38,7 @@ export class BuildingManager {
             icon: buildingData.icon,
             level: level,
             levelName: levelData.name,
+            rotation: ((rotation % 4) + 4) % 4,
             population: Math.floor((buildingData.population || 0) * multiplier),
             income: {
                 gold: Math.floor((buildingData.income.gold || 0) * multiplier),
@@ -70,13 +81,14 @@ export class BuildingManager {
 
         building.level = nextLevel;
         building.levelName = levelData.name;
-        building.population = Math.floor((BUILDING_TYPES[building.type].population || 0) * multiplier);
+        const base = BUILDING_TYPES[building.type] || BUILDING_SECURITY[building.type];
+        building.population = Math.floor((base.population || 0) * multiplier);
         building.income = {
-            gold: Math.floor((BUILDING_TYPES[building.type].income.gold || 0) * multiplier),
-            food: Math.floor((BUILDING_TYPES[building.type].income.food || 0) * multiplier),
-            wood: Math.floor((BUILDING_TYPES[building.type].income.wood || 0) * multiplier)
+            gold: Math.floor((base.income.gold || 0) * multiplier),
+            food: Math.floor((base.income.food || 0) * multiplier),
+            wood: Math.floor((base.income.wood || 0) * multiplier)
         };
-        building.upkeep = Math.floor((BUILDING_TYPES[building.type].upkeep || 0) * multiplier);
+        building.upkeep = Math.floor((base.upkeep || 0) * multiplier);
 
         this.updateTotals();
         return { success: true, message: `${building.name} upgraded to Level ${nextLevel}!` };

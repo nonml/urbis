@@ -34,6 +34,11 @@ export class DevMenu {
                 description: 'Create and start a random minor case',
                 callback: () => this.spawnRandomMinorCase()
             },
+            spawnSpecificCase: {
+                label: 'Spawn Missing Case',
+                description: 'Spawn specific archetype: missing_person',
+                callback: () => this.spawnSpecificCase('missing_person')
+            },
             completeCurrentStep: {
                 label: 'Complete Current Step',
                 description: 'Complete the current quest step for testing',
@@ -53,6 +58,11 @@ export class DevMenu {
                 label: 'List Active Quests',
                 description: 'Show all active quests in console',
                 callback: () => this.listActiveQuests()
+            },
+            toggleEasyHack: {
+                label: 'Toggle Easy Hack',
+                description: 'Auto-succeed breach mini-game',
+                callback: () => this.toggleEasyHack()
             }
         };
     }
@@ -170,36 +180,35 @@ export class DevMenu {
      * Spawn main case
      */
     spawnMainCase() {
-        if (!this.game.questEngine || !this.game.caseGenerator) {
-            this.showMessage('Quest engine or case generator not initialized');
+        if (this.game.spawnCase) {
+            const c = this.game.spawnCase('missing_person');
+            this.showMessage(`Spawned main case: ${c?.id || 'unknown'}`);
             return;
         }
-
-        const quest = this.game.caseGenerator.generateMainCase();
-        if (quest) {
-            this.game.questEngine.addQuest(quest);
-            this.showMessage(`Spawned main case: ${quest.title}`);
-        } else {
-            this.showMessage('Failed to spawn main case - no templates available');
-        }
+        this.showMessage('Case manager not initialized');
     }
 
     /**
      * Spawn random minor case
      */
     spawnRandomMinorCase() {
-        if (!this.game.questEngine || !this.game.caseGenerator) {
-            this.showMessage('Quest engine or case generator not initialized');
+        if (this.game.spawnCase) {
+            const pool = ['corruption', 'extortion'];
+            const type = pool[randomIndex(pool.length)];
+            const c = this.game.spawnCase(type);
+            this.showMessage(`Spawned minor case: ${c?.id || type}`);
             return;
         }
+        this.showMessage('Case manager not initialized');
+    }
 
-        const quest = this.game.caseGenerator.generateMinorCase();
-        if (quest) {
-            this.game.questEngine.addQuest(quest);
-            this.showMessage(`Spawned minor case: ${quest.title}`);
-        } else {
-            this.showMessage('Failed to spawn minor case - no candidates available');
+    spawnSpecificCase(type) {
+        if (!this.game.spawnCase) {
+            this.showMessage('Case manager not initialized');
+            return;
         }
+        const c = this.game.spawnCase(type || 'missing_person');
+        this.showMessage(`Spawned specific case: ${c?.id || type}`);
     }
 
     /**
@@ -279,6 +288,12 @@ export class DevMenu {
             console.log(`   Clues: ${quest.data.clues.length}`);
         });
         this.showMessage(`Listed ${quests.length} active quests (see console)`);
+    }
+
+    toggleEasyHack() {
+        if (!this.game.state) return;
+        this.game.state.debugEasyHack = !this.game.state.debugEasyHack;
+        this.showMessage(`Easy hack: ${this.game.state.debugEasyHack ? 'ON' : 'OFF'}`);
     }
 
     /**

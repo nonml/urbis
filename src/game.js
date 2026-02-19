@@ -8,7 +8,9 @@ import { UIManager } from './ui.js';
 import { Minimap } from './minimap.js';
 import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY } from './constants.js';
 import { RNG, randomSeed32 } from './rng.js';
-import { createNewGameState, validateGameState } from './state/game_state.js';
+import { createRNGStreams, createRNGStreamSeeds, createRNGsFromSeeds } from './rng_streams.js';
+import { createNewGameState, validateGameState as validateState } from './state/game_state.js';
+import { validateGameState, assertStateShape } from './state/validate.js';
 import { ScheduleManager } from './sim/schedule.js';
 import { InteractableManager } from './sim/interactables.js';
 import { QuestEngine } from './sim/quests/quest_engine.js';
@@ -19,6 +21,18 @@ import { ProgressionManager } from './sim/progression.js';
 import { createTutorialManager } from './sim/tutorial/tutorial.js';
 import { eventBus } from './sim/events.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js';
+import { ChunkManager } from './world/chunks.js';
+import { validatePlacement } from './build/placement.js';
+import { EconomyLedger } from './sim/economy/ledger.js';
+import { ServiceManager } from './sim/services/services.js';
+import { GoalsManager } from './sim/goals/goals.js';
+import { CitizenSim } from './sim/citizens/citizen_sim.js';
+import { JobsManager } from './sim/economy/jobs.js';
+import { AnomalyDetectors } from './sim/anomalies/detectors.js';
+import { ensureCitizenState } from './sim/citizens/citizen_state.js';
+import { HeatSystem } from './sim/heat/heat_system.js';
+import { CaseManager } from './sim/cases/case_manager.js';
+import { EvidenceSystem } from './sim/evidence/evidence_system.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -39,6 +53,11 @@ class MockUI {
     setupInfoTabs() {}
     setupGlobalShortcuts() {}
     setupInput() {}
+    showQuestChoice(title, choices, onChoice) {
+        if (choices && choices.length > 0 && typeof onChoice === 'function') {
+            onChoice(choices[0]);
+        }
+    }
     showCrisis(crisis, options, onPick) {
         // In headless mode, automatically pick the cheapest option
         if (options && options.length > 0) {
@@ -60,23 +79,30 @@ export class Game {
     constructor(options = {}) {
         const preset = options.mapPreset || 'CITY';
         const seed = options.seed;
+        const mode = options.mode || 'standard';
 
         // Use seeded RNG for world generation, but seed from options or random
         const worldSeed = (seed ?? randomSeed32()) >>> 0;
-        this.rng = new RNG(worldSeed);
+
+        // Create RNG streams for deterministic simulation
+        this.rngStreams = createRNGStreams(worldSeed);
+
+        // Use sim stream as default for backward compatibility
+        this.rng = this.rngStreams.sim;
 
         // Create fresh GameState - this is the single source of truth
         this.state = createNewGameState({
             mapPreset: preset,
             seed: worldSeed,
         });
+        this.state.progress.mode = mode;
 
         // Initialize systems with references to state
         this.resources = this.state.resources;
-        this.map = new Map(this.state.map.width, this.state.map.height, this.state.meta.seed, this.rng);
-        this.citizens = new CitizenManager(this.rng);
+        this.map = new Map(this.state.map.width, this.state.map.height, this.state.meta.seed, this.rngStreams.world);
+        this.citizens = new CitizenManager(this.rngStreams.sim);
         this.buildings = new BuildingManager(this);
-        this.crisisManager = new CrisisManager(this, this.rng);
+        this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
         this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
         this.interactables.game = this; // Pass game reference for player heat updates
 
@@ -94,14 +120,34 @@ export class Game {
         this.difficulty = DIFFICULTY.NORMAL;
 
         // Schedule system for citizen daily routines
-        this.scheduleManager = new ScheduleManager(this.map.width, this.map.height);
+        this.scheduleManager = new ScheduleManager(this.map.width, this.map.height, this.map, this.buildings);
+        this.nav = this.scheduleManager.nav;
+
+        // Chunk streaming
+        this.chunks = new ChunkManager(this.map.width, this.map.height, {
+            chunkSize: 32,
+            activeRadius: 3,
+            unloadDelayMs: 2000,
+        });
+        this.economyLedger = new EconomyLedger(30);
+        this.servicesManager = new ServiceManager(this);
+        this.powerShortageTicks = 0;
+        this.goalsManager = new GoalsManager(this);
+        this.goalsManager.setMode(mode);
+        this.citizenSim = new CitizenSim(this);
+        this.jobsManager = new JobsManager(this);
+        this.anomalyDetectors = new AnomalyDetectors(this);
+        this.heatSystem = new HeatSystem(this);
+        this.heatSystem.setHeat(this.state.player.heat || 0);
 
         // Quest system
         this.questEngine = new QuestEngine(this);
+        this.caseManager = new CaseManager(this);
+        this.evidenceSystem = new EvidenceSystem(this);
         this.questLogUI = this.isHeadless ? null : new QuestLogUI(this);
 
-        // Rival AI system
-        this.rivalAI = new RivalAI(this.state.meta.seed);
+        // Rival AI system - uses rival stream for independent determinism
+        this.rivalAI = new RivalAI(this.rngStreams.rival);
 
         // Progression system
         this.progressionManager = new ProgressionManager(this);
@@ -144,6 +190,7 @@ export class Game {
         this.state.resources.housing = 4;
 
         for (let i = 0; i < 3; i++) this.citizens.spawnCitizen(startX + i, startY);
+        for (const c of this.citizens.citizens) ensureCitizenState(c, this.map);
 
         this.state.resources.population = this.citizens.getPopulation();
         this.state.resources.housing = this.buildings.totalHousing;
@@ -162,12 +209,20 @@ export class Game {
 
         this.ui.showMessage('Welcome to your new city! Build houses to grow your population.', 'success');
         this.ui.showMessage('Select a building from the panel to place it on the map.', 'normal');
+        if (this.goalsManager.isSandbox()) {
+            this.ui.showMessage('Sandbox mode enabled: win/lose conditions disabled.', 'normal');
+        }
 
         this.ui.setPlayerTile(startX, startY);
 
         // Generate interactables (hacking nodes)
         this.interactables.generate(this.map);
         this.ui.showMessage('Hacking nodes installed across the city!', 'normal');
+        if ((this.state.cases?.active || []).length === 0) {
+            this.caseManager.spawnCase('missing_person');
+            this.caseManager.spawnCase('corruption');
+            this.caseManager.spawnCase('extortion');
+        }
 
         // Initial UI paint
         this.ui.updateResources(this.resources);
@@ -200,16 +255,21 @@ export class Game {
         // Accumulate real time
         this.tickAccumulator += frameDt;
 
+        // Track simDt for player movement (fixed-timestep)
+        let simDt = 0;
+
         // Run fixed-timestep simulation
         if (!this.state.time.paused) {
             while (this.tickAccumulator >= this.tickRate) {
-                this.tickOnce(this.tickRate / 1000); // convert ms to seconds
+                simDt = this.tickRate / 1000; // convert ms to seconds
+                this.tickOnce(simDt);
                 this.tickAccumulator -= this.tickRate;
             }
         }
 
         // UI updates (every frame)
-        this.ui.render(frameDt);
+        // Pass simDt for consistent player movement physics
+        this.ui.render(frameDt, simDt);
 
         // Minimap updates (every frame)
         this.minimap.update();
@@ -234,16 +294,30 @@ export class Game {
         if (newTick % tickPerDay === 0) {
             this.resources.day++;
         }
+        const ledgerTick = this.economyLedger.beginTick(newTick);
 
         // 1. Daily resource income from buildings
-        const income = this.buildings.getIncome();
+        this.jobsManager.updateAssignments();
+        const incomeRaw = this.buildings.getIncome();
+        const income = this.jobsManager.scaleIncome(incomeRaw, this.buildings.buildings);
         this.resources.add('gold', income.gold);
         this.resources.add('food', income.food);
         this.resources.add('wood', income.wood);
+        this.economyLedger.addDelta(ledgerTick, 'gold', income.gold || 0, 'buildings_income_scaled');
+        this.economyLedger.addDelta(ledgerTick, 'food', income.food || 0, 'buildings_income_scaled');
+        this.economyLedger.addDelta(ledgerTick, 'wood', income.wood || 0, 'buildings_income_scaled');
 
         // 2. Daily upkeep
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
+        this.economyLedger.addDelta(ledgerTick, 'gold', -(upkeep || 0), 'buildings_upkeep');
+        const wages = this.jobsManager.applyWages(this.resources);
+        this.economyLedger.addDelta(ledgerTick, 'gold', -wages, 'wages');
+
+        // 2a. Citizen baseline food consumption
+        const foodUse = Math.max(0, Math.ceil((this.resources.population || 0) / 6));
+        this.resources.remove('food', foodUse);
+        this.economyLedger.addDelta(ledgerTick, 'food', -foodUse, 'citizen_food');
 
         // 3. Process citizen daily schedules (movement between home/work/leisure)
         this.processCitizenSchedules();
@@ -261,7 +335,25 @@ export class Game {
             this.resources.add('gold', citizenResult.jobProduction.gold || 0);
             this.resources.add('food', citizenResult.jobProduction.food || 0);
             this.resources.add('wood', citizenResult.jobProduction.wood || 0);
+            this.economyLedger.addDelta(ledgerTick, 'gold', citizenResult.jobProduction.gold || 0, 'jobs');
+            this.economyLedger.addDelta(ledgerTick, 'food', citizenResult.jobProduction.food || 0, 'jobs');
+            this.economyLedger.addDelta(ledgerTick, 'wood', citizenResult.jobProduction.wood || 0, 'jobs');
         }
+
+        // 5a. Services + citizen effects
+        this.servicesManager.update();
+        this.servicesManager.applyCitizenEffects(this.citizens.citizens);
+        if (this.servicesManager.metrics.city.brownout) {
+            this.powerShortageTicks++;
+            if (this.powerShortageTicks === 1 || this.powerShortageTicks % 5 === 0) {
+                this.ui.showMessage('⚡ Brownout: power supply is below demand.', 'crisis');
+            }
+        } else {
+            this.powerShortageTicks = 0;
+        }
+
+        // 5b. Emergent anomaly detectors
+        this.anomalyDetectors.run(this.state.time.tick);
 
         // 6. Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {
@@ -282,6 +374,7 @@ export class Game {
 
         // 8b. Quest engine update
         this.questEngine.update();
+        this.caseManager.update();
 
         // 8c. Progression update
         this.progressionManager.update();
@@ -293,67 +386,61 @@ export class Game {
         this.tutorialManager?.update();
 
         // 8d. Heat decay for player
-        this.state.player.heat = Math.max(0, (this.state.player.heat || 0) - 1);
+        const prevHeatState = this.state.player.heatState || 'calm';
+        this.heatSystem.decay(false);
+        const nextHeatState = this.state.player.heatState || 'calm';
+        if (nextHeatState !== prevHeatState) {
+            this.ui.showMessage(`Heat status: ${nextHeatState.toUpperCase()}`, nextHeatState === 'calm' ? 'normal' : 'crisis');
+        }
 
-        // 9. Victory checks
-        this.checkVictoryConditions();
-
-        // 10. Lose condition checks
-        this.checkLoseConditions();
+        // 9/10. Goals + win/lose checks
+        this.goalsManager.update();
 
         // 11. Update UI
         this.ui.updateResources(this.resources);
+        this.economyLedger.commitTick(ledgerTick);
     }
 
     /**
      * Process citizen daily schedules - move them between home, work, and leisure
      */
     processCitizenSchedules() {
-        const gameData = { map: this.map, buildings: this.buildings };
-        const oldTime = this.state.time.timeOfDay - (1 / this.state.time.tickPerDay);
         const newTime = this.state.time.timeOfDay;
-        const tickPerDay = this.state.time.tickPerDay || 24;
-
-        // Process phase transitions and schedule updates
-        const scheduleResult = this.scheduleManager.updateSchedules(
-            this.citizens.citizens,
-            gameData,
-            oldTime,
-            newTime
-        );
-
-        // Log phase changes (debug)
-        if (scheduleResult.transition) {
-            const phase = this.scheduleManager.getPhaseAt(newTime);
-            // In headless mode, just track it; UI would show this in a full game
-        }
+        this.citizenSim.updateAll(this.citizens.citizens, newTime, this.state.time.tick);
+        this.nav = this.scheduleManager.nav;
     }
 
-    attemptBuild(type, x, y) {
-        const buildingType = BUILDING_TYPES[type];
+    attemptBuild(type, x, y, options = {}) {
+        const buildingType = BUILDING_TYPES[type] || BUILDING_SECURITY[type];
+        if (!buildingType) {
+            return { ok: false, reason: 'Unknown building type.' };
+        }
         const cost = buildingType.cost;
+        const rotation = options.rotation ?? 0;
+
+        const placement = validatePlacement(this, type, x, y, rotation);
+        if (!placement.ok) {
+            this.ui.showMessage(placement.reason, 'crisis');
+            return { ok: false, reason: placement.reason };
+        }
 
         // Check resources
         if (!this.resources.canAfford(cost)) {
             this.ui.showMessage(`Cannot afford ${buildingType.name}! Need more resources.`, 'crisis');
-            return;
-        }
-
-        // Check placement
-        if (!this.buildings.isValidPlacement(x, y, this.map)) {
-            this.ui.showMessage('Cannot build here! Must be on valid terrain near other buildings.', 'crisis');
-            return;
+            return { ok: false, reason: 'Cannot afford building.' };
         }
 
         // Build it
         this.resources.pay(cost);
-        const building = this.buildings.build(type, x, y);
+        const building = this.buildings.build(type, x, y, 1, rotation);
+        this.scheduleManager.syncNavBuildings(this.buildings);
         this.ui.showMessage(`Built: ${building.name} at (${x}, ${y})`, 'success');
 
         // Show VFX feedback if renderer is available
         if (this.ui.renderer3d) {
             this.ui.renderer3d.showBuildFeedback(x, y, buildingType.name, true);
         }
+        return { ok: true, building };
     }
 
     showTileInfo(x, y) {
@@ -363,7 +450,12 @@ export class Game {
         let info = `Tile [${x}, ${y}]: ${this.getTerrainName(tile)}`;
 
         if (buildings.length > 0) {
-            info += ` - Buildings: ${buildings.map(b => b.name).join(', ')}`;
+            const details = buildings.map((b) => {
+                const staffing = this.jobsManager?.getStaffingRatio?.(b.id);
+                if (staffing === undefined) return b.name;
+                return `${b.name} (staff ${Math.round(staffing * 100)}%)`;
+            });
+            info += ` - Buildings: ${details.join(', ')}`;
         }
 
         this.ui.showMessage(info, 'normal');
@@ -457,12 +549,100 @@ export class Game {
         }
     }
 
+    /**
+     * Mutate state safely through a central wrapper
+     * This provides a single place for state invariants and validation
+     * @param {Function} fn - Function that mutates state
+     * @param {Object} options - Validation options
+     * @returns {any} Result of the function
+     */
+    mutate(fn, options = {}) {
+        const { validate = true } = options;
+        const result = fn(this.state);
+        if (validate) {
+            const validation = validateGameState(this.state);
+            if (!validation.valid) {
+                console.error('State mutation failed validation:', validation.errors);
+                throw new Error(`State validation failed: ${validation.errors.join(', ')}`);
+            }
+        }
+        return result;
+    }
+
     showMessage(message, type) {
         this.ui.showMessage(message, type);
     }
 
     getDay() {
         return this.resources.day;
+    }
+
+    getResourceReport() {
+        return this.economyLedger.getResourceReport(this.resources);
+    }
+
+    get player() {
+        return this.state.player;
+    }
+
+    getPinnedChunkTiles() {
+        const pinned = [];
+        const quests = this.questEngine?.activeQuests || [];
+        for (const quest of quests) {
+            const markers = quest?.data?.markers || [];
+            for (const marker of markers) {
+                if (Number.isFinite(marker?.x) && Number.isFinite(marker?.y)) {
+                    pinned.push({ x: marker.x, y: marker.y });
+                }
+            }
+        }
+        return pinned;
+    }
+
+    spawnCase(type, options = {}) {
+        return this.caseManager.spawnCase(type, options);
+    }
+
+    pickHackAction(interactable) {
+        if (!interactable) return null;
+        if (interactable.type === 'CCTV_POLE') return 'camera_takeover';
+        if (interactable.type === 'POWER_SUBSTATION') return 'district_blackout_ping';
+        if (interactable.type === 'TELECOM_BOX') {
+            return (interactable.securityLevel || 1) % 2 === 0 ? 'traffic_light_switch' : 'door_unlock';
+        }
+        return 'door_unlock';
+    }
+
+    executeHack(interactable, success) {
+        if (!interactable) return { ok: false, reason: 'No interactable selected.' };
+        const tick = this.state.time.tick;
+        if (!this.interactables.isAvailable(interactable)) {
+            return { ok: false, reason: 'Node is cooling down.' };
+        }
+
+        this.interactables.startHack(interactable, tick, interactable.securityLevel || 1);
+
+        if (!success) {
+            this.interactables.cancelHack(interactable);
+            this.interactables.setCooldown(interactable, tick + 10);
+            const heat = this.heatSystem.addHeat(5);
+            return { ok: true, success: false, cooldownUntil: tick + 10, heat };
+        }
+
+        this.interactables.tickHack(interactable, tick, (interactable.securityLevel || 1) * 5 + 1);
+        const action = this.pickHackAction(interactable);
+        const actionResult = this.interactables.performHackAction(interactable, action, tick);
+        if (actionResult.ok) {
+            if (actionResult.loud) this.heatSystem.addHeat(12);
+            else this.heatSystem.addHeat(-2);
+        }
+        return {
+            ok: true,
+            success: true,
+            action,
+            actionResult,
+            heat: this.heatSystem.getHeat(),
+        };
     }
 
     saveGame() {
@@ -473,7 +653,9 @@ export class Game {
                 ...this.state.meta,
                 savedAt: Date.now(),
                 version: VERSION,
-                buildTimestamp: BUILD_TIMESTAMP
+                buildTimestamp: BUILD_TIMESTAMP,
+                // Include rngStreamSeeds for reproducible reloads
+                rngStreamSeeds: this.state.meta.rngStreams,
             },
             time: {
                 tick: this.state.time.tick,
@@ -503,6 +685,7 @@ export class Game {
                     x: b.x,
                     y: b.y,
                     level: b.level,
+                    rotation: b.rotation ?? 0,
                     population: b.population,
                     income: b.income,
                     upkeep: b.upkeep,
@@ -523,6 +706,14 @@ export class Game {
                     personality: c.personality,
                     relationships: c.relationships,
                     history: c.history,
+                    homeParcel: c.homeParcel,
+                    workBuildingId: c.workBuildingId,
+                    schedule: c.schedule,
+                    needs: c.needs,
+                    mood: c.mood,
+                    traits: c.traits,
+                    relationshipEdges: c.relationshipEdges,
+                    unemployedTicks: c.unemployedTicks,
                 })),
                 nextId: this.citizens.nextId,
             },
@@ -541,11 +732,14 @@ export class Game {
                 yaw: this.state.player.yaw,
                 pitch: this.state.player.pitch,
                 heat: this.state.player.heat,
+                heatState: this.state.player.heatState || this.heatSystem.getStateForHeat(this.state.player.heat || 0),
                 exposure: this.state.player.exposure,
                 reputation: this.state.player.reputation,
             },
             rival: this.state.rival || null,
             progression: this.state.progression || null,
+            progress: this.state.progress || null,
+            world: this.state.world || null,
         };
 
         try {
@@ -585,10 +779,35 @@ export class Game {
                 this.state.meta.seed = meta.seed >>> 0;
                 this.state.map.width = meta.mapWidth;
                 this.state.map.height = meta.mapHeight;
-                this.rng = new RNG(this.state.meta.seed);
-                this.map = new Map(meta.mapWidth, meta.mapHeight, this.state.meta.seed, this.rng);
-                this.citizens.rng = this.rng;
-                this.crisisManager.rng = this.rng;
+                // Reconstruct RNG streams from saved seeds or seed
+                if (meta.rngStreamSeeds) {
+                    this.rngStreams = createRNGsFromSeeds(meta.rngStreamSeeds);
+                } else {
+                    this.rngStreams = createRNGStreams(this.state.meta.seed);
+                }
+                this.rng = this.rngStreams.sim;
+                this.map = new Map(meta.mapWidth, meta.mapHeight, this.state.meta.seed, this.rngStreams.world);
+                this.citizens = new CitizenManager(this.rngStreams.sim);
+                this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
+                this.scheduleManager = new ScheduleManager(this.map.width, this.map.height, this.map, this.buildings);
+                this.nav = this.scheduleManager.nav;
+                this.chunks = new ChunkManager(this.map.width, this.map.height, {
+                    chunkSize: 32,
+                    activeRadius: 3,
+                    unloadDelayMs: 2000,
+                });
+                this.servicesManager = new ServiceManager(this);
+                this.powerShortageTicks = 0;
+                this.rivalAI = new RivalAI(this.rngStreams.rival);
+                this.citizenSim = new CitizenSim(this);
+                this.jobsManager = new JobsManager(this);
+                this.anomalyDetectors = new AnomalyDetectors(this);
+                this.heatSystem = new HeatSystem(this);
+                this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
+                this.interactables.game = this;
+                this.caseManager = new CaseManager(this);
+                this.evidenceSystem = new EvidenceSystem(this);
+                this.questEngine.rng = this.rngStreams.quest;
                 this.ui.onWorldRebuilt();
                 this.minimap.onWorldRebuilt?.();
             }
@@ -621,8 +840,9 @@ export class Game {
             this.buildings.nextId = data.buildings?.nextId || 1;
             if (data.buildings?.list) {
                 for (const b of data.buildings.list) {
-                    this.buildings.build(b.type, b.x, b.y, b.level);
+                    this.buildings.build(b.type, b.x, b.y, b.level, b.rotation ?? 0);
                 }
+                this.scheduleManager.syncNavBuildings(this.buildings);
             }
 
             // Restore citizens
@@ -641,6 +861,15 @@ export class Game {
                         citizen.personality = c.personality ?? citizen.personality;
                         citizen.relationships = c.relationships ?? {};
                         citizen.history = c.history ?? [];
+                        citizen.homeParcel = c.homeParcel ?? null;
+                        citizen.workBuildingId = c.workBuildingId ?? null;
+                        citizen.schedule = c.schedule ?? null;
+                        citizen.needs = c.needs ?? null;
+                        citizen.mood = c.mood ?? citizen.mood;
+                        citizen.traits = c.traits ?? null;
+                        citizen.relationshipEdges = c.relationshipEdges ?? [];
+                        citizen.unemployedTicks = c.unemployedTicks ?? 0;
+                        ensureCitizenState(citizen, this.map);
                     }
                 }
             }
@@ -653,7 +882,7 @@ export class Game {
             this.questEngine.deserialize(data.quests);
 
             // Restore cases evidence
-            this.state.cases = data.cases || { evidence: [] };
+            this.state.cases = data.cases || { active: [], completed: [], evidence: [], nextCaseSeed: 1 };
             this.state.factions = data.factions || { list: [] };
 
             // Restore player
@@ -665,6 +894,7 @@ export class Game {
                 this.state.player.yaw = data.player.yaw ?? 0;
                 this.state.player.pitch = data.player.pitch ?? -0.35;
                 this.state.player.heat = data.player.heat ?? 0;
+                this.state.player.heatState = data.player.heatState ?? this.heatSystem.getStateForHeat(this.state.player.heat);
                 this.state.player.exposure = data.player.exposure ?? 0;
                 this.state.player.reputation = data.player.reputation ?? 50;
                 this.ui.setPlayerTile(this.state.player.x, this.state.player.y);
@@ -676,6 +906,21 @@ export class Game {
             // Restore progression
             this.state.progression = data.progression || { points: 0, unlocked: [], completedCases: 0, districtStability: {} };
             this.progressionManager.deserialize(this.state.progression);
+            this.state.progress = data.progress || this.state.progress || { mode: 'standard', goalState: {} };
+            this.state.progress.runFlags = this.state.progress.runFlags || {};
+            this.state.progress.unlocks = this.state.progress.unlocks || { buildings: [], hacks: [] };
+            this.state.progress.rewardLog = this.state.progress.rewardLog || {};
+            this.state.cases.active = this.state.cases.active || [];
+            this.state.cases.completed = this.state.cases.completed || [];
+            this.state.cases.evidence = this.state.cases.evidence || [];
+            this.state.cases.nextCaseSeed = this.state.cases.nextCaseSeed || 1;
+            this.state.world = data.world || this.state.world || { anomalies: [] };
+            this.goalsManager.setMode(this.state.progress.mode || 'standard');
+            this.interactables.generate(this.map);
+            this.heatSystem.setHeat(this.state.player.heat ?? 0);
+            this.caseManager = new CaseManager(this);
+            this.evidenceSystem = new EvidenceSystem(this);
+            this.caseManager.rebuildQuestMap?.();
 
             this.ui.showMessage('Game loaded!', 'success');
             return true;

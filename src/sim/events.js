@@ -9,7 +9,8 @@ export const EVENT_TYPES = {
     PLAYER_HACKED_NODE: 'player_hacked_node',
     PLAYER_ENTERED_DISTRICT: 'player_entered_district',
     PLAYER_MOVED: 'player_moved',
-    PLAYER picked_INTERACTABLE: 'player_picked_interactable',
+    PLAYER_INTERACT: 'player_interact',
+    PLAYER_PICKED_INTERACTABLE: 'player_picked_interactable',
     PLAYER_DECISION: 'player_decision',
 
     // System events
@@ -260,6 +261,16 @@ export const Events = {
     clueDiscovered(clue) {
         eventBus.emit(EVENT_TYPES.CLUE_DISCOVERED, {
             clue,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Player interacts with an interactable
+     */
+    playerInteract(interactable) {
+        eventBus.emit(EVENT_TYPES.PLAYER_INTERACT, {
+            interactable,
             tick: Date.now()
         });
     }

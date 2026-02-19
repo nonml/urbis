@@ -4,6 +4,11 @@
   "title": "The Sabotage Plot",
   "description": "Critical infrastructure has been tampered with. Stop the sabotage before it's too late.",
   "tags": ["sabotage", "infrastructure", "urgent", "danger"],
+  "rewards": [
+    { "type": "rep_delta", "amount": 8 },
+    { "type": "modify_heat", "delta": -6 },
+    { "type": "unlock_building", "buildingId": "counterintel" }
+  ],
   "steps": [
     {
       "id": "start",

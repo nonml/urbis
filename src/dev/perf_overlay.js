@@ -12,6 +12,7 @@ export class PerfOverlay {
         this.terrainInstancesElement = null;
         this.buildingInstancesElement = null;
         this.citizenInstancesElement = null;
+        this.activeChunksElement = null;
 
         this.lastFrameTime = 0;
         this.frameCount = 0;
@@ -49,6 +50,7 @@ export class PerfOverlay {
             <div>Terrain: <span id="perf-terrain">0</span> instances</div>
             <div>Buildings: <span id="perf-buildings">0</span> instances</div>
             <div>Citizens: <span id="perf-citizens">0</span> instances</div>
+            <div>Active Chunks: <span id="perf-chunks">0</span></div>
         `;
 
         document.body.appendChild(this.container);
@@ -60,6 +62,7 @@ export class PerfOverlay {
         this.terrainInstancesElement = this.container.querySelector('#perf-terrain');
         this.buildingInstancesElement = this.container.querySelector('#perf-buildings');
         this.citizenInstancesElement = this.container.querySelector('#perf-citizens');
+        this.activeChunksElement = this.container.querySelector('#perf-chunks');
     }
 
     bindEvents() {
@@ -98,19 +101,14 @@ export class PerfOverlay {
         this.fpsElement.textContent = this.currentFps;
 
         // Update tick time
-        this.tickElement.textContent = Math.round(frameDt * 1000);
+        this.tickElement.textContent = Math.round(frameDt);
 
-        // Approximate draw calls (One per terrain, one per building type, one per citizen type)
-        let drawCalls = 1; // terrain
-        drawCalls += this.game.buildings.buildings.length > 0 ? 1 : 0; // buildings mesh
-        drawCalls += this.game.citizens.citizens.length > 0 ? 1 : 0; // citizens mesh
-
-        this.drawCallsElement.textContent = drawCalls;
-
-        // Instance counts
-        this.terrainInstancesElement.textContent = this.game.map.width * this.game.map.height;
-        this.buildingInstancesElement.textContent = this.game.buildings.buildings.length;
-        this.citizenInstancesElement.textContent = this.game.citizens.citizens.length;
+        const perf = renderer?.getPerfStats?.() || {};
+        this.drawCallsElement.textContent = perf.drawCalls ?? 0;
+        this.terrainInstancesElement.textContent = perf.terrainInstances ?? 0;
+        this.buildingInstancesElement.textContent = perf.buildingInstances ?? 0;
+        this.citizenInstancesElement.textContent = perf.citizenInstances ?? this.game.citizens.citizens.length;
+        this.activeChunksElement.textContent = perf.activeChunks ?? 0;
     }
 
     destroy() {

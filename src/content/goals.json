@@ -1,0 +1,18 @@
+{
+  "win": {
+    "population": 50,
+    "avgHappiness": 60,
+    "holdTicks": 3
+  },
+  "lose": {
+    "bankruptTicks": 10,
+    "minPopulationAfterDay": {
+      "day": 3,
+      "population": 10
+    },
+    "revolt": {
+      "happinessBelow": 15,
+      "ticks": 5
+    }
+  }
+}
