@@ -257,7 +257,8 @@ export class UIManager {
 
         // 3D
         this.renderer3d = createRendererStub(this.game, this.canvas);
-        this.loadRenderer3D();
+        // Keep compatibility renderer as default until 3D init is stabilized in plain static-server runs.
+        this.useCompatibilityRenderer('default_2d');
 
         // Input
         this.keys = new Set();
