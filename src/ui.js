@@ -1,17 +1,55 @@
 // UI manager for DOM + third-person 3D rendering
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
-import { Renderer3D } from './renderer3d.js';
 import { MapScreen } from './ui/map_screen.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
 import { BuildMenu } from './ui/build_menu.js';
 import { CaseFileUI } from './ui/case_file.js';
+import { FactionsPanel } from './ui/factions_panel.js';
 import { createAudioManager } from './audio/audio_manager.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
 import { updatePlayerMovement, createPlayerState } from './player/controller.js';
 import { validatePlacement } from './build/placement.js';
 import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
+
+function createRendererStub(game, canvas) {
+    return {
+        game,
+        canvas,
+        yaw: 0,
+        pitch: -0.35,
+        followDist: 7,
+        followHeight: 4,
+        _debugMode: 'none',
+        rebuildWorld() {},
+        syncPlayer() {},
+        markBuildingsDirty() {},
+        markCitizensDirty() {},
+        pickTile() { return null; },
+        render() {},
+        clearBuildGhost() {},
+        setBuildGhost() {},
+        setDebugMode(mode) { this._debugMode = mode || 'none'; },
+        getNearestPOIDistance() { return -1; },
+        setRenderScale() {},
+        setShowFPS() {},
+        showBuildFeedback() {},
+        updateHackProgress() {},
+        showHackResult() {},
+        setCameraHackView() {},
+        getPerfStats() {
+            return {
+                terrainInstances: 0,
+                buildingInstances: 0,
+                citizenInstances: game?.citizens?.citizens?.length || 0,
+                activeChunks: game?.chunks?.getActiveChunkCount?.() ?? 0,
+                visibleChunks: 0,
+                drawCalls: 0,
+            };
+        },
+    };
+}
 
 export class UIManager {
     constructor(game) {
@@ -27,7 +65,8 @@ export class UIManager {
         this.audioManager = createAudioManager(game);
 
         // 3D
-        this.renderer3d = new Renderer3D(this.game, this.canvas);
+        this.renderer3d = createRendererStub(this.game, this.canvas);
+        this.loadRenderer3D();
 
         // Input
         this.keys = new Set();
@@ -60,9 +99,23 @@ export class UIManager {
         this.setupBuildingPanel();
         this.buildMenu = new BuildMenu(this);
         this.caseFileUI = new CaseFileUI(this.game);
+        this.factionsPanel = new FactionsPanel(this.game);
         this.setupInfoTabs();
         this.setupInput();
         this.setupGlobalShortcuts();
+    }
+
+    async loadRenderer3D() {
+        try {
+            const mod = await import('./renderer3d.js');
+            const Renderer3D = mod?.Renderer3D;
+            if (!Renderer3D) throw new Error('Renderer3D export missing.');
+            this.renderer3d = new Renderer3D(this.game, this.canvas);
+            this.applySettings();
+        } catch (e) {
+            console.error('[UI] 3D renderer unavailable, continuing with fallback:', e);
+            this.showMessage('3D renderer unavailable; running in compatibility mode.', 'crisis');
+        }
     }
 
     onWorldRebuilt() {
@@ -386,6 +439,7 @@ export class UIManager {
             this.updateHackScan();
         }
         if (this.caseFileUI?.open) this.caseFileUI.refresh();
+        this.factionsPanel?.update();
         this.renderer3d.render();
     }
 

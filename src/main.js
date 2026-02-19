@@ -6,7 +6,7 @@ import { UIManager } from './ui.js';
 import { loadQuestsFromDirectory } from './content/loader.js';
 import { loadStoryletsFromDirectory } from './content/loader.js';
 import { loadOutcomes } from './content/loader.js';
-import { VERSION, BUILD_TIMESTAMP } from './version.js';
+import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 
 // Display version
 document.addEventListener('DOMContentLoaded', () => {
@@ -69,55 +69,63 @@ function nextFrame() {
 // Global functions for HTML onclick handlers
 window.startGame = async function() {
     const menu = document.getElementById('main-menu-overlay');
-    updateLoading(5, 'Preparing session...');
-    console.log('[StartGame] Menu element:', menu);
-    if (menu) {
-        menu.classList.add('hidden');
-        console.log('[StartGame] Menu hidden, display:', window.getComputedStyle(menu).display);
+    try {
+        updateLoading(5, 'Preparing session...');
+        if (menu) menu.classList.add('hidden');
+
+        const preset = document.getElementById('map-size')?.value || 'CITY';
+        const seedStr = document.getElementById('world-seed')?.value?.trim();
+        const seed = seedStr ? parseInt(seedStr, 10) : undefined;
+        const mode = document.getElementById('game-mode')?.value || 'standard';
+
+        await nextFrame();
+        updateLoading(35, 'Generating world...');
+        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
+        updateLoading(60, 'Booting systems...');
+        window.perfOverlay = new PerfOverlay(window.game);
+        window.devMenu = new DevMenu(window.game);
+        window.devMenu.enable();
+        updateLoading(85, 'Streaming initial chunks...');
+        window.game.init();
+        updateLoading(100, 'Ready');
+        setTimeout(() => hideLoading(), 150);
+    } catch (e) {
+        console.error('[StartGame] failed:', e);
+        hideLoading();
+        if (menu) menu.classList.remove('hidden');
+        window.alert(`Failed to start game: ${e?.message || e}`);
     }
-
-    const preset = document.getElementById('map-size')?.value || 'CITY';
-    const seedStr = document.getElementById('world-seed')?.value?.trim();
-    const seed = seedStr ? parseInt(seedStr, 10) : undefined;
-    const mode = document.getElementById('game-mode')?.value || 'standard';
-
-    await nextFrame();
-    updateLoading(35, 'Generating world...');
-    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
-    updateLoading(60, 'Booting systems...');
-    window.perfOverlay = new PerfOverlay(window.game);
-    window.devMenu = new DevMenu(window.game);
-    window.devMenu.enable();
-    updateLoading(85, 'Streaming initial chunks...');
-    window.game.init();
-    updateLoading(100, 'Ready');
-    setTimeout(() => hideLoading(), 150);
 };
 
 window.restartGame = async function() {
-    document.getElementById('victory-overlay').classList.add('hidden');
-    updateLoading(5, 'Restarting...');
+    const menu = document.getElementById('main-menu-overlay');
+    try {
+        document.getElementById('victory-overlay').classList.add('hidden');
+        updateLoading(5, 'Restarting...');
 
-    const preset = document.getElementById('map-size')?.value || 'CITY';
-    const seedStr = document.getElementById('world-seed')?.value?.trim();
-    const seed = seedStr ? parseInt(seedStr, 10) : undefined;
-    const mode = document.getElementById('game-mode')?.value || 'standard';
+        const preset = document.getElementById('map-size')?.value || 'CITY';
+        const seedStr = document.getElementById('world-seed')?.value?.trim();
+        const seed = seedStr ? parseInt(seedStr, 10) : undefined;
+        const mode = document.getElementById('game-mode')?.value || 'standard';
 
-    await nextFrame();
-    updateLoading(35, 'Generating world...');
-    window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
+        await nextFrame();
+        updateLoading(35, 'Generating world...');
+        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
 
-    // Create performance overlay
-    updateLoading(60, 'Booting systems...');
-    window.perfOverlay = new PerfOverlay(window.game);
-
-    // Create dev menu (enabled by default for development)
-    window.devMenu = new DevMenu(window.game);
-    window.devMenu.enable();
-    updateLoading(85, 'Streaming initial chunks...');
-    window.game.init();
-    updateLoading(100, 'Ready');
-    setTimeout(() => hideLoading(), 150);
+        updateLoading(60, 'Booting systems...');
+        window.perfOverlay = new PerfOverlay(window.game);
+        window.devMenu = new DevMenu(window.game);
+        window.devMenu.enable();
+        updateLoading(85, 'Streaming initial chunks...');
+        window.game.init();
+        updateLoading(100, 'Ready');
+        setTimeout(() => hideLoading(), 150);
+    } catch (e) {
+        console.error('[RestartGame] failed:', e);
+        hideLoading();
+        if (menu) menu.classList.remove('hidden');
+        window.alert(`Failed to restart game: ${e?.message || e}`);
+    }
 };
 
 window.showStartScreen = function() {

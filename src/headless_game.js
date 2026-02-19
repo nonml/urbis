@@ -24,6 +24,7 @@ import { HeatSystem } from './sim/heat/heat_system.js';
 import { QuestEngine } from './sim/quests/quest_engine.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
+import { FactionSystem } from './sim/factions/faction_system.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -129,6 +130,7 @@ export class Game {
         this.questEngine = new QuestEngine(this);
         this.caseManager = new CaseManager(this);
         this.evidenceSystem = new EvidenceSystem(this);
+        this.factionSystem = new FactionSystem(this);
 
         this.isRunning = false;
         this.lastFrame = 0;
@@ -259,7 +261,8 @@ export class Game {
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
         this.economyLedger.addDelta(ledgerTick, 'gold', -(upkeep || 0), 'buildings_upkeep');
-        const wages = this.jobsManager.applyWages(this.resources);
+        const wageMult = this.factionSystem.getPerkSnapshot().modifiers.wageMultiplier ?? 1;
+        const wages = this.jobsManager.applyWages(this.resources, wageMult);
         this.economyLedger.addDelta(ledgerTick, 'gold', -wages, 'wages');
 
         const foodUse = Math.max(0, Math.ceil((this.resources.population || 0) / 6));
@@ -290,12 +293,16 @@ export class Game {
         // 5a. Services + citizen effects
         this.servicesManager.update();
         this.servicesManager.applyCitizenEffects(this.citizens.citizens);
+        const policeCov = this.servicesManager.metrics?.city?.police || 0;
+        if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
+        else if (policeCov > 0.6) this.factionSystem.modifyRep('citizens', 0.25, 'safe_streets', 'services');
         if (this.servicesManager.metrics.city.brownout) {
             this.powerShortageTicks++;
         } else {
             this.powerShortageTicks = 0;
         }
         this.anomalyDetectors.run(this.state.time.tick);
+        this.factionSystem.update();
 
         // 6. Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {
@@ -453,6 +460,8 @@ export class Game {
             this.interactables.cancelHack(interactable);
             this.interactables.setCooldown(interactable, tick + 10);
             const heat = this.heatSystem.addHeat(5);
+            this.factionSystem.modifyRep('police', -3, 'failed_loud_hack', 'hacks');
+            this.factionSystem.modifyRep('citizens', -1, 'failed_loud_hack', 'hacks');
             return { ok: true, success: false, cooldownUntil: tick + 10, heat };
         }
 
@@ -460,8 +469,16 @@ export class Game {
         const action = this.pickHackAction(interactable);
         const actionResult = this.interactables.performHackAction(interactable, action, tick);
         if (actionResult.ok) {
-            if (actionResult.loud) this.heatSystem.addHeat(12);
-            else this.heatSystem.addHeat(-2);
+            if (actionResult.loud) {
+                this.heatSystem.addHeat(12);
+                this.factionSystem.modifyRep('police', -4, `hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('citizens', -1, `hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('gangs', 1, `hack_${action}`, 'hacks');
+            } else {
+                this.heatSystem.addHeat(-2);
+                this.factionSystem.modifyRep('citizens', 1, `stealth_hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('corp', 1, `stealth_hack_${action}`, 'hacks');
+            }
         }
         return {
             ok: true,
@@ -621,6 +638,7 @@ export class Game {
                 this.questEngine = new QuestEngine(this);
                 this.caseManager = new CaseManager(this);
                 this.evidenceSystem = new EvidenceSystem(this);
+                this.factionSystem = new FactionSystem(this);
                 this.ui.onWorldRebuilt();
                 this.minimap.onWorldRebuilt?.();
             }
@@ -690,7 +708,12 @@ export class Game {
             this.crisisManager.activeCrisis = data.crises?.active || null;
             this.crisisManager.eventHistory = data.crises?.history || [];
             this.state.cases = data.cases || this.state.cases || { active: [], completed: [], evidence: [], nextCaseSeed: 1 };
-            this.state.factions = data.factions || this.state.factions || { list: [] };
+            this.state.factions = data.factions || this.state.factions || { list: ['citizens', 'police', 'gangs', 'corp'], reputation: {}, recentChanges: [] };
+            this.state.factions.list = this.state.factions.list || ['citizens', 'police', 'gangs', 'corp'];
+            this.state.factions.reputation = this.state.factions.reputation || {};
+            this.state.factions.recentChanges = this.state.factions.recentChanges || [];
+            this.state.meta.devTuning = this.state.meta.devTuning || { factionMultipliers: { hacks: 1, quests: 1, services: 1 } };
+            this.state.meta.devTuning.factionMultipliers = this.state.meta.devTuning.factionMultipliers || { hacks: 1, quests: 1, services: 1 };
             this.questEngine.deserialize(data.quests);
 
             // Restore player
@@ -715,11 +738,13 @@ export class Game {
             this.state.cases.completed = this.state.cases.completed || [];
             this.state.cases.evidence = this.state.cases.evidence || [];
             this.state.cases.nextCaseSeed = this.state.cases.nextCaseSeed || 1;
-            this.state.world = data.world || this.state.world || { anomalies: [] };
+            this.state.world = data.world || this.state.world || { anomalies: [], factionEncounters: [] };
+            this.state.world.factionEncounters = this.state.world.factionEncounters || [];
             this.interactables.generate(this.map);
             this.heatSystem.setHeat(this.state.player.heat ?? 0);
             this.caseManager = new CaseManager(this);
             this.evidenceSystem = new EvidenceSystem(this);
+            this.factionSystem = new FactionSystem(this);
             this.caseManager.rebuildQuestMap?.();
 
             this.ui.showMessage('Game loaded!', 'success');

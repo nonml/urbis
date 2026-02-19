@@ -168,6 +168,12 @@ export function validateGameState(state) {
         errors.push(...questErrors);
     }
 
+    // Validate factions
+    if (state.factions) {
+        const factionErrors = validateFactions(state.factions);
+        errors.push(...factionErrors);
+    }
+
     // Validate cases
     if (state.cases) {
         const caseErrors = validateCases(state.cases);
@@ -252,6 +258,24 @@ function validateMeta(meta) {
     if (meta.rngStreams) {
         const streamErrors = validateRNGStreams(meta.rngStreams);
         errors.push(...streamErrors);
+    }
+
+    if (meta.devTuning !== undefined) {
+        if (typeof meta.devTuning !== 'object') {
+            errors.push('meta.devTuning must be an object');
+        } else if (meta.devTuning.factionMultipliers !== undefined) {
+            const m = meta.devTuning.factionMultipliers;
+            if (!m || typeof m !== 'object') {
+                errors.push('meta.devTuning.factionMultipliers must be an object');
+            } else {
+                for (const key of ['hacks', 'quests', 'services']) {
+                    if (m[key] !== undefined) {
+                        const r = validateNonNegativeNumber(m[key], `meta.devTuning.factionMultipliers.${key}`, 0, 5);
+                        if (!r.ok) errors.push(...r.errors);
+                    }
+                }
+            }
+        }
     }
 
     return errors;
@@ -686,6 +710,35 @@ function validateCases(cases) {
         if (!r.ok) errors.push(...r.errors);
     }
 
+    return errors;
+}
+
+function validateFactions(factions) {
+    const errors = [];
+    if (!factions || typeof factions !== 'object') {
+        errors.push('factions must be an object');
+        return errors;
+    }
+
+    if (factions.list !== undefined && !Array.isArray(factions.list)) {
+        errors.push('factions.list must be an array');
+    }
+    if (factions.reputation !== undefined) {
+        if (typeof factions.reputation !== 'object' || factions.reputation === null) {
+            errors.push('factions.reputation must be an object');
+        } else {
+            for (const [id, value] of Object.entries(factions.reputation)) {
+                if (typeof value !== 'number' || Number.isNaN(value)) {
+                    errors.push(`factions.reputation.${id} must be a number`);
+                } else if (value < -100 || value > 100) {
+                    errors.push(`factions.reputation.${id} must be within -100..100`);
+                }
+            }
+        }
+    }
+    if (factions.recentChanges !== undefined && !Array.isArray(factions.recentChanges)) {
+        errors.push('factions.recentChanges must be an array');
+    }
     return errors;
 }
 

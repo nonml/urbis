@@ -4,6 +4,7 @@
 
 import { STEP_KINDS, createQuestInstance, QuestEngine } from '../quests/quest_engine.js';
 import { createInteractable, INTERACTABLE_TYPES } from '../interactables.js';
+import { eventBus } from '../events.js';
 import { DISTRICT_AMBIENT } from '../../audio/audio_manager.js';
 
 // Tutorial steps

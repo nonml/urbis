@@ -37,8 +37,8 @@
                     <div class="progress-fill" id="victory-progress" style="width: 0%"></div>
                 </div>
             </div>
-            <button class="btn btn-primary" id="victory-restart-btn">Play Again</button>
-            <button class="btn btn-secondary" id="victory-main-menu-btn">Main Menu</button>
+            <button class="btn btn-primary" id="victory-restart-btn" onclick="window.restartGame && window.restartGame()">Play Again</button>
+            <button class="btn btn-secondary" id="victory-main-menu-btn" onclick="window.showStartScreen && window.showStartScreen()">Main Menu</button>
         </div>
     </div>
 
@@ -168,7 +168,7 @@
             <h1>Dynamic City Builder</h1>
             <p id="version-display">Build 1.0.0</p>
             <p>Build and manage your own city with dynamic citizens, random events, and multiple victory paths.</p>
-            <button class="btn btn-primary" id="start-btn">Start Game</button>
+            <button class="btn btn-primary" id="start-btn" onclick="window.startGame && window.startGame()">Start Game</button>
             <div class="stats-grid" style="margin-top: 20px">
                 <div class="stat-item">
                     <div class="stat-label">Victory Types</div>
@@ -200,8 +200,8 @@
                     </select>
                 </div>
             </div>
-            <button class="btn btn-primary" id="restart-btn">Play Again</button>
-            <button class="btn btn-secondary" id="main-menu-btn">Main Menu</button>
+            <button class="btn btn-primary" id="restart-btn" onclick="window.restartGame && window.restartGame()">Play Again</button>
+            <button class="btn btn-secondary" id="main-menu-btn" onclick="window.showStartScreen && window.showStartScreen()">Main Menu</button>
         </div>
     </div>
 

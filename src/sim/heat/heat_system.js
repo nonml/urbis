@@ -30,7 +30,8 @@ export class HeatSystem {
 
     decay(seen = false) {
         if (seen) return this.getHeat();
-        return this.setHeat(this.getHeat() - this.decayPerTick);
+        const m = this.game.factionSystem?.getPerkSnapshot?.()?.modifiers?.heatDecayMultiplier ?? 1;
+        return this.setHeat(this.getHeat() - (this.decayPerTick * m));
     }
 
     getStateForHeat(heat) {
@@ -40,4 +41,3 @@ export class HeatSystem {
         return 'calm';
     }
 }
-

@@ -63,6 +63,21 @@ export class DevMenu {
                 label: 'Toggle Easy Hack',
                 description: 'Auto-succeed breach mini-game',
                 callback: () => this.toggleEasyHack()
+            },
+            tuneFactionHacksUp: {
+                label: 'Faction Hacks +',
+                description: 'Increase faction delta multiplier for hacks',
+                callback: () => this.adjustFactionMultiplier('hacks', +0.25)
+            },
+            tuneFactionHacksDown: {
+                label: 'Faction Hacks -',
+                description: 'Decrease faction delta multiplier for hacks',
+                callback: () => this.adjustFactionMultiplier('hacks', -0.25)
+            },
+            setPoliceHostile: {
+                label: 'Police Hostile',
+                description: 'Set police reputation to hostile for tuning',
+                callback: () => this.setFactionRep('police', -60)
             }
         };
     }
@@ -294,6 +309,22 @@ export class DevMenu {
         if (!this.game.state) return;
         this.game.state.debugEasyHack = !this.game.state.debugEasyHack;
         this.showMessage(`Easy hack: ${this.game.state.debugEasyHack ? 'ON' : 'OFF'}`);
+    }
+
+    adjustFactionMultiplier(category, delta) {
+        const meta = this.game.state.meta || (this.game.state.meta = {});
+        const devTuning = meta.devTuning || (meta.devTuning = {});
+        const fm = devTuning.factionMultipliers || (devTuning.factionMultipliers = { hacks: 1, quests: 1, services: 1 });
+        const prev = Number(fm[category] || 1);
+        const next = Math.max(0, Math.min(5, Math.round((prev + delta) * 100) / 100));
+        fm[category] = next;
+        this.showMessage(`Faction multiplier ${category}: ${next.toFixed(2)}`);
+    }
+
+    setFactionRep(faction, value) {
+        if (!this.game.factionSystem) return;
+        this.game.factionSystem.setReputation(faction, value, 'dev_override');
+        this.showMessage(`${faction} reputation set to ${value}`);
     }
 
     /**

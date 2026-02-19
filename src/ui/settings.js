@@ -1,8 +1,6 @@
 // Settings UI - Mouse sensitivity, volume, render scale, toggles
 // Settings persist in localStorage (not in save file)
 
-import { Renderer3D } from './renderer3d.js';
-
 // Default settings
 export const DEFAULT_SETTINGS = {
     mouseSensitivity: 0.005,

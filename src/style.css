@@ -428,7 +428,7 @@ body {
     align-items: center;
     z-index: 100;
     animation: fadeIn 0.5s ease;
-    pointer-events: none;
+    pointer-events: auto;
 }
 
 .overlay.hidden {
@@ -1648,4 +1648,55 @@ body {
     background: #1d1d1d;
     border-radius: 2px;
     box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
+}
+
+.factions-panel {
+    position: absolute;
+    right: 16px;
+    top: 76px;
+    width: min(360px, 40vw);
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(20, 30, 24, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.24);
+    color: #eef6ef;
+    z-index: 65;
+    font-size: 12px;
+}
+
+.factions-title {
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.f-row {
+    display: grid;
+    grid-template-columns: 66px 1fr 36px 54px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+}
+
+.f-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.18);
+    border-radius: 999px;
+    overflow: hidden;
+}
+
+.f-fill {
+    height: 100%;
+    width: 50%;
+    background: linear-gradient(90deg, #de5e5e, #f0c95f, #4fbf74);
+}
+
+.f-band {
+    text-transform: lowercase;
+    opacity: 0.9;
+}
+
+.factions-changes {
+    margin-top: 6px;
+    font-size: 11px;
+    opacity: 0.95;
 }

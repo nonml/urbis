@@ -621,20 +621,13 @@ export class QuestEngine {
     }
 
     applyFactionImpact(faction, impact) {
-        const factions = this.game.state.factions || (this.game.state.factions = {});
-        factions.reputation = factions.reputation || {};
-
-        const applyOne = (key, delta) => {
-            const prev = Number(factions.reputation[key] || 0);
-            factions.reputation[key] = Math.max(-100, Math.min(100, prev + delta));
-        };
-
+        const fs = this.game.factionSystem;
+        if (!fs) return;
         if (faction === 'all_factions') {
-            ['citizens', 'police', 'gangs', 'corp'].forEach((f) => applyOne(f, impact));
+            ['citizens', 'police', 'gangs', 'corp'].forEach((f) => fs.modifyRep(f, impact, 'quest_outcome_all', 'quests'));
             return;
         }
-
-        applyOne(faction, impact);
+        fs.modifyRep(faction, impact, `quest_outcome_${faction}`, 'quests');
     }
 
     update() {

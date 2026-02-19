@@ -27,6 +27,13 @@ export function createNewGameState(options = {}) {
             createdAt: Date.now(),
             runId: randomId('run'),
             rngStreams: rngStreamSeeds,
+            devTuning: {
+                factionMultipliers: {
+                    hacks: 1,
+                    quests: 1,
+                    services: 1,
+                }
+            }
         },
         time: {
             tick: 0,
@@ -77,13 +84,21 @@ export function createNewGameState(options = {}) {
             nextCaseSeed: 1,
         },
         factions: {
-            list: [],
+            list: ['citizens', 'police', 'gangs', 'corp'],
+            reputation: {
+                citizens: 0,
+                police: 0,
+                gangs: 0,
+                corp: 0,
+            },
+            recentChanges: [],
         },
         world: {
             anomalies: [],
             blackouts: [],
             trafficSwitches: [],
             unlockedDoors: [],
+            factionEncounters: [],
         },
         player: {
             x: 0,

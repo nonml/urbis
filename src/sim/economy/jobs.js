@@ -139,10 +139,9 @@ export class JobsManager {
         };
     }
 
-    applyWages(resources) {
-        const wageCost = Math.max(0, Math.floor(this.totalWageCost));
+    applyWages(resources, multiplier = 1) {
+        const wageCost = Math.max(0, Math.floor(this.totalWageCost * Math.max(0, multiplier)));
         resources.remove('gold', wageCost);
         return wageCost;
     }
 }
-

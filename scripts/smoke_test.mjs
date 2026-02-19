@@ -257,6 +257,9 @@ testQuestRewardsUnlocksV2();
 testCaseManagerPersistenceV1();
 testEvidenceSystemV1();
 testCaseArchetypesAssemblyV1();
+testFactionRegistryTrackingV1();
+testFactionPerksHostilityV1();
+testFactionTuningV1();
 
 function testInteractPrompt() {
     console.log('\n[8] Interact Prompt + Action Dispatch (Ticket B-3)');
@@ -955,6 +958,101 @@ function testCaseArchetypesAssemblyV1() {
         assert(stepIds.has(cond.thenStep) && stepIds.has(cond.elseStep), 'Conditional references coherent step ids');
     } catch (e) {
         console.log(`  ✗ Case archetype assembly test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testFactionRegistryTrackingV1() {
+    console.log('\n[27] Faction Registry + Reputation Tracking (Ticket J-1)');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 190190, mode: 'standard' });
+        game.init();
+
+        const rep = game.state.factions?.reputation || {};
+        assert(['citizens', 'police', 'gangs', 'corp'].every((k) => k in rep), 'All 4 faction ids exist');
+
+        const before = game.factionSystem.getReputation('police');
+        game.factionSystem.modifyRep('police', -15, 'test_delta', 'quests');
+        const after = game.factionSystem.getReputation('police');
+        assert(after === before - 15, 'modifyRep applies deterministic delta');
+        assert((game.state.factions.recentChanges || []).length > 0, 'Rep changes are logged');
+
+        game.factionSystem.setReputation('police', -300, 'clamp_test');
+        assert(game.factionSystem.getReputation('police') === -100, 'Reputation is clamped to -100');
+        game.factionSystem.setReputation('police', 300, 'clamp_test');
+        assert(game.factionSystem.getReputation('police') === 100, 'Reputation is clamped to +100');
+    } catch (e) {
+        console.log(`  ✗ Faction registry test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testFactionPerksHostilityV1() {
+    console.log('\n[28] Faction Perks + Hostility Rules (Ticket J-2)');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 200200, mode: 'standard' });
+        game.init();
+
+        // Police friendly should improve heat decay.
+        game.heatSystem.setHeat(20);
+        game.factionSystem.setReputation('police', 70, 'test_friendly');
+        const beforeDecay = game.state.player.heat;
+        game.heatSystem.decay(false);
+        const dropFriendly = beforeDecay - game.state.player.heat;
+
+        game.heatSystem.setHeat(20);
+        game.factionSystem.setReputation('police', -70, 'test_hostile');
+        const beforeDecayHostile = game.state.player.heat;
+        game.heatSystem.decay(false);
+        const dropHostile = beforeDecayHostile - game.state.player.heat;
+        assert(dropFriendly > dropHostile, 'Police-friendly rep increases heat decay versus hostile');
+
+        // Corp rep should alter wage burden via perk multiplier.
+        game.jobsManager.totalWageCost = 100;
+        game.resources.gold = 1000;
+        game.factionSystem.setReputation('corp', 70, 'test_corp_friendly');
+        const wageFriendly = game.jobsManager.applyWages(game.resources, game.factionSystem.getPerkSnapshot().modifiers.wageMultiplier || 1);
+        game.resources.gold = 1000;
+        game.factionSystem.setReputation('corp', -70, 'test_corp_hostile');
+        const wageHostile = game.jobsManager.applyWages(game.resources, game.factionSystem.getPerkSnapshot().modifiers.wageMultiplier || 1);
+        assert(wageFriendly < wageHostile, 'Corp-friendly rep reduces wages versus hostile');
+
+        // Hostility encounter stub should fire when gang/police rep is hostile.
+        const encountersBefore = (game.state.world.factionEncounters || []).length;
+        game.state.time.tick += 10;
+        game.factionSystem.setReputation('gangs', -80, 'test_hostile_gang');
+        game.factionSystem.update();
+        const encountersAfter = (game.state.world.factionEncounters || []).length;
+        assert(encountersAfter > encountersBefore, 'Hostile rep emits encounter notifications');
+    } catch (e) {
+        console.log(`  ✗ Faction perks/hostility test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testFactionTuningV1() {
+    console.log('\n[29] Faction UI/Tuning Multipliers (Ticket J-3)');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 210210, mode: 'standard' });
+        game.init();
+
+        const meta = game.state.meta || {};
+        assert(meta.devTuning?.factionMultipliers !== undefined, 'Dev tuning multipliers exist in state.meta');
+
+        const before = game.factionSystem.getReputation('police');
+        game.state.meta.devTuning.factionMultipliers.hacks = 2;
+        game.factionSystem.modifyRep('police', -3, 'tuned_hack_delta', 'hacks');
+        const after = game.factionSystem.getReputation('police');
+        assert(after === before - 6, 'Tuning multiplier affects deltas immediately');
+
+        // Ensure recent change has a reason suitable for UI explainability.
+        const last = (game.state.factions.recentChanges || []).slice(-1)[0];
+        assert(typeof last.reason === 'string' && last.reason.length > 0, 'Recent faction change carries a reason');
+    } catch (e) {
+        console.log(`  ✗ Faction tuning test failed: ${e.message}`);
         console.log(`  Stack: ${e.stack}`);
         failCount++;
     }

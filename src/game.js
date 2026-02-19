@@ -20,7 +20,7 @@ import { RivalAI } from './sim/rival/rival_ai.js';
 import { ProgressionManager } from './sim/progression.js';
 import { createTutorialManager } from './sim/tutorial/tutorial.js';
 import { eventBus } from './sim/events.js';
-import { VERSION, BUILD_TIMESTAMP } from './version.js';
+import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 import { ChunkManager } from './world/chunks.js';
 import { validatePlacement } from './build/placement.js';
 import { EconomyLedger } from './sim/economy/ledger.js';
@@ -33,6 +33,7 @@ import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
+import { FactionSystem } from './sim/factions/faction_system.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -144,6 +145,7 @@ export class Game {
         this.questEngine = new QuestEngine(this);
         this.caseManager = new CaseManager(this);
         this.evidenceSystem = new EvidenceSystem(this);
+        this.factionSystem = new FactionSystem(this);
         this.questLogUI = this.isHeadless ? null : new QuestLogUI(this);
 
         // Rival AI system - uses rival stream for independent determinism
@@ -311,7 +313,8 @@ export class Game {
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
         this.economyLedger.addDelta(ledgerTick, 'gold', -(upkeep || 0), 'buildings_upkeep');
-        const wages = this.jobsManager.applyWages(this.resources);
+        const wageMult = this.factionSystem.getPerkSnapshot().modifiers.wageMultiplier ?? 1;
+        const wages = this.jobsManager.applyWages(this.resources, wageMult);
         this.economyLedger.addDelta(ledgerTick, 'gold', -wages, 'wages');
 
         // 2a. Citizen baseline food consumption
@@ -343,6 +346,9 @@ export class Game {
         // 5a. Services + citizen effects
         this.servicesManager.update();
         this.servicesManager.applyCitizenEffects(this.citizens.citizens);
+        const policeCov = this.servicesManager.metrics?.city?.police || 0;
+        if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
+        else if (policeCov > 0.6) this.factionSystem.modifyRep('citizens', 0.25, 'safe_streets', 'services');
         if (this.servicesManager.metrics.city.brownout) {
             this.powerShortageTicks++;
             if (this.powerShortageTicks === 1 || this.powerShortageTicks % 5 === 0) {
@@ -354,6 +360,7 @@ export class Game {
 
         // 5b. Emergent anomaly detectors
         this.anomalyDetectors.run(this.state.time.tick);
+        this.factionSystem.update();
 
         // 6. Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {
@@ -626,6 +633,8 @@ export class Game {
             this.interactables.cancelHack(interactable);
             this.interactables.setCooldown(interactable, tick + 10);
             const heat = this.heatSystem.addHeat(5);
+            this.factionSystem.modifyRep('police', -3, 'failed_loud_hack', 'hacks');
+            this.factionSystem.modifyRep('citizens', -1, 'failed_loud_hack', 'hacks');
             return { ok: true, success: false, cooldownUntil: tick + 10, heat };
         }
 
@@ -633,8 +642,16 @@ export class Game {
         const action = this.pickHackAction(interactable);
         const actionResult = this.interactables.performHackAction(interactable, action, tick);
         if (actionResult.ok) {
-            if (actionResult.loud) this.heatSystem.addHeat(12);
-            else this.heatSystem.addHeat(-2);
+            if (actionResult.loud) {
+                this.heatSystem.addHeat(12);
+                this.factionSystem.modifyRep('police', -4, `hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('citizens', -1, `hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('gangs', 1, `hack_${action}`, 'hacks');
+            } else {
+                this.heatSystem.addHeat(-2);
+                this.factionSystem.modifyRep('citizens', 1, `stealth_hack_${action}`, 'hacks');
+                this.factionSystem.modifyRep('corp', 1, `stealth_hack_${action}`, 'hacks');
+            }
         }
         return {
             ok: true,
@@ -807,6 +824,7 @@ export class Game {
                 this.interactables.game = this;
                 this.caseManager = new CaseManager(this);
                 this.evidenceSystem = new EvidenceSystem(this);
+                this.factionSystem = new FactionSystem(this);
                 this.questEngine.rng = this.rngStreams.quest;
                 this.ui.onWorldRebuilt();
                 this.minimap.onWorldRebuilt?.();
@@ -883,7 +901,12 @@ export class Game {
 
             // Restore cases evidence
             this.state.cases = data.cases || { active: [], completed: [], evidence: [], nextCaseSeed: 1 };
-            this.state.factions = data.factions || { list: [] };
+            this.state.factions = data.factions || { list: ['citizens', 'police', 'gangs', 'corp'], reputation: {}, recentChanges: [] };
+            this.state.factions.list = this.state.factions.list || ['citizens', 'police', 'gangs', 'corp'];
+            this.state.factions.reputation = this.state.factions.reputation || {};
+            this.state.factions.recentChanges = this.state.factions.recentChanges || [];
+            this.state.meta.devTuning = this.state.meta.devTuning || { factionMultipliers: { hacks: 1, quests: 1, services: 1 } };
+            this.state.meta.devTuning.factionMultipliers = this.state.meta.devTuning.factionMultipliers || { hacks: 1, quests: 1, services: 1 };
 
             // Restore player
             if (data.player) {
@@ -914,12 +937,14 @@ export class Game {
             this.state.cases.completed = this.state.cases.completed || [];
             this.state.cases.evidence = this.state.cases.evidence || [];
             this.state.cases.nextCaseSeed = this.state.cases.nextCaseSeed || 1;
-            this.state.world = data.world || this.state.world || { anomalies: [] };
+            this.state.world = data.world || this.state.world || { anomalies: [], factionEncounters: [] };
+            this.state.world.factionEncounters = this.state.world.factionEncounters || [];
             this.goalsManager.setMode(this.state.progress.mode || 'standard');
             this.interactables.generate(this.map);
             this.heatSystem.setHeat(this.state.player.heat ?? 0);
             this.caseManager = new CaseManager(this);
             this.evidenceSystem = new EvidenceSystem(this);
+            this.factionSystem = new FactionSystem(this);
             this.caseManager.rebuildQuestMap?.();
 
             this.ui.showMessage('Game loaded!', 'success');
