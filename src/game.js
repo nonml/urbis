@@ -99,7 +99,8 @@ export class Game {
         this.state.progress.mode = mode;
 
         // Initialize systems with references to state
-        this.resources = this.state.resources;
+        this.resources = new Resources(this.state.resources);
+        this.resources.syncFromState();
         this.map = new Map(this.state.map.width, this.state.map.height, this.state.meta.seed, this.rngStreams.world);
         this.citizens = new CitizenManager(this.rngStreams.sim);
         this.buildings = new BuildingManager(this);
