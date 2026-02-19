@@ -259,8 +259,6 @@ export class UIManager {
 
     async loadRenderer3D() {
         try {
-            const gl = this.canvas?.getContext?.('webgl2') || this.canvas?.getContext?.('webgl') || this.canvas?.getContext?.('experimental-webgl');
-            if (!gl) throw new Error('WebGL context unavailable.');
             const mod = await import('./renderer3d.js');
             const Renderer3D = mod?.Renderer3D;
             if (!Renderer3D) throw new Error('Renderer3D export missing.');
