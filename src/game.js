@@ -18,7 +18,7 @@ import { QuestLogUI } from './ui/quest_log.js';
 import { loadQuestsFromDirectory } from './content/loader.js';
 import { RivalAI } from './sim/rival/rival_ai.js';
 import { ProgressionManager } from './sim/progression.js';
-import { createTutorialManager } from './sim/tutorial/tutorial.js';
+import { createTutorialManager } from './sim/tutorial/tutorial.js?v=20260220b';
 import { eventBus } from './sim/events.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 import { ChunkManager } from './world/chunks.js';
