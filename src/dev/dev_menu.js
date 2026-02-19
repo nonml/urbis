@@ -1,4 +1,16 @@
 // Dev Menu - Debug tools for quest testing
+
+// Non-deterministic helper (no Math.random). Dev-only.
+function randomIndex(len) {
+    const cryptoObj = globalThis.crypto;
+    if (cryptoObj && cryptoObj.getRandomValues) {
+        const b = new Uint32Array(1);
+        cryptoObj.getRandomValues(b);
+        return (b[0] >>> 0) % len;
+    }
+    return 0;
+}
+
 // Accessible via debug overlay (enable via console or build flag)
 
 /**
@@ -249,7 +261,7 @@ export class DevMenu {
             'ANOMALY_BLACKMAIL'
         ];
 
-        const type = anomalyTypes[Math.floor(Math.random() * anomalyTypes.length)];
+        const type = anomalyTypes[randomIndex(anomalyTypes.length)];
         this.game.questEngine.handleAnomaly(type, { random: true });
         this.showMessage(`Triggered anomaly: ${type}`);
     }

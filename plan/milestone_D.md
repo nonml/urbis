@@ -1,193 +1,113 @@
-# Milestone D — Rival AI + Progression + Win/Lose (target: 0.10.x / pre-1.0)
+# Milestone D: Mega-city performance: chunk streaming, instancing, navigation grid
 
-## Objective 🤖
-Add the “adversarial city controller” and define the actual game:
-- Rival AI applies pressure and counters your strategy
-- Progression/unlocks give long-term goals
-- Multiple victory conditions (economic / stability / influence)
-- Failure states (collapse, takeover, runaway crisis)
+## Objective
+Make MEGA playable by streaming world chunks and providing nav data used for citizens/vehicles later.
 
----
-
-## Milestone Exit Criteria (Acceptance)
-- ✅ Rival AI exists and acts at least every N ticks
-- ✅ Rival actions are readable (telegraphed to player) and counterable
-- ✅ Player can win/lose a run with clear screens and stats
-- ✅ Difficulty scaling works across Small → MEGA
-
-## DoD
-- Rival does not soft-lock the game (always counterplay)
-- Rival decisions deterministic per seed (plus your actions)
-
----
+## Exit criteria (acceptance for milestone)
+- MEGA loads with a progress indicator and becomes playable under 10 seconds on typical dev PC.
+- Camera/render stays above 30 FPS in dense districts (dev overlay).
+- Chunk system streams terrain/buildings/POIs around player.
+- Navigation grid exists and basic path queries work.
 
 ## Phases
-1) Rival model + telemetry
-2) Counter-systems (heat, security, public opinion)
-3) Progression & win/lose
-4) Balance
-
----
+- D1: Chunked world representation
+- D2: Renderer instancing + culling
+- D3: Navigation grid + path query API
 
 ## Tickets
 
-### D-01 — Rival AI model (goals + budget + actions)
-**Phase:** 1 — Rival model + telemetry
-**Objective:** A consistent “opponent” that reacts.
+## Ticket D-1: Chunk manager v1 (terrain + road + parcels)
+- **Phase:** D1
+- **Depends on:** C-3
 
-**Design**
-- Rival has:
-  - `influence`, `budget`, `heat`, `intel`
-- Chooses one action from a deck based on city state.
+### Objective
+Partition the map into chunks and load/unload chunk render data based on player position.
 
-**Specs**
-- `state.rival = { influence, budget, heat, lastActionTick, ... }`
-- `src/sim/rival/rival_ai.js`
+### Design
+Use fixed chunk size (e.g., 32x32). Keep sim data global, but render data per chunk. Maintain active chunk radius (e.g., 3 chunks).
 
-**Implementation details**
-1. Define action catalog:
-  - sabotage grid, spread propaganda, poach workers, trigger gang activity
-2. Action selection uses weighted utility:
-  - respond to your strengths (if economy booming → sabotage trade)
-3. Apply action with clear player notification.
+### Specs
+- Chunk size: 32 tiles; active radius: 3 chunks.
+- Unload far chunks after 2 seconds out of range.
+- Never unload chunk containing active quest markers.
 
-**Acceptance**
-- Rival performs at least 3 distinct actions in a 15-min run.
+### Implementation details
+- Add `src/world/chunks.js` with `getChunkId(x,y)` and `getChunkBounds(id)`.
+- Renderer requests `getVisibleChunks(playerPos)` each frame.
+- Build placement must request parcel data from global map, not render chunks.
 
-**DoD**
-- Rival actions logged to history with timestamps and causes.
+### Acceptance
+- Walking across the city streams chunks without stutter spikes > 50ms.
+- Memory use stabilizes (does not grow endlessly).
 
----
+### DoD (Definition of Done)
+- Dev overlay shows active chunk count.
+- MEGA preset: active chunks <= 49 (7x7).
 
-### D-02 — Heat / Wanted / Exposure system
-**Phase:** 2 — Counter-systems
-**Objective:** Give consequences to hacking + aggressive play.
+### QA checklist
+- Sprint diagonally across map for 3 minutes; no crash/no leak.
+- Place buildings then walk away and back; they persist.
 
-**Design**
-- Player generates “heat” by hacking frequently or choosing extreme options.
-- High heat increases:
-  - police presence (movement penalty)
-  - rival aggression
-  - chance of certain crises.
+## Ticket D-2: Renderer instancing pass (terrain/buildings/citizens)
+- **Phase:** D2
+- **Depends on:** D-1
 
-**Specs**
-- `state.player.heat`
-- Decay over time; reduced by certain buildings/policies.
+### Objective
+Keep draw calls low and stable for MEGA.
 
-**Implementation details**
-1. Add heat gain to hacking nodes and case outcomes.
-2. Add UI meter + warnings.
+### Design
+Use `THREE.InstancedMesh` per terrain type and per building type per chunk. Update only dirty chunks.
 
-**Acceptance**
-- Heat changes gameplay (not just a number).
+### Specs
+- Terrain instanced meshes per chunk: 4 types max.
+- Buildings instanced meshes per chunk: per type; keep under 200 instances per mesh when possible.
+- Citizens render: pooled instanced spheres; update transforms only.
 
-**DoD**
-- Heat is deterministic and saved/loaded.
+### Implementation details
+- Add dirty flags: `chunk.dirtyTerrain`, `chunk.dirtyBuildings`.
+- Batch updates on sim tick, not every frame.
+- Add simple frustum culling per chunk.
 
----
+### Acceptance
+- MEGA: draw calls remain under 400 (target) in typical view.
+- FPS stays above 30 in dense areas.
 
-### D-03 — Security & countermeasures
-**Phase:** 2 — Counter-systems
-**Objective:** Counterplay to rival.
+### DoD (Definition of Done)
+- No per-frame geometry creation for citizens/terrain.
+- Profiler note in docs: expected budgets.
 
-**Design**
-- Buildings/policies that reduce vulnerabilities:
-  - CCTV upgrades
-  - grid redundancy
-  - social programs
-  - anti-corruption offices
+### QA checklist
+- Rotate camera in place for 60 seconds; FPS stable.
+- Spawn 500 citizens; FPS drop is graceful.
 
-**Specs**
-- Add building upgrades: `level 1..3`
-- `BUILDING_TYPES` extended with upgrade effects.
+## Ticket D-3: Navigation grid API (walkability + A*)
+- **Phase:** D3
+- **Depends on:** C-2, D-1
 
-**Implementation details**
-1. Implement upgrade costs + effects.
-2. Rival action success chance reduced by defenses.
+### Objective
+Provide pathfinding that citizens and missions can rely on.
 
-**Acceptance**
-- Player can meaningfully reduce impact of at least 2 rival actions.
+### Design
+Create a grid of walkable tiles (roads+sidewalk+parks). Implement A* with Manhattan/diagonal costs. Cache results per chunk and invalidate when buildings block tiles.
 
-**DoD**
-- Upgrade UI and save schema updated.
+### Specs
+- API: `nav.isWalkable(x,y)`, `nav.findPath(a,b)` returns polyline of tiles.
+- Max path length hard cap (e.g., 2048 nodes) with fallback.
+- Path queries must be deterministic (use stable tie-breaker).
 
----
+### Implementation details
+- Add `src/sim/nav/nav_grid.js`.
+- Store blocked tiles from buildings (footprints).
+- Add debug mode: render nav grid around player.
 
-### D-04 — Progression & unlocks
-**Phase:** 3 — Progression & win/lose
-**Objective:** Long-term motivation within a run.
+### Acceptance
+- Citizen can navigate from one district center to another without getting stuck (basic test).
+- Building placement updates nav walkability.
 
-**Design**
-- Unlocks triggered by:
-  - district stability
-  - completed case files
-  - tech tree points
+### DoD (Definition of Done)
+- Unit test: path exists on road graph centers.
+- A* tie-breaker documented to avoid nondeterministic choices.
 
-**Specs**
-- `state.progression = { unlocked: [], points: ... }`
-- UI screen “Tech” toggle: `T`
-
-**Implementation details**
-1. Define unlock catalog in content JSON.
-2. Apply unlock effects to available buildings/hacks.
-
-**Acceptance**
-- Completing a case unlocks a new capability.
-
-**DoD**
-- Unlocks persist through save/load and are deterministic.
-
----
-
-### D-05 — Win/Lose conditions + end screens
-**Phase:** 3 — Progression & win/lose
-**Objective:** Define “what is a run”.
-
-**Design**
-- Victory conditions (choose at run start):
-  - Economic: reach X income and keep stability for Y days
-  - Influence: complete main case + reach influence threshold
-  - Stability: survive Z days with low crisis severity
-- Failure:
-  - bankruptcy, population collapse, takeover by rival
-
-**Specs**
-- `state.runGoals`
-- `src/sim/run_conditions.js`
-
-**Implementation details**
-1. Add goal picker UI at start.
-2. Evaluate each tick; if met, pause and show end screen.
-
-**Acceptance**
-- A run can end with clear “You Win/You Lose” and stats summary.
-
-**DoD**
-- End screens show replay seed and major choices.
-
----
-
-### D-06 — Balance pass (economy, crisis, rival)
-**Phase:** 4 — Balance
-**Objective:** Make the game “playable”, not chaotic.
-
-**Design**
-- Tune:
-  - production rates
-  - citizen needs
-  - crisis thresholds
-  - rival pacing
-- Use 10 fixed seeds for regression.
-
-**Specs**
-- `docs/BALANCE_SEEDS.md` with 10 seeds and expected outcomes.
-
-**Implementation details**
-1. Add a “simulate 5 minutes fast” dev tool.
-2. Adjust constants iteratively.
-
-**Acceptance**
-- Small and Mega both feel fair and winnable.
-
-**DoD**
-- Balance changes documented with rationale.
+### QA checklist
+- Place a building blocking a road; path reroutes or fails gracefully.
+- MEGA path query average < 5ms for 100 queries (dev overlay).

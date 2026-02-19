@@ -13,6 +13,14 @@ export const TERRAIN_WATER = 0;
 export const TERRAIN_GRASS = 1;
 export const TERRAIN_FOREST = 2;
 export const TERRAIN_MOUNTAIN = 3;
+export const TERRAIN_ROAD = 4;
+export const TERRAIN_SIDEWALK = 5;
+export const TERRAIN_PARK = 6;
+
+// Interactable node types (stored as tile modifiers)
+export const INTERACTABLE_POWER_SUBSTATION = 'power_substation';
+export const INTERACTABLE_CCTV_POLE = 'cctv_pole';
+export const INTERACTABLE_TELECOM_BOX = 'telecom_box';
 
 export const TERRAIN_COLORS = {
     [TERRAIN_WATER]: '#4da6ff',
@@ -158,6 +166,79 @@ export const BUILDING_LEVELS = {
     2: { name: 'Improved', multiplier: 1.3, description: '+30% efficiency' },
     3: { name: 'Advanced', multiplier: 1.6, description: '+60% efficiency' },
     4: { name: 'Premium', multiplier: 2.0, description: '+100% efficiency' }
+};
+
+// Rival AI constants
+export const RIVAL_CONFIG = {
+    baseInfluence: 50,
+    baseBudget: 500,
+    baseHeat: 10,
+    baseIntel: 30,
+    actionInterval: 5, // Minimum ticks between actions
+    heatDecay: 2, // Heat decreases per tick
+    budgetRegen: 20, // Budget regenerates per tick
+    maxHeat: 100,
+    maxBudget: 2000,
+    maxInfluence: 100
+};
+
+// Rival action types
+export const RIVAL_ACTION_SABOTAGE_GRID = 'sabotage_grid';
+export const RIVAL_ACTION_SPREAD_PROPAGANDA = 'spread_propaganda';
+export const RIVAL_ACTION_POACH_WORKERS = 'poach_workers';
+export const RIVAL_ACTION_TRIGGER_GANG_ACTIVITY = 'trigger_gang_activity';
+export const RIVAL_ACTION_BRIBE_OFFICIALS = 'bribe_officials';
+export const RIVAL_ACTION_ECONOMIC_SPYING = 'economic_spying';
+export const RIVAL_ACTION_MEDIA_BLACKOUT = 'media_blackout';
+export const RIVAL_ACTION_COOLDOWN = 'cooldown';
+
+// Security/countermeasure buildings
+export const BUILDING_POLICE_STATION = 'police-station';
+export const BUILDING_CCTV_NETWORK = 'cctv-network';
+export const BUILDING_COUNTERINTEL = 'counterintel';
+export const BUILDING_PROPAGANDA_OFFICE = 'propaganda-office';
+
+export const BUILDING_SECURITY = {
+    [BUILDING_POLICE_STATION]: {
+        name: 'Police Station',
+        icon: '👮',
+        description: 'Reduces heat gain and rival success chance',
+        cost: { gold: 100, wood: 80, food: 50 },
+        income: { gold: -5, food: 0, wood: 0 },
+        upkeep: 10,
+        heatReduction: 5,
+        rivalChanceReduction: 0.15
+    },
+    [BUILDING_CCTV_NETWORK]: {
+        name: 'CCTV Network',
+        icon: '📹',
+        description: 'Surveillance reduces sabotage and espionage',
+        cost: { gold: 80, wood: 60, food: 30 },
+        income: { gold: -3, food: 0, wood: 0 },
+        upkeep: 8,
+        heatReduction: 2,
+        rivalChanceReduction: 0.10
+    },
+    [BUILDING_COUNTERINTEL]: {
+        name: 'Counter-Intel Office',
+        icon: '🕵️',
+        description: 'Detects and neutralizes rival espionage',
+        cost: { gold: 150, wood: 100, food: 70 },
+        income: { gold: -8, food: 0, wood: 0 },
+        upkeep: 12,
+        heatReduction: 8,
+        rivalChanceReduction: 0.20
+    },
+    [BUILDING_PROPAGANDA_OFFICE]: {
+        name: 'Propaganda Office',
+        icon: '📢',
+        description: 'Boosts citizen morale and counters rival propaganda',
+        cost: { gold: 70, wood: 50, food: 40 },
+        income: { gold: -2, food: 0, wood: 0 },
+        upkeep: 6,
+        happinessBoost: 5,
+        rivalChanceReduction: 0.10
+    }
 };
 
 // Upgrade costs by level

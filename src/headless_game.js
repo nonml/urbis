@@ -6,7 +6,7 @@ import { CitizenManager } from './citizen.js';
 import { BuildingManager } from './buildings.js';
 import { CrisisManager } from './crisis.js';
 import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS } from './constants.js';
-import { RNG } from './rng.js';
+import { RNG, randomSeed32 } from './rng.js';
 import { createNewGameState, validateGameState } from './state/game_state.js';
 import { ScheduleManager } from './sim/schedule.js';
 
@@ -58,7 +58,7 @@ export class Game {
         const seed = options.seed;
 
         // Use seeded RNG for world generation, but seed from options or random
-        const worldSeed = (seed ?? Math.floor(Math.random() * 1000000)) >>> 0;
+        const worldSeed = (seed ?? randomSeed32()) >>> 0;
         this.rng = new RNG(worldSeed);
 
         // Create fresh GameState - this is the single source of truth

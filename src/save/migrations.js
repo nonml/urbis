@@ -1,6 +1,17 @@
 // Migration functions for save schema versions
 // Each function transforms state from oldVersion to oldVersion+1
 
+function newRunId() {
+    const cryptoObj = globalThis.crypto;
+    if (cryptoObj && cryptoObj.randomUUID) return cryptoObj.randomUUID();
+    if (cryptoObj && cryptoObj.getRandomValues) {
+        const bytes = new Uint8Array(16);
+        cryptoObj.getRandomValues(bytes);
+        return [...bytes].map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+    return `${Date.now().toString(16)}_${(Date.now() ^ 0x9e3779b9).toString(16)}`;
+}
+
 /**
  * Migration v0 -> v1 (initial version)
  * This is a placeholder - original saves didn't have schemaVersion
@@ -17,7 +28,7 @@ export function migrateV0ToV1(state) {
             mapWidth: state.meta?.mapWidth ?? 96,
             mapHeight: state.meta?.mapHeight ?? 96,
             createdAt: Date.now(),
-            runId: Math.random().toString(36).slice(2),
+            runId: newRunId(),
         };
     }
 

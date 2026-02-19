@@ -9,6 +9,8 @@
     --stardew-gold-light: #f0c808;
     --stardew-wood: #8b5a2b;
     --stardew-wood-light: #a06b3a;
+    --stardew-heat: #ff4444;
+    --stardew-heat-light: #ffcccc;
     --stardew-text: #3d3d3d;
     --stardew-bg: #f4e4bc;
     --stardew-card-bg: #e8d5b0;
@@ -84,6 +86,56 @@ body {
 .resource#day-display {
     background: var(--stardew-gold-light);
     border-color: var(--stardew-gold);
+}
+
+/* Heat Meter */
+.resource.heat-meter {
+    background: var(--stardew-heat-light);
+    border-color: var(--stardew-heat);
+}
+
+.resource.heat-meter .icon {
+    font-size: 22px;
+}
+
+.resource.heat-meter .heat-bar-container {
+    display: flex;
+    flex-direction: column;
+    width: 80px;
+}
+
+.resource.heat-meter .heat-bar {
+    width: 100%;
+    height: 12px;
+    background: #333;
+    border-radius: 6px;
+    overflow: hidden;
+}
+
+.resource.heat-meter .heat-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ffaa00, #ff4444);
+    transition: width 0.3s ease;
+}
+
+.resource.heat-meter .heat-label {
+    font-size: 14px;
+    color: var(--stardew-text);
+    text-align: center;
+    margin-top: 4px;
+}
+
+/* Security Buildings in Panel */
+.building-card.security-building {
+    border: 2px solid #4488ff;
+    box-shadow: 0 0 8px rgba(68, 136, 255, 0.3);
+}
+
+.building-card.security-building .building-security-note {
+    font-size: 12px;
+    color: #4488ff;
+    margin-top: 6px;
+    font-style: italic;
 }
 
 /* Main Game Area */
@@ -364,10 +416,12 @@ body {
     align-items: center;
     z-index: 100;
     animation: fadeIn 0.5s ease;
+    pointer-events: none;
 }
 
 .overlay.hidden {
     display: none;
+    pointer-events: none;
 }
 
 .overlay-content {
@@ -385,6 +439,7 @@ body {
     border: 8px solid var(--stardew-wood);
     box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
     position: relative;
+    pointer-events: auto;
 }
 
 .overlay-content::before {
@@ -755,4 +810,754 @@ body {
     font-size: 12px;
     color: #555;
     line-height: 1.4;
+}
+
+/* Quest Log Panel */
+.quest-log-panel {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 450px;
+    max-height: 80vh;
+    background: repeating-linear-gradient(
+        45deg,
+        #fff8e1,
+        #fff8e1 10px,
+        #fff0d1 10px,
+        #fff0d1 20px
+    );
+    border: 8px solid var(--stardew-wood);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+}
+
+.quest-log-panel.open {
+    display: flex;
+}
+
+.quest-log-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.1);
+    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+}
+
+.quest-log-header h2 {
+    font-size: 18px;
+    color: var(--stardew-green-dark);
+    text-transform: uppercase;
+    font-weight: 700;
+}
+
+.quest-log-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--stardew-green-dark);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.quest-log-content {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+}
+
+.quest-list {
+    width: 50%;
+    padding: 12px;
+    border-right: 3px solid rgba(0, 0, 0, 0.1);
+    overflow-y: auto;
+}
+
+.quest-list h3 {
+    font-size: 14px;
+    color: var(--stardew-wood);
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    font-weight: 700;
+}
+
+.quest-list-items {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.quest-list-item {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.quest-list-item:hover {
+    border-color: var(--stardew-green-light);
+    background: var(--stardew-card-bg);
+}
+
+.quest-list-item.quest-completed {
+    opacity: 0.6;
+    border-color: #aaa;
+}
+
+.quest-status {
+    font-size: 11px;
+    padding: 3px 8px;
+    border-radius: 12px;
+    background: var(--stardew-green);
+    color: #fff;
+    font-weight: 700;
+}
+
+.quest-details {
+    width: 50%;
+    padding: 16px;
+    overflow-y: auto;
+}
+
+.quest-details h3 {
+    font-size: 18px;
+    color: var(--stardew-green-dark);
+    margin-bottom: 8px;
+    font-weight: 700;
+}
+
+.quest-desc {
+    color: #555;
+    font-size: 14px;
+    line-height: 1.5;
+    margin-bottom: 16px;
+}
+
+.quest-details h4 {
+    font-size: 14px;
+    color: var(--stardew-wood);
+    text-transform: uppercase;
+    margin: 16px 0 8px 0;
+    font-weight: 700;
+}
+
+.quest-details ul {
+    list-style: none;
+    padding-left: 0;
+}
+
+.quest-details li {
+    padding: 6px 8px;
+    background: #fff;
+    border-radius: 6px;
+    margin-bottom: 6px;
+    border: 2px solid #d4c598;
+    font-size: 13px;
+}
+
+.quest-progress {
+    margin: 16px 0;
+}
+
+.quest-progress-bar {
+    height: 12px;
+    background: #d4c598;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 6px;
+    border: 2px solid #cbbda4;
+}
+
+.quest-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--stardew-green-light) 0%, var(--stardew-gold) 100%);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+.quest-progress-text {
+    font-size: 12px;
+    color: var(--stardew-wood);
+    font-weight: 700;
+}
+
+.quest-waypoint {
+    margin-top: 16px;
+    padding: 12px;
+    background: var(--stardew-card-bg);
+    border-radius: 8px;
+    border: 2px solid var(--stardew-green);
+}
+
+.quest-waypoint p {
+    margin: 4px 0;
+    font-size: 13px;
+    color: var(--stardew-text);
+}
+
+.quest-waypoint span {
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+}
+
+.quest-log-footer {
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.1);
+    border-top: 3px solid rgba(0, 0, 0, 0.15);
+    display: flex;
+    gap: 10px;
+}
+
+.quest-log-footer button {
+    padding: 8px 16px;
+    border: 2px solid var(--stardew-green-dark);
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 700;
+    font-size: 12px;
+    background: #fff;
+    transition: all 0.2s ease;
+}
+
+.quest-log-footer button:hover:not(:disabled) {
+    background: var(--stardew-green-light);
+    color: #fff;
+}
+
+.quest-log-footer button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Action Prompt (for quest hacking) */
+.action-prompt {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    padding: 16px 24px;
+    background: rgba(60, 90, 66, 0.9);
+    border-radius: 12px;
+    border: 3px solid var(--stardew-green-light);
+    color: #fff;
+    font-size: 18px;
+    font-weight: 700;
+    text-align: center;
+    z-index: 150;
+    animation: pulse 1s infinite;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+
+@keyframes pulse {
+    0%, 100% { transform: translate(-50%, -50%) scale(1); }
+    50% { transform: translate(-50%, -50%) scale(1.05); }
+}
+
+/* Build Confirmation Bubble */
+.build-feedback {
+    position: absolute;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 700;
+    pointer-events: none;
+    z-index: 200;
+    animation: floatUp 1.5s ease-out forwards;
+    white-space: nowrap;
+    transform: translate(-50%, -50%);
+}
+
+@keyframes floatUp {
+    0% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
+    50% { transform: translate(-50%, -50%) translateY(-30px); }
+    100% { opacity: 0; transform: translate(-50%, -50%) translateY(-60px); }
+}
+
+/* Hack Progress Ring */
+.hack-progress {
+    position: absolute;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: conic-gradient(var(--stardew-green-light) 0deg, rgba(0, 0, 0, 0.2) 0deg);
+    border: 3px solid var(--stardew-green-dark);
+    z-index: 150;
+    animation: spin 1s linear infinite;
+    box-shadow: 0 0 0 3px rgba(60, 90, 66, 0.5);
+}
+
+.hack-progress.hack-success {
+    animation: none;
+    background: conic-gradient(#4caf50 360deg, rgba(0, 0, 0, 0.2) 0deg);
+    border-color: #4caf50;
+}
+
+.hack-progress.hack-fail {
+    animation: none;
+    background: conic-gradient(#f44336 360deg, rgba(0, 0, 0, 0.2) 0deg);
+    border-color: #f44336;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+/* Crisis Stinger Effect */
+.crisis-stinger {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0);
+    background: rgba(255, 0, 0, 0.3);
+    width: 100vw;
+    height: 100vh;
+    z-index: 500;
+    pointer-events: none;
+    animation: crisisFlash 0.5s ease-out forwards;
+}
+
+.crisis-stinger .stinger-content {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: rgba(255, 0, 0, 0.9);
+    color: #fff;
+    padding: 40px 60px;
+    border-radius: 24px;
+    text-align: center;
+    border: 8px solid #fff;
+    box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
+}
+
+.crisis-stinger .stinger-content h2 {
+    font-size: 36px;
+    margin-bottom: 10px;
+    text-transform: uppercase;
+}
+
+@keyframes crisisFlash {
+    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
+    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
+}
+
+/* Settings Menu Overlay */
+.settings-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(62, 91, 68, 0.95);
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    z-index: 250;
+}
+
+.settings-content {
+    width: 500px;
+    max-height: 90vh;
+    overflow-y: auto;
+    background: #fff;
+    border-radius: 24px;
+    border: 8px solid var(--stardew-wood);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+}
+
+.settings-content .overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 24px;
+    background: var(--stardew-wood);
+    color: #fff;
+    border-radius: 16px 16px 0 0;
+}
+
+.settings-content .overlay-header h2 {
+    font-size: 24px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.settings-content .overlay-footer {
+    display: flex;
+    justify-content: center;
+    padding: 16px 24px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 0 0 16px 16px;
+}
+
+.settings-content .overlay-footer .btn {
+    width: 100%;
+}
+
+.settings-content .settings-tabs {
+    display: flex;
+    border-bottom: 2px solid #e8d5b0;
+}
+
+.settings-content .settings-tabs .tab {
+    flex: 1;
+    padding: 14px;
+    background: none;
+    border: none;
+    border-bottom: 3px solid transparent;
+    font-weight: 700;
+    color: #666;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-content .settings-tabs .tab.active {
+    background: #f0f0f0;
+    border-bottom-color: var(--stardew-green);
+    color: var(--stardew-green-dark);
+}
+
+.settings-content .settings-tab-content {
+    display: none;
+    padding: 20px 24px;
+}
+
+.settings-content .settings-tab-content.active {
+    display: block;
+}
+
+.settings-content .setting-row {
+    margin-bottom: 20px;
+}
+
+.settings-content .setting-row label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 8px;
+    color: var(--stardew-wood);
+}
+
+.settings-content .setting-row small {
+    display: block;
+    font-size: 11px;
+    color: #999;
+    margin-top: 4px;
+}
+
+.settings-content .slider-container {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.settings-content .slider-container input[type="range"] {
+    flex: 1;
+    height: 6px;
+    background: #e8d5b0;
+    border-radius: 3px;
+    outline: none;
+    -webkit-appearance: none;
+}
+
+.settings-content .slider-container input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px;
+    height: 20px;
+    background: var(--stardew-green);
+    border-radius: 50%;
+    cursor: pointer;
+    border: 3px solid #fff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.settings-content .checkbox-label {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    padding: 10px;
+    background: #f0f0f0;
+    border-radius: 8px;
+}
+
+.settings-content .checkbox-label input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    cursor: pointer;
+}
+
+.settings-content .value-display {
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+    font-size: 14px;
+    min-width: 60px;
+    text-align: right;
+}
+
+.settings-content .btn {
+    background: var(--stardew-green-light);
+    border-color: var(--stardew-green-dark);
+    box-shadow: 0 4px 0 var(--stardew-green-dark);
+}
+
+.settings-content .btn:hover {
+    background: var(--stardew-green);
+}
+
+.settings-content .btn:active {
+    box-shadow: 0 2px 0 var(--stardew-green-dark);
+}
+
+.settings-content .btn-reset {
+    background: #f44336;
+    border-color: #d32f2f;
+    box-shadow: 0 4px 0 #d32f2f;
+}
+
+.settings-content .btn-reset:hover {
+    background: #e53935;
+}
+
+.settings-content .btn-reset:active {
+    box-shadow: 0 2px 0 #c62828;
+}
+
+/* Quest Choice Overlay */
+.quest-choice-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(62, 91, 68, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 300;
+}
+
+.quest-choice-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+    max-width: 400px;
+}
+
+.quest-choice-list .btn {
+    width: 100%;
+    padding: 12px 20px;
+    font-size: 16px;
+}
+
+/* Dev Overlay */
+.dev-overlay {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    width: 300px;
+    background: #fff;
+    border: 4px solid var(--stardew-green);
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    z-index: 400;
+    font-family: 'Segoe UI', sans-serif;
+}
+
+.dev-overlay-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 14px;
+    background: var(--stardew-green);
+    color: #fff;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.dev-overlay-header h3 {
+    font-size: 14px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.dev-overlay-close {
+    background: none;
+    border: none;
+    color: #fff;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 0;
+}
+
+.dev-overlay-content {
+    padding: 14px;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.dev-status {
+    font-size: 12px;
+    color: var(--stardew-wood);
+    margin-bottom: 10px;
+    padding: 6px 8px;
+    background: #e8f5e9;
+    border-radius: 6px;
+    border: 2px solid var(--stardew-green);
+}
+
+.dev-status-indicator {
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+}
+
+.dev-actions {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.dev-btn {
+    display: flex;
+    flex-direction: column;
+    padding: 10px 12px;
+    background: var(--stardew-card-bg);
+    border: 2px solid #d4c598;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    transition: all 0.2s ease;
+}
+
+.dev-btn:hover {
+    background: #f0dcb0;
+    border-color: var(--stardew-green-light);
+}
+
+.dev-btn-label {
+    font-weight: 700;
+    color: var(--stardew-text);
+    font-size: 13px;
+}
+
+.dev-btn-desc {
+    font-size: 11px;
+    color: #666;
+    margin-top: 4px;
+}
+
+.dev-overlay-content .dev-btn {
+    width: 100%;
+}
+
+/* Tech Screen */
+.tech-unlock-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.tech-unlock-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+}
+
+.tech-unlock-item.unlocked {
+    border-color: var(--stardew-green);
+    background: #e8f5e9;
+}
+
+.tech-unlock-item.locked {
+    border-color: #aaa;
+    opacity: 0.6;
+}
+
+.tech-unlock-item .unlock-icon {
+    font-size: 20px;
+}
+
+.tech-unlock-item .unlock-info {
+    flex: 1;
+}
+
+.tech-unlock-item .unlock-name {
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+    font-size: 14px;
+}
+
+.tech-unlock-item .unlock-desc {
+    font-size: 12px;
+    color: #666;
+    line-height: 1.3;
+}
+
+.tech-unlock-item .unlock-trigger {
+    font-size: 10px;
+    color: var(--stardew-wood);
+    margin-top: 4px;
+}
+
+.tech-stability-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.stability-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px;
+    background: #fff;
+    border-radius: 6px;
+    border: 2px solid #d4c598;
+}
+
+.stability-name {
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--stardew-text);
+    min-width: 80px;
+}
+
+.stability-bar {
+    flex: 1;
+    height: 10px;
+    background: #e8d5b0;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.stability-fill {
+    height: 100%;
+    background: var(--stardew-green);
+    transition: width 0.3s ease;
+    border-radius: 5px;
+}
+
+.stability-value {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--stardew-text);
+    min-width: 35px;
 }

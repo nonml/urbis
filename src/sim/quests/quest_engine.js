@@ -72,7 +72,17 @@ function resolveStep(step, context) {
     if (step.interactType === 'citizen' && context.citizens) {
         // Find a random citizen as target
         if (context.citizens.length > 0) {
-            resolved.targetCitizen = context.citizens[Math.floor(Math.random() * context.citizens.length)];
+            const rng = context?.rng;
+            const idx = rng ? rng.int(0, context.citizens.length - 1) : (() => {
+                const cryptoObj = globalThis.crypto;
+                if (cryptoObj && cryptoObj.getRandomValues) {
+                    const buf = new Uint32Array(1);
+                    cryptoObj.getRandomValues(buf);
+                    return buf[0] % context.citizens.length;
+                }
+                return 0;
+            })();
+            resolved.targetCitizen = context.citizens[idx];
         }
     }
 
@@ -128,7 +138,8 @@ export class QuestEngine {
      * @returns {Object} The created quest instance
      */
     addQuest(questDef, context = {}) {
-        const quest = createQuestInstance(questDef, context);
+        const ctx = { ...context, rng: this.rng };
+        const quest = createQuestInstance(questDef, ctx);
         this.activeQuests.push(quest);
 
         // Emit quest started event

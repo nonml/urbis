@@ -1,5 +1,6 @@
 // Rival AI Core - Manages the adversarial city controller
 import { selectBestAction, RIVAL_ACTION_CATALOG, RIVAL_ACTION_COOLDOWN } from './rival_actions.js';
+import { RNG } from '../../rng.js';
 
 // Default rival config
 export const RIVAL_CONFIG = {
@@ -19,6 +20,7 @@ export const RIVAL_CONFIG = {
 export class RivalAI {
     constructor(seed) {
         this.rngSeed = seed;
+        this.rng = new RNG((seed ^ 0xA5A5A5A5) >>> 0);
         this.lastActionTick = 0;
         this.actionHistory = [];
         this.nextActionDelay = RIVAL_CONFIG.actionInterval;
@@ -135,7 +137,7 @@ export class RivalAI {
         const rival = state.rival;
 
         // Select best action
-        const actionType = selectBestAction(state);
+        const actionType = selectBestAction(state, this.rng);
         const action = RIVAL_ACTION_CATALOG[actionType];
 
         // Deduct cost

@@ -1,273 +1,146 @@
-# Milestone C — Side-Stories / “Case Files” (target: 0.9.x)
+# Milestone C: Procedural city generation v1 (districts, roads, parcels, POIs)
 
-## Objective 🕵️
-Deliver Watch Dogs-like **unique side-story chains** that emerge from the sim:
-- Data-driven quests (“case files”) generated per seed
-- Storylets that branch based on city state + citizen relationships
-- Breadcrumb gameplay: hack → clue → travel → confront → outcome
-- Outcomes permanently modify districts/systems (replayability)
+## Objective
+Generate believable cities from seed with districts, roads, blocks/parcels, and points of interest that support both small and mega presets.
 
----
-
-## Milestone Exit Criteria (Acceptance)
-- ✅ Each new run generates at least **1 main Case File** + several minor cases
-- ✅ Cases are followable via Quest Log + waypoint markers
-- ✅ Player actions branch outcomes and change city modifiers
-- ✅ Save/load preserves quest progress and outcomes
-
-## DoD for Milestone C
-- At least 15 storylets implemented and reused across cases
-- No dead-end quests (every case resolves or fails gracefully)
-- Debug tools exist to force-trigger cases
-
----
+## Exit criteria (acceptance for milestone)
+- Given the same seed + preset, city generation is identical.
+- Districts are contiguous and cover the whole map.
+- Road network connects all districts (no isolated islands except intentional).
+- Parcels are generated and usable for building placement.
+- POIs spawn per district with minimum spacing rules.
 
 ## Phases
-1) **Quest system foundation**
-2) **Storylet library**
-3) **Case File generator**
-4) **UI + Debugging**
-5) **Persistence**
-
----
+- C1: District graph + zoning rules
+- C2: Road generation + connectivity
+- C3: Parcelization + build snapping
+- C4: POIs and spawn points
 
 ## Tickets
 
-### C-01 — Quest content format + loader
-**Phase:** 1 — Quest system foundation
-**Objective:** Quests authored as data, not code.
+## Ticket C-1: District generator v1 (graph + contiguous regions)
+- **Phase:** C1
+- **Depends on:** A-1
 
-**Design**
-- Store quests/storylets as JSON in `src/content/quests/`.
-- Load at startup, validate schema.
+### Objective
+Create district regions with identity and density targets (downtown vs suburbs etc.).
 
-**Specs**
-- Folder:
-  - `src/content/quests/*.json`
-- Minimal schema:
-```json
-{
-  "id": "case_missing_person",
-  "type": "casefile",
-  "tags": ["missing", "cctv", "district_residential"],
-  "steps": [
-    { "id": "start", "kind": "trigger", "trigger": "ANOMALY_MISSING_PERSON" },
-    { "id": "clue1", "kind": "hack_node", "nodeType": "CCTV", "onComplete": ["spawn_clue:cctv_clip"] },
-    { "id": "travel", "kind": "go_to", "marker": "last_seen" },
-    { "id": "resolve", "kind": "choice", "choices": [...] }
-  ]
-}
-```
+### Design
+Generate N district seeds, run multi-source flood fill with noise bias to form contiguous regions. Store districtId per tile. District metadata contains theme, density, security baseline.
 
-**Implementation details**
-1. Implement loader in `src/content/loader.js`.
-2. Validate required fields and log errors clearly.
+### Specs
+- SMALL: 4-6 districts; CITY: 8-12; MEGA: 14-20.
+- Each district has: `theme`, `density`, `securityLevel`, `poiBudget`.
+- Min district size: 3% of map tiles.
 
-**Acceptance**
-- Game boots even if one quest file is invalid (skips invalid with warning).
+### Implementation details
+- Implement in `src/gen/districts.js` (or verify existing and fix).
+- Expose `getDistrictAt(x,y)` and `getDistrictName(id)`.
+- Add debug overlay: show district id under player.
 
-**DoD**
-- Schema documented in `docs/QUEST_SCHEMA.md`.
+### Acceptance
+- No tile has missing district id.
+- District count matches preset target range.
 
----
+### DoD (Definition of Done)
+- Generation time: SMALL < 30ms, CITY < 120ms, MEGA < 600ms on dev machine.
+- Unit test: district contiguity (BFS count per district).
 
-### C-02 — Quest runtime engine
-**Phase:** 1 — Quest system foundation
-**Objective:** Execute quests step-by-step, event-driven.
+### QA checklist
+- Generate 10 random seeds, visually verify distribution and no tiny slivers.
+- MEGA generation does not freeze UI (use loading spinner).
 
-**Design**
-- Event bus emits events:
-  - `PLAYER_HACKED_NODE`, `PLAYER_ENTERED_DISTRICT`, `CRISIS_STARTED`, etc.
-- Quest engine listens and advances steps.
+## Ticket C-2: Road network v1 with connectivity guarantee
+- **Phase:** C2
+- **Depends on:** C-1
 
-**Specs**
-- `src/sim/events.js` (simple pub/sub)
-- `src/sim/quests/quest_engine.js`
-- Quest state stored in:
-  - `state.quests.active[]`
-  - `state.quests.completed[]`
+### Objective
+Build a road graph that connects district centers and supports vehicle navigation later.
 
-**Implementation details**
-1. Implement event bus.
-2. Implement step handlers per `kind`.
-3. Add safe fallback: if step cannot complete, mark quest “blocked” with reason.
+### Design
+Pick district centers, connect via minimum spanning tree (MST) in tile space, then add 20-35% extra edges for loops. Carve roads with width rules. Guarantee connectivity with BFS on road tiles.
 
-**Acceptance**
-- A test quest advances from start → clue → travel → resolve.
+### Specs
+- Primary roads width: 3 tiles, secondary: 2 tiles.
+- Every district center is within 8 tiles of a road.
+- At least one loop per 3 districts (CITY/MEGA).
 
-**DoD**
-- Engine does not hard-crash on malformed content; errors are surfaced in dev overlay.
+### Implementation details
+- Implement in `src/gen/roads.js`.
+- Provide `isRoad(x,y)` and `roadGraph` (nodes/edges).
+- Add debug render mode: roads only.
 
----
+### Acceptance
+- All district centers are connected by road graph.
+- No road dead-ends longer than 20 tiles unless at map border.
 
-### C-03 — Quest Log UI + waypoint markers
-**Phase:** 4 — UI + Debugging
-**Objective:** Player can follow story without guessing.
+### DoD (Definition of Done)
+- Road generation deterministic and stable.
+- Connectivity test passes for fixed seeds.
 
-**Design**
-- Quest log panel: `J`
-- Shows:
-  - active case files
-  - current objective text
-  - distance to marker
-- World marker (billboard) + minimap icon.
+### QA checklist
+- Run BFS connectivity check on 20 seeds per preset.
+- Walk player along roads; ensure collision doesn't block roads.
 
-**Specs**
-- `src/ui/quest_log.js`
-- `src/render/markers.js` (or integrate into renderer3d)
+## Ticket C-3: Parcel generation v1 (blocks + buildable lots)
+- **Phase:** C3
+- **Depends on:** C-2
 
-**Implementation details**
-1. Add UI panel with list and selection.
-2. Add one “current objective” marker in-world.
+### Objective
+Turn road blocks into parcels/lots usable by the building placement system.
 
-**Acceptance**
-- Player can complete a case file without external instructions.
+### Design
+Flood-fill areas bounded by roads/water to get blocks, then split blocks into parcels based on district density. Store parcelId per tile and parcel bounds.
 
-**DoD**
-- UI scales for MEGA (search/filter optional).
+### Specs
+- Parcel must have at least 6 tiles area.
+- Parcels prefer rectangular shapes; allow irregular fallback.
+- Expose: `getParcelAt(x,y)`, `getParcelById(id)`, `isTileInParcel(x,y,parcelId)`.
 
----
+### Implementation details
+- Implement in `src/gen/parcels.js`.
+- Add build placement snapping to parcel centroid + edge alignment.
+- Add debug overlay: show parcel outline around player.
 
-### C-04 — Breadcrumb objects (clues) and evidence board
-**Phase:** 4 — UI + Debugging
-**Objective:** Make cases feel investigative.
+### Acceptance
+- Building placement can snap to parcels and respects non-buildable tiles (roads/water).
+- No overlapping parcels; each buildable tile belongs to at most one parcel.
 
-**Design**
-- Clues are world objects spawned by quests:
-  - CCTV clip, phone dump, witness, hidden cache
-- Evidence board (UI) shows discovered clues and connections.
+### DoD (Definition of Done)
+- Parcel data serialized in save for fast reload (or regenerate deterministically on load).
+- At least 70% of non-road land is parcelized.
 
-**Specs**
-- `state.cases.evidence[]`:
-```js
-{ id, caseId, type, title, description, source, discoveredTick }
-```
+### QA checklist
+- Attempt to build on road/water → blocked with message.
+- Build in different districts; confirm parcel sizes differ.
 
-**Implementation details**
-1. Add clue spawn + pickup interaction.
-2. Add “Evidence Board” UI screen.
+## Ticket C-4: POI spawner v1 (landmarks + hack nodes + safehouses)
+- **Phase:** C4
+- **Depends on:** B-3, C-3
 
-**Acceptance**
-- Completing hacks yields tangible clue items that persist.
+### Objective
+Place meaningful exploration anchors and hacking infrastructure.
 
-**DoD**
-- Evidence survives save/load.
+### Design
+Per district, allocate POI budget; choose templates (landmark, terminal hub, camera tower, safehouse). Enforce spacing and avoid roads/water.
 
----
+### Specs
+- POI spacing: min 12 tiles (SMALL), 20 (CITY), 30 (MEGA).
+- Each district gets: 1 landmark, 2-4 hack nodes, 0-1 safehouse (based on theme).
 
-### C-05 — Storylet library (modular narrative blocks)
-**Phase:** 2 — Storylet library
-**Objective:** Reuse narrative pieces to create variety per run.
+### Implementation details
+- Add templates in `src/content/pois/*.json`.
+- Spawn POIs during map generation; store in `state.world.pois`.
+- Create interactables for hack nodes.
 
-**Design**
-- Storylet = small quest fragment with tags + requirements:
-  - requires: district theme, citizen trait, crisis type, etc.
-- Generator picks storylets to build a case.
+### Acceptance
+- POIs appear in-world and are discoverable by walking.
+- Hack nodes are interactable and show prompt.
 
-**Specs**
-- `src/content/storylets/*.json`
-- Fields:
-  - `tags`, `requires`, `provides`, `weight`
+### DoD (Definition of Done)
+- No POI spawns inside non-walkable tiles.
+- Dev overlay lists nearest POI and distance.
 
-**Implementation details**
-1. Build storylet selector:
-  - filter by requires
-  - weighted pick with RNG
-2. Add at least 15 storylets:
-  - corruption, missing, gang, whistleblower, sabotage, coverup
-
-**Acceptance**
-- Two runs with different seeds produce different storylet chains.
-
-**DoD**
-- No storylet causes unwinnable chain (must have exits).
-
----
-
-### C-06 — Case File generator (per run)
-**Phase:** 3 — Case File generator
-**Objective:** Auto-create a “main case” and several minors.
-
-**Design**
-- At game start:
-  - choose 1 “main arc” template
-  - fill roles with actual citizens, buildings, districts
-- During play:
-  - crises/anomalies spawn minor cases.
-
-**Specs**
-- `src/sim/cases/case_generator.js`
-- Inputs:
-  - districts, citizens, buildings, current pressures
-- Outputs:
-  - runtime quest instances with bound entities
-
-**Implementation details**
-1. Build entity selection helpers:
-  - pick citizen by trait/job/district
-  - pick location building in district
-2. Instantiate quest with concrete ids and marker positions.
-
-**Acceptance**
-- “Main case file” always exists by minute 2 of a new run.
-
-**DoD**
-- Generator never fails silently; if it can’t build a case, it logs why and retries with fallback.
-
----
-
-### C-07 — Consequence system (district modifiers, factions, heat)
-**Phase:** 5 — Persistence
-**Objective:** Outcomes matter and replay differs.
-
-**Design**
-- Case outcomes apply modifiers:
-  - district: `crime +10%`, `income +5%`, etc.
-  - factions: reputation shifts
-  - heat: increases rival pressure (feeds Milestone D)
-
-**Specs**
-- `state.factions[]`
-- `state.map.districts[i].modifiers[]`
-- `applyOutcome(outcomeId, context)` pure function.
-
-**Implementation details**
-1. Add outcome definitions in `src/content/outcomes.json`.
-2. Apply outcomes from quest resolve steps.
-
-**Acceptance**
-- UI shows district modifier changes after case resolution.
-
-**DoD**
-- Outcomes are reversible only if explicitly designed (no hidden coupling).
-
----
-
-### C-08 — Debug tools for story + quest testing
-**Phase:** 4 — UI + Debugging
-**Objective:** Avoid slow iteration.
-
-**Design**
-- Dev menu (toggle in overlay):
-  - spawn main case
-  - spawn random minor case
-  - complete current step (for testing)
-  - teleport to marker
-
-**Specs**
-- `src/dev/dev_menu.js`
-
-**Implementation details**
-1. Add a dev-only toggle (e.g., `F4`) to open/close the menu.
-2. UI: minimal HTML overlay listing actions + hotkeys.
-3. Hook into quest runtime:
-   - `forceStartMainCase()`
-   - `spawnMinorCase()`
-   - `completeCurrentStep()` (skips validations only in dev mode)
-   - `teleportToCurrentMarker()`
-4. Ensure each action logs what it did (quest id, step id, marker id).
-**Acceptance**
-- Junior dev can test a quest chain in under 2 minutes.
-
-**DoD**
-- Dev tools disabled by default in “release build” flag.
+### QA checklist
+- Generate MEGA and ensure POIs are not all clustered.
+- Interact with 5 hack nodes in different districts.

@@ -1,264 +1,112 @@
-# Milestone B — Procedural City + Exploration Loop (target: 0.6.x)
+# Milestone B: Third-person playable avatar + camera + interaction baseline
 
-## Objective 🏙️
-Turn “terrain + boxes” into a **believable explorable city**:
-- Districts with rules (density, building pools, events)
-- Road network + blocks + parcels
-- Third-person roaming + interactables (hacking nodes)
-- Citizens move meaningfully through the city (home/work/leisure)
-- Supports **Small** and **MEGA** with streaming/chunking
+## Objective
+Make the game controllable as a third-person character in a 3D city with stable camera, collision, and interact prompts.
 
----
-
-## Milestone Exit Criteria (Acceptance)
-- ✅ New game generates: districts + roads + parcels + initial buildings
-- ✅ Player can roam city and interact with hacking nodes
-- ✅ Citizens follow a simple daily schedule and visibly move
-- ✅ MEGA city loads within a reasonable time and remains playable
-
-## DoD for Milestone B
-- No console errors during 30-minute MEGA play
-- Chunked rendering remains in place; no full rebuilds on small edits
-- District + road generator is deterministic per seed
-
----
+## Exit criteria (acceptance for milestone)
+- Third-person controller feels solid: move, sprint, jump(optional), rotate camera.
+- Camera collision/occlusion mitigation (no clipping into terrain/buildings).
+- Interact prompt works with nearest interactable; can trigger a stub action.
+- Input remapping file exists and is documented.
 
 ## Phases
-1) **City Generation (Districts → Roads → Parcels)**
-2) **Exploration + Interaction**
-3) **Citizen Movement + Schedules**
-4) **Performance / Streaming**
-
----
+- B1: Controller + camera
+- B2: Collision + ground alignment
+- B3: Interaction prompts
 
 ## Tickets
 
-### B-01 — District graph generator
-**Phase:** 1 — City Generation
-**Objective:** Create “neighborhood identity” to drive content + stories.
+## Ticket B-1: Third-person controller v1 (WASD + mouse)
+- **Phase:** B1
+- **Depends on:** A-1
 
-**Design**
-- Generate K districts (based on map size) using seeded Voronoi / flood-fill from seeds.
-- District has:
-  - `id, name, theme, bounds/tiles, densityTarget`
-  - biases: `crimeBias, wealthBias, eventBias`
-  - building pools: `allowedBuildingTypes[]`
+### Objective
+Consistent, frame-rate-independent movement with acceleration and turn smoothing.
 
-**Specs**
-- `src/gen/districts.js`
-- Output stored in `state.map.districts[]`
-- Deterministic naming via RNG + name tables.
+### Design
+Use a kinematic capsule approximated by cylinder+hemispheres. Compute intended velocity in camera-space, apply acceleration, and resolve ground height from map.
 
-**Implementation details**
-1. Pick district centers.
-2. Expand via multi-source BFS until all tiles assigned.
-3. Compute per-district stats (area, water %, elevation).
+### Specs
+- Walk speed: 4 m/s, sprint: 6 m/s.
+- Acceleration: 18 m/s², decel: 22 m/s².
+- Turn smoothing: slerp ~0.15 per frame.
 
-**Acceptance**
-- UI can display “District: <name>” when player stands inside it.
+### Implementation details
+- Add `src/player/controller.js` and keep `state.player` as source of truth.
+- Controller uses `dt` from fixed sim tick (not render dt).
+- Expose `player.forward`, `player.velocity`, `player.isSprinting`.
 
-**DoD**
-- District assignment stable under same seed.
+### Acceptance
+- Movement speed consistent at 30fps vs 144fps.
+- Diagonal movement is normalized (no faster than forward).
 
----
+### DoD (Definition of Done)
+- No per-frame allocations in movement loop.
+- Unit test: controller step updates within expected bounds.
 
-### B-02 — Road network + block partitioning
-**Phase:** 1 — City Generation
-**Objective:** Roads define traversal and parcel boundaries.
+### QA checklist
+- Walk/sprint in empty map for 2 minutes; no jitter drift.
+- Rotate camera while moving; character follows expected heading.
 
-**Design**
-- Generate a primary road skeleton:
-  - connect district centers (MST + some extra edges)
-- Rasterize roads onto tiles:
-  - road width 1–2 tiles depending on preset
-- Blocks are regions separated by roads/water.
+## Ticket B-2: Camera rig v1 (orbit + follow + collision)
+- **Phase:** B1/B2
+- **Depends on:** B-1
 
-**Specs**
-- `src/gen/roads.js`
-- Tile flags: `TILE_ROAD`, `TILE_SIDEWALK`
-- Block id map: `state.map.blockIds` (packed array)
+### Objective
+A Watch Dogs-style third-person follow cam that doesn’t clip through objects.
 
-**Implementation details**
-1. Build graph connecting centers.
-2. Draw lines with Bresenham-ish rasterization.
-3. Flood fill blocks (ignore road tiles).
+### Design
+Use a camera boom with target at player head. Raycast/segment test from target backward to desired camera position; if hit, pull camera forward.
 
-**Acceptance**
-- Player walks on roads and can follow them across the map.
+### Specs
+- Default distance: 6m; min: 2.5m; max: 10m.
+- Pitch clamp: -15° .. 55°.
+- Right mouse: rotate; wheel: zoom.
 
-**DoD**
-- Roads never cut off spawn area completely (ensure connectivity).
+### Implementation details
+- Implement in `src/render/camera_rig.js`.
+- Use simplified collision: AABB from building instances; terrain is heightfield.
 
----
+### Acceptance
+- Camera never goes inside buildings.
+- Zoom feels smooth; no snapping when passing corners.
 
-### B-03 — Parcels + building snapping
-**Phase:** 1 — City Generation
-**Objective:** Buildings placed on parcels, not arbitrary tiles.
+### DoD (Definition of Done)
+- Config values are exposed via `constants.js`.
+- Camera settings persisted in save.
 
-**Design**
-- Inside each block, carve parcels (rectangles) aligned to roads.
-- Parcels store:
-  - `x,y,w,h, zoneType, reserved`
-- Building placement chooses a parcel and reserves it.
+### QA checklist
+- Run around dense district; verify no wall clipping.
+- Spin camera 360° rapidly; no NaN/flip.
 
-**Specs**
-- `src/gen/parcels.js`
-- `state.map.parcels[]`
-- Update build UI to highlight valid parcels.
+## Ticket B-3: Interact prompt + action dispatch
+- **Phase:** B3
+- **Depends on:** B-1
 
-**Implementation details**
-1. For each block, detect road-facing edges.
-2. Slice block into strips, then rectangles.
-3. Tag parcels with zone suggestions (residential/commercial/industrial).
+### Objective
+Enable the player to interact with nearby objects (terminals, doors, cameras) with a consistent UI prompt.
 
-**Acceptance**
-- Player cannot place buildings off-parcel.
-- Buildings align visually with roads.
+### Design
+Interaction system exposes `getNearbyInteractable(playerPos, radius)` and `interact(interactableId)` events. UI shows `[E] Interact` prompt with object name.
 
-**DoD**
-- Parcel generation fast enough for MEGA (use chunked processing if needed).
+### Specs
+- Interact radius: 2.2m.
+- Priority: closest, then highest priority type (terminal > camera > door).
+- Input: E
 
----
+### Implementation details
+- Add `Events.PLAYER_INTERACT` in `src/sim/events.js` if missing.
+- Update `InteractableManager` to return a stable reference for UI.
+- UI prompt uses a single DOM element; no re-create per frame.
 
-### B-04 — Citizen pathing (grid A* with caching)
-**Phase:** 3 — Citizen Movement + Schedules
-**Objective:** Citizens move between home/work/leisure.
+### Acceptance
+- Approaching a terminal shows prompt and pressing E triggers an event.
+- Prompt disappears when moving away.
 
-**Design**
-- Simple A* on road/sidewalk tiles.
-- Cache paths per `(fromCell,toCell)` with LRU eviction.
+### DoD (Definition of Done)
+- No duplicate prompts and no stuck prompts after pause/unpause.
+- One integration test: spawn a terminal, walk to it, interact.
 
-**Specs**
-- `src/sim/pathfinding.js`
-- Walkable rules:
-  - roads/sidewalk preferred
-  - grass allowed but slower (optional)
-- Citizen state:
-  - `target`, `path`, `pathIndex`, `speed`
-
-**Implementation details**
-1. Implement A* with Manhattan heuristic.
-2. Add path cache (Map with key string).
-3. Integrate into `CitizenManager.tick()`.
-
-**Acceptance**
-- 50+ citizens visibly walk to targets without jitter.
-
-**DoD**
-- MEGA city does not freeze due to pathfinding spikes (budget + caching).
-
----
-
-### B-05 — Daily schedule system
-**Phase:** 3 — Citizen Movement + Schedules
-**Objective:** “Living city” feel without heavy AI.
-
-**Design**
-- Time-of-day normalized 0..1 repeating each “day”.
-- Schedule rules:
-  - morning: go to work
-  - evening: go home
-  - night: leisure (parks/shops) based on happiness
-
-**Specs**
-- `state.time.dayPhase`
-- Citizen fields:
-  - `homeId`, `workId`, `leisureSpotId`
-
-**Implementation details**
-1. Assign homes/jobs using parcels/buildings.
-2. Each tick: if dayPhase crosses threshold, pick new target.
-
-**Acceptance**
-- Citizens relocate at phase changes; jobs affect resources.
-
-**DoD**
-- No citizen gets “stuck” forever (fallback teleport if path fails, with debug log).
-
----
-
-### B-06 — Interactables + hacking nodes
-**Phase:** 2 — Exploration + Interaction
-**Objective:** Watch Dogs-like micro-loop inside city builder.
-
-**Design**
-- Place hacking nodes on:
-  - power substations
-  - CCTV poles
-  - telecom boxes
-- Interaction:
-  - scan prompt when close
-  - minigame: timed hold / simple pattern
-  - reward: resources/info/quest leads (in Milestone C)
-
-**Specs**
-- `state.world.interactables[]`:
-```js
-{ id, type, x, y, districtId, difficulty, cooldown, lastUsedTick }
-```
-- `src/sim/interactables.js`
-- UI prompt in `ui.js`
-
-**Implementation details**
-1. Add proximity detection in player update.
-2. Add simple “hack progress” UI.
-3. Apply reward + cooldown.
-
-**Acceptance**
-- Player can hack 3 node types and see rewards.
-
-**DoD**
-- Hack loop is deterministic; difficulty scales with district.
-
----
-
-### B-07 — City map UI (district overlay + icons)
-**Phase:** 2 — Exploration + Interaction
-**Objective:** Navigation and planning for MEGA.
-
-**Design**
-- A map screen toggle: `M`
-- Shows districts, roads, building icons, quest markers (later).
-
-**Specs**
-- `src/ui/map_screen.js`
-- Uses offscreen canvas to draw at lower resolution.
-
-**Implementation details**
-1. Add map toggle UI.
-2. Render district colors and road lines.
-3. Click map to set waypoint for player.
-
-**Acceptance**
-- Player can orient themselves in MEGA using map.
-
-**DoD**
-- Map render does not allocate every frame.
-
----
-
-### B-08 — Streaming / progressive generation for MEGA
-**Phase:** 4 — Performance / Streaming
-**Objective:** MEGA should “start fast” and fill in.
-
-**Design**
-- Generate city in passes:
-  1) terrain
-  2) districts
-  3) roads
-  4) parcels
-  5) initial buildings
-- Show loading progress.
-
-**Specs**
-- `src/gen/pipeline.js` yields progress events.
-
-**Implementation details**
-1. Convert generators to step-based functions.
-2. Drive pipeline over multiple frames (avoid long main-thread blocks).
-
-**Acceptance**
-- MEGA loads without a multi-second browser “freeze”.
-
-**DoD**
-- Pipeline progress shown and correct.
+### QA checklist
+- Spam E near an interactable; ensure no crashes.
+- Interact while camera is rotating; still works.

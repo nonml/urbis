@@ -1,12 +1,23 @@
 // UI manager for DOM + third-person 3D rendering
-import { BUILDING_TYPES } from './constants.js';
+import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
 import { Renderer3D } from './renderer3d.js';
+import { MapScreen } from './ui/map_screen.js';
+import { TechScreen } from './ui/tech_screen.js';
+import { SettingsManager } from './ui/settings.js';
+import { createAudioManager } from './audio/audio_manager.js';
+import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
 
 export class UIManager {
     constructor(game) {
         this.game = game;
         this.canvas = document.getElementById('game-canvas');
         this.selectedBuilding = null;
+
+        // Settings
+        this.settings = new SettingsManager(game);
+
+        // Audio
+        this.audioManager = createAudioManager(game);
 
         // 3D
         this.renderer3d = new Renderer3D(this.game, this.canvas);
@@ -20,6 +31,10 @@ export class UIManager {
         // Dirty flags
         this._lastBuildingCount = 0;
         this._lastCitizenCount = 0;
+
+        // Action prompt state
+        this.actionPrompt = null;
+        this.actionCallback = null;
 
         this.setupBuildingPanel();
         this.setupInfoTabs();
@@ -52,30 +67,46 @@ export class UIManager {
         if (!grid) return;
         grid.innerHTML = '';
 
+        // Add basic buildings
         for (const [key, building] of Object.entries(BUILDING_TYPES)) {
-            const card = document.createElement('div');
-            card.className = 'building-card';
-            card.dataset.type = key;
-            card.innerHTML = `
-                <div class="building-icon">${building.icon}</div>
-                <div class="building-info">
-                    <div class="building-name">${building.name}</div>
-                    <div class="building-desc">${building.description || ''}</div>
-                    <div class="building-cost">
-                        ${building.cost.gold ? `<span class="cost-item gold">💰${building.cost.gold}</span>` : ''}
-                        ${building.cost.wood ? `<span class="cost-item wood">🌲${building.cost.wood}</span>` : ''}
-                        ${building.cost.food ? `<span class="cost-item food">🌾${building.cost.food}</span>` : ''}
-                    </div>
-                </div>
-            `;
-            card.addEventListener('click', () => {
-                document.querySelectorAll('.building-card').forEach(o => o.classList.remove('selected'));
-                card.classList.add('selected');
-                this.selectedBuilding = key;
-                this.showMessage(`Selected: ${building.name}`, 'success');
-            });
-            grid.appendChild(card);
+            this.createBuildingCard(grid, key, building);
         }
+
+        // Add security buildings (only if unlocked via progression)
+        for (const [key, security] of Object.entries(BUILDING_SECURITY)) {
+            // Check if player has unlocked security buildings
+            const securityUnlocked = this.game.state.progression?.unlocked?.includes('security_buildings');
+            if (securityUnlocked) {
+                this.createBuildingCard(grid, key, security, true);
+            }
+        }
+    }
+
+    createBuildingCard(grid, key, building, isSecurity = false) {
+        const card = document.createElement('div');
+        card.className = `building-card ${isSecurity ? 'security-building' : ''}`;
+        card.dataset.type = key;
+        card.innerHTML = `
+            <div class="building-icon">${building.icon}</div>
+            <div class="building-info">
+                <div class="building-name">${building.name}</div>
+                <div class="building-desc">${building.description || ''}</div>
+                <div class="building-cost">
+                    ${building.cost.gold ? `<span class="cost-item gold">💰${building.cost.gold}</span>` : ''}
+                    ${building.cost.wood ? `<span class="cost-item wood">🌲${building.cost.wood}</span>` : ''}
+                    ${building.cost.food ? `<span class="cost-item food">🌾${building.cost.food}</span>` : ''}
+                </div>
+                ${isSecurity ? `<div class="building-security-note">Reduces heat & rival effectiveness</div>` : ''}
+            </div>
+        `;
+        card.addEventListener('click', () => {
+            document.querySelectorAll('.building-card').forEach(o => o.classList.remove('selected'));
+            card.classList.add('selected');
+            this.selectedBuilding = key;
+            this.showMessage(`Selected: ${building.name}`, 'success');
+            this.playUISound('click');
+        });
+        grid.appendChild(card);
     }
 
     setupInfoTabs() {
@@ -108,7 +139,23 @@ export class UIManager {
                 this.game.paused = !this.game.paused;
                 this.showMessage(this.game.paused ? '⏸️ Paused' : '▶️ Resumed', 'normal');
             }
+            if (e.key.toLowerCase() === 'm') {
+                this.toggleMapScreen();
+            }
+            if (e.key.toLowerCase() === 'e') {
+                this.handleEKey();
+            }
+            if (e.key.toLowerCase() === 't') {
+                this.toggleTechScreen();
+            }
+            if (e.key.toLowerCase() === 'o' && e.shiftKey) {
+                this.toggleSettings();
+            }
         });
+        // Add map screen reference
+        this.mapScreen = null;
+        // Add tech screen reference
+        this.techScreen = null;
     }
 
     setupInput() {
@@ -218,7 +265,11 @@ export class UIManager {
             this.renderer3d.markCitizensDirty();
         }
 
-        if (!this.game.paused) this.updatePlayerMovement(dt);
+        if (!this.game.paused) {
+            this.updatePlayerMovement(dt);
+            // Check for nearby interactables
+            this.checkInteractableProximity();
+        }
         this.renderer3d.render();
     }
 
@@ -237,6 +288,47 @@ export class UIManager {
         } else {
             popDisplay.style.border = '3px solid #fff';
             popDisplay.style.boxShadow = '0 4px 0 rgba(0,0,0,0.15)';
+        }
+
+        // Heat meter
+        const player = this.game.state.player || {};
+        const heat = player.heat || 0;
+        this.updateHeatMeter(heat);
+    }
+
+    updateHeatMeter(heat) {
+        // Check if heat meter already exists, create if not
+        let heatContainer = document.getElementById('heat-meter');
+        if (!heatContainer) {
+            const resourceBar = document.getElementById('resource-bar');
+            if (!resourceBar) return;
+
+            heatContainer = document.createElement('div');
+            heatContainer.id = 'heat-meter';
+            heatContainer.className = 'resource heat-meter';
+            heatContainer.innerHTML = `
+                <span class="icon">🔥</span>
+                <div class="heat-bar-container">
+                    <div class="heat-bar" id="heat-bar">
+                        <div class="heat-fill" id="heat-fill"></div>
+                    </div>
+                    <span class="heat-label" id="heat-label">0</span>
+                </div>
+            `;
+            resourceBar.appendChild(heatContainer);
+        }
+
+        const heatFill = document.getElementById('heat-fill');
+        const heatLabel = document.getElementById('heat-label');
+
+        if (heatFill) {
+            heatFill.style.width = `${heat}%`;
+        }
+
+        if (heatLabel) {
+            heatLabel.textContent = `${heat}`;
+            // Visual warning at high heat
+            heatContainer.style.borderColor = heat >= 70 ? '#ff4444' : (heat >= 30 ? '#ffaa00' : '#44ff44');
         }
     }
 
@@ -262,10 +354,37 @@ export class UIManager {
         const happiness = document.getElementById('stats-happiness');
         const housing = document.getElementById('stats-housing');
 
+        const jobGold = document.getElementById('stats-job-gold');
+        const jobFood = document.getElementById('stats-job-food');
+        const jobWood = document.getElementById('stats-job-wood');
+        const jobDist = document.getElementById('stats-job-dist');
+
         if (stats) stats.textContent = citizens.getPopulation();
         if (employment) employment.textContent = citizens.getEmploymentRate() + '%';
         if (happiness) happiness.textContent = citizens.getAverageHappiness() + '%';
-        if (housing) housing.textContent = `${this.game.resources.housing}/${this.game.resources.population}`;
+        if (housing) housing.textContent = `${this.game.resources.population}/${this.game.resources.housing}`;
+
+        // Job production (last computed tick)
+        const jp = this.game.resources.jobProduction || { gold: 0, food: 0, wood: 0 };
+        if (jobGold) jobGold.textContent = Math.floor(jp.gold || 0);
+        if (jobFood) jobFood.textContent = Math.floor(jp.food || 0);
+        if (jobWood) jobWood.textContent = Math.floor(jp.wood || 0);
+
+        // Job distribution
+        if (jobDist) {
+            const dist = new Map();
+            for (const c of citizens.citizens) {
+                const j = (c.job || 'unemployed');
+                dist.set(j, (dist.get(j) || 0) + 1);
+            }
+            const employed = Array.from(dist.entries()).filter(([j]) => j !== 'unemployed');
+            if (employed.length === 0) {
+                jobDist.textContent = 'No employed citizens';
+            } else {
+                employed.sort((a, b) => b[1] - a[1]);
+                jobDist.textContent = employed.map(([j, n]) => `${j}: ${n}`).join(' • ');
+            }
+        }
     }
 
     showVictory(condition, progress) {
@@ -287,6 +406,40 @@ export class UIManager {
         finalGold.textContent = Math.floor(this.game.resources.gold);
         progressFill.style.width = `${Math.min(100, progress)}%`;
         overlay.classList.remove('hidden');
+    }
+
+    showDefeat(reason, message) {
+        const overlay = document.getElementById('defeat-overlay');
+        const title = document.getElementById('defeat-title');
+        const desc = document.getElementById('defeat-message');
+        const finalDays = document.getElementById('defeat-days');
+        const finalPop = document.getElementById('defeat-pop');
+        const finalBuildings = document.getElementById('defeat-buildings');
+        const finalGold = document.getElementById('defeat-gold');
+        if (!overlay) return;
+
+        title.textContent = reason;
+        desc.textContent = message || `Your city has fallen due to ${reason.toLowerCase()}.`;
+        finalDays.textContent = this.game.resources.day;
+        finalPop.textContent = this.game.resources.population;
+        finalBuildings.textContent = this.game.buildings.buildings.length;
+        finalGold.textContent = Math.floor(this.game.resources.gold);
+        overlay.classList.remove('hidden');
+    }
+
+    showRivalActivity(action) {
+        const log = document.getElementById('message-log');
+        if (!log) return;
+
+        const entry = document.createElement('div');
+        entry.className = 'message rival-action';
+        entry.innerHTML = `<span class="icon">🕵️</span> <strong>Rival Action:</strong> ${action.name}`;
+        log.prepend(entry);
+
+        // Keep log size reasonable
+        if (log.children.length > 50) {
+            log.lastChild.remove();
+        }
     }
 
     showCrisis(crisis, options, onPick) {
@@ -312,6 +465,175 @@ export class UIManager {
         }
 
         overlay.classList.remove('hidden');
+    }
+
+    toggleMapScreen() {
+        if (!this.mapScreen) {
+            this.mapScreen = new MapScreen(this.game);
+        }
+        this.mapScreen.toggle();
+    }
+
+    toggleTechScreen() {
+        if (!this.techScreen) {
+            this.techScreen = new TechScreen(this.game);
+        }
+        this.techScreen.toggle();
+    }
+
+    checkInteractableProximity() {
+        if (this.game.interactables) {
+            const node = this.game.interactables.getNearbyInteractable(
+                this.game.player.x,
+                this.game.player.y,
+                3
+            );
+            if (node) {
+                const typeInfo = getInteractableTypeInfo(node.type);
+                const stateName = getInteractableStateName(node.state);
+                this.showMessage(` Nearby ${typeInfo.name}: ${stateName} (Press E to hack)`, 'normal');
+            }
+        }
+    }
+
+    handleEKey() {
+        // Handle E key for hacking interactables
+        if (this.game.interactables) {
+            const node = this.game.interactables.getNearbyInteractable(
+                this.game.player.x,
+                this.game.player.y,
+                3
+            );
+            if (node && node.state === 'available') {
+                this.game.interactables.startHack(node, this.game.state.time.tick);
+                this.showMessage(`Hacking ${getInteractableTypeInfo(node.type).name}...`, 'normal');
+            }
+        }
+    }
+
+    /**
+     * Show action prompt (for quest steps like hacking)
+     */
+    showActionPrompt(actionLabel, callback) {
+        this.actionPrompt = actionLabel;
+        this.actionCallback = callback;
+
+        // Create action prompt UI
+        const promptDiv = document.createElement('div');
+        promptDiv.id = 'action-prompt';
+        promptDiv.className = 'action-prompt';
+        promptDiv.innerHTML = `<span class="prompt-text">Press SPACE to ${actionLabel}</span>`;
+        document.body.appendChild(promptDiv);
+
+        // Setup space key handler
+        this.actionKeyHandler = (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (this.actionCallback) {
+                    this.actionCallback();
+                }
+                this.clearActionPrompt();
+            }
+        };
+        window.addEventListener('keydown', this.actionKeyHandler);
+    }
+
+    /**
+     * Clear action prompt
+     */
+    clearActionPrompt() {
+        if (this.actionPrompt) {
+            const promptDiv = document.getElementById('action-prompt');
+            if (promptDiv) promptDiv.remove();
+
+            if (this.actionKeyHandler) {
+                window.removeEventListener('keydown', this.actionKeyHandler);
+                this.actionKeyHandler = null;
+            }
+
+            this.actionPrompt = null;
+            this.actionCallback = null;
+        }
+    }
+
+    /**
+     * Show quest choice dialog
+     */
+    showQuestChoice(title, choices, onChoice) {
+        const overlay = document.getElementById('quest-choice-overlay');
+        if (!overlay) return;
+
+        const titleEl = document.getElementById('quest-choice-title');
+        const listEl = document.getElementById('quest-choice-list');
+
+        if (!titleEl || !listEl) return;
+
+        titleEl.textContent = title;
+        listEl.innerHTML = '';
+
+        for (const choice of choices) {
+            const btn = document.createElement('button');
+            btn.className = 'btn btn-primary';
+            btn.textContent = choice.label;
+            btn.addEventListener('click', () => {
+                overlay.classList.add('hidden');
+                onChoice(choice);
+            });
+            listEl.appendChild(btn);
+        }
+
+        overlay.classList.remove('hidden');
+        this.questChoiceCallback = onChoice;
+    }
+
+    /**
+     * Handle quest choice resolution
+     */
+    resolveQuestChoice(choiceId) {
+        if (this.questChoiceCallback) {
+            const choice = this.game.questEngine.getQuestById(this.selectedQuestId)?.data?.choices?.find(c => c.id === choiceId);
+            if (choice) {
+                this.questChoiceCallback(choice);
+                this.questChoiceCallback = null;
+            }
+        }
+    }
+
+    /**
+     * Toggle settings menu
+     */
+    toggleSettings() {
+        this.settings.toggle();
+    }
+
+    /**
+     * Play UI sound via audio manager
+     */
+    playUISound(type) {
+        if (this.audioManager) {
+            const soundMap = {
+                'click': 'playClick',
+                'slider': 'playSlider',
+                'success': 'playSuccess',
+                'error': 'playError'
+            };
+            const method = soundMap[type];
+            if (method && this.audioManager[method]) {
+                this.audioManager[method]();
+            }
+        }
+    }
+
+    /**
+     * Setup settings on renderer
+     */
+    applySettings() {
+        if (this.renderer3d) {
+            this.renderer3d.mouseSensitivity = this.settings.get('mouseSensitivity');
+            this.renderer3d.invertY = this.settings.get('invertY');
+            this.renderer3d.setRenderScale(this.settings.get('renderScale'));
+            this.renderer3d.setShowFPS(this.settings.get('showFPS'));
+        }
     }
 }
 

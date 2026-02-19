@@ -185,7 +185,7 @@ export function calculateActionUtility(state, actionType) {
     }
 
     // Random factor for unpredictability
-    utility += Math.random() * 20;
+    utility += (rng ? rng.float(0, 20) : 0);
 
     return utility;
 }
@@ -195,7 +195,7 @@ export function calculateActionUtility(state, actionType) {
  * @param {Object} state - Current game state
  * @returns {string} Selected action type
  */
-export function selectBestAction(state) {
+export function selectBestAction(state, rng) {
     const categories = RIVAL_ACTION_CATEGORIES;
     const allActions = [
         ...categories.economic,

@@ -219,7 +219,16 @@ export class AudioManager {
                 baseFreq * 1.5,
                 baseFreq * 1.25
             ];
-            playTone(time, freqs[Math.floor(Math.random() * freqs.length)]);
+            const idx = (() => {
+            const cryptoObj = globalThis.crypto;
+            if (cryptoObj && cryptoObj.getRandomValues) {
+                const b = new Uint32Array(1);
+                cryptoObj.getRandomValues(b);
+                return b[0] % freqs.length;
+            }
+            return 0;
+        })();
+        playTone(time, freqs[idx]);
         }, interval);
 
         return { stop: () => {} };

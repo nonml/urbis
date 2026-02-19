@@ -1,12 +1,45 @@
 // Resources class for tracking and managing game resources
 export class Resources {
-    constructor() {
-        this.gold = 50;
-        this.food = 50;
-        this.wood = 50;
+    constructor(stateResources = null) {
+        this.gold = 100;
+        this.food = 100;
+        this.wood = 100;
         this.population = 0;
         this.housing = 0;
         this.day = 1;
+
+        // UI / telemetry (optional)
+        this.jobProduction = { gold: 0, food: 0, wood: 0 };
+        this.totalGoldEarned = 0;
+        this.totalFoodProduced = 0;
+        this.totalWoodProduced = 0;
+
+        // If stateResources provided, sync with it
+        this.stateResources = stateResources;
+    }
+
+    // Sync state resources if provided
+    _syncState() {
+        if (this.stateResources) {
+            this.stateResources.gold = this.gold;
+            this.stateResources.food = this.food;
+            this.stateResources.wood = this.wood;
+            this.stateResources.population = this.population;
+            this.stateResources.housing = this.housing;
+            this.stateResources.day = this.day;
+        }
+    }
+
+    // Sync resources from state (one-way from state to resources)
+    syncFromState() {
+        if (this.stateResources) {
+            this.gold = this.stateResources.gold;
+            this.food = this.stateResources.food;
+            this.wood = this.stateResources.wood;
+            this.population = this.stateResources.population;
+            this.housing = this.stateResources.housing;
+            this.day = this.stateResources.day;
+        }
     }
 
     add(resource, amount) {
@@ -14,12 +47,14 @@ export class Resources {
             return this.remove(resource, Math.abs(amount));
         }
         this[resource] += amount;
+        this._syncState();
         return true;
     }
 
     remove(resource, amount) {
         // Clamp at 0 (keeps simulation stable even with negative event effects)
         this[resource] = Math.max(0, this[resource] - amount);
+        this._syncState();
         return true;
     }
 
@@ -69,5 +104,17 @@ export class Resources {
 
     hasOvercrowding() {
         return this.population > this.housing;
+    }
+
+    recordJobProduction(production) {
+        const p = production || { gold: 0, food: 0, wood: 0 };
+        this.jobProduction = {
+            gold: p.gold || 0,
+            food: p.food || 0,
+            wood: p.wood || 0
+        };
+        this.totalGoldEarned += this.jobProduction.gold;
+        this.totalFoodProduced += this.jobProduction.food;
+        this.totalWoodProduced += this.jobProduction.wood;
     }
 }

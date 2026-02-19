@@ -8,6 +8,18 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 
+// Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
+function rand01() {
+    const cryptoObj = globalThis.crypto;
+    if (cryptoObj && cryptoObj.getRandomValues) {
+        const b = new Uint32Array(1);
+        cryptoObj.getRandomValues(b);
+        return (b[0] >>> 0) / 4294967296;
+    }
+    return 0.5;
+}
+
+
 export class Renderer3D {
     constructor(game, canvas) {
         this.game = game;
@@ -23,11 +35,15 @@ export class Renderer3D {
         this.pitch = -0.35;
         this.followDist = 7;
         this.followHeight = 4;
+        this.mouseSensitivity = 0.005;
+        this.invertY = false;
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
         this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
         this.renderer.shadowMap.enabled = false;
+        this.renderScale = 1.0;
+        this.setRenderScale(1.0);
 
         // Lighting
         const amb = new THREE.AmbientLight(0xffffff, 0.7);
@@ -50,6 +66,16 @@ export class Renderer3D {
         this._buildingsDirty = true;
         this._citizensDirty = true;
 
+        // VFX - Floating text and progress rings
+        this._vfxGroup = new THREE.Group();
+        this._vfxTextGroup = new THREE.Group();
+        this._vfxRingGroup = new THREE.Group();
+        this._vfxGroup.add(this._vfxTextGroup);
+        this._vfxGroup.add(this._vfxRingGroup);
+        this.scene.add(this._vfxGroup);
+        this._vfxEntries = [];
+        this._vfxRings = [];
+
         this._groundPlane = new THREE.Mesh(
             new THREE.PlaneGeometry(2000, 2000),
             new THREE.MeshBasicMaterial({ visible: false })
@@ -64,15 +90,8 @@ export class Renderer3D {
 
     resize() {
         const rect = this.canvas.getBoundingClientRect();
-        const w = Math.max(2, Math.floor(rect.width) || 0);
-        const h = Math.max(2, Math.floor(rect.height) || 0);
-        // If canvas is temporarily 0-sized (e.g., right after overlay transitions),
-        // fall back to viewport size so WebGL doesn't end up with invalid aspect.
-        const fw = w > 2 ? w : Math.max(2, window.innerWidth);
-        const fh = h > 2 ? h : Math.max(2, window.innerHeight);
-
-        this.renderer.setSize(fw, fh, false);
-        this.camera.aspect = fw / fh;
+        this.renderer.setSize(rect.width, rect.height, false);
+        this.camera.aspect = rect.width / rect.height;
         this.camera.updateProjectionMatrix();
     }
 
@@ -299,13 +318,233 @@ export class Renderer3D {
     }
 
     render() {
+        const now = performance.now();
+        if (this.fpsElement && this.fpsTimes !== undefined) {
+            this.fpsTimes.push(now);
+            while (this.fpsTimes.length > 60) this.fpsTimes.shift();
+            if (this.fpsTimes.length >= 2) {
+                const fps = Math.round(1000 / ((now - this.fpsTimes[0]) / (this.fpsTimes.length - 1)));
+                this.fpsElement.textContent = `FPS: ${fps}`;
+            }
+        }
+
         if (this._buildingsDirty) this.rebuildBuildings();
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
 
         this.syncPlayer();
         this.updateCamera();
+        this.updateVFX();
         this.renderer.render(this.scene, this.camera);
+    }
+
+    /**
+     * Set render scale (for performance)
+     */
+    setRenderScale(scale) {
+        this.renderScale = scale;
+        const width = this.canvas.clientWidth;
+        const height = this.canvas.clientHeight;
+        this.renderer.setSize(width * scale, height * scale, false);
+    }
+
+    /**
+     * Toggle FPS overlay
+     */
+    setShowFPS(show) {
+        if (show) {
+            if (!this.fpsElement) {
+                this.fpsElement = document.createElement('div');
+                this.fpsElement.id = 'fps-overlay';
+                this.fpsElement.className = 'fps-overlay hidden';
+                this.fpsElement.style.cssText = 'position:fixed;bottom:10px;left:10px;padding:8px 12px;background:rgba(0,0,0,0.7);color:#fff;font-family:monospace;font-size:12px;border-radius:4px;z-index:1000;';
+                document.body.appendChild(this.fpsElement);
+                this.fpsTimes = [];
+            }
+            this.fpsElement.classList.remove('hidden');
+        } else {
+            if (this.fpsElement) {
+                this.fpsElement.classList.add('hidden');
+            }
+        }
+    }
+
+    /**
+     * Show floating build confirmation text
+     */
+    showBuildFeedback(x, y, type, success) {
+        const text = success ? `Built ${type}` : 'Build Failed';
+        const color = success ? '#4caf50' : '#f44336';
+        this.showFloatingText(x, y, text, color, 1500);
+    }
+
+    /**
+     * Show hack progress ring
+     */
+    showHackProgress(x, y, progress) {
+        // Remove existing ring for same position
+        this._vfxRings = this._vfxRings.filter(r => r.x !== x || r.y !== y);
+        this._vfxRingGroup.remove(ringMesh);
+
+        // Create ring at position
+        const ringGeometry = new THREE.RingGeometry(0.3, 0.4, 32);
+        const ringMaterial = new THREE.MeshBasicMaterial({
+            color: 0x3b7a57,
+            side: THREE.DoubleSide,
+            transparent: true,
+            opacity: 0.8
+        });
+        const ringMesh = new THREE.Mesh(ringGeometry, ringMaterial);
+        const wx = x - this._mapHalfW + 0.5;
+        const wz = y - this._mapHalfH + 0.5;
+        ringMesh.position.set(wx, 0.2, wz);
+        ringMesh.rotation.x = -Math.PI / 2;
+        this._vfxRingGroup.add(ringMesh);
+
+        this._vfxRings.push({ x, y, mesh: ringMesh, progress: 0 });
+    }
+
+    /**
+     * Update hack progress ring
+     */
+    updateHackProgress(x, y, progress) {
+        const ring = this._vfxRings.find(r => r.x === x && r.y === y);
+        if (ring) {
+            // Update ring material to show progress
+            const size = Math.min(0.4, 0.3 + progress * 0.1);
+            ring.mesh.scale.setScalar(1 + progress * 0.2);
+            ring.mesh.material.color.setHSL(0.33 + progress * 0.1, 0.7, 0.5);
+            ring.mesh.material.opacity = 0.8 - progress * 0.3;
+        }
+    }
+
+    /**
+     * Show hack completion/failed effect
+     */
+    showHackResult(x, y, success) {
+        // Remove existing rings
+        this._vfxRings = this._vfxRings.filter(r => r.x !== x || r.y !== y);
+
+        const color = success ? '#4caf50' : '#f44336';
+        const text = success ? 'Success!' : 'Failed';
+        this.showFloatingText(x, y, text, color, 2000);
+
+        // Simple particle burst
+        this.showParticleBurst(x, y, color, 10);
+    }
+
+    /**
+     * Show floating text (billboarded sprite text)
+     */
+    showFloatingText(x, y, text, color = '#fff', duration = 2000) {
+        const container = document.createElement('div');
+        container.className = 'build-feedback';
+        container.textContent = text;
+        container.style.color = color;
+        container.style.left = '';
+        container.style.top = '';
+
+        // Add to DOM
+        const rect = this.canvas.getBoundingClientRect();
+        const wx = x - this._mapHalfW + 0.5;
+        const wz = y - this._mapHalfH + 0.5;
+
+        // Project world position to screen
+        const vector = new THREE.Vector3(wx, 0.5, wz);
+        vector.project(this.camera);
+
+        const screenX = (vector.x * 0.5 + 0.5) * rect.width;
+        const screenY = (-(vector.y * 0.5) + 0.5) * rect.height;
+
+        container.style.left = screenX + 'px';
+        container.style.top = screenY + 'px';
+        document.body.appendChild(container);
+
+        // Cleanup after animation
+        setTimeout(() => {
+            if (container.parentNode) {
+                container.parentNode.removeChild(container);
+            }
+        }, duration);
+
+        this._vfxEntries.push({
+            type: 'text',
+            element: container,
+            endTime: performance.now() + duration
+        });
+    }
+
+    /**
+     * Show particle burst at position
+     */
+    showParticleBurst(x, y, color, count = 10) {
+        const wx = x - this._mapHalfW + 0.5;
+        const wz = y - this._mapHalfH + 0.5;
+
+        for (let i = 0; i < count; i++) {
+            const particleGeometry = new THREE.SphereGeometry(0.05, 8, 8);
+            const particleMaterial = new THREE.MeshBasicMaterial({ color });
+            const particle = new THREE.Mesh(particleGeometry, particleMaterial);
+
+            particle.position.set(
+                wx + (rand01() - 0.5) * 0.5,
+                0.2,
+                wz + (rand01() - 0.5) * 0.5
+            );
+
+            particle.userData = {
+                velocity: new THREE.Vector3(
+                    (rand01() - 0.5) * 0.1,
+                    (rand01() * 0.1 + 0.05),
+                    (rand01() - 0.5) * 0.1
+                ),
+                life: 1.0
+            };
+
+            this._vfxGroup.add(particle);
+
+            this._vfxEntries.push({
+                type: 'particle',
+                mesh: particle,
+                endTime: performance.now() + 1000
+            });
+        }
+    }
+
+    /**
+     * Update VFX entries (particles, floating text cleanup)
+     */
+    updateVFX() {
+        const now = performance.now();
+
+        // Clean up expired entries
+        this._vfxEntries = this._vfxEntries.filter(entry => {
+            if (now >= entry.endTime) {
+                if (entry.type === 'text' && entry.element.parentNode) {
+                    entry.element.parentNode.removeChild(entry.element);
+                } else if (entry.type === 'particle') {
+                    this._vfxGroup.remove(entry.mesh);
+                }
+                return false;
+            }
+            return true;
+        });
+
+        // Update particles
+        for (const entry of this._vfxEntries) {
+            if (entry.type === 'particle' && entry.mesh.userData.velocity) {
+                const data = entry.mesh.userData;
+                entry.mesh.position.add(data.velocity);
+                data.velocity.y -= 0.005; // gravity
+                data.life -= 0.02;
+                entry.mesh.material.opacity = data.life;
+
+                if (entry.mesh.position.y < 0) {
+                    entry.mesh.position.y = 0;
+                    data.velocity.y *= -0.5; // bounce
+                }
+            }
+        }
     }
 }
 

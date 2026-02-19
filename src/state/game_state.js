@@ -1,5 +1,6 @@
 // GameState - Single source of truth for all serializable game state
 import { DIFFICULTY, RIVAL_CONFIG } from '../constants.js';
+import { randomSeed32, randomId } from '../rng.js';
 
 export const CURRENT_SCHEMA_VERSION = 1;
 
@@ -12,7 +13,7 @@ export const CURRENT_SCHEMA_VERSION = 1;
  */
 export function createNewGameState(options = {}) {
     const mapPreset = options.mapPreset || 'CITY';
-    const seed = (options.seed ?? Math.floor(Math.random() * 1000000)) >>> 0;
+    const seed = (options.seed ?? randomSeed32()) >>> 0;
 
     return {
         schemaVersion: CURRENT_SCHEMA_VERSION,
@@ -22,7 +23,7 @@ export function createNewGameState(options = {}) {
             mapWidth: mapPreset === 'SMALL' ? 40 : mapPreset === 'CITY' ? 96 : 256,
             mapHeight: mapPreset === 'SMALL' ? 40 : mapPreset === 'CITY' ? 96 : 256,
             createdAt: Date.now(),
-            runId: Math.random().toString(36).slice(2) + Date.now().toString(36),
+            runId: randomId('run'),
         },
         time: {
             tick: 0,

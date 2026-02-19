@@ -125,20 +125,43 @@ export class CrisisManager {
     }
 
     update() {
-        // Escalation for an unresolved crisis (single-active model).
-        // NOTE: This must never throw; the main loop depends on it.
+        // Active crisis may worsen if ignored for too long (simple prototype).
         if (!this.activeCrisis) return;
 
-        // If a crisis overlay is open and player ignores it, apply light pressure.
-        if (this.rng.chance(0.25)) {
+        // Every day, small chance the crisis escalates.
+        if (this.rng.chance(0.2)) {
             this.game.showMessage(`⚠️ ${this.activeCrisis.name} is getting worse...`, 'crisis');
-            // Small, non-lethal drip so the player feels urgency.
-            this.game.applyEffect({ gold: -2, food: -2 });
-            this.game.ui.updateResources(this.game.resources);
+
+            // Escalation effect (light-touch, deterministic)
+            const t = this.activeCrisis.type;
+            if (t === CRISIS_TYPES.FIRE) this.game.applyEffect({ wood: -5 });
+            else if (t === CRISIS_TYPES.FLOOD) this.game.applyEffect({ food: -8 });
+            else if (t === CRISIS_TYPES.DROUGHT) this.game.applyEffect({ food: -10 });
+            else if (t === CRISIS_TYPES.PLAGUE) this.game.applyEffect({ population: -1 });
+            else if (t === CRISIS_TYPES.INFLATION) this.game.applyEffect({ gold: -8 });
+            else if (t === CRISIS_TYPES.RIOT) this.game.applyEffect({ gold: -10 });
+            else if (t === CRISIS_TYPES.MIGRATION) this.game.applyEffect({ food: -6 });
         }
     }
 
     getActiveCrisisCount() {
         return this.activeCrisis ? 1 : 0;
+    }
+
+    /**
+     * Calculate accumulated damage from crises (for lose conditions)
+     */
+    getAccumulatedDamage() {
+        let damage = 0;
+        for (const event of this.eventHistory) {
+            if (event.crisis && event.crisis.severity) {
+                damage += event.crisis.severity * 20;
+            }
+        }
+        // Also add damage from escalation
+        if (this.activeCrisis) {
+            damage += this.activeCrisis.severity * 10;
+        }
+        return damage;
     }
 }

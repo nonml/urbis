@@ -1,222 +1,147 @@
-# Milestone E — Polish + QA + Ship 1.0.0 (target: 1.0.0)
+# Milestone E: Core city-builder loop v1 (build, zone, services, economy, goals)
 
-## Objective 🧼
-Make it shippable:
-- UX polish, stability, and performance
-- Tutorial/onboarding
-- Audio + feedback
-- Packaging + versioning + release checklist
+## Objective
+Deliver a playable management loop: build and expand, keep citizens alive/happy, respond to shortages, and have clear short-term goals.
 
----
-
-## 1.0.0 Exit Criteria (Acceptance)
-- ✅ 0 critical bugs in checklist
-- ✅ 30-minute MEGA soak test passes without memory/perf collapse
-- ✅ Tutorial gets player to:
-  - place buildings
-  - handle one crisis
-  - complete one minor case
-  - start the main case
-- ✅ Build has visible version `1.0.0` + seed/run id
-- ✅ Save compatibility documented; migrations work
-
-## DoD
-- Release checklist executed and archived
-- Patch notes prepared (CHANGELOG)
-
----
+## Exit criteria (acceptance for milestone)
+- Player can place and upgrade buildings with valid placement rules.
+- Resources change predictably (production/consumption visible).
+- Basic services affect citizen metrics (happiness/health/safety).
+- At least one victory condition and one failure condition exist (sandbox optional).
+- UI includes a city dashboard with key metrics + alerts.
 
 ## Phases
-1) UX & controls
-2) Audio/feedback
-3) Tutorial
-4) QA + regression
-5) Build/release
-
----
+- E1: Placement + build mode UX
+- E2: Economy (production/consumption) + budgets
+- E3: Services + effects on citizens
+- E4: Goals + win/lose scaffolding
 
 ## Tickets
 
-### E-01 — Settings menu (controls, graphics, audio)
-**Phase:** 1 — UX & controls
-**Objective:** Basic player options.
+## Ticket E-1: Build mode UX (ghost preview + rotation + validity)
+- **Phase:** E1
+- **Depends on:** C-3, D-3
 
-**Design**
-- Settings: mouse sensitivity, invert Y, volume, render scale, toggles.
+### Objective
+Make building placement fast and unambiguous.
 
-**Specs**
-- `src/ui/settings.js`
-- Persist in `localStorage` (not in save file).
+### Design
+When in build mode, show a ghost mesh aligned to parcel/road, colored by validity. Allow rotate (Q/E). Show cost + projected upkeep.
 
-**Implementation details**
-1. Add `Settings` button to HUD + keybind (e.g., `Esc` opens menu).
-2. Store settings in `localStorage` under `cityBuilderSettings`.
-3. Wire up controls:
-   - mouse sensitivity → camera
-   - invert Y → camera pitch
-   - volume sliders → `AudioManager`
-4. Wire up graphics:
-   - render scale / instancing toggles (safe defaults)
-5. Add “Reset to defaults”.
-**Acceptance**
-- Player can change sensitivity and it applies immediately.
+### Specs
+- Rotate steps: 90°.
+- Validity checks: inside parcel, not overlapping roads/water, not overlapping other buildings.
+- Hotkeys: B open build menu, Esc cancel.
 
-**DoD**
-- Defaults sensible and documented.
+### Implementation details
+- Add `src/ui/build_menu.js`.
+- Placement logic in `src/build/placement.js` returns `{ok, reason}`.
+- Renderer draws ghost using transparent material.
 
----
+### Acceptance
+- Invalid placement shows reason and prevents confirm.
+- Confirm places building and updates state/save.
 
-### E-02 — Feedback polish (VFX + UI messaging)
-**Phase:** 1 — UX & controls
-**Objective:** Make actions readable and satisfying.
+### DoD (Definition of Done)
+- No duplicated buildings on double-click.
+- Placement is deterministic with same seed + same inputs.
 
-**Design**
-- Place/build: highlight + sound + confirmation text
-- Crisis: stinger + clear “what changed”
-- Hack: progress ring + success/fail effect
+### QA checklist
+- Try placing on roads/water → blocked.
+- Place 20 buildings quickly → no lag spikes.
 
-**Specs**
-- Keep VFX lightweight (simple sprites/billboards).
+## Ticket E-2: Economy ledger v1 (production/consumption + upkeep)
+- **Phase:** E2
+- **Depends on:** A-2
 
-**Implementation details**
-1. Add hover/placement highlight (tile/parcels) + build confirmation pulse.
-2. Add small UI toast for resource delta (e.g., `+10 food`, `-5 gold`).
-3. Crisis UI:
-   - show “Before → After” preview for selected option
-   - show result summary after pick
-4. Hack feedback:
-   - progress ring / bar
-   - success/fail sound + particle (cheap sprite)
-**Acceptance**
-- Player understands consequences without reading logs.
+### Objective
+Make resources intelligible and debuggable.
 
-**DoD**
-- No performance regression.
+### Design
+Introduce per-tick ledger that sums sources/sinks per resource. UI shows breakdown. Buildings contribute production and upkeep; citizens consume food/needs.
 
----
+### Specs
+- Resources: gold, food, power, water, materials (wood/steel optional).
+- Ledger keeps last 30 ticks for graphs (dev-only if needed).
+- Upkeep drains gold; insufficient gold triggers service degradation.
 
-### E-03 — Audio pass (minimum viable)
-**Phase:** 2 — Audio/feedback
-**Objective:** Atmosphere and usability.
+### Implementation details
+- Add `src/sim/economy/ledger.js`.
+- Update building definitions to include `outputs`, `inputs`, `upkeep`.
+- Expose `game.getResourceReport()` for UI.
 
-**Design**
-- Ambient loop per district theme
-- Footsteps
-- UI clicks and crisis stingers
+### Acceptance
+- UI shows per-resource net change and top contributors.
+- Negative resources trigger clear alerts.
 
-**Specs**
-- `assets/audio/*`
-- `src/audio/audio_manager.js`
+### DoD (Definition of Done)
+- No NaN resources ever (clamp + validator).
+- Smoke test snapshots include ledger-derived totals.
 
-**Implementation details**
-1. Implement `AudioManager` with:
-   - master/music/sfx gain nodes
-   - lazy load + cache of audio buffers
-2. Add a minimal set of triggers:
-   - footsteps (rate-limited)
-   - UI click
-   - build confirm
-   - crisis stinger
-3. Add district ambient selection (fallback to global ambient).
-4. Add safe defaults and “mute all” toggle.
-**Acceptance**
-- Audio can be muted and doesn’t clip.
+### QA checklist
+- Build a farm, observe food increase; demolish, observe decrease.
+- Run 50 ticks with zero food; citizens react (see E-3).
 
-**DoD**
-- Audio assets licensed/owned or placeholders noted.
+## Ticket E-3: Services v1 (power/water/health/police) + citizen effects
+- **Phase:** E3
+- **Depends on:** C-1, D-1
 
----
+### Objective
+Tie city-builder choices to citizen outcomes and mission hooks.
 
-### E-04 — Tutorial + first-time user flow
-**Phase:** 3 — Tutorial
-**Objective:** Teach the loop in 5 minutes.
+### Design
+Each service has coverage radius and quality level. Citizens in uncovered zones lose happiness/health; crime rises without police; outages create crisis triggers.
 
-**Design**
-- Guided objectives with soft locks:
-  1) move camera
-  2) place a house
-  3) place a job building
-  4) handle a crisis
-  5) hack a node
-  6) open quest log and follow marker
+### Specs
+- Coverage: radius in tiles; quality scales with staffing.
+- Service metrics per district: coverage %, average quality.
+- Outages: power < demand triggers brownouts -> happiness drop.
 
-**Specs**
-- `src/sim/tutorial/tutorial.js`
-- Tutorial uses quest engine under the hood (so it stays maintainable).
+### Implementation details
+- Add `src/sim/services/services.js` with service registry.
+- Compute per-district coverage each tick (cached per chunk).
+- Expose overlay: press F2 to show service heatmaps.
 
-**Implementation details**
-1. Implement a tutorial state machine:
-   - steps with `start()`, `isComplete()`, `onComplete()`
-2. Add HUD objective widget + “Next” hint.
-3. Soft locks:
-   - disable advanced tools until required step completes
-   - spawn a guaranteed crisis at step 4 (deterministic)
-4. Persist tutorial completion in `localStorage`.
-5. Add a “Reset tutorial” button in settings.
-**Acceptance**
-- New player can reach “main case started” reliably.
+### Acceptance
+- Adding a police station improves safety metric in nearby districts.
+- Power shortage causes visible consequences within 10 ticks.
 
-**DoD**
-- Tutorial can be skipped and never reappears unless reset.
+### DoD (Definition of Done)
+- Service computation cost bounded (< 5ms per tick CITY).
+- Service data serialized or recomputed deterministically.
 
----
+### QA checklist
+- Create power deficit; verify brownout alert and citizen impact.
+- Remove police; verify crime metric rises.
 
-### E-05 — QA + regression suite
-**Phase:** 4 — QA + regression
-**Objective:** Fewer surprises.
+## Ticket E-4: Goals + win/lose v1 (sandbox toggle)
+- **Phase:** E4
+- **Depends on:** E-2, E-3
 
-**Design**
-- Maintain:
-  - manual checklist
-  - automated smoke test
-  - 10 fixed balance seeds
+### Objective
+Give players direction and an endpoint for 0.x builds.
 
-**Specs**
-- `docs/RELEASE_CHECKLIST.md`
-- `docs/KNOWN_ISSUES.md`
+### Design
+Add short-term goals (tutorial-like) and a simple win condition (population + stability) and lose conditions (bankrupt, mass death, revolt). Sandbox mode disables win/lose.
 
-**Implementation details**
-1. Add `docs/RELEASE_CHECKLIST.md` if not already present; keep it executable.
-2. Define 10 balance seeds in `docs/BALANCE_SEEDS.md`:
-   - seed, preset, expected early-day economy range.
-3. Extend smoke test:
-   - run N ticks for each seed/preset
-   - assert no NaNs, no negative resources, no runaway population.
-4. Add MEGA soak procedure:
-   - start seed, roam, place 100 buildings, save/load, monitor overlay.
-**Acceptance**
-- 30-min MEGA soak test passes on 2 machines (or 2 browsers).
+### Specs
+- Win: population >= X and avg happiness >= Y for Z days.
+- Lose: gold < 0 for 10 ticks OR population < 10 after day 3 OR revolt event fires.
+- Sandbox toggle in new game menu.
 
-**DoD**
-- All critical bugs tracked with reproduction steps.
+### Implementation details
+- Add `src/sim/goals/goals.js`.
+- UI: goal tracker panel and end screen.
+- State: `state.progress.mode`, `state.progress.goalState`.
 
----
+### Acceptance
+- Win/lose screens appear and are replayable (return to main menu).
+- Sandbox does not trigger game over.
 
-### E-06 — Build pipeline + version stamping + changelog
-**Phase:** 5 — Build/release
-**Objective:** Produce a consistent 1.0.0 artifact.
+### DoD (Definition of Done)
+- Goals are data-driven (`src/content/goals.json`).
+- End state saved in run summary.
 
-**Design**
-- Add build step (recommended: Vite).
-- Inject version string into UI + save meta.
-- Maintain `CHANGELOG.md` (Keep a Changelog format).
-
-**Specs**
-- `package.json` scripts:
-  - `dev`, `build`, `preview`
-- Version in `src/version.js`.
-
-**Implementation details**
-1. Add Vite (or equivalent) build:
-   - `npm i -D vite`
-   - `npm run dev/build/preview`
-2. Add `src/version.js` exporting `VERSION` + `BUILD_DATE`.
-3. Inject version into UI (title bar + pause menu) and save meta.
-4. Add `CHANGELOG.md` (Keep a Changelog format).
-5. Add a release script `scripts/release.mjs` that:
-   - bumps version, builds, zips dist, writes checksums.
-**Acceptance**
-- `build/` output runs offline and shows version.
-
-**DoD**
-- Release zip produced and validated with checklist.
+### QA checklist
+- Force bankrupt by spamming buildings; verify lose condition.
+- Achieve win by building up; verify win condition.

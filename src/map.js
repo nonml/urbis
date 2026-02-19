@@ -1,6 +1,9 @@
 // Map class for terrain generation and management
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_COLORS, TERRAIN_ICONS } from './constants.js';
-import { RNG } from './rng.js';
+import { RNG, randomSeed32 } from './rng.js';
+import { generateDistricts, getDistrictAt, getDistrictName } from './gen/districts.js';
+import { generateRoads, getBlockAt } from './gen/roads.js';
+import { generateParcels, getParcelAt, getParcelById, isTileInParcel } from './gen/parcels.js';
 
 class SimpleNoise {
     constructor(seed = 123) {
@@ -42,9 +45,17 @@ export class Map {
     constructor(width, height, seed = null, rng = null) {
         this.width = width;
         this.height = height;
-        this.seed = (seed ?? Math.floor(Math.random() * 10000)) >>> 0;
+        this.seed = (seed ?? randomSeed32()) >>> 0;
         this.rng = rng || new RNG(this.seed);
         this.grid = [];
+        this.districts = [];
+        this.districtMap = null;
+        this.roads = null;
+        this.roadMap = null;
+        this.sidewalkMap = null;
+        this.blockMap = null;
+        this.parcels = null;
+        this.parcelMap = null;
         this.resources = [];
         this.cities = [];
         this.noise = new SimpleNoise(this.seed);
@@ -78,6 +89,27 @@ export class Map {
 
         // Ensure starting area is accessible (grass/plain)
         this.createStartingArea();
+
+        // Generate districts
+        this.generateDistricts();
+
+        // Generate road network
+        this.generateRoads();
+
+        // Generate parcels
+        this.generateParcels();
+    }
+
+    generateDistricts() {
+        // Determine district count based on map size
+        const area = this.width * this.height;
+        let districtCount = 3;
+        if (area > 10000) districtCount = 5;  // MEGA
+        else if (area > 5000) districtCount = 4;  // CITY
+
+        const result = generateDistricts(this.width, this.height, this.seed + 1, districtCount);
+        this.districts = result.districts;
+        this.districtMap = result.districtMap;
     }
 
     placeResourceClusters() {
@@ -88,8 +120,8 @@ export class Map {
             for (let y = -3; y <= 3; y++) {
                 for (let x = -3; x <= 3; x++) {
                     if (this.rng.next() > 0.3) {
-                        const ny = (cy + y + this.height) % this.height;
-                        const nx = (cx + x + this.width) % this.width;
+                        const ny = ((cy + y) % this.height + this.height) % this.height;
+                        const nx = ((cx + x) % this.width + this.width) % this.width;
                         if (this.grid[ny][nx] === TERRAIN_GRASS) {
                             this.grid[ny][nx] = TERRAIN_FOREST;
                         }
@@ -105,8 +137,8 @@ export class Map {
             for (let y = -2; y <= 2; y++) {
                 for (let x = -2; x <= 2; x++) {
                     if (this.rng.next() > 0.4) {
-                        const ny = (cy + y + this.height) % this.height;
-                        const nx = (cx + x + this.width) % this.width;
+                        const ny = ((cy + y) % this.height + this.height) % this.height;
+                        const nx = ((cx + x) % this.width + this.width) % this.width;
                         if (this.grid[ny][nx] === TERRAIN_GRASS) {
                             this.grid[ny][nx] = TERRAIN_MOUNTAIN;
                         }
@@ -178,5 +210,58 @@ export class Map {
             }
         }
         return land;
+    }
+
+    getDistrictAt(x, y) {
+        return getDistrictAt(this.districtMap, x, y, this.width);
+    }
+
+    getDistrictName(districtId) {
+        return getDistrictName(this.districts, districtId);
+    }
+
+    getTileDistrictName(x, y) {
+        const districtId = this.getDistrictAt(x, y);
+        return this.getDistrictName(districtId);
+    }
+
+    generateRoads() {
+        const result = generateRoads(this, this.seed + 2);
+        this.roads = result.roads;
+        this.roadMap = result.roadMap;
+        this.sidewalkMap = result.sidewalkMap;
+        this.blockMap = result.blockMap;
+    }
+
+    getBlockAt(x, y) {
+        return getBlockAt(this.blockMap, x, y, this.width);
+    }
+
+    getRoadTiles(roadIndex) {
+        const road = this.roads[roadIndex];
+        return road ? road.tiles : [];
+    }
+
+    getSidewalkTiles(roadIndex) {
+        const road = this.roads[roadIndex];
+        return road ? road.sidewalks : [];
+    }
+
+    generateParcels() {
+        const result = generateParcels(this, this.seed + 3);
+        this.parcels = result.parcels;
+        this.parcelMap = result.parcelMap;
+    }
+
+    getParcelAt(x, y) {
+        return getParcelAt(this.parcelMap, x, y, this.width);
+    }
+
+    getParcelById(parcelId) {
+        return getParcelById(this.parcels, parcelId);
+    }
+
+    isTileInParcel(x, y) {
+        return isTileInParcel(this.parcelMap, x, y, this.width);
     }
 }

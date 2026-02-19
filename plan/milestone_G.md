@@ -1,254 +1,113 @@
-# Milestone G — 1.2.0: Modding + Creator Tools + Sharing
+# Milestone G: Hacking gameplay v1 (scan, breach, cameras, traffic control, heat)
 
-## Objective 🛠️
-Let players (and juniors) add content safely:
-- Data-driven content registry (buildings, storylets, cases, modifiers)
-- Mod loader with manifests + versioning
-- Creator tools (validator + lightweight editor)
-- Shareable “Run Codes” (seed + preset + enabled mods)
+## Objective
+Deliver a Watch Dogs-like hacking loop tied to exploration and city systems.
 
----
-
-## Exit Criteria (Acceptance)
-- ✅ Mods can be loaded from a `mods/` folder with a manifest
-- ✅ Two sample mods ship:
-  - “New Buildings Pack”
-  - “Storylets Pack”
-- ✅ Content validation runs and blocks bad mods with actionable errors
-- ✅ Run Code export/import works and reproduces the run reliably
-
-## DoD
-- Mods are sandboxed to data (no arbitrary JS execution in 1.2.0)
-- Mod compatibility rules documented (load order, overrides)
-- Save includes enabled mod list and rejects incompatible loads gracefully
-
----
+## Exit criteria (acceptance for milestone)
+- Player can scan nearby hackables and see security levels.
+- At least 4 hack actions work: camera view, traffic light, door/gate, district ping.
+- Hacks generate heat; heat affects police response later.
+- Security upgrades increase difficulty (breach mini-game).
 
 ## Phases
-1) **Content registry + override rules**
-2) **Mod loader + validation**
-3) **Creator tools**
-4) **Sharing + compatibility**
-
----
+- G1: Hackable taxonomy + scanning UI
+- G2: Breach mini-game stub + success/fail outcomes
+- G3: Hack actions + heat plumbing
 
 ## Tickets
 
-### G-01 — Content registry + override semantics
-**Phase:** 1 — Content registry + override rules
-**Objective:** Make all content discoverable and overrideable.
+## Ticket G-1: Hackable system: types, security, ownership
+- **Phase:** G1
+- **Depends on:** B-3, C-4
 
-**Design**
-- Add registry that loads base content first, then applies mod overlays.
-- Override rules:
-  - same `id` replaces (with warning)
-  - arrays merge by id (configurable)
-  - missing refs cause validator errors
+### Objective
+Standardize what can be hacked and how difficulty is represented.
 
-**Specs**
-- `src/content/registry.js`
-- Registry outputs:
-  - `content.buildings`, `content.storylets`, `content.cases`, `content.modifiers`, `content.crises`
+### Design
+Hackable objects implement `{id,type,pos,securityLevel,ownerFaction,state}`. Scanning shows outline + tooltip and adds to nearby list.
 
-**Implementation details**
-1. Define schemas (minimal JSON schema-like checks).
-2. Load base packs from `src/content/**`.
-3. Provide `registry.get(type, id)` and `registry.list(type)`.
+### Specs
+- Security levels: 1..5.
+- Scan radius: 25m; line-of-sight optional.
+- Owners: city, corp, gang, police.
 
-**Acceptance**
-- Game can run purely from registry content without hard-coded lookups.
+### Implementation details
+- Extend `InteractableManager` with hackables registry.
+- Add UI panel `HackList` sorted by distance and priority.
+- Persist discovered hackables in state (optional).
 
-**DoD**
-- Registry logs clearly what was loaded and overridden (dev only).
+### Acceptance
+- Approaching a camera shows it in scan list.
+- Security level shown consistently.
 
----
+### DoD (Definition of Done)
+- No per-frame DOM re-creation.
+- Hackables serialized or regenerated deterministically.
 
-### G-02 — Mod manifest format + folder loader
-**Phase:** 2 — Mod loader + validation
-**Objective:** Load mods predictably from disk (local).
+### QA checklist
+- Scan in 3 districts; ensure list updates correctly.
+- Pause/unpause; scan list stable.
 
-**Design**
-- `mods/<modId>/manifest.json`:
-  - `id, name, version, gameVersionRange, loadOrder, contentPaths[]`
-- Loader reads manifests and loads JSON packs.
+## Ticket G-2: Breach mini-game v1 (timed lock)
+- **Phase:** G2
+- **Depends on:** G-1
 
-**Specs**
-- `src/mods/mod_loader.js`
-- Mods are enabled/disabled via settings UI; saved to `localStorage`.
+### Objective
+Create a repeatable challenge for hacks without building full puzzle complexity.
 
-**Implementation details**
-1. Implement mod discovery (list known folders; for web, use file picker / drag-drop zip).
-2. Parse manifests, sort by `loadOrder`.
-3. Feed content into registry overlays.
+### Design
+Timed “match the node” or “hold-to-sync” with moving needle; difficulty scales speed + window size. Fail increases heat.
 
-**Acceptance**
-- Disabling a mod removes its content on next new run.
+### Specs
+- Difficulty scales by security level.
+- Fail penalty: +5 heat; cooldown 10s on that node.
+- Success reward: 0..-heat for stealth hacks.
 
-**DoD**
-- Loader errors never crash the game; they show a clear UI message.
+### Implementation details
+- Add `src/ui/breach_minigame.js` as modal.
+- Game pauses world sim or slows time to 0.2x during breach.
+- Emit `player_hacked_node` event with success/fail.
 
----
+### Acceptance
+- Player can succeed/fail and see consequences.
+- Mini-game never softlocks input.
 
-### G-03 — Content validator (hard gate)
-**Phase:** 2 — Mod loader + validation
-**Objective:** Catch broken content before runtime.
+### DoD (Definition of Done)
+- Keyboard + mouse usable.
+- Accessibility: optional “easy hack” in dev menu.
 
-**Design**
-- Validator checks:
-  - required fields
-  - referenced ids exist (storylet → outcome, case → steps)
-  - no cycles in required quest steps (unless explicitly allowed)
+### QA checklist
+- Attempt 20 hacks; ensure no memory leak (modal removed).
+- Fail 5 times; confirm cooldown works.
 
-**Specs**
-- `scripts/validate_content.mjs`
-- Output:
-  - human-readable errors + machine-readable JSON report.
+## Ticket G-3: Hack actions v1 + heat system
+- **Phase:** G3
+- **Depends on:** G-2
 
-**Implementation details**
-1. Implement schema checks per content type.
-2. Implement reference resolver to detect missing ids.
-3. Integrate validator into build step or pre-run check.
+### Objective
+Make hacks affect the world meaningfully and feed chase loop later.
 
-**Acceptance**
-- A bad mod yields a list of actionable errors with file/line context (best effort).
+### Design
+Implement discrete actions with durations and cooldowns. Heat is a 0..100 meter with decay. Certain hacks are “loud”.
 
-**DoD**
-- Validator runs in under 2 seconds for typical packs.
+### Specs
+- Actions: camera takeover, traffic light switch, door unlock, district blackout ping.
+- Heat decay: 0.5 per tick if not seen.
+- Heat thresholds: 25 alert, 50 search, 75 pursuit.
 
----
+### Implementation details
+- Add `src/sim/heat/heat_system.js`.
+- Implement camera view as render overlay switching to camera node position.
+- Traffic light hack toggles vehicle AI later and can cause crashes event.
 
-### G-04 — Lightweight story/case editor (dev tool)
-**Phase:** 3 — Creator tools
-**Objective:** Speed up authoring for juniors and modders.
+### Acceptance
+- Hacking camera changes view and provides intel.
+- Heat increases on loud hacks and is visible in HUD.
 
-**Design**
-- Minimal in-browser editor:
-  - create/edit storylets + cases
-  - preview step graph
-  - “simulate outcome” using mock city state
+### DoD (Definition of Done)
+- Heat state saved/loaded.
+- Heat never goes negative or above max.
 
-**Specs**
-- `src/dev/content_editor.js`
-- Saves JSON to disk via download (web limitations).
-
-**Implementation details**
-1. Build a simple UI with forms + JSON preview.
-2. Provide “Validate” button that runs the validator logic in-browser.
-3. Provide “Export pack” button.
-
-**Acceptance**
-- Junior can create a new minor case in under 15 minutes.
-
-**DoD**
-- Editor is dev-only and does not ship in release builds by default.
-
----
-
-### G-05 — Run Code export/import (seed + preset + mods)
-**Phase:** 4 — Sharing + compatibility
-**Objective:** Share reproducible runs.
-
-**Design**
-- Run Code includes:
-  - seed
-  - map preset
-  - difficulty
-  - enabled mods + versions
-- Encode as base64 JSON (short enough to copy/paste).
-
-**Specs**
-- `src/share/run_code.js`
-- UI:
-  - “Copy Run Code”
-  - “Paste Run Code”
-
-**Implementation details**
-1. Add serializer/deserializer with validation.
-2. Add UI prompts and clipboard integration.
-3. On import, warn if required mods missing or version mismatch.
-
-**Acceptance**
-- Importing a Run Code recreates the same city generation.
-
-**DoD**
-- Invalid codes fail gracefully with helpful error messages.
-
----
-
-### G-06 — Mod compatibility in saves
-**Phase:** 4 — Sharing + compatibility
-**Objective:** Prevent corrupted saves.
-
-**Design**
-- Save meta includes:
-  - enabled mods list + versions
-  - content pack hashes (optional)
-- On load:
-  - if mismatch → warn and block, or offer “attempt load” in dev.
-
-**Specs**
-- `src/save/save.js` extended
-- `schemaVersion` bump + migration for old saves.
-
-**Implementation details**
-1. Add mod metadata to save payload.
-2. Add compatibility check + UI prompt.
-3. Implement migration path for pre-mod saves.
-
-**Acceptance**
-- Loading a save with missing mods does not crash and provides a clear prompt.
-
-**DoD**
-- Save version bump documented in changelog.
-
----
-
-### G-07 — Sample mods + documentation
-**Phase:** 3 — Creator tools
-**Objective:** Ship examples that juniors can learn from.
-
-**Design**
-- Provide:
-  - buildings pack with 3 new buildings
-  - storylets pack with 10 new storylets
-
-**Specs**
-- `mods/sample_buildings/`
-- `mods/sample_storylets/`
-- `docs/MODDING.md`
-
-**Implementation details**
-1. Author packs using the manifest format.
-2. Document load order and override rules.
-3. Add “mod troubleshooting” section.
-
-**Acceptance**
-- Samples load without errors and appear in a new run.
-
-**DoD**
-- Docs include a step-by-step “make your first mod”.
-
----
-
-### G-08 — Release gating for mods
-**Phase:** 2 — Mod loader + validation
-**Objective:** Avoid shipping a broken mod pipeline.
-
-**Design**
-- Add a checklist section:
-  - validate base content
-  - validate sample mods
-  - run 5 reference seeds with mods enabled
-
-**Specs**
-- `docs/RELEASE_CHECKLIST.md` extended with “Modding” section.
-
-**Implementation details**
-1. Update checklist.
-2. Run it once and store results in `qa_runs/`.
-
-**Acceptance**
-- Release checklist contains an explicit “Mods OK” gate.
-
-**DoD**
-- Failures are reproducible and tracked as tickets.
+### QA checklist
+- Trigger heat > 50; verify UI changes state.
+- Restart with same seed; repeat hacks; heat behaves consistently.

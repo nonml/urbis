@@ -1,241 +1,112 @@
-# Milestone H — 1.3.0: Replayability Boost (Challenges + Photo + Replay)
+# Milestone H: Quest framework v2 (data-driven steps, markers, branching, rewards)
 
-## Objective 🎥
-Make runs more shareable and “Watch Dogs vibe” friendly:
-- Weekly/rotating challenge framework (offline-first)
-- Photo mode + cinematic camera tools
-- Replay/ghost of your run (lightweight)
-- More emergent moments surfaced (city “news feed”)
+## Objective
+Turn anomalies + hacks into structured quests with branching, rewards, and reliable progression tracking.
 
----
-
-## Exit Criteria (Acceptance)
-- ✅ Challenge mode exists with rotating presets (seed + rules)
-- ✅ Photo mode can capture and export an image (client-side)
-- ✅ Replay captures last N minutes of key events (not full deterministic replay)
-- ✅ A “city news feed” surfaces notable events without spamming
-
-## DoD
-- No online services required (offline-first)
-- Features are optional and do not affect core sim determinism
-- MEGA performance not regressed
-
----
+## Exit criteria (acceptance for milestone)
+- Quest definitions are loaded from `src/content/quests/` and validated.
+- Quest log shows active/completed quests and current objective.
+- Markers/waypoints work and persist across save/load.
+- At least 6 quests run end-to-end with branching choices.
 
 ## Phases
-1) **Challenges framework**
-2) **Photo/cinematic tools**
-3) **Replay/event capture**
-4) **Presentation (news feed) + polish**
-
----
+- H1: Quest schema + validator
+- H2: Step handlers + branching
+- H3: Rewards + persistence + tooling
 
 ## Tickets
 
-### H-01 — Challenge presets + rules engine
-**Phase:** 1 — Challenges framework
-**Objective:** Add structured replayable scenarios.
+## Ticket H-1: Quest schema + validation pipeline
+- **Phase:** H1
+- **Depends on:** A-2
 
-**Design**
-- Challenge preset defines:
-  - seed, preset, difficulty
-  - starting resources
-  - extra rules (e.g., “no farms”, “crisis rate x2”, “must reach pop 200 by day 40”)
+### Objective
+Ensure content errors don’t crash runtime.
 
-**Specs**
-- `src/challenges/challenges.json`
-- `src/challenges/challenge_manager.js`
+### Design
+Define JSON schema-like validator in code (lightweight). Validate on load; invalid quests are logged and skipped.
 
-**Implementation details**
-1. Implement rule checks that run each tick and produce pass/fail.
-2. Add UI to select a challenge and start a run.
-3. Store best results locally.
+### Specs
+- Quest fields: id, title, tags, trigger, steps[], rewards[]
+- Step kinds: go_to, hack, investigate, choice, outcome.
+- All references (poiId, citizenId markers) must resolve or have fallback.
 
-**Acceptance**
-- At least 5 challenge presets ship.
+### Implementation details
+- Add `src/content/quests/schema.js` validator.
+- Extend `loadQuestsFromDirectory()` to report errors in dev overlay.
+- Add `npm run test` quest validation step.
 
-**DoD**
-- Challenges never modify RNG ordering; they only read state.
+### Acceptance
+- Bad quest JSON does not crash game; shows error list.
+- Valid quests load and appear in dev menu.
 
----
+### DoD (Definition of Done)
+- Validator has unit tests with fixtures.
+- Docs: `docs/QUESTS.md`.
 
-### H-02 — Local leaderboard + run summary
-**Phase:** 1 — Challenges framework
-**Objective:** Encourage replay without servers.
+### QA checklist
+- Intentionally break a quest file; verify graceful handling.
+- Fix it; verify quest appears again.
 
-**Design**
-- Save best run summaries per challenge:
-  - day reached, population, resources, completion time
-- Display top 10 locally.
+## Ticket H-2: Branching + choice memory
+- **Phase:** H2
+- **Depends on:** H-1
 
-**Specs**
-- `src/challenges/leaderboard.js` (localStorage backed)
+### Objective
+Make player decisions affect future steps and city state.
 
-**Implementation details**
-1. Implement serialization of run summary.
-2. Implement UI list with sorting.
+### Design
+Choices set flags in quest context and global run flags. Conditional steps evaluate flags + city metrics (heat, happiness, district security).
 
-**Acceptance**
-- Completing a challenge records a run and shows it in leaderboard.
+### Specs
+- Choice step: 2–4 options, each sets flags and may modify heat/reputation.
+- Conditional step supports AND/OR on flags and metrics thresholds.
+- Quest context persists in save.
 
-**DoD**
-- Leaderboard does not grow unbounded (cap entries).
+### Implementation details
+- Implement `STEP_KINDS.CONDITIONAL` fully (if currently stub).
+- Add `state.progress.runFlags`.
+- Add UI: choice modal with keybinds 1-4.
 
----
+### Acceptance
+- Making a choice changes later steps reliably.
+- Save/load retains choice state.
 
-### H-03 — Photo mode (free camera + hide HUD)
-**Phase:** 2 — Photo/cinematic tools
-**Objective:** Shareable visuals.
+### DoD (Definition of Done)
+- No branching dead-ends unless marked as fail.
+- Quest engine has automated test for a branching quest.
 
-**Design**
-- Photo mode:
-  - toggles free camera controls
-  - hide HUD toggle
-  - field-of-view slider
-  - screenshot button
+### QA checklist
+- Run branching quest twice with different choices; verify different outcomes.
+- Reload mid-quest; ensure branch remains consistent.
 
-**Specs**
-- `src/ui/photo_mode.js`
-- Screenshot uses `renderer.domElement.toDataURL()`.
+## Ticket H-3: Rewards + unlocks (cash, heat, faction rep, building unlock)
+- **Phase:** H3
+- **Depends on:** E-2, G-3
 
-**Implementation details**
-1. Add keybind (e.g., `F9`) to toggle photo mode.
-2. Disable sim input while in photo mode.
-3. Provide a small UI panel for settings and capture.
+### Objective
+Tie quests into progression and city-building incentives.
 
-**Acceptance**
-- Player can export a PNG without dev tools.
+### Design
+Reward system applies effects to economy, heat, faction reputation, unlock lists. Rewards are applied once with idempotent guard.
 
-**DoD**
-- Photo mode exits cleanly and restores camera.
+### Specs
+- Reward types: add_resource, set_flag, modify_heat, rep_delta, unlock_building, unlock_hack.
+- Reward log stored per quest to prevent duplication.
 
----
+### Implementation details
+- Add `src/sim/rewards/reward_system.js`.
+- UI: reward toast summary at quest completion.
+- Persist unlocks in `state.progress.unlocks`.
 
-### H-04 — Cinematic camera presets (walk, orbit, follow)
-**Phase:** 2 — Photo/cinematic tools
-**Objective:** Make camera motion look intentional.
+### Acceptance
+- Quest completion grants rewards and updates UI.
+- Reload doesn’t duplicate rewards.
 
-**Design**
-- Presets:
-  - slow follow
-  - orbit around point
-  - dolly path (simple spline)
+### DoD (Definition of Done)
+- Reward definitions validated.
+- At least 3 unlockable buildings and 2 unlockable hacks exist.
 
-**Specs**
-- `src/camera/cinematic.js`
-
-**Implementation details**
-1. Implement a small state machine for camera modes.
-2. Add UI to select and tweak parameters.
-
-**Acceptance**
-- Orbit preset works on any POI/building.
-
-**DoD**
-- Camera modes are deterministic given same inputs.
-
----
-
-### H-05 — Event capture buffer (last N minutes)
-**Phase:** 3 — Replay/event capture
-**Objective:** Provide a “replay” feel without full deterministic playback.
-
-**Design**
-- Capture a ring buffer of:
-  - player positions (downsampled)
-  - key events (build, crisis, quest step)
-  - screenshots optionally (disabled by default)
-
-**Specs**
-- `src/replay/event_buffer.js`
-- Default: keep last 5 minutes.
-
-**Implementation details**
-1. Sample player transform every X frames.
-2. Push discrete events from systems into buffer.
-3. Add UI to scrub timeline and jump camera to recorded points.
-
-**Acceptance**
-- Player can review last 5 minutes and jump to major events.
-
-**DoD**
-- Buffer memory bounded and tested on MEGA.
-
----
-
-### H-06 — City news feed (story surfacing)
-**Phase:** 4 — Presentation (news feed) + polish
-**Objective:** Surface emergent moments in a readable way.
-
-**Design**
-- News feed cards for:
-  - major crisis triggered/resolved
-  - case progress
-  - district modifier changes
-  - “citizen spotlight” (notable relationship event)
-
-**Specs**
-- `src/ui/news_feed.js`
-- Rate limiting: max 1 card per in-game day (configurable).
-
-**Implementation details**
-1. Add event bus that emits “notable events”.
-2. Feed subscribes and formats cards.
-3. Add filters to hide categories.
-
-**Acceptance**
-- Feed provides useful context without spam.
-
-**DoD**
-- Feed formatting consistent and localizable later.
-
----
-
-### H-07 — Shareable run summary export
-**Phase:** 4 — Presentation (news feed) + polish
-**Objective:** Make sharing runs easy.
-
-**Design**
-- Export a summary JSON:
-  - seed, preset, mods, outcomes, screenshots list (optional)
-- Provide “copy to clipboard” and “download summary”.
-
-**Specs**
-- `src/share/run_summary.js`
-
-**Implementation details**
-1. Implement serializer for run summary.
-2. Add UI button in end screen.
-
-**Acceptance**
-- Exported summary can be imported to reproduce the run setup.
-
-**DoD**
-- Export respects privacy (no personal data).
-
----
-
-### H-08 — Polish pass + QA gates
-**Phase:** 4 — Presentation (news feed) + polish
-**Objective:** Ship 1.3.0 cleanly.
-
-**Design**
-- Extend release checklist with:
-  - photo mode
-  - challenges
-  - replay buffer
-  - news feed
-
-**Specs**
-- `docs/RELEASE_CHECKLIST.md` updated
-- Add 5 new reference seeds for challenge mode.
-
-**Implementation details**
-1. Run QA checklist across Small/City/MEGA.
-2. Record results in `qa_runs/` and fix regressions.
-
-**Acceptance**
-- No crashes during 30-min MEGA challenge play.
-
-**DoD**
-- 1.3.0 patch notes prepared.
+### QA checklist
+- Complete a quest; verify gold changes and unlock appears in build menu.
+- Save/load after reward; verify no duplication.

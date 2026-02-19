@@ -37,8 +37,8 @@
                     <div class="progress-fill" id="victory-progress" style="width: 0%"></div>
                 </div>
             </div>
-            <button class="btn btn-primary" onclick="window.restartGame()">Play Again</button>
-            <button class="btn btn-secondary" onclick="window.showStartScreen()">Main Menu</button>
+            <button class="btn btn-primary" id="victory-restart-btn">Play Again</button>
+            <button class="btn btn-secondary" id="victory-main-menu-btn">Main Menu</button>
         </div>
     </div>
 
@@ -166,8 +166,19 @@
         <div class="overlay-content">
             <div class="victory-icon">🏙️</div>
             <h1>Dynamic City Builder</h1>
+            <p id="version-display">Build 1.0.0</p>
             <p>Build and manage your own city with dynamic citizens, random events, and multiple victory paths.</p>
-            <button class="btn btn-primary" onclick="window.startGame()">Start Game</button>
+            <button class="btn btn-primary" id="start-btn">Start Game</button>
+            <div class="stats-grid" style="margin-top: 20px">
+                <div class="stat-item">
+                    <div class="stat-label">Victory Types</div>
+                    <div class="stat-value" style="text-align: left">• Military<br>• Economic<br>• Cultural<br>• Technological</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Controls</div>
+                    <div class="stat-value" style="text-align: left">• WASD to move (3rd-person)<br>• Right-drag to rotate camera<br>• Click tile to build/inspect<br>• 'P' to pause<br>• Ctrl+S to save</div>
+                </div>
+            </div>
             <div class="menu-options">
                 <div class="option-row">
                     <label for="map-size">Map Size</label>
@@ -182,16 +193,8 @@
                     <input id="world-seed" placeholder="(blank = random)" />
                 </div>
             </div>
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <div class="stat-label">Victory Types</div>
-                    <div class="stat-value" style="text-align: left">• Military<br>• Economic<br>• Cultural<br>• Technological</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-label">Controls</div>
-                    <div class="stat-value" style="text-align: left">• WASD to move (3rd-person)<br>• Right-drag to rotate camera<br>• Click tile to build/inspect<br>• 'P' to pause<br>• Ctrl+S to save</div>
-                </div>
-            </div>
+            <button class="btn btn-primary" id="restart-btn">Play Again</button>
+            <button class="btn btn-secondary" id="main-menu-btn">Main Menu</button>
         </div>
     </div>
 
@@ -203,6 +206,41 @@
             <p id="crisis-desc">Something happened.</p>
             <div id="crisis-options" class="crisis-options"></div>
         </div>
+    </div>
+
+    <!-- Quest Choice Modal -->
+    <div id="quest-choice-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <h2 id="quest-choice-title">Choose an Option</h2>
+            <div id="quest-choice-list" class="quest-choice-list"></div>
+        </div>
+    </div>
+
+    <!-- Defeat Modal -->
+    <div id="defeat-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <div class="victory-icon">💀</div>
+            <h1 id="defeat-title">City Collapsed</h1>
+            <p id="defeat-message">Your city has fallen. Review your choices and try again.</p>
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-label">Total Days</div>
+                    <div class="stat-value" id="defeat-days">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Final Population</div>
+                    <div class="stat-value" id="defeat-pop">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Total Buildings</div>
+                    <div class="stat-value" id="defeat-buildings">0</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-label">Final Gold</div>
+                    <div class="stat-value" id="defeat-gold">0</div>
+                </div>
+            </div>
+                    </div>
     </div>
 
     <script type="module" src="src/main.js"></script>
