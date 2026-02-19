@@ -14,26 +14,176 @@ import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
 
 function createRendererStub(game, canvas) {
-    return {
+    const stub = {
         game,
         canvas,
+        ctx: null,
         yaw: 0,
         pitch: -0.35,
         followDist: 7,
         followHeight: 4,
         _debugMode: 'none',
+        _renderScale: 1,
+        _showFPS: false,
+        _ghost: null,
+        _view: null,
+        _lastFrameMs: 0,
+        _lastFrameAt: 0,
+        _ensureCtx() {
+            if (!this.canvas) return null;
+            if (!this.ctx) this.ctx = this.canvas.getContext('2d');
+            return this.ctx;
+        },
+        _resizeCanvas() {
+            if (!this.canvas) return;
+            const dpr = window.devicePixelRatio || 1;
+            const rect = this.canvas.getBoundingClientRect();
+            const w = Math.max(1, Math.floor(rect.width * dpr));
+            const h = Math.max(1, Math.floor(rect.height * dpr));
+            if (this.canvas.width !== w || this.canvas.height !== h) {
+                this.canvas.width = w;
+                this.canvas.height = h;
+            }
+        },
+        _resolveView() {
+            const rect = this.canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const canvasW = Math.max(1, Math.floor(rect.width * dpr));
+            const canvasH = Math.max(1, Math.floor(rect.height * dpr));
+            const scale = Math.max(0.65, Math.min(1.8, Number(this._renderScale) || 1));
+            const targetTilesX = Math.max(16, Math.round(30 / scale));
+            const tilePx = Math.max(14, Math.min(64, Math.floor(canvasW / targetTilesX)));
+            const tilesX = Math.max(8, Math.floor(canvasW / tilePx));
+            const tilesY = Math.max(6, Math.floor(canvasH / tilePx));
+
+            const px = Math.max(0, Math.min(game.map.width - 1, Math.floor((game.player?.wx ?? game.player?.x ?? 0))));
+            const py = Math.max(0, Math.min(game.map.height - 1, Math.floor((game.player?.wz ?? game.player?.y ?? 0))));
+            const maxStartX = Math.max(0, game.map.width - tilesX);
+            const maxStartY = Math.max(0, game.map.height - tilesY);
+            const startX = Math.max(0, Math.min(maxStartX, px - Math.floor(tilesX / 2)));
+            const startY = Math.max(0, Math.min(maxStartY, py - Math.floor(tilesY / 2)));
+
+            return { dpr, canvasW, canvasH, tilePx, tilesX, tilesY, startX, startY };
+        },
         rebuildWorld() {},
         syncPlayer() {},
         markBuildingsDirty() {},
         markCitizensDirty() {},
-        pickTile() { return null; },
-        render() {},
-        clearBuildGhost() {},
-        setBuildGhost() {},
+        pickTile(clientX, clientY) {
+            const view = this._view || this._resolveView();
+            if (!view) return null;
+            const rect = this.canvas.getBoundingClientRect();
+            const mx = (clientX - rect.left) * view.dpr;
+            const my = (clientY - rect.top) * view.dpr;
+            const tx = view.startX + Math.floor(mx / view.tilePx);
+            const ty = view.startY + Math.floor(my / view.tilePx);
+            if (tx < 0 || ty < 0 || tx >= game.map.width || ty >= game.map.height) return null;
+            return { x: tx, y: ty };
+        },
+        render() {
+            const ctx = this._ensureCtx();
+            if (!ctx || !game?.map) return;
+            this._resizeCanvas();
+            this.yaw = 0;
+            this.pitch = -0.35;
+            const view = this._resolveView();
+            this._view = view;
+
+            ctx.setTransform(1, 0, 0, 1, 0, 0);
+            ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+            ctx.fillStyle = '#0f1c1a';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+
+            for (let y = 0; y < view.tilesY; y++) {
+                for (let x = 0; x < view.tilesX; x++) {
+                    const tx = view.startX + x;
+                    const ty = view.startY + y;
+                    if (tx >= game.map.width || ty >= game.map.height) continue;
+                    const px = x * view.tilePx;
+                    const py = y * view.tilePx;
+                    const idx = ty * game.map.width + tx;
+                    const terrain = game.map.getTileAt(tx, ty);
+                    let color = game.map.getTerrainColor(terrain);
+                    if (game.map.roadMap?.[idx]) color = '#68707a';
+                    else if (game.map.sidewalkMap?.[idx]) color = '#8f989f';
+                    ctx.fillStyle = color || '#2f5f4a';
+                    ctx.fillRect(px, py, view.tilePx, view.tilePx);
+                    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                    ctx.strokeRect(px, py, view.tilePx, view.tilePx);
+                }
+            }
+
+            const buildingByTile = new Map();
+            for (const b of game.buildings?.buildings || []) {
+                buildingByTile.set(`${b.x},${b.y}`, b);
+            }
+            for (const [key, b] of buildingByTile.entries()) {
+                const [txs, tys] = key.split(',');
+                const tx = Number(txs);
+                const ty = Number(tys);
+                if (tx < view.startX || ty < view.startY || tx >= view.startX + view.tilesX || ty >= view.startY + view.tilesY) continue;
+                const px = (tx - view.startX) * view.tilePx;
+                const py = (ty - view.startY) * view.tilePx;
+                const pad = Math.max(2, Math.floor(view.tilePx * 0.14));
+                ctx.fillStyle = 'rgba(15, 26, 44, 0.9)';
+                ctx.fillRect(px + pad, py + pad, view.tilePx - pad * 2, view.tilePx - pad * 2);
+                ctx.strokeStyle = '#f2d27a';
+                ctx.lineWidth = Math.max(1, Math.floor(view.tilePx * 0.06));
+                ctx.strokeRect(px + pad, py + pad, view.tilePx - pad * 2, view.tilePx - pad * 2);
+                if (view.tilePx >= 18) {
+                    ctx.font = `${Math.max(10, Math.floor(view.tilePx * 0.45))}px sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillStyle = '#ffffff';
+                    ctx.fillText(b.icon || 'B', px + (view.tilePx / 2), py + (view.tilePx / 2) + 1);
+                }
+            }
+
+            if (this._ghost) {
+                const g = this._ghost;
+                if (g.x >= view.startX && g.y >= view.startY && g.x < view.startX + view.tilesX && g.y < view.startY + view.tilesY) {
+                    const px = (g.x - view.startX) * view.tilePx;
+                    const py = (g.y - view.startY) * view.tilePx;
+                    ctx.strokeStyle = g.ok ? '#4cff8a' : '#ff5f5f';
+                    ctx.lineWidth = Math.max(2, Math.floor(view.tilePx * 0.08));
+                    ctx.strokeRect(px + 2, py + 2, view.tilePx - 4, view.tilePx - 4);
+                }
+            }
+
+            const ptx = Math.floor(game.player?.wx ?? game.player?.x ?? 0);
+            const pty = Math.floor(game.player?.wz ?? game.player?.y ?? 0);
+            if (ptx >= view.startX && pty >= view.startY && ptx < view.startX + view.tilesX && pty < view.startY + view.tilesY) {
+                const cx = (ptx - view.startX) * view.tilePx + (view.tilePx / 2);
+                const cy = (pty - view.startY) * view.tilePx + (view.tilePx / 2);
+                ctx.fillStyle = '#58d5ff';
+                ctx.beginPath();
+                ctx.arc(cx, cy, Math.max(3, Math.floor(view.tilePx * 0.2)), 0, Math.PI * 2);
+                ctx.fill();
+            }
+
+            const now = performance.now();
+            this._lastFrameMs = this._lastFrameAt ? (now - this._lastFrameAt) : 16;
+            this._lastFrameAt = now;
+        },
+        clearBuildGhost() { this._ghost = null; },
+        setBuildGhost(buildingType, x, y, rotation, ok) { this._ghost = { buildingType, x, y, rotation, ok }; },
         setDebugMode(mode) { this._debugMode = mode || 'none'; },
-        getNearestPOIDistance() { return -1; },
-        setRenderScale() {},
-        setShowFPS() {},
+        getNearestPOIDistance() {
+            const pois = game.map?.pois || [];
+            if (!pois.length) return -1;
+            const px = game.player?.wx ?? game.player?.x ?? 0;
+            const py = game.player?.wz ?? game.player?.y ?? 0;
+            let best = Infinity;
+            for (const poi of pois) {
+                const dx = poi.x - px;
+                const dy = poi.y - py;
+                const d = Math.sqrt(dx * dx + dy * dy);
+                if (d < best) best = d;
+            }
+            return Number.isFinite(best) ? best : -1;
+        },
+        setRenderScale(scale) { this._renderScale = scale; },
+        setShowFPS(show) { this._showFPS = !!show; },
         showBuildFeedback() {},
         updateHackProgress() {},
         showHackResult() {},
@@ -41,14 +191,15 @@ function createRendererStub(game, canvas) {
         getPerfStats() {
             return {
                 terrainInstances: 0,
-                buildingInstances: 0,
+                buildingInstances: game?.buildings?.buildings?.length || 0,
                 citizenInstances: game?.citizens?.citizens?.length || 0,
                 activeChunks: game?.chunks?.getActiveChunkCount?.() ?? 0,
-                visibleChunks: 0,
-                drawCalls: 0,
+                visibleChunks: 1,
+                drawCalls: 3,
             };
         },
     };
+    return stub;
 }
 
 export class UIManager {
