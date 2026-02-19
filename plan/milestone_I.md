@@ -1,112 +1,185 @@
-# Milestone I: Case Files v1 (side-story chains, evidence, suspects, investigations)
+# Milestone I — Traffic Simulation + Player Driving (target: 0.20.x)
 
-## Objective
-Deliver the Watch Dogs “followable” side-stories: cases with evidence, suspect lists, and multi-step investigations.
+## Objective 🎯
+- Introduce roads-as-a-graph and traffic metrics (core City Skylines loop).
+- Implement citizen commuting and basic vehicle agents with LOD.
+- Add drivable vehicles for Street Mode (GTA feel).
 
-## Exit criteria (acceptance for milestone)
-- Case File UI exists: overview, objectives, suspects, evidence board.
-- Evidence items are collectable and unlock new steps.
-- At least 3 case archetypes play end-to-end (missing person, corruption, gang extortion).
-- Cases are seeded and differ across runs.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Traffic overlay shows congestion hotspots and average commute time.
+- ✅ Citizens commute between home and work using the road graph (at least for a sample set).
+- ✅ Player can enter a vehicle and drive across the city with collision.
+- ✅ MEGA uses traffic LOD: near-player agents + far-field statistics.
+
+
+## Definition of Done (DoD)
+- Road graph generation is deterministic and stable per seed.
+- Vehicle sim does not tank performance on City preset.
+- Crises can be caused by traffic failures (gridlock impacts services).
+
+
+---
 
 ## Phases
-- I1: Case data model + UI
-- I2: Evidence collection + gating
-- I3: Archetypes + procedural assembly
+1) Road graph + routing
+2) Traffic agents + metrics
+3) Player driving
+4) LOD + perf
+
+
+---
 
 ## Tickets
 
-## Ticket I-1: Case File data model + persistence
-- **Phase:** I1
-- **Depends on:** H-1, F-3
+### I-01 — Road graph extraction from road tiles
+**Objective:** Convert road tiles into a navigable graph for routing.
 
-### Objective
-Represent cases independently of quests but implemented on top of quest engine for execution.
+**Design**
+- Nodes at intersections/turns; edges along straight segments.
+- Each edge has length and capacity; congestion increases travel time.
 
-### Design
-Case = seeded template that instantiates one or more quests. Case state includes suspects, evidence, leads, current chapter.
 
-### Specs
-- `state.cases.active[]`, `state.cases.completed[]`.
-- Case has: id, type, districtId, difficulty, suspects[], evidence[], leads[].
+**Specs**
+- `src/sim/traffic/road_graph.js`
+- `state.traffic.roadGraph = { nodes[], edges[] }` (serializable)
 
-### Implementation details
-- Add `src/sim/cases/case_manager.js`.
-- Case manager listens to anomalies and spawns cases.
-- Save/load includes cases.
 
-### Acceptance
-- A case can be created, progressed, saved, and resumed.
-- Case list UI updates correctly.
+**Implementation details**
+1. Scan road tilemap to find junctions and build nodes.
+2. Build edges between nodes along road segments.
+3. Store adjacency lists for routing.
 
-### DoD (Definition of Done)
-- Validator for case state in `validateGameState`.
-- Dev command: spawn specific case type.
 
-### QA checklist
-- Spawn 3 cases; complete 1; verify state lists update.
-- Reload mid-case; progress continues.
+**Acceptance**
+- Graph is connected for typical generated cities.
+- Pathfinding between two random road nodes succeeds.
 
-## Ticket I-2: Evidence system (collect, display, unlock)
-- **Phase:** I2
-- **Depends on:** B-3, G-2, H-2
 
-### Objective
-Make investigations feel tangible.
+**DoD**
+- Graph rebuild is incremental (only when roads change).
 
-### Design
-Evidence items exist in world (terminal logs, CCTV clip, witness statement). Collecting evidence sets flags and may reveal new locations/suspects.
 
-### Specs
-- Evidence types: log, cctv, witness, physical.
-- Evidence has `sourcePoiId` and optional `suspectId` link.
-- Collect action: interact + optional hack.
+---
 
-### Implementation details
-- Add `src/sim/evidence/evidence_system.js`.
-- Add UI: evidence board list and detail view.
-- Integrate with quest steps: `INVESTIGATE` step requires evidence id.
+### I-02 — Routing system (A* / Dijkstra) + caching
+**Objective:** Make routing fast enough for many agents.
 
-### Acceptance
-- Collecting evidence updates case UI and unlocks next step.
-- Evidence cannot be collected twice.
+**Design**
+- Use Dijkstra/A* with heuristic on node positions.
+- Cache frequently used OD pairs (home↔work) per citizen.
 
-### DoD (Definition of Done)
-- Evidence entries have deterministic ids.
-- At least 10 evidence templates exist.
 
-### QA checklist
-- Collect evidence after failing hack; ensure still works after retry.
-- Save/load; evidence stays collected.
+**Specs**
+- `src/sim/traffic/router.js`
+- `state.traffic.routeCache` (bounded LRU)
 
-## Ticket I-3: Case archetypes + procedural assembly v1
-- **Phase:** I3
-- **Depends on:** I-1, I-2
 
-### Objective
-Ensure each run produces unique cases without authoring 100% by hand.
+**Implementation details**
+1. Implement routing on the road graph.
+2. Add cache with max entries and eviction.
+3. Expose dev command to clear cache and profile routing time.
 
-### Design
-Case templates are storylets with tags. Assemble chain based on district theme + citizen graph + rival pressure. Use quest engine for execution.
 
-### Specs
-- Archetypes: missing_person, corruption, extortion.
-- Each case is 3–6 chapters; each chapter is 1 quest.
-- Branch point at chapter 2 or 3 based on player choice.
+**Acceptance**
+- 1000 route queries on City complete within a reasonable budget (profiling).
+- Routes update if roads are bulldozed.
 
-### Implementation details
-- Add `src/content/cases/templates/*.json`.
-- Add `src/sim/cases/assembler.js` using `rngQuest`.
-- Expose `caseSeed` stored in case.
 
-### Acceptance
-- Starting a new seed yields different suspect names/locations.
-- Case flow remains coherent (no missing references).
+**DoD**
+- Cache bounded; no memory leak.
 
-### DoD (Definition of Done)
-- Validation prevents impossible assembly.
-- At least 9 total cases playable across 3 archetypes.
 
-### QA checklist
-- Generate 5 seeds; verify case diversity.
-- Complete one of each archetype.
+---
+
+### I-03 — Traffic agents v1 (cars) + congestion metrics
+**Objective:** Create visible traffic and meaningful congestion numbers.
+
+**Design**
+- Spawn a capped number of simulated cars representing commutes.
+- Edge occupancy drives congestion; increases travel time.
+
+
+**Specs**
+- `src/sim/traffic/traffic_agents.js`
+- `state.traffic.metrics = { avgCommute, congestionIndex }`
+
+
+**Implementation details**
+1. Spawn cars for a subset of citizens and simulate along edges.
+2. Accumulate per-edge occupancy and compute congestion.
+3. Render cars near player as instanced meshes; far field uses stats only.
+
+
+**Acceptance**
+- Congestion increases when roads are insufficient for population.
+- Traffic overlay correlates with visible car density.
+
+
+**DoD**
+- Agent count scales by preset and is capped.
+
+
+---
+
+### I-04 — Player vehicle system (enter/exit, driving, collisions)
+**Objective:** Add GTA-like street agency.
+
+**Design**
+- Spawn a few vehicles near roads.
+- Player can enter with `F`, drive with WASD, exit with `F`.
+- Simple collision with buildings/props; no physics engine required initially.
+
+
+**Specs**
+- `src/sim/player/vehicle_controller.js`
+- `src/render/vehicle_render.js`
+
+
+**Implementation details**
+1. Implement vehicle entity and controller.
+2. Switch camera follow target between avatar and vehicle.
+3. Add basic collision resolution (AABB or capsule vs obstacles).
+
+
+**Acceptance**
+- Player can drive across the map without falling through geometry.
+- Vehicle speed feels controllable (tunable).
+
+
+**DoD**
+- Driving input does not interfere with God Mode tools.
+
+
+---
+
+### I-05 — Public services routing dependency (ambulance/fire response time)
+**Objective:** Tie traffic back into city-builder stakes.
+
+**Design**
+- Service response time depends on road travel time.
+- High congestion increases fatality/damage in crises.
+
+
+**Specs**
+- `src/sim/services/response_time.js`
+- Crisis outcomes reference response time metric.
+
+
+**Implementation details**
+1. Compute travel time between service building and incident node.
+2. Apply modifier to crisis resolution outcomes.
+3. Add UI 'Response time' badge per district.
+
+
+**Acceptance**
+- Gridlock measurably worsens fire/medical outcomes.
+- Player can improve outcomes by adding roads or services.
+
+
+**DoD**
+- Calculations cached to avoid per-tick heavy routing.
+
+
+---

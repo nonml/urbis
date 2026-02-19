@@ -34,6 +34,9 @@ import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
 import { FactionSystem } from './sim/factions/faction_system.js';
+import { PoliceSystem } from './sim/police/police_system.js';
+import { PursuitAI } from './sim/police/pursuit_ai.js';
+import { IntelSystem } from './sim/intel/intel_system.js';
 
 // Mock UI class for headless mode
 class MockUI {

@@ -1,106 +1,187 @@
-# Milestone N: Traffic + ambient vehicles + pedestrians (city life layer)
+# Milestone N — Campaign Structure + Case File Expansion (target: 0.30.x)
 
-## Objective
-Populate the city so it feels alive and supports chases and immersion.
+## Objective 🎯
+- Turn the quest system into a real campaign: chapters, branching, and run-defining arcs.
+- Expand story content without writing bespoke scripts per seed.
+- Make the city feel narratively reactive (news feed, faction reactions).
 
-## Exit criteria (acceptance for milestone)
-- Ambient traffic drives along roads with simple rules.
-- Pedestrians (citizens) are visible near roads/POIs and follow schedules.
-- Traffic reacts to hacked lights and police chases.
-- Performance remains stable on CITY and acceptable on MEGA.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Each run generates 1 main arc with 3–5 chapters and at least 5 minor cases.
+- ✅ Branching outcomes meaningfully change rival/factions/district modifiers.
+- ✅ Quest UI supports chapter progression and shows consequences clearly.
+- ✅ Story content is validated and can be extended by juniors safely.
+
+
+## Definition of Done (DoD)
+- No dead-end main arc (always resolves or fails with clear state).
+- Content validation scripts catch missing ids and broken references.
+- Save/load correctly restores quest engine state mid-chapter.
+
+
+---
 
 ## Phases
-- N1: Ambient vehicle spawner + road following
-- N2: Interactions with lights + police
-- N3: Pedestrian rendering + LOD
+1) Campaign model
+2) Case generator upgrade
+3) Reactive presentation (news/briefings)
+4) Validation + tooling
+
+
+---
 
 ## Tickets
 
-## Ticket N-1: Ambient traffic v1 (road-follow + intersections)
-- **Phase:** N1
-- **Depends on:** C-2, L-2
+### N-01 — Campaign model (chapters, gates, branching)
+**Objective:** Define the structure of the 'main thread' per run.
 
-### Objective
-Basic city traffic for ambience and obstacles in chases.
+**Design**
+- Campaign = ordered chapter nodes with gates (conditions).
+- Branch picks next chapter based on outcomes/tags.
 
-### Design
-Traffic vehicles follow road graph edges, choose turns at intersections via weighted randomness (district density). Avoid collisions with simple spacing.
 
-### Specs
-- Active traffic cap: SMALL 20, CITY 80, MEGA 150 (streamed).
-- Intersection turn choice: 60% straight, 20% left, 20% right (tunable).
-- Spacing: keep 2–6m gap.
+**Specs**
+- `src/content/campaigns/*.json`
+- `state.campaign = { id, chapterId, flags{}, history[] }`
+- `src/sim/quests/campaign_engine.js`
 
-### Implementation details
-- Add `src/sim/traffic/traffic_system.js`.
-- Use road graph from C-2 for routing.
-- Integrate with chunk streaming; spawn in active chunks only.
 
-### Acceptance
-- Traffic moves continuously and doesn’t pile up permanently.
+**Implementation details**
+1. Define 2 campaign templates (corruption scandal, missing person network).
+2. Implement gates and branching selection.
+3. Add campaign screen (briefing) at run start and between chapters.
 
-### DoD (Definition of Done)
-- Traffic sim cost < 5ms per tick CITY.
-- Deterministic routing when seeded.
 
-### QA checklist
-- Hack traffic light; see vehicles stop/go accordingly.
+**Acceptance**
+- A run consistently progresses through chapters when objectives completed.
+- Branch selection is deterministic from seed + choices.
 
-## Ticket N-2: Traffic-light system + crash events
-- **Phase:** N2
-- **Depends on:** G-3, N-1
 
-### Objective
-Make traffic light hacks impactful.
+**DoD**
+- Campaign engine shares event bus with quest engine (no duplicate logic).
 
-### Design
-Intersections have light state with cycle timing. Hacking overrides state for duration. Incorrect overrides can trigger crashes as events.
 
-### Specs
-- Light cycle: 8–12 seconds per direction.
-- Hack override duration: 6 seconds.
-- Crash event probability increases during police chase.
+---
 
-### Implementation details
-- Add `src/sim/traffic/lights.js`.
-- Expose lights as hackables.
-- Crash event spawns VFX + blocks road for N seconds.
+### N-02 — Case generator v2 (district-aware + social-graph-aware)
+**Objective:** Make cases feel tied to the city that was generated.
 
-### Acceptance
-- Hacking lights changes traffic flow.
-- Crashes can occur and affect pursuit routes.
+**Design**
+- Case selection weights by district tags (industrial, waterfront) and active faction influence.
+- Case targets pick from social graph (suspect is connected to victim).
 
-### DoD (Definition of Done)
-- No crashes cause hardlocks; road clears automatically.
-- Crash blocks are visible on minimap.
 
-### QA checklist
-- Trigger crash; ensure nav reroutes or stops gracefully.
+**Specs**
+- `src/sim/quests/case_generator.js`
+- Storylet tags: `district:*`, `faction:*`, `relationship:*`
 
-## Ticket N-3: Pedestrian visibility + LOD
-- **Phase:** N3
-- **Depends on:** F-1, D-2
 
-### Objective
-Make citizens visible in third-person view without destroying performance.
+**Implementation details**
+1. Add tag matcher and weighted selection for storylets.
+2. Pick targets using social graph edges and constraints.
+3. Generate breadcrumbs: locations, sources, witnesses.
 
-### Design
-Render nearby citizens as instanced meshes; far citizens as low-cost markers or not rendered.
 
-### Specs
-- Render radius: 80m on foot, 120m driving.
-- LOD tiers: full mesh, billboard, none.
+**Acceptance**
+- Same seed generates the same case set; different seeds produce meaningfully different cases.
+- At least 50% of cases reference a real district modifier or faction influence.
 
-### Implementation details
-- Extend renderer citizen instancing.
-- Add per-chunk citizen lists for rendering only.
 
-### Acceptance
-- City feels populated in dense districts.
-- No major FPS collapse when many citizens exist.
+**DoD**
+- Generator has fallback paths if constraints can’t be satisfied.
 
-### DoD (Definition of Done)
-- Citizen render updates only on sim tick.
 
-### QA checklist
-- CITY with 2000 citizens: average FPS stable.
+---
+
+### N-03 — Dialogue + choice presentation v1 (lightweight)
+**Objective:** Make story steps readable and dramatic without heavy tooling.
+
+**Design**
+- Dialogue is simple text cards with choices and consequences summary.
+- Choices apply effects via shared outcome system.
+
+
+**Specs**
+- `src/ui/dialogue_modal.js`
+- `src/content/dialogue/*.json` (optional)
+- Quest steps can reference `dialogueId`
+
+
+**Implementation details**
+1. Implement modal with speaker, body, and choice buttons.
+2. Wire choices to quest engine and outcome application.
+3. Add 'recent decisions' panel for recap.
+
+
+**Acceptance**
+- Player can complete a story step purely via dialogue choices.
+- Outcomes show immediate and long-term effects.
+
+
+**DoD**
+- Modal is keyboard-navigable (accessibility baseline).
+
+
+---
+
+### N-04 — News feed + briefing system (reactive narrative UI)
+**Objective:** Connect simulation events to story tone (Watch Dogs style).
+
+**Design**
+- News items generated from: crises, ops, faction shifts, campaign steps.
+- Briefing screen highlights 'what changed' every chapter.
+
+
+**Specs**
+- `state.news.items[]` capped
+- `src/ui/news_feed.js` (if not already)
+- `src/ui/briefing_screen.js`
+
+
+**Implementation details**
+1. Add news item templates and event hooks.
+2. Add briefing screen that summarizes last 5 key events and current goals.
+3. Allow pinning a news item as investigation lead.
+
+
+**Acceptance**
+- Major events create readable headlines and summaries.
+- Player can trace why sentiment or faction power changed.
+
+
+**DoD**
+- News feed items include the run id + tick for debugging.
+
+
+---
+
+### N-05 — Content validation scripts (quests/campaigns/ops)
+**Objective:** Let juniors add content safely without breaking the build.
+
+**Design**
+- Validation checks: duplicate ids, missing references, invalid tags, unreachable chapters.
+- Fail build (or warn) depending on mode.
+
+
+**Specs**
+- `scripts/validate_content.mjs`
+- Docs: `docs/CONTENT_AUTHORING.md`
+
+
+**Implementation details**
+1. Implement validators for JSON schemas and references.
+2. Add npm script `npm run validate` and run in CI (optional).
+3. Document common mistakes and examples.
+
+
+**Acceptance**
+- A broken content file is flagged with a clear error message and path.
+- Game can skip invalid content in dev mode without crashing.
+
+
+**DoD**
+- Validation runs in under 1 second for typical content size.
+
+
+---

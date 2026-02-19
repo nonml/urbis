@@ -1,113 +1,188 @@
-# Milestone G: Hacking gameplay v1 (scan, breach, cameras, traffic control, heat)
+# Milestone G — Economy + Services v1 (Taxes, Upkeep, Coverage) (target: 0.16.x)
 
-## Objective
-Deliver a Watch Dogs-like hacking loop tied to exploration and city systems.
+## Objective 🎯
+- Implement a readable city economy: income, expenses, and budgets.
+- Add core service buildings with coverage effects (police/fire/medical/schools).
+- Introduce failure pressure: loans, upkeep, bankruptcy path.
 
-## Exit criteria (acceptance for milestone)
-- Player can scan nearby hackables and see security levels.
-- At least 4 hack actions work: camera view, traffic light, door/gate, district ping.
-- Hacks generate heat; heat affects police response later.
-- Security upgrades increase difficulty (breach mini-game).
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Budget screen shows line items and updates live as you build.
+- ✅ At least 4 service types affect citizens/crises via coverage maps.
+- ✅ Player can take a loan; bankruptcy is a clear lose condition (or near-lose).
+- ✅ Economy behaves consistently across Small and City presets.
+
+
+## Definition of Done (DoD)
+- All new numbers are surfaced in UI (no hidden modifiers without tooltips).
+- No negative resources unless explicitly allowed (debt).
+- Smoke test includes economy invariants.
+
+
+---
 
 ## Phases
-- G1: Hackable taxonomy + scanning UI
-- G2: Breach mini-game stub + success/fail outcomes
-- G3: Hack actions + heat plumbing
+1) Economy accounting
+2) Services and coverage maps
+3) Failure/loan mechanics
+4) Balance pass v1
+
+
+---
 
 ## Tickets
 
-## Ticket G-1: Hackable system: types, security, ownership
-- **Phase:** G1
-- **Depends on:** B-3, C-4
+### G-01 — Budget & taxes system (income/expense accounting)
+**Objective:** Create the backbone for City Skylines-style management.
 
-### Objective
-Standardize what can be hacked and how difficulty is represented.
+**Design**
+- Monthly (or daily) budget tick calculates income and expenses.
+- Tax sliders for R/C/I; affects demand and citizen happiness.
+- Transparent ledger: every system writes to `state.economy.ledger` with reasons.
 
-### Design
-Hackable objects implement `{id,type,pos,securityLevel,ownerFaction,state}`. Scanning shows outline + tooltip and adds to nearby list.
 
-### Specs
-- Security levels: 1..5.
-- Scan radius: 25m; line-of-sight optional.
-- Owners: city, corp, gang, police.
+**Specs**
+- `state.economy = { cash, debt, taxRates, ledger, lastBudgetTick }`
+- `src/sim/economy/budget.js`
+- `src/ui/budget_screen.js` (hotkey `B`)
 
-### Implementation details
-- Extend `InteractableManager` with hackables registry.
-- Add UI panel `HackList` sorted by distance and priority.
-- Persist discovered hackables in state (optional).
 
-### Acceptance
-- Approaching a camera shows it in scan list.
-- Security level shown consistently.
+**Implementation details**
+1. Add economy state + baseline starting cash.
+2. Implement income from households/jobs; expenses from upkeep/services.
+3. Create budget screen with sliders + tooltips and a 'last cycle' summary.
 
-### DoD (Definition of Done)
-- No per-frame DOM re-creation.
-- Hackables serialized or regenerated deterministically.
 
-### QA checklist
-- Scan in 3 districts; ensure list updates correctly.
-- Pause/unpause; scan list stable.
+**Acceptance**
+- Changing tax rates changes net income and demand within one budget cycle.
+- Budget screen matches the underlying ledger totals.
 
-## Ticket G-2: Breach mini-game v1 (timed lock)
-- **Phase:** G2
-- **Depends on:** G-1
 
-### Objective
-Create a repeatable challenge for hacks without building full puzzle complexity.
+**DoD**
+- Ledger entries include stable `code` strings for debugging and tests.
 
-### Design
-Timed “match the node” or “hold-to-sync” with moving needle; difficulty scales speed + window size. Fail increases heat.
 
-### Specs
-- Difficulty scales by security level.
-- Fail penalty: +5 heat; cooldown 10s on that node.
-- Success reward: 0..-heat for stealth hacks.
+---
 
-### Implementation details
-- Add `src/ui/breach_minigame.js` as modal.
-- Game pauses world sim or slows time to 0.2x during breach.
-- Emit `player_hacked_node` event with success/fail.
+### G-02 — Coverage map system (influence radius on grid)
+**Objective:** Enable service buildings to have spatial effects cheaply.
 
-### Acceptance
-- Player can succeed/fail and see consequences.
-- Mini-game never softlocks input.
+**Design**
+- Services generate coverage 'heat' on a grid (0..1) via radius falloff.
+- Coverage is chunked and recomputed only when service buildings change.
 
-### DoD (Definition of Done)
-- Keyboard + mouse usable.
-- Accessibility: optional “easy hack” in dev menu.
 
-### QA checklist
-- Attempt 20 hacks; ensure no memory leak (modal removed).
-- Fail 5 times; confirm cooldown works.
+**Specs**
+- `state.map.coverage = { police, fire, medical, education }` (packed floats or Uint8)
+- `src/sim/services/coverage.js`
 
-## Ticket G-3: Hack actions v1 + heat system
-- **Phase:** G3
-- **Depends on:** G-2
 
-### Objective
-Make hacks affect the world meaningfully and feed chase loop later.
+**Implementation details**
+1. Implement coverage buffers per service.
+2. On service building add/remove, recompute affected chunks.
+3. Expose debug overlay to visualize coverage.
 
-### Design
-Implement discrete actions with durations and cooldowns. Heat is a 0..100 meter with decay. Certain hacks are “loud”.
 
-### Specs
-- Actions: camera takeover, traffic light switch, door unlock, district blackout ping.
-- Heat decay: 0.5 per tick if not seen.
-- Heat thresholds: 25 alert, 50 search, 75 pursuit.
+**Acceptance**
+- Placing a police station increases police coverage around it.
+- Coverage overlay matches expected radius.
 
-### Implementation details
-- Add `src/sim/heat/heat_system.js`.
-- Implement camera view as render overlay switching to camera node position.
-- Traffic light hack toggles vehicle AI later and can cause crashes event.
 
-### Acceptance
-- Hacking camera changes view and provides intel.
-- Heat increases on loud hacks and is visible in HUD.
+**DoD**
+- MEGA recompute is incremental; no full-map rebuild for one station.
 
-### DoD (Definition of Done)
-- Heat state saved/loaded.
-- Heat never goes negative or above max.
 
-### QA checklist
-- Trigger heat > 50; verify UI changes state.
-- Restart with same seed; repeat hacks; heat behaves consistently.
+---
+
+### G-03 — Service buildings v1 (police/fire/medical/schools)
+**Objective:** Connect macro building to citizen well-being and crisis mitigation.
+
+**Design**
+- Each service type modifies citizen stats and crisis probabilities.
+- Services have upkeep costs and staffing requirements (future-proof).
+
+
+**Specs**
+- Building types added to `BUILDING_TYPES` with `serviceType` and `radius`
+- `src/sim/services/services_system.js`
+
+
+**Implementation details**
+1. Add the four buildings + UI category.
+2. Hook coverage into citizen happiness/health and crisis thresholds.
+3. Add monthly upkeep to economy ledger.
+
+
+**Acceptance**
+- Adding medical coverage reduces illness-related crises frequency.
+- Upkeep visibly increases expenses.
+
+
+**DoD**
+- Services effects documented with in-game tooltip math.
+
+
+---
+
+### G-04 — Loans, debt, and bankruptcy flow
+**Objective:** Add stakes and a clear lose condition that feels fair.
+
+**Design**
+- Player can take loans with interest; monthly payment deducted automatically.
+- If cash < 0 beyond grace period → bankruptcy warning → collapse.
+- Provide recovery paths: sell assets, raise taxes, cut budgets.
+
+
+**Specs**
+- `state.economy.debt` and `state.economy.loans[]`
+- `src/sim/economy/loans.js`
+- `src/ui/bank_screen.js`
+
+
+**Implementation details**
+1. Implement loan offers and repayment schedule.
+2. Add warning UI and grace timer.
+3. Integrate with run lose conditions.
+
+
+**Acceptance**
+- Player can recover from low cash using loans and policy changes.
+- Bankruptcy ends run with clear summary.
+
+
+**DoD**
+- No soft-locks: player always has an exit path (restart/end run).
+
+
+---
+
+### G-05 — Economy balancing pass v1 + regression seeds
+**Objective:** Make early game stable and teachable.
+
+**Design**
+- Define target ranges for: income, upkeep, crisis rate, growth rate.
+- Use 10 regression seeds and record expected outcomes.
+
+
+**Specs**
+- `docs/BALANCE_SEEDS.md` updated
+- Dev tool: 'simulate 90 days' fast-forward
+
+
+**Implementation details**
+1. Add fast-forward tool and summary printout.
+2. Tune constants iteratively using seeds.
+3. Document tuned values and rationale.
+
+
+**Acceptance**
+- Small preset is winnable without expert play.
+- City preset is challenging but recoverable.
+
+
+**DoD**
+- Balance changes tracked in `CHANGELOG.md`.
+
+
+---

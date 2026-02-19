@@ -1,98 +1,185 @@
-# Milestone U: 1.0.0 Release build (packaging, polish locks, release process)
+# Milestone U — Release 1.0.0 (Ship, Support, Post-Launch Plan) (target: 1.0.0)
 
-## Objective
-Ship a stable 1.0.0 build with vehicles + chases + cases + hacking + city-building loop all working end-to-end.
+## Objective 🎯
+- Finalize quality, performance, content, and packaging for a public 1.0 release.
+- Lock save schema, publish release notes, and define post-launch support.
+- Deliver a build that is stable across Small → MEGA for typical sessions.
 
-## Exit criteria (acceptance for milestone)
-- All prior milestones A–T are merged and green (tests pass).
-- No known P0/P1 issues in `docs/KNOWN_ISSUES.md`.
-- Build artifacts generated and verified (`npm run build` + `npm run preview`).
-- Versioned release notes written; save schema version frozen for 1.0.0.
-- Minimum playable loop: build → hack → case → chase → escape → expand city.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ 0 S0 (crash) bugs open; S1 < 2 with documented workarounds.
+- ✅ MEGA 60-minute soak test passes without memory leak or severe perf collapse.
+- ✅ Core promise is met: dual-mode (God/Street), procedural cities, emergent crises, influence layer, and campaign/cases.
+- ✅ Build artifacts include licenses/credits and show version 1.0.0 in UI.
+
+
+## Definition of Done (DoD)
+- Release checklist completed and stored with build artifact.
+- Save schema locked; migration path documented for future patches.
+- Post-launch patch plan created (1.0.1 hotfix scope).
+
+
+---
 
 ## Phases
-- U1: Release hardening + versioning
-- U2: Packaging + build verification
-- U3: Release notes + final sign-off
+1) Release candidate hardening
+2) Final QA + compliance
+3) Launch packaging
+4) Post-launch readiness
+
+
+---
 
 ## Tickets
 
-## Ticket U-1: Release candidate hardening (freeze schema + configs)
-- **Phase:** U1
-- **Depends on:** T-3
+### U-01 — Release candidate checklist + final bug triage
+**Objective:** Turn beta into release quality.
 
-### Objective
-Lock compatibility and reduce last-minute breakage.
+**Design**
+- Define RC gates and freeze rules.
+- Only bug fixes allowed; no new features.
 
-### Design
-Freeze `CURRENT_SCHEMA_VERSION` and content schemas; only allow bugfix migrations. Lock balance config defaults.
 
-### Specs
-- Schema changes require explicit migration and changelog entry.
+**Specs**
+- `docs/RELEASE_CHECKLIST.md` (final)
+- `docs/RC_GATES.md`
 
-### Implementation details
-- Audit save files for size and compatibility.
-- Add `docs/RELEASE_PROCESS.md`.
 
-### Acceptance
-- Saves created on RC build load on final build.
+**Implementation details**
+1. Run RC gate checklist on 3 presets and 5 seeds.
+2. Triage remaining issues and fix S0/S1 first.
+3. Lock branches/tags for RC.
 
-### DoD (Definition of Done)
-- All docs updated.
 
-### QA checklist
-- Create save on RC, update to final, load successfully.
+**Acceptance**
+- All RC gates pass on at least 2 browsers.
+- No new regressions introduced during freeze.
 
-## Ticket U-2: Build + preview verification + performance budgets
-- **Phase:** U2
-- **Depends on:** D-2, T-3
 
-### Objective
-Ensure production build works on target browsers.
+**DoD**
+- Checklist results archived with version tag.
 
-### Design
-Use Vite production build; test on Chrome/Edge; verify no dev-only code paths required.
 
-### Specs
-- CITY target: 60fps typical, 30fps worst case.
-- MEGA target: 30fps typical, 24fps worst case acceptable.
+---
 
-### Implementation details
-- Run `npm run build` and `npm run preview` and do full gameplay loop.
-- Disable dev overlay by default in prod.
+### U-02 — Final performance certification (Small/City/Mega)
+**Objective:** Ensure minimum playable performance on target hardware.
 
-### Acceptance
-- Production build runs without console errors.
-- FPS meets budgets in CITY and acceptable in MEGA.
+**Design**
+- Define budgets and collect measurements using perf overlay and telemetry.
+- Provide graphics settings that scale down cleanly.
 
-### DoD (Definition of Done)
-- Release checklist completed and signed.
 
-### QA checklist
-- Full loop playtest: build → hack → case → chase → escape.
+**Specs**
+- `docs/PERF_TARGETS.md`
+- Settings presets: Low/Medium/High
 
-## Ticket U-3: Release notes + changelog + tagging
-- **Phase:** U3
-- **Depends on:** U-1, U-2
 
-### Objective
-Ship cleanly and make future patches manageable.
+**Implementation details**
+1. Benchmark presets and record results.
+2. Tune LOD and sim chunking thresholds.
+3. Fix remaining hot spots discovered.
 
-### Design
-Update CHANGELOG with milestone highlights, known issues, and save compatibility notes. Tag version 1.0.0.
 
-### Specs
-- Changelog includes: features, fixes, breaking changes, compatibility.
+**Acceptance**
+- Performance targets met or documented with settings guidance.
+- No frame-time spikes that break controls in normal play.
 
-### Implementation details
-- Write `docs/1.0.0_RELEASE_NOTES.md`.
-- Ensure package version matches release (if you use it).
 
-### Acceptance
-- Docs are complete and consistent.
+**DoD**
+- Perf targets referenced in release notes.
 
-### DoD (Definition of Done)
-- Repo clean; no debug junk; build artifacts excluded.
 
-### QA checklist
-- Review notes for accuracy and completeness.
+---
+
+### U-03 — Legal/credits/licenses packaging
+**Objective:** Ship responsibly and avoid asset/license issues.
+
+**Design**
+- Credits screen lists contributors and third-party libs.
+- Licenses included in build artifact.
+
+
+**Specs**
+- `CREDITS.md`
+- `LICENSES/` folder in build
+- `src/ui/credits.js`
+
+
+**Implementation details**
+1. Generate third-party license list (manual ok).
+2. Add credits UI screen from main menu.
+3. Verify all assets have license notes in manifest.
+
+
+**Acceptance**
+- Credits screen accessible and complete.
+- License files included in distribution.
+
+
+**DoD**
+- No unknown-license assets shipped.
+
+
+---
+
+### U-04 — Release notes + changelog finalization
+**Objective:** Communicate what 1.0 is and set expectations.
+
+**Design**
+- Keep a Changelog format; add 'Known Issues' section.
+- Include concept statement: dual-mode city builder + influence sim.
+
+
+**Specs**
+- `CHANGELOG.md` updated for 1.0.0
+- `docs/KNOWN_ISSUES.md` final
+
+
+**Implementation details**
+1. Write 1.0.0 notes with feature list and limitations.
+2. Summarize content counts and performance guidance.
+3. Include troubleshooting section.
+
+
+**Acceptance**
+- Release notes match shipped feature set.
+- Known issues list is accurate.
+
+
+**DoD**
+- Notes reviewed by at least 2 devs (process requirement).
+
+
+---
+
+### U-05 — Post-launch plan (1.0.1 hotfix + 1.1 roadmap)
+**Objective:** Be ready for inevitable bugs and feedback.
+
+**Design**
+- Define hotfix scope: crashers, save corruption, major perf regressions.
+- Define triage timeline and versioning scheme.
+
+
+**Specs**
+- `docs/POST_LAUNCH.md`
+- Issue labels and severity guidelines referenced.
+
+
+**Implementation details**
+1. Create hotfix checklist and quick RC process.
+2. Define telemetry/bug report intake workflow.
+3. Draft 1.1 feature candidates (not committed to).
+
+
+**Acceptance**
+- Team can ship a 1.0.1 hotfix in a predictable process.
+- Roadmap exists and is realistic.
+
+
+**DoD**
+- Post-launch doc included in repo.
+
+
+---

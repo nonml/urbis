@@ -1,102 +1,187 @@
-# Milestone O: Dynamic crisis director v2 + world events (systems-driven storytelling)
+# Milestone O — Roguelike Meta-Progression + Legacy System (target: 0.32.x)
 
-## Objective
-Make crises feel like consequences of management choices and fuel missions/cases.
+## Objective 🎯
+- Implement run-end meta progression so failure is motivating, not just loss.
+- Add unlock trees, starting perks, and run modifiers tied to performance.
+- Make seeds + run history first-class so players can share/replay.
 
-## Exit criteria (acceptance for milestone)
-- Crisis director chooses events based on city pressure (not pure random).
-- Event chains branch based on player response.
-- At least 8 crisis types exist with 3 multi-step chains.
-- Crises can spawn side missions and change district modifiers.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ At run end, player receives Legacy Points and a summary of major decisions.
+- ✅ Legacy unlocks affect next runs (new buildings, policies, starting bonuses).
+- ✅ Run history screen shows last 20 runs with seed, outcome, score, and notes.
+- ✅ Difficulty mutators exist and can be selected at run start.
+
+
+## Definition of Done (DoD)
+- Meta progression is stored separately from saves (profile file/localStorage).
+- Unlocks are deterministic and cannot corrupt run state.
+- UI clearly distinguishes 'run save' vs 'profile progression'.
+
+
+---
 
 ## Phases
-- O1: Pressure model + crisis selection
-- O2: Chain system + branching responses
-- O3: Integration with quests/cases
+1) Run-end summary + scoring
+2) Profile persistence
+3) Unlock trees
+4) Mutators + UX
+
+
+---
 
 ## Tickets
 
-## Ticket O-1: Pressure model + crisis selection
-- **Phase:** O1
-- **Depends on:** E-3, F-2
+### O-01 — Run-end summary + scoring model
+**Objective:** Define what success means and feed progression.
 
-### Objective
-Replace random disasters with state-based selection.
+**Design**
+- Score components: economy, stability, influence, story progress, survival time.
+- Show a 'timeline' of major events (crises, policies, ops, chapter outcomes).
 
-### Design
-Compute pressures: power, water, health, crime, inequality, traffic. Use weighted selector with cooldowns and severity scaling.
 
-### Specs
-- Pressures 0..1 with smoothing (EMA).
-- Cooldown per crisis type: 20–60 ticks.
-- Severity tiers: 1..5 affects duration and impact.
+**Specs**
+- `src/sim/run/scoring.js`
+- `src/ui/run_summary.js`
+- `state.runSummary` ephemeral at end
 
-### Implementation details
-- Add `src/sim/crisis/pressure.js`.
-- Update `CrisisManager` to use `rngSim` and pressure weights.
 
-### Acceptance
-- Running a power deficit increases blackout crisis frequency.
+**Implementation details**
+1. Compute score at end and store snapshot.
+2. Render summary screen with breakdown and highlights.
+3. Add 'continue to legacy' flow.
 
-### DoD (Definition of Done)
-- Crisis selection deterministic per seed.
 
-### QA checklist
-- Create traffic congestion; see traffic-related crises increase.
+**Acceptance**
+- Two different play styles produce different score breakdowns.
+- Summary includes seed and run id for sharing.
 
-## Ticket O-2: Crisis chains + response UI
-- **Phase:** O2
-- **Depends on:** O-1
 
-### Objective
-Make crises interactive with branching outcomes.
+**DoD**
+- Scoring math documented in UI tooltip.
 
-### Design
-Crisis chain has stages. Player picks response options with costs and effects. Outcomes set district modifiers and faction rep changes.
 
-### Specs
-- Response window: 30–90 seconds depending on severity.
-- At least 3 options per crisis stage.
-- Option effects include: resources, heat, rep, service modifiers.
+---
 
-### Implementation details
-- Add `src/content/crises/*.json` with chain definitions.
-- UI: crisis panel lists active crises and response buttons.
-- Persist crisis stage in save.
+### O-02 — Profile persistence (legacy points, unlocks, run history)
+**Objective:** Persist progress between runs without save-file fragility.
 
-### Acceptance
-- Choosing different responses leads to different results.
-- Ignoring a crisis worsens state predictably.
+**Design**
+- Profile stored in `localStorage` (web) with versioning.
+- Separate schema from run save schema.
 
-### DoD (Definition of Done)
-- Crisis UI never blocks critical inputs.
 
-### QA checklist
-- Trigger crisis; choose each option across retries; compare outcomes.
+**Specs**
+- `src/profile/profile.js`
+- `profile.schemaVersion` + migrations
 
-## Ticket O-3: Crisis → mission hooks
-- **Phase:** O3
-- **Depends on:** I-3, O-2
 
-### Objective
-Use crises as story fuel for cases and quests.
+**Implementation details**
+1. Create profile loader/saver and migrations.
+2. Store legacy points and unlocked ids.
+3. Append run history entries capped to 20.
 
-### Design
-Certain crisis stages emit triggers that spawn quests/cases (e.g., blackout reveals corruption, hospital outbreak leads to missing person).
 
-### Specs
-- At least 4 hooks implemented.
-- Hooks include district and involved citizens.
+**Acceptance**
+- Profile survives refresh and new runs.
+- Profile can be reset from settings.
 
-### Implementation details
-- Integrate with `CaseManager` and `QuestEngine` triggers.
-- Add “case spawned from crisis” label in UI.
 
-### Acceptance
-- Crises can produce at least one case per 10–20 minutes on average.
+**DoD**
+- Corrupt profile is handled gracefully (fallback to defaults + warning).
 
-### DoD (Definition of Done)
-- Hooks are deterministic and rate-limited.
 
-### QA checklist
-- Run sim 200 ticks; verify at least one crisis-generated quest.
+---
+
+### O-03 — Unlock tree + shop UI
+**Objective:** Give long-term goals and meaningful variety across seeds.
+
+**Design**
+- Unlock categories: buildings, policies, starting perks, storylet packs.
+- Costs in legacy points; some unlocks gated by achievements.
+
+
+**Specs**
+- `src/content/unlocks.json`
+- `src/ui/legacy_shop.js` (hotkey from main menu)
+- `state.progression` references profile unlocked ids
+
+
+**Implementation details**
+1. Define initial unlock catalog (20 items).
+2. Implement UI with filters and tooltips.
+3. Apply unlock effects at run start (available build menu items etc.).
+
+
+**Acceptance**
+- Unlocking a building adds it to build menu in next run.
+- Locked items are clearly indicated with requirements.
+
+
+**DoD**
+- Unlocks never retroactively change an ongoing run.
+
+
+---
+
+### O-04 — Run start scenario + mutator system
+**Objective:** Make runs feel distinct beyond map seeds.
+
+**Design**
+- Scenario defines starting cash, starting faction rep, starting infrastructure.
+- Mutators adjust difficulty: harsher economy, aggressive rival, frequent disasters.
+
+
+**Specs**
+- `src/content/scenarios.json`
+- `src/content/mutators.json`
+- `src/sim/run/run_start.js`
+
+
+**Implementation details**
+1. Implement scenario picker at new game screen.
+2. Apply mutator effects as modifiers to systems (not hard-coded).
+3. Save selected scenario/mutators in run meta.
+
+
+**Acceptance**
+- Two scenarios feel meaningfully different in first 10 minutes.
+- Mutator effects are visible in UI (icons + tooltip).
+
+
+**DoD**
+- Mutators are deterministic and compatible with saves.
+
+
+---
+
+### O-05 — Seed browser + replay mode (optional)
+**Objective:** Support sharing and deterministic replays at the run level.
+
+**Design**
+- Seed browser lists past run seeds and allows quick restart.
+- Replay mode (lite): re-run seed with the same scenario/mutators; inputs not replayed.
+
+
+**Specs**
+- `src/ui/seed_browser.js`
+- Run history entry stores seed + scenario + mutators
+
+
+**Implementation details**
+1. Add UI from main menu to list run history.
+2. Implement 'Restart this run settings' button.
+3. Add copy-to-clipboard for seed string.
+
+
+**Acceptance**
+- Player can restart with identical world gen parameters easily.
+- Seed display includes map preset.
+
+
+**DoD**
+- UI works without clipboard permission (fallback manual copy).
+
+
+---

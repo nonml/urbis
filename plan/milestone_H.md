@@ -1,112 +1,186 @@
-# Milestone H: Quest framework v2 (data-driven steps, markers, branching, rewards)
+# Milestone H — Infrastructure Networks (Power / Water / Sewage / Data Grid) (target: 0.18.x)
 
-## Objective
-Turn anomalies + hacks into structured quests with branching, rewards, and reliable progression tracking.
+## Objective 🎯
+- Add core utility networks that create systemic constraints like City Skylines.
+- Introduce the **Data Grid** as the Watch Dogs-ish information layer foundation (not just hacking).
+- Provide overlays so players can reason about failures.
 
-## Exit criteria (acceptance for milestone)
-- Quest definitions are loaded from `src/content/quests/` and validated.
-- Quest log shows active/completed quests and current objective.
-- Markers/waypoints work and persist across save/load.
-- At least 6 quests run end-to-end with branching choices.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Power and water coverage are simulated and can fail (brownouts, water shortage).
+- ✅ Sewage/garbage (choose one for v1) creates pollution/health pressure when insufficient.
+- ✅ Data Grid (towers/cameras) exists, can be expanded, and powers intel gameplay later.
+- ✅ Overlays show network coverage and bottlenecks.
+
+
+## Definition of Done (DoD)
+- Network updates are incremental (chunk/graph based).
+- All network state is saved/loaded with schema versioning.
+- At least one crisis chain is caused by each network failure type.
+
+
+---
 
 ## Phases
-- H1: Quest schema + validator
-- H2: Step handlers + branching
-- H3: Rewards + persistence + tooling
+1) Network data model
+2) Placement + propagation
+3) Overlays + UX
+4) Crisis integration
+
+
+---
 
 ## Tickets
 
-## Ticket H-1: Quest schema + validation pipeline
-- **Phase:** H1
-- **Depends on:** A-2
+### H-01 — Utility graph/coverage framework (shared)
+**Objective:** Avoid implementing each network from scratch.
 
-### Objective
-Ensure content errors don’t crash runtime.
+**Design**
+- Abstract 'network' that supports sources, consumers, and propagation (grid BFS or graph).
+- Two operation modes: simple radius coverage (early) and connected graph (later).
 
-### Design
-Define JSON schema-like validator in code (lightweight). Validate on load; invalid quests are logged and skipped.
 
-### Specs
-- Quest fields: id, title, tags, trigger, steps[], rewards[]
-- Step kinds: go_to, hack, investigate, choice, outcome.
-- All references (poiId, citizenId markers) must resolve or have fallback.
+**Specs**
+- `src/sim/networks/network_core.js`
+- `state.networks = { power:{...}, water:{...}, data:{...} }`
 
-### Implementation details
-- Add `src/content/quests/schema.js` validator.
-- Extend `loadQuestsFromDirectory()` to report errors in dev overlay.
-- Add `npm run test` quest validation step.
 
-### Acceptance
-- Bad quest JSON does not crash game; shows error list.
-- Valid quests load and appear in dev menu.
+**Implementation details**
+1. Create network core with API: `addSource`, `addConsumer`, `recomputeChunks(chunks)`.
+2. Implement packed coverage buffer for fast queries (0..255).
+3. Add debug overlay toggles.
 
-### DoD (Definition of Done)
-- Validator has unit tests with fixtures.
-- Docs: `docs/QUESTS.md`.
 
-### QA checklist
-- Intentionally break a quest file; verify graceful handling.
-- Fix it; verify quest appears again.
+**Acceptance**
+- Network core can be reused for power and water with different configs.
+- Coverage queries are O(1) per tile.
 
-## Ticket H-2: Branching + choice memory
-- **Phase:** H2
-- **Depends on:** H-1
 
-### Objective
-Make player decisions affect future steps and city state.
+**DoD**
+- MEGA recompute only touches affected chunks.
 
-### Design
-Choices set flags in quest context and global run flags. Conditional steps evaluate flags + city metrics (heat, happiness, district security).
 
-### Specs
-- Choice step: 2–4 options, each sets flags and may modify heat/reputation.
-- Conditional step supports AND/OR on flags and metrics thresholds.
-- Quest context persists in save.
+---
 
-### Implementation details
-- Implement `STEP_KINDS.CONDITIONAL` fully (if currently stub).
-- Add `state.progress.runFlags`.
-- Add UI: choice modal with keybinds 1-4.
+### H-02 — Power network v1 (generation + consumption + outages)
+**Objective:** Make growth constrained by electricity.
 
-### Acceptance
-- Making a choice changes later steps reliably.
-- Save/load retains choice state.
+**Design**
+- Generators produce MW; buildings consume MW.
+- If demand > supply, underpowered districts suffer penalties and blackout crises.
 
-### DoD (Definition of Done)
-- No branching dead-ends unless marked as fail.
-- Quest engine has automated test for a branching quest.
 
-### QA checklist
-- Run branching quest twice with different choices; verify different outcomes.
-- Reload mid-quest; ensure branch remains consistent.
+**Specs**
+- New buildings: `PowerPlant`, optional `Substation`
+- `state.networks.power = { supply, demand, coverage }`
+- `src/sim/networks/power.js`
 
-## Ticket H-3: Rewards + unlocks (cash, heat, faction rep, building unlock)
-- **Phase:** H3
-- **Depends on:** E-2, G-3
 
-### Objective
-Tie quests into progression and city-building incentives.
+**Implementation details**
+1. Add generator building + upkeep.
+2. Compute demand from placed buildings.
+3. Trigger blackout events when supply short and apply penalties.
 
-### Design
-Reward system applies effects to economy, heat, faction reputation, unlock lists. Rewards are applied once with idempotent guard.
 
-### Specs
-- Reward types: add_resource, set_flag, modify_heat, rep_delta, unlock_building, unlock_hack.
-- Reward log stored per quest to prevent duplication.
+**Acceptance**
+- Turning off/losing a plant reduces powered area and impacts citizens.
+- UI shows power supply vs demand.
 
-### Implementation details
-- Add `src/sim/rewards/reward_system.js`.
-- UI: reward toast summary at quest completion.
-- Persist unlocks in `state.progress.unlocks`.
 
-### Acceptance
-- Quest completion grants rewards and updates UI.
-- Reload doesn’t duplicate rewards.
+**DoD**
+- Blackout penalty is reversible when power restored.
 
-### DoD (Definition of Done)
-- Reward definitions validated.
-- At least 3 unlockable buildings and 2 unlockable hacks exist.
 
-### QA checklist
-- Complete a quest; verify gold changes and unlock appears in build menu.
-- Save/load after reward; verify no duplication.
+---
+
+### H-03 — Water + sewage v1 (supply, pollution, health)
+**Objective:** Add classic city-builder pressure tied to health/crises.
+
+**Design**
+- Water plant provides supply; buildings consume.
+- If sewage capacity insufficient, pollution rises and illness crises increase.
+
+
+**Specs**
+- Buildings: `WaterPlant`, `SewagePlant`
+- `src/sim/networks/water.js`, `src/sim/networks/sewage.js`
+
+
+**Implementation details**
+1. Implement supply/demand and coverage like power.
+2. Add pollution map affected by sewage shortage.
+3. Integrate with citizen health and crisis director.
+
+
+**Acceptance**
+- Water shortage slows growth and reduces happiness.
+- Sewage shortage increases pollution overlay and illness rate.
+
+
+**DoD**
+- Overlays render at reduced resolution for perf.
+
+
+---
+
+### H-04 — Data Grid v1 (towers + cameras + coverage)
+**Objective:** Foundation for surveillance and influence gameplay (Watch Dogs element).
+
+**Design**
+- Data coverage comes from towers/hubs; cameras are intel sources within coverage.
+- No phone hacking required: it's city-owned infrastructure you invest in.
+
+
+**Specs**
+- Buildings/props: `CellTower`, `CameraPole`, `DataHub`
+- `state.networks.data.coverage` + `state.intel.sources[]`
+- `src/sim/networks/data_grid.js`
+
+
+**Implementation details**
+1. Add tower building type that expands data coverage.
+2. Spawn/allow placement of camera props; active only when covered.
+3. Expose 'Grid' overlay showing coverage % and blind spots.
+
+
+**Acceptance**
+- Player can expand data coverage and see blind spots shrink.
+- Covered cameras provide 'intel pings' (placeholder event).
+
+
+**DoD**
+- Data grid does not break existing renderer performance.
+
+
+---
+
+### H-05 — Utility overlays + UX integration
+**Objective:** Make networks legible and debuggable.
+
+**Design**
+- Overlay hotkeys: `1` power, `2` water, `3` sewage, `4` data.
+- HUD shows summary bars: coverage %, supply/demand.
+
+
+**Specs**
+- `src/ui/overlays/network_overlay.js`
+- Reuse perf overlay style for debug info.
+
+
+**Implementation details**
+1. Implement overlay toggles and render tinted ground tiles (instanced attribute or decal).
+2. Add HUD summary widgets.
+3. Add tooltips when hovering a building: its demand/production.
+
+
+**Acceptance**
+- Player can identify why a district is failing (power/water/etc.) in < 30 seconds.
+- Overlays update within 1 second of building changes.
+
+
+**DoD**
+- Overlay rendering avoids per-tile DOM; uses GPU-friendly approach.
+
+
+---

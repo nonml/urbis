@@ -43,6 +43,18 @@ export const EVENT_TYPES = {
     // Evidence events
     CLUE_DISCOVERED: 'clue_discovered',
     EVIDENCE_ADDED: 'evidence_added',
+
+    // Intel events
+    INTEL_REVEALED: 'intel_revealed',
+
+    // Rival events
+    RIVAL_ACTION_STARTED: 'rival_action_started',
+    RIVAL_ACTION_COMPLETED: 'rival_action_completed',
+
+    // Police events
+    POLICE_UNIT_SPAWNED: 'police_unit_spawned',
+    POLICE_UNIT_DESPAWNED: 'police_unit_despawned',
+    POLICE_ENCOUNTER: 'police_encounter',
 };
 
 /**

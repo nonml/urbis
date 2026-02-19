@@ -1,6 +1,7 @@
 // Rival AI Core - Manages the adversarial city controller
 import { selectBestAction, RIVAL_ACTION_CATALOG, RIVAL_ACTION_COOLDOWN } from './rival_actions.js';
 import { RNG } from '../../rng.js';
+import { eventBus, EVENT_TYPES } from '../events.js';
 
 // Default rival config
 export const RIVAL_CONFIG = {
@@ -163,6 +164,14 @@ export class RivalAI {
 
         // Apply action effects
         this.applyActionEffects(state, action);
+
+        // Emit rival action started event for counterplay hooks
+        eventBus.emit(EVENT_TYPES.RIVAL_ACTION_STARTED, {
+            action: actionType,
+            duration: action.duration,
+            tick: tick,
+            districtId: this.game?.map?.getDistrictAt(state.player.x, state.player.y) ?? 0
+        });
 
         // Notify player
         this.notifyPlayer(state, action);

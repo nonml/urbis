@@ -1,112 +1,187 @@
-# Milestone M: Police + Heat + Chase v1 (detection, pursuit, evasion, hacks)
+# Milestone M — Dynamic Crises v2 + Emergency Response (target: 0.28.x)
 
-## Objective
-Make vehicles meaningful by adding police response and chases tied to hacking/rep.
+## Objective 🎯
+- Evolve crises from random events into **state-driven chains** with forecasting.
+- Add emergency response units and response-time mechanics that tie to traffic and services.
+- Create dramatic but fair failure/recovery loops.
 
-## Exit criteria (acceptance for milestone)
-- Heat states (alert/search/pursuit) cause police spawning and pursuit behavior.
-- Player can evade by breaking line-of-sight, hiding, or using hacks.
-- Chase loop feels complete: detection -> pursuit -> escape -> cooldown.
-- At least 3 chase hacks work (traffic lights, roadblock disable, blackout).
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Crises have multi-step chains (warning → incident → aftermath).
+- ✅ Emergency response (dispatch) exists for fire/medical/police incidents.
+- ✅ Player can intervene in Street Mode to affect at least 2 crisis types.
+- ✅ Crisis severity and frequency scale with city state (not pure RNG).
+
+
+## Definition of Done (DoD)
+- Every crisis has: trigger, escalation rules, resolution, aftermath effects.
+- Crisis history is logged and saved.
+- No soft-locks from crises (always at least one recovery path).
+
+
+---
 
 ## Phases
-- M1: Police agents + spawning
-- M2: Pursuit behavior + LOS
-- M3: Evasion tools + hacking integration
+1) Crisis director upgrade
+2) Dispatch + response loop
+3) Street interventions
+4) Balance + UX
+
+
+---
 
 ## Tickets
 
-## Ticket M-1: Police unit entity + spawn manager
-- **Phase:** M1
-- **Depends on:** G-3, J-2, L-2
+### M-01 — Crisis Director v2 (pressure-based + chain model)
+**Objective:** Generate believable crises from the city’s condition.
 
-### Objective
-Create police units that appear based on heat and district rules.
+**Design**
+- Pressures: powerShortage, waterShortage, unemployment, inequality, congestion, pollution.
+- Director picks chain templates weighted by pressures.
 
-### Design
-Spawn manager picks spawn points on roads near player but out of view. Police units have type: patrol car, interceptor, drone (optional).
 
-### Specs
-- Spawn rate scales with heat band.
-- Max active units: SMALL 6, CITY 12, MEGA 20.
-- Police rep modifies thresholds and spawn aggressiveness.
+**Specs**
+- `src/sim/crises/crisis_director.js`
+- `state.crises = { active[], history[], pressures{} }`
+- `src/content/crisis_chains.json`
 
-### Implementation details
-- Add `src/sim/police/police_system.js`.
-- Spawn points: road tiles within ring radius.
-- Persist police state in save (optional) or respawn deterministically.
 
-### Acceptance
-- At heat >= 50, police units spawn within 30 seconds and move toward player area.
+**Implementation details**
+1. Compute pressure signals each budget cycle.
+2. Select and start crisis chain steps deterministically.
+3. Add forecasting UI: 'risk meter' per crisis category.
 
-### DoD (Definition of Done)
-- No spawn inside water/buildings.
-- Spawn respects chunk streaming.
 
-### QA checklist
-- Set heat to 60 in dev menu; verify police appear.
-- Lower heat to 0; police despawn/cool down.
+**Acceptance**
+- If power supply is low, blackout-related chains become more likely.
+- Risk meter correlates with later crises.
 
-## Ticket M-2: Pursuit behavior v1 (seek, follow, ram) + LOS
-- **Phase:** M2
-- **Depends on:** M-1
 
-### Objective
-Core chase AI that feels Watch Dogs-ish without full traffic sim.
+**DoD**
+- Chain templates are data-driven and validated at load.
 
-### Design
-Police uses simple steering to pursue target position; if LOS lost, go to last known position and search pattern. In pursuit, try to stay behind/side and occasionally ram at high heat.
 
-### Specs
-- LOS check: raycast in tile grid (roads/buildings).
-- Search state lasts 20–40 seconds.
-- Ramming only above heat 75.
+---
 
-### Implementation details
-- Add `src/sim/police/los.js` and `pursuit_ai.js`.
-- Police uses the same vehicle controller with different params.
-- Add UI: “WANTED” banner with heat band.
+### M-02 — Incident system (spawn, location, timers, damage)
+**Objective:** Standardize how crises appear in world and progress over time.
 
-### Acceptance
-- Police follow player vehicle; losing LOS transitions to search mode.
-- If player stays hidden, heat decays and chase ends.
+**Design**
+- Incident has type, location, severity, timer, and affected entities.
+- Incidents can damage buildings, reduce sentiment, or kill citizens (optional).
 
-### DoD (Definition of Done)
-- AI deterministic given same inputs and seed.
-- No jittering oscillation when close to player.
 
-### QA checklist
-- Drive around buildings to break LOS; verify search behavior.
-- Stop in alley; verify cooldown to 0 over time.
+**Specs**
+- `state.incidents[]`
+- `src/sim/incidents/incidents.js`
+- Map marker + minimap icon per incident
 
-## Ticket M-3: Chase hacks: traffic lights, blackout, roadblock disable
-- **Phase:** M3
-- **Depends on:** G-3, M-2
 
-### Objective
-Give player active tools to escape instead of just driving.
+**Implementation details**
+1. Add incident spawner from crisis chain steps.
+2. Implement ticking progression and outcomes.
+3. Render markers and allow selecting incident to view details.
 
-### Design
-During chase, expose hackable nodes in area. Hacking traffic lights causes NPC police to slow/crash; blackout disables nearby cameras; roadblock disable opens gates.
 
-### Specs
-- Each hack has cooldown 30s.
-- Success reduces heat by 5–15 depending on hack.
-- Fail increases heat by 5.
+**Acceptance**
+- Incidents appear with clear markers and countdown/impact info.
+- Unresolved incidents escalate or resolve with consequences.
 
-### Implementation details
-- Extend hack actions with chase context modifiers.
-- Add `src/sim/police/roadblocks.js` that spawns barriers at high heat.
-- Add camera network effect: if blackout, LOS detection weaker.
 
-### Acceptance
-- Using hacks changes chase outcome noticeably.
-- Roadblocks can be avoided or disabled.
+**DoD**
+- Incident list bounded; old incidents archived.
 
-### DoD (Definition of Done)
-- Hacks available from both on-foot and in-vehicle modes.
-- All hacks have clear UI feedback.
 
-### QA checklist
-- Start chase; use traffic hack; verify at least one police unit is disrupted.
-- Use blackout; verify reduced detection for duration.
+---
+
+### M-03 — Dispatch/response v1 (police/fire/ambulance)
+**Objective:** Tie services + traffic into crisis outcomes.
+
+**Design**
+- Service buildings generate response units (virtual or visible).
+- Response time computed via traffic routing; modifies outcome success.
+
+
+**Specs**
+- `src/sim/services/dispatch.js`
+- `state.dispatch = { units[], assignments[] }`
+
+
+**Implementation details**
+1. For each incident, find nearest capable service building.
+2. Compute response time using traffic router cache.
+3. Apply success modifiers and show ETA in incident UI.
+
+
+**Acceptance**
+- Adding a fire station reduces average fire response time locally.
+- Gridlock increases ETA and worsens outcomes.
+
+
+**DoD**
+- Dispatch uses cached routing; no per-tick heavy pathfinding.
+
+
+---
+
+### M-04 — Street Mode interventions (player can help/hinder)
+**Objective:** Deliver the GTA-ish agency during crises.
+
+**Design**
+- At least two interventions:
+- 1) deliver supplies / escort evac vehicle
+- 2) secure area / calm crowd (influence mini-action)
+
+
+**Specs**
+- `src/sim/player/interventions.js`
+- Interventions triggered from incident UI 'Respond in person'
+
+
+**Implementation details**
+1. Add incident interaction prompt when near marker.
+2. Implement two mini-objectives with timers and success/fail effects.
+3. Tie results into incident resolution.
+
+
+**Acceptance**
+- Player intervention can swing an incident outcome measurably.
+- Interventions are optional; city systems still matter.
+
+
+**DoD**
+- No forced failure if player ignores interventions.
+
+
+---
+
+### M-05 — Aftermath system (rebuild, insurance, narrative consequences)
+**Objective:** Make crises feed the long-term story and economy.
+
+**Design**
+- After an incident, apply district modifiers and building damage.
+- Allow rebuilding; optionally add insurance policy that reduces cost.
+
+
+**Specs**
+- `src/sim/crises/aftermath.js`
+- `state.map.districts[i].modifiers[]` extended
+
+
+**Implementation details**
+1. Apply damage levels to buildings; reduce output until repaired.
+2. Add repair tool and cost model.
+3. Write news feed entry summarizing aftermath.
+
+
+**Acceptance**
+- Player sees persistent consequences after major incident.
+- Repair restores function and updates economy.
+
+
+**DoD**
+- Damage/repair survives save/load.
+
+
+---

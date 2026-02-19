@@ -1,99 +1,187 @@
-# Milestone P: UI/UX overhaul (HUD, minimap, menus, accessibility)
+# Milestone P — Developer Tooling + Content Pipeline (for scaling to 1.0) (target: 0.34.x)
 
-## Objective
-Make the game readable and usable for real play sessions.
+## Objective 🎯
+- Add internal tools so juniors can build content fast without breaking systems.
+- Standardize asset pipeline, validation, and debug utilities.
+- Prepare for larger content volume (quests, ops, policies, districts).
 
-## Exit criteria (acceptance for milestone)
-- Main menu: new game (preset+seed), load game, settings.
-- HUD: resources, heat, minimap, quest/case tracker, alerts.
-- Minimap supports zoom, markers, and chase indicators.
-- Keybindings shown and remappable.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Dev console/menu supports spawning incidents, toggling overlays, teleporting, fast-forwarding.
+- ✅ Content validation runs on build and catches broken references.
+- ✅ Asset folder structure exists and is referenced consistently.
+- ✅ A 'content authoring guide' exists with examples.
+
+
+## Definition of Done (DoD)
+- Tools are gated behind a dev flag and off by default in release builds.
+- All tooling is deterministic-safe (no random side effects unless using RNG).
+- Tooling does not ship heavy debug UIs into production bundle.
+
+
+---
 
 ## Phases
-- P1: Menu + settings
-- P2: HUD consolidation
-- P3: Minimap v2 + markers
+1) Dev tools
+2) Validation + scripts
+3) Asset pipeline
+4) Authoring docs
+
+
+---
 
 ## Tickets
 
-## Ticket P-1: Main menu + settings + keybind remap
-- **Phase:** P1
-- **Depends on:** E-4
+### P-01 — Dev menu/console v2 (fast-forward, teleport, spawn)
+**Objective:** Reduce iteration time from minutes to seconds.
 
-### Objective
-Professionalize the entry experience and reduce confusion.
+**Design**
+- Dev menu toggled by `F1` (only in dev builds).
+- Actions: teleport to marker, spawn incident, trigger main case, grant resources, simulate days.
 
-### Design
-A simple menu screen with preset selection (small/city/mega), seed input, difficulty, sandbox toggle. Settings include audio levels and keybinds.
 
-### Specs
-- Seed field supports “random” button.
-- Keybinds stored in localStorage + saved in state optionally.
+**Specs**
+- `src/dev/dev_menu.js`
+- `state.dev = { enabled }`
+- Build flag: `__DEV__` injected by bundler
 
-### Implementation details
-- Add `src/ui/screens/main_menu.js`.
-- Add `src/input/keybinds.js` with default map and remap UI.
 
-### Acceptance
-- Can start a new run with chosen preset/seed and see them in overlay.
+**Implementation details**
+1. Implement menu with buttons and keybinds.
+2. Wire to safe APIs in systems (no direct state mutation from UI).
+3. Add 'seed reseed' option only for new runs (not mid-run).
 
-### DoD (Definition of Done)
-- Menu works in dev and production build.
 
-### QA checklist
-- Start game with MEGA seed 123; verify correct map size.
+**Acceptance**
+- A dev can reach any district and trigger a crisis in < 30 seconds.
+- Fast-forward does not desync state.
 
-## Ticket P-2: HUD consolidation + alert system
-- **Phase:** P2
-- **Depends on:** E-2, G-3, O-2
 
-### Objective
-Stop UI fragmentation and make alerts actionable.
+**DoD**
+- Dev menu removed/hidden in production build.
 
-### Design
-Single HUD layout with panels. Alerts have severity and can open related panels (services, crises, cases).
 
-### Specs
-- Alert dedupe window: 15s.
-- Clickable alerts open the relevant UI view.
+---
 
-### Implementation details
-- Add `src/ui/hud/hud_root.js`.
-- Create `AlertManager` with queue + dedupe.
+### P-02 — Content validation + CI-lite scripts
+**Objective:** Prevent content-driven crashes.
 
-### Acceptance
-- Player can identify why they’re losing (food/power/heat) quickly.
+**Design**
+- Validation checks all content JSON for schema + references.
+- Optional: a lightweight Git hook or npm script for pre-commit.
 
-### DoD (Definition of Done)
-- HUD has no overlapping elements at 720p.
 
-### QA checklist
-- Trigger multiple alerts; verify dedupe and click-through.
+**Specs**
+- `scripts/validate_content.mjs` (expand from Milestone N)
+- `scripts/check_no_math_random.mjs`
+- NPM scripts: `validate`, `lint:basic`
 
-## Ticket P-3: Minimap v2 (markers, zoom, chase)
-- **Phase:** P3
-- **Depends on:** M-1, H-2
 
-### Objective
-A minimap that supports exploration and chases.
+**Implementation details**
+1. Add validators for all content types: quests, campaigns, ops, policies, unlocks, factions.
+2. Add 'no Math.random' scan for src/.
+3. Document scripts in `docs/CONTRIBUTING.md`.
 
-### Design
-Minimap renders roads, water, districts as colors; overlays markers: player, vehicle, police, quests, cases, crises. Zoom with scroll.
 
-### Specs
-- Zoom levels: 3 steps.
-- Marker priority: police > quest > case > crisis > POI.
+**Acceptance**
+- Broken references fail validation with actionable output.
+- Validators run in < 2 seconds.
 
-### Implementation details
-- Fix any remaining canvas/div issues in minimap implementation.
-- Add marker registry interface `registerMarker(type, id, pos)`.
 
-### Acceptance
-- Markers show and update smoothly.
-- During chase, police markers appear and update.
+**DoD**
+- Scripts work on Windows and macOS (path-safe).
 
-### DoD (Definition of Done)
-- Minimap costs < 1ms per frame.
 
-### QA checklist
-- Start chase; confirm police markers update and disappear after cooldown.
+---
+
+### P-03 — In-game placement tools for landmarks/nodes (authoring helper)
+**Objective:** Make world authoring possible without external editors.
+
+**Design**
+- Dev tool: place landmark, intel source, quest marker and export JSON.
+- Export includes coordinates and district id.
+
+
+**Specs**
+- `src/dev/placement_tool.js`
+- Exports to clipboard or downloads JSON file.
+
+
+**Implementation details**
+1. Add placement mode with snapping and preview.
+2. Collect placed objects into list and export.
+3. Add import ability to load a pack into the run (dev only).
+
+
+**Acceptance**
+- A junior can create a small landmark pack in 5 minutes.
+- Exported JSON validates with scripts.
+
+
+**DoD**
+- Placement tool does not ship in release builds.
+
+
+---
+
+### P-04 — Asset pipeline + folder conventions (audio, textures, models)
+**Objective:** Stop ad-hoc asset placement and broken paths.
+
+**Design**
+- Standard folders: `assets/audio`, `assets/textures`, `assets/models`, `assets/ui`.
+- Asset manifest maps ids to paths and metadata.
+
+
+**Specs**
+- `assets/manifest.json`
+- `src/assets/assets.js` loader
+- Docs: `docs/ASSETS.md`
+
+
+**Implementation details**
+1. Create asset manifest and loader helper.
+2. Refactor audio manager to use manifest ids.
+3. Add placeholders and mark licensing status.
+
+
+**Acceptance**
+- No hard-coded asset paths in gameplay code.
+- Missing asset results in graceful fallback.
+
+
+**DoD**
+- Manifest validated by scripts.
+
+
+---
+
+### P-05 — Localization-ready text system (minimal)
+**Objective:** Prevent hard-coded strings from blocking later shipping.
+
+**Design**
+- Simple `t(key, params)` function with English table.
+- UI strings and quest text can reference keys or raw text (transition plan).
+
+
+**Specs**
+- `src/i18n/i18n.js`
+- `assets/i18n/en.json`
+
+
+**Implementation details**
+1. Implement i18n table loader.
+2. Replace core UI labels with keys (top 50 strings).
+3. Add guideline for content authors.
+
+
+**Acceptance**
+- Switching language (even if only EN exists) doesn’t break UI.
+- Missing keys fall back with visible marker in dev.
+
+
+**DoD**
+- No runtime exceptions from missing i18n keys.
+
+
+---

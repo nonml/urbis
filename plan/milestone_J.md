@@ -1,109 +1,187 @@
-# Milestone J: Factions + reputation + world rules
+# Milestone J — Citizen Simulation v2 (Households, Jobs, Crime, Social Graph) (target: 0.22.x)
 
-## Objective
-Make the city feel reactive: gangs, police, corps, and citizens respond to your actions and hacks.
+## Objective 🎯
+- Upgrade citizens from simple walkers into a simulation that produces stories.
+- Add households, jobs, wages, and basic crime dynamics.
+- Establish a persistent social graph that feeds quests and influence ops.
 
-## Exit criteria (acceptance for milestone)
-- Faction rep meter exists for at least 4 factions.
-- Rep changes from hacks, quests, and city conditions.
-- Rep unlocks content (buildings, hacks, safehouses) and also causes hostility.
-- World rules based on rep affect police/gang behavior.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Citizens belong to households and occupy housing units.
+- ✅ Jobs have wages; unemployment and inequality affect crime and happiness.
+- ✅ Crime incidents emerge from conditions and are mitigated by policing/poverty programs.
+- ✅ Social graph (friend/enemy/family) exists for at least 10% of population and persists.
+
+
+## Definition of Done (DoD)
+- Citizen data remains stable under save/load and migrations.
+- Sim avoids NaNs and runaway growth (hard caps + sanity checks).
+- Debug overlays exist for citizen stats and incidents.
+
+
+---
 
 ## Phases
-- J1: Faction model + rep math
-- J2: Rep-driven unlocks and hostility
-- J3: UI + tuning
+1) Households + housing
+2) Jobs + wages
+3) Crime incidents
+4) Social graph + debug
+
+
+---
 
 ## Tickets
 
-## Ticket J-1: Faction registry + reputation tracking
-- **Phase:** J1
-- **Depends on:** G-3, H-3
+### J-01 — Household model + housing units
+**Objective:** Create a scalable way to represent population realistically.
 
-### Objective
-Centralize faction definitions and make rep deterministic and auditable.
+**Design**
+- Household is a unit with members, income, home building, and needs.
+- Residential buildings provide `units` capacity (not infinite).
 
-### Design
-Faction defs in content json. Rep is -100..100 with named bands (hostile, wary, neutral, friendly, allied).
 
-### Specs
-- Factions: citizens, police, gangs, corp.
-- Rep delta sources include: hack loudness, quest outcomes, service coverage.
-- Decay/growth optional; keep simple for now.
+**Specs**
+- `state.households[]` and `state.citizens[]` reference householdId
+- Residential building config includes `units`
+- `src/sim/citizens/households.js`
 
-### Implementation details
-- Add `src/sim/factions/faction_system.js`.
-- Expose `modifyRep(factionId, delta, reason)` that logs last 20 changes.
-- Persist rep in `state.factions.reputation`.
 
-### Acceptance
-- Rep changes show in UI with reason.
-- Save/load preserves rep.
+**Implementation details**
+1. Create household generator during growth.
+2. Assign households to available residential units.
+3. Update UI stats: population, households, occupancy %.
 
-### DoD (Definition of Done)
-- No uncapped values; always clamp.
-- Unit test: rep band transitions.
 
-### QA checklist
-- Do loud hacks; police rep decreases.
-- Help citizens via quest; citizen rep increases.
+**Acceptance**
+- Population cannot exceed available housing units (unless homelessness is implemented).
+- Vacancy and occupancy are visible in UI.
 
-## Ticket J-2: Unlocks + hostility rules
-- **Phase:** J2
-- **Depends on:** J-1
 
-### Objective
-Make rep matter in gameplay loops.
+**DoD**
+- No per-citizen expensive searches each tick; use indices/maps.
 
-### Design
-Friendly factions unlock perks; hostile factions trigger encounters/events (police patrols, gang ambush).
 
-### Specs
-- Unlock examples: police-friendly -> reduced heat decay penalty; corp-friendly -> better wages; gang-friendly -> black market items.
-- Hostility triggers above thresholds: police rep < -40 causes faster pursuit; gangs rep < -40 causes street threats.
+---
 
-### Implementation details
-- Add `src/sim/factions/perks.js` mapping rep band -> modifiers.
-- Integrate perks into heat system and economy.
-- Add encounter spawner stub (fully used later in chase milestone).
+### J-02 — Job market v1 (employment, wages, education)
+**Objective:** Make economy human and story-generating.
 
-### Acceptance
-- Changing rep changes at least 2 systems (heat/economy).
-- Hostile rep triggers visible changes in world within 5 minutes.
+**Design**
+- Each job building provides N jobs with wage bands.
+- Citizens seek jobs based on education/skills and distance.
 
-### DoD (Definition of Done)
-- Perks are data-driven.
-- No circular dependencies (perks read-only modifiers).
 
-### QA checklist
-- Set police rep negative via dev menu; verify heat grows faster.
-- Set gang rep negative; verify encounter notifications.
+**Specs**
+- `state.jobs = { openingsByBuildingId, wageBands }`
+- `src/sim/economy/jobs.js`
 
-## Ticket J-3: Faction UI + tuning tools
-- **Phase:** J3
-- **Depends on:** J-2
 
-### Objective
-Give juniors knobs for balancing without code edits.
+**Implementation details**
+1. Add job slots to building definitions.
+2. Implement job assignment pass (batch) each budget cycle.
+3. Compute unemployment rate and expose in UI.
 
-### Design
-Faction panel in HUD showing reps, bands, and recent changes. Dev sliders to adjust deltas multipliers.
 
-### Specs
-- HUD: small rep bars + tooltip details.
-- Dev menu: multipliers per rep source category.
+**Acceptance**
+- Adding job buildings reduces unemployment over time.
+- Higher wages improve happiness but increase business expenses (future hook).
 
-### Implementation details
-- Add `src/ui/factions_panel.js`.
-- Add dev config in `state.meta.devTuning` (dev-only default).
 
-### Acceptance
-- Player can understand why rep changed.
-- Tuning multipliers affect deltas immediately.
+**DoD**
+- Job assignment deterministic (sorted candidates + RNG only for ties).
 
-### DoD (Definition of Done)
-- UI does not spam; merges repeated messages.
-- All faction ids consistent with content.
 
-### QA checklist
-- Play 10 minutes; observe at least 3 rep changes with reasons.
+---
+
+### J-03 — Crime incident generator + resolution loop
+**Objective:** Create emergent conflict and pressure without scripted events.
+
+**Design**
+- Crime probability increases with unemployment, inequality, low police coverage.
+- Incidents spawn at hotspots and can be resolved by police response or player intervention.
+
+
+**Specs**
+- `state.crime = { incidents[], heatMap }`
+- `src/sim/crime/crime_system.js`
+
+
+**Implementation details**
+1. Generate incidents based on district stats and coverage.
+2. Create resolution logic (success chance depends on response time and coverage).
+3. Add UI feed entries and map markers.
+
+
+**Acceptance**
+- High unemployment districts show more incidents.
+- Improving policing reduces incidents within a few cycles.
+
+
+**DoD**
+- Incident list bounded; old incidents archived to history.
+
+
+---
+
+### J-04 — Social graph v1 (relationships, factions, rumors)
+**Objective:** Enable Watch Dogs-like personal stories without hand-authoring everyone.
+
+**Design**
+- Sparse graph: each citizen has 2–6 relations from templates.
+- Relations have type + strength and can change from events.
+- Rumors are small 'facts' that can propagate through the graph.
+
+
+**Specs**
+- `state.social.edges[] = { aId, bId, type, strength }`
+- `src/sim/social/social_graph.js`
+- `state.rumors[]`
+
+
+**Implementation details**
+1. Generate relations at citizen creation and occasionally over time.
+2. Expose a citizen profile panel showing top relations.
+3. Add rumor propagation tick (bounded).
+
+
+**Acceptance**
+- At least one minor case can reference social relations (e.g., friend knows suspect).
+- Rumors can shift district sentiment slightly.
+
+
+**DoD**
+- Graph operations are O(E) with caps; no runaway propagation.
+
+
+---
+
+### J-05 — Citizen profile UI + debug inspector
+**Objective:** Make the sim understandable to players and devs.
+
+**Design**
+- Click a citizen → show panel: name, job, household, mood, secrets (if known), relations.
+- Dev mode shows hidden fields; release hides them.
+
+
+**Specs**
+- `src/ui/citizen_panel.js`
+- Uses selection system + raycast in Street Mode.
+
+
+**Implementation details**
+1. Implement selection on citizen mesh/instance.
+2. Populate panel from state.
+3. Add dev toggle to reveal full profile.
+
+
+**Acceptance**
+- Player can inspect at least 10 citizens reliably.
+- Panel updates when citizen state changes.
+
+
+**DoD**
+- Panel does not spam DOM updates (diff-based rendering).
+
+
+---

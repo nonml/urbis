@@ -1,4 +1,4 @@
-import goalsData from '../../content/goals.json' with { type: 'json' };
+import goalsData from '../../content/goals.json' assert { type: 'json' };
 
 const DEFAULT_GOALS = {
     win: {

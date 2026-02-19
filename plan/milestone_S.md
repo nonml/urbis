@@ -1,97 +1,185 @@
-# Milestone S: VFX + feedback pass (hacks, chases, crises, UI polish)
+# Milestone S — QA Automation + Balancing (toward Beta) (target: 0.40.x)
 
-## Objective
-Make outcomes readable with clear feedback and satisfying effects.
+## Objective 🎯
+- Harden the game with repeatable tests and balancing workflows.
+- Add telemetry-style logs (local) for tuning economy/crises/AI.
+- Prepare for external playtesting (beta).
 
-## Exit criteria (acceptance for milestone)
-- Hacks have VFX: scan outlines, success burst, fail sparks.
-- Chases have feedback: sirens, wanted level, roadblock indicators.
-- Crises have district-level markers and visual cues.
-- UI polish: consistent typography and spacing.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Automated tests cover: content validation, smoke sims, save/load fuzz.
+- ✅ Balance seeds list expanded and tracked with expected ranges.
+- ✅ Telemetry log can be exported with key metrics and event timeline.
+- ✅ Critical bug rate reduced (bug bash shows no S0/S1 issues).
+
+
+## Definition of Done (DoD)
+- Tests run in CI-like fashion locally with one command.
+- Balancing changes documented and traceable.
+- Telemetry is opt-in and does not collect personal data.
+
+
+---
 
 ## Phases
-- S1: Hack VFX
-- S2: Chase VFX
-- S3: Crisis markers + UI polish
+1) Test suite expansion
+2) Telemetry + analysis helpers
+3) Balance process
+4) Bug bash iterations
+
+
+---
 
 ## Tickets
 
-## Ticket S-1: Hack VFX suite (scan, ping, success/fail)
-- **Phase:** S1
-- **Depends on:** G-3
+### S-01 — Automated sim regression tests (seeded scenarios)
+**Objective:** Catch major logic regressions early.
 
-### Objective
-Instant feedback for hacking actions.
+**Design**
+- Run N seeds across presets and assert ranges for metrics (not exact numbers).
+- Metrics: population, cash, crises count, sentiment.
 
-### Design
-Outline shader substitute (cheap) or emissive tint, plus particle bursts and screen-space ping rings.
 
-### Specs
-- Scan outline visible up to 30m.
-- Ping ring lasts 1.2s.
+**Specs**
+- `scripts/regression_test.mjs`
+- `docs/REGRESSION_METRICS.md`
 
-### Implementation details
-- Expand `renderer3d.showParticleBurst` with pooled particles.
-- Add `src/render/fx/pings.js`.
 
-### Acceptance
-- Player can tell what got hacked and whether it succeeded.
+**Implementation details**
+1. Implement regression runner using headless mode.
+2. Define expected ranges per seed/preset (tunable).
+3. Fail if metrics outside range or NaN appears.
 
-### DoD (Definition of Done)
-- No per-hack geometry allocation; use pools.
 
-### QA checklist
-- Perform 50 hacks; no FPS decay over time.
+**Acceptance**
+- A deliberate bug causes test failure.
+- Normal tuning changes can update ranges with documentation.
 
-## Ticket S-2: Chase feedback (sirens, indicators, roadblocks)
-- **Phase:** S2
-- **Depends on:** M-3, P-3
 
-### Objective
-Make chases readable and tense.
+**DoD**
+- Runner completes in < 5 minutes.
 
-### Design
-HUD wanted level, police direction indicators, roadblock warning icon, camera shake on collision.
 
-### Specs
-- Directional indicator updates at 10Hz.
-- Camera shake max amplitude clamped.
+---
 
-### Implementation details
-- Add `src/ui/chase_hud.js`.
-- Add roadblock marker integration with minimap.
+### S-02 — Save/load fuzz testing
+**Objective:** Prevent corrupt saves from breaking builds.
 
-### Acceptance
-- Player knows where police are and where roadblocks are.
+**Design**
+- Generate random valid-ish states and roundtrip save/load.
+- Mutate saved JSON slightly and ensure loader fails gracefully.
 
-### DoD (Definition of Done)
-- No motion sickness defaults; shake can be disabled in settings.
 
-### QA checklist
-- Chase with 10 police units; HUD remains readable.
+**Specs**
+- `scripts/fuzz_save_load.mjs`
+- `docs/SAVE_ROUNDTRIP.md`
 
-## Ticket S-3: Crisis visual markers + UI cohesion
-- **Phase:** S3
-- **Depends on:** O-2, P-2
 
-### Objective
-Let players see city problems spatially.
+**Implementation details**
+1. Create state generator with caps and invariants.
+2. Roundtrip test and compare key fields.
+3. Add corrupted save tests and verify error messages.
 
-### Design
-District tint/heatmap for affected areas; crisis icons at district center; consistent HUD styling across panels.
 
-### Specs
-- Heatmap toggles per service and per crisis type.
+**Acceptance**
+- Loader never hard-crashes on fuzzed inputs.
+- Corrupt save yields readable error and recovery option.
 
-### Implementation details
-- Integrate with `services` and `crisis` data.
-- Create shared UI style tokens in CSS.
 
-### Acceptance
-- Player can locate crises and service gaps visually.
+**DoD**
+- Fuzz tests are deterministic (seeded).
 
-### DoD (Definition of Done)
-- All UI panels share common styles and spacing rules.
 
-### QA checklist
-- Toggle heatmap while moving; no flicker.
+---
+
+### S-03 — Telemetry logging + export bundle
+**Objective:** Make balancing evidence-based.
+
+**Design**
+- Log key metrics every N ticks and major events (ops, crises, wins).
+- Export creates a JSON bundle attached to bug reports.
+
+
+**Specs**
+- `src/dev/telemetry.js`
+- `state.telemetry.enabled`
+- Export button in pause menu (dev/beta)
+
+
+**Implementation details**
+1. Implement ring-buffer telemetry storage.
+2. Add export to file (download) and copy summary to clipboard.
+3. Document fields for analysis.
+
+
+**Acceptance**
+- Exported log can reproduce 'what happened' in a run at high level.
+- Telemetry can be disabled.
+
+
+**DoD**
+- No sensitive data; only game state ids and numbers.
+
+
+---
+
+### S-04 — Balance process v2 (economy/crises/rival/factions)
+**Objective:** Tune for fun and fairness.
+
+**Design**
+- Define difficulty bands and target experience per preset.
+- Use telemetry + seeds to tune thresholds and pacing.
+
+
+**Specs**
+- `docs/BALANCE_GUIDE.md`
+- Expanded `docs/BALANCE_SEEDS.md` (20 seeds)
+
+
+**Implementation details**
+1. Run telemetry on seeds and identify pain points.
+2. Tune in small increments and record changes.
+3. Add automated report summary (optional).
+
+
+**Acceptance**
+- Small preset: approachable; City: strategic; Mega: long-run challenge.
+- Rival pressure feels counterable, not random.
+
+
+**DoD**
+- Balance changes accompanied by patch note entry.
+
+
+---
+
+### S-05 — Beta bug bash rounds + exit gates
+**Objective:** Lock quality before calling it beta-ready.
+
+**Design**
+- Define exit gates: 0 S0, <3 S1, <10 S2 open issues.
+- Conduct 3 bug bash rounds with fixed test scripts.
+
+
+**Specs**
+- `docs/BETA_EXIT_GATES.md`
+- `docs/BUG_BASH_SCRIPT.md`
+
+
+**Implementation details**
+1. Write scripts and assign roles for bug bash.
+2. Run sessions and triage issues.
+3. Retest fixes and update known issues list.
+
+
+**Acceptance**
+- Exit gates satisfied for one full week of development.
+- Known issues list is accurate and prioritized.
+
+
+**DoD**
+- Bug bash artifacts archived (logs, seeds, saves).
+
+
+---

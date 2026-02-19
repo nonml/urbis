@@ -1,6 +1,8 @@
 // Rival AI Action Catalog
 // Defines all actions the rival can take and their effects
 
+import { calculateActionUtilityByWeakness } from './weakness.js';
+
 // Action types
 export const RIVAL_ACTION_SABOTAGE_GRID = 'sabotage_grid';
 export const RIVAL_ACTION_SPREAD_PROPAGANDA = 'spread_propaganda';
@@ -191,8 +193,9 @@ export function calculateActionUtility(state, actionType) {
 }
 
 /**
- * Selects the best action for the rival AI
+ * Selects the best action for the rival AI using weakness-based scoring
  * @param {Object} state - Current game state
+ * @param {Object} rng - RNG instance for deterministic behavior
  * @returns {string} Selected action type
  */
 export function selectBestAction(state, rng) {
@@ -208,10 +211,24 @@ export function selectBestAction(state, rng) {
     let bestUtility = -50;
 
     for (const actionType of allActions) {
-        const utility = calculateActionUtility(state, actionType);
+        // Use weakness-based utility calculation
+        const utility = calculateActionUtilityByWeakness(state, actionType);
         if (utility > bestUtility) {
             bestUtility = utility;
             bestAction = actionType;
+        }
+    }
+
+    // Add some randomness for unpredictability (deterministic with seed)
+    if (rng && bestUtility > -50) {
+        bestUtility += rng.float(0, 15);
+        // Re-select with randomness
+        for (const actionType of allActions) {
+            const utility = calculateActionUtilityByWeakness(state, actionType) + rng.float(0, 15);
+            if (utility > bestUtility) {
+                bestUtility = utility;
+                bestAction = actionType;
+            }
         }
     }
 

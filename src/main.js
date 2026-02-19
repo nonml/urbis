@@ -233,20 +233,13 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Hook into game loop to update perf overlay
-window.Game = Game;
-const originalLoop = window.Game.prototype.loop;
-window.Game.prototype.loop = function() {
-    // This won't work for prototype hooking due to ES modules
-    // Instead, we'll update perf overlay in the renderer
-};
-
 // Update perf overlay after rendering
 window.UIManager = UIManager;
 const originalRender = window.UIManager.prototype.render;
-window.UIManager.prototype.render = function(frameDt) {
+window.UIManager.prototype.render = function(...args) {
+    const frameDt = args[0];
     if (window.game && window.perfOverlay) {
         window.perfOverlay.update(frameDt, this.renderer3d);
     }
-    originalRender.call(this, frameDt);
+    originalRender.apply(this, args);
 };

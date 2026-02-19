@@ -1,152 +1,315 @@
-# Milestone A: Foundation: deterministic core, state/schema, dev workflow
+# Milestone A — Stabilize Foundations (target: 0.3.x)
 
-## Objective
-Stabilize the codebase so every run is reproducible by seed, saves are forward-compatible, and juniors can develop safely (tests + CI-style discipline).
+## Objective ✅
+Turn the current prototype into a **predictable, debuggable, scalable** base:
+- Deterministic simulation (seeded RNG everywhere)
+- Clear state ownership (GameState) + versioned saves
+- Performance guardrails for **MEGA** maps
+- Minimal “project hygiene” so juniors can work in parallel safely
 
-## Exit criteria (acceptance for milestone)
-- No `Math.random()` in `src/` (determinism + auditability).
-- Single source of truth: `GameState` validated on load and before save.
-- Save schema migration works: can load previous saves and auto-upgrade.
-- Smoke test passes locally via `npm run test`.
-- Dev overlay shows FPS + sim tick + seed + runId.
+## Current State Snapshot (what exists today)
+**Core modules (src/):**
+- `game.js`: owns map/resources/citizens/buildings/crises/ui/minimap
+- `renderer3d.js`: Three.js instanced rendering + third-person camera
+- `map.js`: seeded terrain generation
+- `citizen.js`, `buildings.js`, `resources.js`, `crisis.js`: sim systems
+- `ui.js`, `minimap.js`: UI layer
+- `rng.js`: deterministic RNG (must be the only randomness source)
 
-## Phases
-- A1: Code hygiene + architecture boundaries
-- A2: Determinism + RNG streams
-- A3: Save schema + migrations
-- A4: Tests + smoke suite + debug overlay
+**Known risks:**
+- State is distributed across systems (harder to save/migrate/test)
+- Render + sim are loosely coupled (risk of subtle non-determinism)
+- No perf instrumentation (MEGA regressions will slip in unnoticed)
+- No save schema versioning (future changes will break saves)
+
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ No runtime errors in console during a 30-minute play session on **MEGA**
+- ✅ Same `seed + same inputs` produces consistent outcomes (within tolerance)
+- ✅ Save files include a `schemaVersion` and can load after minor schema changes
+- ✅ Perf overlay exists and MEGA map stays within agreed budgets:
+  - Target: **30 FPS** on mid-range PC in MEGA map (browser)
+- ✅ Codebase supports parallel dev: clear folders + documented conventions
+
+## Definition of Done (DoD) for Milestone A
+- All tickets below merged into `dev`, then to `main`
+- Manual QA checklist completed (provided in A-10)
+- No “TODO: fix later” left in core loop (unless tracked as ticket)
+
+---
+
+## Phase Breakdown
+1) **Design/Architecture**
+2) **Implementation**
+3) **Verification + Regression**
+4) **Integration + Docs**
+
+---
 
 ## Tickets
 
-## Ticket A-1: Enforce deterministic RNG streams (world/sim/quest/rival/vfx)
-- **Phase:** A2
+### A-01 — Create `/plan` + `/docs` + project conventions
+**Objective:** Make the repo self-explanatory for juniors.
 
-### Objective
-Prevent accidental RNG consumption (e.g., UI/render affecting simulation) by splitting RNG streams and documenting rules.
+**Design**
+- Add `docs/CONTRIBUTING.md` with:
+  - branch naming, PR checklist, coding style, how to test
+- Add `docs/ARCHITECTURE.md` with module responsibilities
 
-### Design
-Derive independent RNG seeds from `meta.seed` via XOR constants. Store stream seeds in `state.meta.rngStreams` for save/load. Simulation-only code uses `rngSim`, quest logic uses `rngQuest`, rival uses `rngRival`. Rendering uses `rngVfx` and must not touch sim RNG.
+**Specs**
+- Files:
+  - `docs/CONTRIBUTING.md`
+  - `docs/ARCHITECTURE.md`
+  - `docs/TEST_CHECKLIST.md`
 
-### Specs
-- Add `state.meta.rngStreams = { worldSeed, simSeed, questSeed, rivalSeed, vfxSeed }`.
-- Add `game.rng = { world, sim, quest, rival, vfx }` object.
-- Map generation uses `world` only. Daily events/crises use `sim` only.
-- QuestEngine uses `quest` (not sim). RivalAI uses `rival`.
+**Implementation details**
+1. Create docs folder + templates.
+2. Document current controls + run steps (link `README.md`).
 
-### Implementation details
-- Update `src/game.js` init to create all RNGs from `this.state.meta.seed`.
-- Update `src/map.js` to accept RNG in constructor (`new Map(..., rngWorld)`), remove internal RNG creation.
-- Update `QuestEngine` to store `this.rng = game.rng.quest` and pass into quest context.
-- Update `RivalAI` to store `this.rng = game.rng.rival` instead of new RNG; keep current code if needed but prefer shared stream.
-- Update VFX helper in `renderer3d.js` to use `game.rng.vfx` *without* advancing on frame; only advance on VFX spawn.
+**Acceptance**
+- A new dev can clone + run + understand folder purposes in 10 minutes.
 
-### Acceptance
-- Running the same seed twice produces identical map + initial citizens + first 10 sim ticks outcomes (resources/population/happiness).
-- Toggling UI elements does not change sim outcome for the same seed.
-- Quest target selection is stable for the same seed and same trigger order.
+**DoD**
+- Docs reviewed for completeness; no broken paths.
 
-### DoD (Definition of Done)
-- All modified files pass `node --check` and `npm run test`.
-- Documented in `docs/DETERMINISM.md` (rules + examples).
-- No regression in MEGA preset load time (±10%).
+---
 
-### QA checklist
-- Start seed=123 on SMALL and CITY, compare map hashes (log hash).
-- Trigger 3 anomalies from dev menu; ensure same targets on restart with same seed.
-- Save + reload after 5 ticks; continue and compare to uninterrupted run.
+### A-02 — Introduce `GameState` as the single source of truth
+**Objective:** Reduce hidden coupling and make save/load trivial.
 
-## Ticket A-2: GameState validation + strict schema boundaries
-- **Phase:** A1/A3
+**Design**
+- Introduce `src/state/game_state.js` that contains all serializable state.
+- Systems read/write through `game.state`, not “free-floating” fields.
 
-### Objective
-Guarantee that state is always well-formed and future migrations don’t silently corrupt runs.
+**Specs**
+- `GameState` shape (minimum):
+```js
+{
+  schemaVersion: 1,
+  meta: { seed, mapPreset, createdAt, runId },
+  time: { tick, paused, simDt },
+  resources: { gold, food, wood, stone, ... },
+  map: { width, height, tiles: Uint8Array or packed array },
+  buildings: { list: [{ id, type, x, y, level, ... }] },
+  citizens: { list: [{ id, name, age, x, y, job, homeId, happiness, traits, ... }] },
+  crises: { active: [...], history: [...] },
+  player: { x, y, yaw, pitch, ... },
+  ui: { selectedTool, ... } // optional
+}
+```
 
-### Design
-Use `validateGameState(state)` as a hard gate for load/new/save. Introduce `assertStateShape()` dev-only checks. Store schema version in save root and migrate step-by-step.
+**Implementation details**
+1. Create `src/state/game_state.js` + `createNewGameState(options)`.
+2. Update systems to consume `game.state`:
+   - `Resources` becomes pure helpers or removed
+   - `CitizenManager` reads/writes `state.citizens`
+3. Keep wrapper methods for now to avoid huge refactor.
 
-### Specs
-- `validateGameState()` returns `{ ok: boolean, errors: string[] }`.
-- Any `ok=false` blocks load and shows a UI error with copyable details.
-- State updates go through `game.mutate(fn)` wrapper (central place for invariants).
+**Acceptance**
+- Game runs with state-driven data.
+- Save/load uses `state` directly.
 
-### Implementation details
-- Add `src/state/validate.js` with small composable validators (numbers, arrays, bounds).
-- Update `src/save/save_manager.js` to call validate before write and after read+migrate.
-- Add `docs/SAVE_SCHEMA.md` describing fields and invariants.
-- Add `scripts/state_fuzz_test.mjs` generating random-ish states and ensuring validator catches bad ones.
+**DoD**
+- No duplicated state fields exist in `Game` vs `state` for the same concept.
 
-### Acceptance
-- Corrupt save (manually edited JSON) is rejected with a readable error.
-- Valid save loads without console errors.
-- Migration runs automatically and increments schema.
+---
 
-### DoD (Definition of Done)
-- All new docs exist and are referenced from `README.md`.
-- Smoke test includes a migrate path test.
+### A-03 — Fixed-timestep simulation loop + deterministic ordering
+**Objective:** Prevent “FPS changes gameplay”.
 
-### QA checklist
-- Edit save: delete `meta.seed` → load must fail with message.
-- Load old schema save → verify schemaVersion increments.
+**Design**
+- Use fixed sim step (e.g., `simDt = 0.2s`) with accumulator.
+- Systems update in stable order every tick:
+  1) buildings production
+  2) citizen needs + movement
+  3) crises director
+  4) UI messages/log (not affecting sim randomness)
 
-## Ticket A-3: Smoke tests: headless sim + determinism snapshot
-- **Phase:** A4
-- **Depends on:** A-1, A-2
+**Specs**
+- In `game.js`:
+  - `update(realDt)` accumulates
+  - loops `while (accum >= simDt)` → `tickOnce(simDt)`
 
-### Objective
-Give juniors a fast “red/green” loop to detect breaking changes.
+**Implementation details**
+1. Separate `tickOnce()` from render frame.
+2. Ensure any random draws occur in consistent order:
+   - Iterate citizens/buildings in stable `id` order.
 
-### Design
-Use `src/headless_game.js` to run 200 ticks without rendering. Compute a stable snapshot hash of key state fields each N ticks. Compare to expected hash for fixed seeds.
+**Acceptance**
+- Same seed + same input timings produce consistent results across different FPS.
 
-### Specs
-- Test seeds: 1, 42, 123, 999.
-- Record snapshots at ticks: 0, 10, 50, 100, 200.
-- Fields hashed: resources, population, avg happiness, building counts, crisis count, rival heat/budget.
+**DoD**
+- No use of `Date.now()` inside sim decisions (only for UI display).
 
-### Implementation details
-- Add `scripts/smoke_test.mjs` if missing; ensure `npm run test` runs it.
-- Add `scripts/hash_state.mjs` with stable ordering (no JSON key nondeterminism).
-- On mismatch, print diff summary (expected vs actual).
+---
 
-### Acceptance
-- `npm run test` passes on clean checkout.
-- Changing non-sim code (UI text) does not change snapshot hashes.
+### A-04 — RNG enforcement & audit
+**Objective:** Guarantee full determinism.
 
-### DoD (Definition of Done)
-- Test runtime under 5 seconds on typical dev machine.
-- Document how to update snapshots (only when intended).
+**Design**
+- Replace all `Math.random()` usage with `game.rng.next()` or `rng.rangeInt()`.
+- Provide `RNG` helpers:
+  - `float()`, `int(min,max)`, `pick(array)`, `chance(p)`.
 
-### QA checklist
-- Run smoke test twice in a row; confirm identical output.
-- Force a small sim change; confirm test fails with clear message.
+**Specs**
+- Add a basic grep check to `docs/TEST_CHECKLIST.md`:
+  - “No `Math.random()` in `src/`”
 
-## Ticket A-4: Dev overlay + log discipline
-- **Phase:** A4
+**Implementation details**
+1. Search and replace randomness.
+2. Add `RNG.pickWeighted(items, weights)` for content selection.
 
-### Objective
-Provide always-on visibility for performance + state to prevent juniors guessing.
+**Acceptance**
+- No `Math.random()` in gameplay code.
 
-### Design
-A small overlay UI (toggle with F1) shows FPS, frametime, seed, tick, day, player pos, district, heat, active quest count, active crisis count.
+**DoD**
+- RNG helpers documented + used.
 
-### Specs
-- Toggle: F1
-- Overlay never allocates per-frame (no GC spikes).
-- Log categories: `SIM`, `GEN`, `QUEST`, `RIVAL`, `SAVE`.
+---
 
-### Implementation details
-- Add `src/dev/overlay.js`.
-- Expose `game.getDebugStats()` to return stable object.
-- Replace noisy `console.log` with `devLog(category, msg)`.
+### A-05 — Versioned save schema + migrations
+**Objective:** Prevent save breaks as the project evolves.
 
-### Acceptance
-- Overlay updates correctly and can be toggled.
-- No noticeable FPS drop when overlay is hidden.
+**Design**
+- Save file contains `schemaVersion`.
+- Loading runs migration chain `migrate(state)`.
 
-### DoD (Definition of Done)
-- No console spam during normal play (except warnings/errors).
-- Overlay is disabled in production build (`import.meta.env.DEV`).
+**Specs**
+- Files:
+  - `src/save/save.js`
+  - `src/save/migrations/v1_to_v2.js` etc.
 
-### QA checklist
-- Run MEGA preset and verify overlay stays responsive.
-- Toggle overlay 20 times; ensure no input lockups.
+**Implementation details**
+1. Move current save/load into `src/save/save.js`.
+2. Implement `loadState(json)`:
+   - validate minimal shape
+   - while `schemaVersion < CURRENT` → apply migration
+3. Add “incompatible save” user-facing error.
+
+**Acceptance**
+- Loading old saves works after at least one intentional schema bump test.
+
+**DoD**
+- Migration functions are pure and covered by manual tests.
+
+---
+
+### A-06 — Performance overlay + budget tests (MEGA)
+**Objective:** Spot perf regressions early.
+
+**Design**
+- Toggle dev overlay key: `F3`
+- Show:
+  - FPS (smoothed)
+  - draw calls (approx)
+  - instance counts (terrain/buildings/citizens)
+  - tick time (ms)
+
+**Specs**
+- UI: DOM overlay (not in-canvas) for simplicity.
+
+**Implementation details**
+1. Add `src/dev/perf_overlay.js`.
+2. Hook into renderer stats (approx; Three.js doesn’t expose everything easily).
+
+**Acceptance**
+- Overlay toggles on/off and updates live.
+
+**DoD**
+- Overlay does not allocate heavily each frame.
+
+---
+
+### A-07 — Chunked instancing rebuilds (terrain/buildings)
+**Objective:** Mega city shouldn’t rebuild all instances on small changes.
+
+**Design**
+- Divide map into chunks (e.g., 32×32).
+- Terrain instances built once per chunk.
+- Buildings instances rebuilt only for affected chunk.
+
+**Specs**
+- `ChunkKey = `${cx},${cy}``
+- `chunkSize = 32` (config in constants)
+
+**Implementation details**
+1. Update `renderer3d.js` instancing builders:
+   - create chunk meshes per terrain type
+   - cache building instances per chunk and type
+2. Add debug toggle to show chunk boundaries.
+
+**Acceptance**
+- Placing 1 building does not rebuild the entire mega mesh.
+
+**DoD**
+- Memory use stable; no increasing chunk count leak.
+
+---
+
+### A-08 — Unified error handling + debug logging
+**Objective:** Juniors can diagnose issues fast.
+
+**Design**
+- Add `src/dev/logger.js` with levels: `error/warn/info/debug`.
+- Add `game.debug = { enabled, logLevel }`.
+
+**Specs**
+- Production default: warn+
+- Dev default: info+
+
+**Implementation details**
+1. Replace ad-hoc `console.log`.
+2. Catch unhandled promise errors and show UI toast.
+
+**Acceptance**
+- When a system crashes, user sees a readable message + stack in console.
+
+**DoD**
+- No noisy logs in normal play.
+
+---
+
+### A-09 — Basic automated smoke test (no framework)
+**Objective:** Quick verification without manual play every time.
+
+**Design**
+- Add `scripts/smoke_test.mjs` that:
+  - creates `Game` headlessly (no renderer)
+  - runs N ticks
+  - asserts invariants:
+    - resources non-negative
+    - no NaNs in citizen stats
+    - tile bounds valid
+
+**Specs**
+- Run: `node scripts/smoke_test.mjs`
+
+**Implementation details**
+1. Make `Game` support `headless: true` (no DOM/UI).
+2. Add minimal assertions.
+
+**Acceptance**
+- Smoke test passes locally.
+
+**DoD**
+- Script documented in `docs/TEST_CHECKLIST.md`.
+
+---
+
+### A-10 — Manual QA checklist + release discipline
+**Objective:** Repeatable testing routine for milestones.
+
+**Design**
+- `docs/TEST_CHECKLIST.md` includes:
+  - small/city/mega
+  - save/load
+  - crisis triggers
+  - 15-min roam test
+  - perf overlay check
+
+**Acceptance**
+- Junior dev can run checklist and file bugs consistently.
+
+**DoD**
+- Checklist links to where to file issues and what info to include.

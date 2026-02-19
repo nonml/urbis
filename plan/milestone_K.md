@@ -1,111 +1,188 @@
-# Milestone K: Rival AI v2 (strategic pressure + counterplay + intel)
+# Milestone K — Surveillance + Influence Operations (Watch Dogs layer, not just hacking) (target: 0.24.x)
 
-## Objective
-Make the rival controller a real antagonist: applies pressure, reacts to your strategy, and can be countered via hacks/cases.
+## Objective 🎯
+- Add the **information/influence layer**: surveillance, intel, blackmail, leaks, bribery.
+- Make actions have tradeoffs: heat/exposure vs influence vs stability.
+- Integrate with Data Grid (Milestone H) and social graph (Milestone J).
 
-## Exit criteria (acceptance for milestone)
-- Rival performs actions at intervals and telegraphs via intel clues.
-- Actions target weak points (power deficit, low police coverage, high inequality).
-- Player can counter at least 3 rival actions via quests/hacks/policies.
-- Rival is deterministic per seed.
+---
+
+## Milestone Exit Criteria (Acceptance)
+- ✅ Player can collect intel on citizens/factions via surveillance sources (cameras, informants).
+- ✅ Player can run at least 6 influence operations (bribe/leak/smear/recruit/blackmail/protect).
+- ✅ Public sentiment exists per district and changes from operations and crises.
+- ✅ Operations affect rival/factions and can trigger retaliation events.
+
+
+## Definition of Done (DoD)
+- All operations are data-driven and logged (for debugging and balancing).
+- Heat/exposure system has clear UI feedback and counterplay.
+- Save/load preserves intel inventory and ongoing operations.
+
+
+---
 
 ## Phases
-- K1: Strategic evaluator + action selection
-- K2: Action execution + counterplay hooks
-- K3: Intel system
+1) Intel model
+2) Operations system
+3) Sentiment + media loop
+4) UI + balancing hooks
+
+
+---
 
 ## Tickets
 
-## Ticket K-1: Rival strategy evaluator (city weakness scoring)
-- **Phase:** K1
-- **Depends on:** J-1, E-3
+### K-01 — Intel database (profiles, evidence, secrets)
+**Objective:** Represent knowledge as a first-class gameplay resource.
 
-### Objective
-Choose actions based on meaningful city metrics, not random.
+**Design**
+- Intel items have type, subject, source, reliability, and expiry.
+- Citizen profiles reveal fields gradually (unknown → partial → verified).
 
-### Design
-Compute weakness vector per tick: economy, services, public opinion, security, heat. Actions have preconditions and utility functions.
 
-### Specs
-- Weakness metrics normalized 0..1.
-- Each action defines: preconditions, base utility weights, cooldown.
-- At least 8 actions implemented with distinct impacts.
+**Specs**
+- `state.intel = { items[], knownProfiles{} }`
+- `src/sim/intel/intel_db.js`
+- Intel item schema documented in `docs/INTEL_SCHEMA.md`
 
-### Implementation details
-- Update `src/sim/rival/rival_actions.js` to use weakness vector.
-- Add `src/sim/rival/weakness.js`.
-- Keep deterministic tie-breakers.
 
-### Acceptance
-- If power deficit is high, sabotage-grid is chosen more often.
-- If police rep is hostile, rival uses propaganda less (already aligned).
+**Implementation details**
+1. Implement intel item creation and storage.
+2. Add basic reliability/expiry mechanics.
+3. Integrate with citizen panel to show known fields.
 
-### DoD (Definition of Done)
-- Utility calculations logged in dev overlay (top 3).
-- No action triggers if preconditions fail.
 
-### QA checklist
-- Create power deficit then wait; observe sabotage bias.
-- Fix deficit; observe different action selection.
+**Acceptance**
+- Using a camera source can generate a new intel item about a citizen.
+- Intel can be viewed in an 'Intel' screen.
 
-## Ticket K-2: Counterplay quests/hacks for rival actions
-- **Phase:** K2
-- **Depends on:** H-3, I-1
 
-### Objective
-Give players agency: detect and undo rival damage.
+**DoD**
+- Intel list is capped; old items archived with summary.
 
-### Design
-Each rival action creates a “counter objective” (quest/case hook) with a timer. Success mitigates effects and yields rewards.
 
-### Specs
-- Counter objective available within 1 tick of action.
-- Timer: 10–30 ticks based on difficulty.
-- At least 3 actions have counterplay in 1.0 path.
+---
 
-### Implementation details
-- Emit event `rival_action_started` with payload.
-- Case manager or quest engine spawns counter quest.
-- Apply mitigation by reducing duration or reversing impact.
+### K-02 — Surveillance sources (cameras, drones, informants)
+**Objective:** Enable information gathering without phone hacking.
 
-### Acceptance
-- Player can complete counter quest and see effects reduced.
-- Failing timer makes effects worse (optional) but consistent.
+**Design**
+- Sources exist on the map and have coverage constraints (Data Grid).
+- Actions: 'observe area', 'tail target', 'stakeout'.
 
-### DoD (Definition of Done)
-- No duplicate counter quests.
-- Counter status saved/loaded.
 
-### QA checklist
-- Force rival sabotage via dev menu; complete counter; verify recovery.
+**Specs**
+- `state.intel.sources[] = { id, type, x,y, active }`
+- `src/sim/intel/surveillance.js`
+- UI: Grid overlay + 'Scan' tool
 
-## Ticket K-3: Intel system (signals, surveillance, safehouse)
-- **Phase:** K3
-- **Depends on:** G-3, C-4
 
-### Objective
-Telegraph rival moves and create exploration incentives.
+**Implementation details**
+1. Add a Scan tool that uses sources within coverage to reveal nearby entities.
+2. Implement 'tail' as a timed objective (keep target in range).
+3. Add drones as consumable/limited devices (optional).
 
-### Design
-Intel points are gained by hacking cameras, using safehouses, completing cases. Intel reveals rival plans and improves counter windows.
 
-### Specs
-- Intel meter 0..100; spend intel to reveal target district/poi.
-- Safehouses provide daily intel regen.
-- Intel affects: action delay, detection chance, counter timer.
+**Acceptance**
+- Scanning reveals at least: citizen names, faction presence, incident markers.
+- Tail objective can succeed/fail with clear feedback.
 
-### Implementation details
-- Add `src/sim/intel/intel_system.js`.
-- UI: intel bar + ‘spend to reveal’ button.
-- Tie into hack actions (camera takeover gives +intel).
 
-### Acceptance
-- Gather intel via play; spend intel reveals upcoming rival action.
+**DoD**
+- Surveillance tick cost bounded (no N^2 scans).
 
-### DoD (Definition of Done)
-- Intel is deterministic and saved.
-- Intel sources are logged with reasons.
 
-### QA checklist
-- Hack 5 cameras; confirm intel increases.
-- Spend intel; confirm UI and reveal marker.
+---
+
+### K-03 — Influence operations engine (data-driven actions)
+**Objective:** Make player feel like a fixer/shadow mayor.
+
+**Design**
+- Operations are templates with requirements, costs, and effects.
+- Effects can target: district modifiers, faction rep, specific NPC status.
+
+
+**Specs**
+- `src/content/operations.json`
+- `src/sim/influence/operations_engine.js`
+- `state.ops.active[]` and `state.ops.history[]`
+
+
+**Implementation details**
+1. Define 6 baseline operations: bribe, leak, smear, recruit, blackmail, protect.
+2. Implement requirements (needs intel item tags) and costs (cash/influence/heat).
+3. Apply effects via a pure `applyEffect(effect, context)` function.
+
+
+**Acceptance**
+- Player can run an operation end-to-end and see a measurable city change.
+- Operation history shows what happened and why.
+
+
+**DoD**
+- Operations engine never mutates state outside approved effect functions.
+
+
+---
+
+### K-04 — Public sentiment + media cycle
+**Objective:** Give operations systemic consequences and make the city 'react'.
+
+**Design**
+- Sentiment per district: trust/fear/approval axes (simplify to 1–2 first).
+- Media cycle periodically amplifies events/operations into sentiment shifts.
+
+
+**Specs**
+- `state.sentiment.district[]`
+- `src/sim/influence/sentiment.js`
+- `src/ui/news_feed.js`
+
+
+**Implementation details**
+1. Add sentiment values and visualize as overlay/mini widgets.
+2. Implement media tick that converts events into sentiment changes.
+3. Add news feed entries (headline + short text).
+
+
+**Acceptance**
+- A smear/leak operation changes sentiment and affects demand/crime within a few cycles.
+- Player can monitor sentiment changes via UI.
+
+
+**DoD**
+- Sentiment math documented with tooltips.
+
+
+---
+
+### K-05 — Exposure/heat v2 (counterplay and retaliation)
+**Objective:** Balance power fantasy with risk.
+
+**Design**
+- Heat increases from aggressive ops and surveillance.
+- Counterplay: lay low, invest in legal cover, public programs, or pay down exposure.
+
+
+**Specs**
+- Extend `state.player.heat` and add `state.player.exposure`
+- `src/sim/influence/exposure.js`
+
+
+**Implementation details**
+1. Differentiate heat (short-term) vs exposure (long-term).
+2. Add retaliation events from rival/factions at thresholds.
+3. Add UI meter + warnings + mitigation actions.
+
+
+**Acceptance**
+- High exposure triggers at least 2 types of retaliation events.
+- Mitigation actions can reduce exposure over time.
+
+
+**DoD**
+- Retaliation events are deterministic and logged for QA.
+
+
+---
