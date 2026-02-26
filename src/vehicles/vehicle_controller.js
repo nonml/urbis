@@ -177,10 +177,11 @@ export class VehicleController {
     spawnAmbientVehicles(count) {
         const playerX = this.game.state.player.x;
         const playerY = this.game.state.player.y;
+        const rng = this.game.rngStreams?.sim || this.game.rng;
 
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2;
-            const radius = 10 + (Math.random() * 20);
+            const radius = 10 + (rng.float() * 20);
             const x = Math.round(playerX + Math.cos(angle) * radius);
             const y = Math.round(playerY + Math.sin(angle) * radius);
 
@@ -190,7 +191,7 @@ export class VehicleController {
                 this.spawnVehicle({
                     x,
                     y,
-                    heading: Math.random() * 360
+                    heading: rng.float() * 360
                 });
             }
         }
