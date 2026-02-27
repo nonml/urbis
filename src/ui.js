@@ -1,6 +1,7 @@
 // UI manager for DOM + third-person 3D rendering
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
 import { MapScreen } from './ui/map_screen.js';
+import { MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
 import { BuildMenu } from './ui/build_menu.js';
@@ -413,6 +414,91 @@ export class UIManager {
                 }
             });
         });
+
+        // Debug info button (E-07)
+        const debugBtn = document.getElementById('debug-info-btn');
+        if (debugBtn) {
+            debugBtn.addEventListener('click', () => this.copyDebugInfo());
+        }
+    }
+
+    /**
+     * Copy debug info for bug reports (E-07)
+     */
+    copyDebugInfo() {
+        const game = this.game;
+        const state = game.state;
+        const version = game.version || '1.0.0';
+        const seed = state?.meta?.seed || 'unknown';
+        const mapSize = state?.meta?.mapSize || 'unknown';
+        const day = state?.resources?.day || 0;
+        const tick = state?.tick || 0;
+        const population = state?.resources?.population || 0;
+        const gold = state?.resources?.gold || 0;
+        const food = state?.resources?.food || 0;
+        const wood = state?.resources?.wood || 0;
+        const heat = state?.player?.heat || 0;
+        const buildings = state?.buildings?.list?.length || 0;
+        const district = game.map?.getDistrictAt?.(state?.player?.x || 0, state?.player?.y || 0) ?? 'unknown';
+
+        const debugInfo = `=== Game Debug Info ===
+Version: ${version}
+Seed: ${seed}
+Map Size: ${mapSize}
+Day: ${day}
+Tick: ${tick}
+Player Position: (${state?.player?.x || 0}, ${state?.player?.y || 0})
+District: ${district}
+
+=== Resources ===
+Gold: ${gold}
+Food: ${food}
+Wood: ${wood}
+Population: ${population}
+Housing: ${state?.resources?.housing || 0}
+Heat: ${heat}
+
+=== City Stats ===
+Buildings: ${buildings}
+Citizens: ${state?.citizens?.list?.length || 0}
+
+=== Rival Status ===
+Influence: ${state?.rival?.influence || 0}
+Budget: ${state?.rival?.budget || 0}
+Rival Heat: ${state?.rival?.heat || 0}
+
+=== System Info ===
+User Agent: ${navigator.userAgent}
+Screen: ${window.screen.width}x${window.screen.height}
+LocalStorage Keys: ${Object.keys(localStorage).length}
+
+=== Instructions ===
+Paste this info with your bug report at: docs/BUG_REPORT.md`;
+
+        // Copy to clipboard
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(debugInfo).then(() => {
+                this.showMessage('Debug info copied to clipboard!', 'success');
+            }).catch(() => {
+                // Fallback
+                const textarea = document.createElement('textarea');
+                textarea.value = debugInfo;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                this.showMessage('Debug info copied to clipboard!', 'success');
+            });
+        } else {
+            // Older fallback
+            const textarea = document.createElement('textarea');
+            textarea.value = debugInfo;
+            document.body.appendChild(textarea);
+            textarea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textarea);
+            this.showMessage('Debug info copied to clipboard!', 'success');
+        }
     }
 
     setupGlobalShortcuts() {
@@ -455,6 +541,11 @@ export class UIManager {
             }
             if (e.key.toLowerCase() === 'c') {
                 this.caseFileUI?.toggle();
+            }
+            // Milestone F: Mode toggle (Tab key)
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                this.toggleGameMode();
             }
             if (e.key.toLowerCase() === 'o' && e.shiftKey) {
                 this.toggleSettings();
@@ -950,6 +1041,20 @@ export class UIManager {
             this.techScreen = new TechScreen(this.game);
         }
         this.techScreen.toggle();
+    }
+
+    // Milestone F: Toggle between Street Mode and God Mode
+    toggleGameMode() {
+        if (!this.game.modeIndicator) return;
+        const currentMode = this.game.mode;
+        const newMode = currentMode === MODE_STREET ? MODE_GOD : MODE_STREET;
+        this.game.mode = newMode;
+        this.modeIndicator.setMode(newMode);
+        this.game.handleModeChange?.(newMode);
+        this.showMessage(
+            newMode === MODE_GOD ? 'Switched to God Mode' : 'Switched to Street Mode',
+            'normal'
+        );
     }
 
     checkInteractableProximity() {

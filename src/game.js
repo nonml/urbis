@@ -37,6 +37,9 @@ import { FactionSystem } from './sim/factions/faction_system.js';
 import { PoliceSystem } from './sim/police/police_system.js';
 import { PursuitAI } from './sim/police/pursuit_ai.js';
 import { IntelSystem } from './sim/intel/intel_system.js';
+import { ZoningManager, createZoningManager, ZONE_TYPES } from './sim/zoning/zoning.js';
+import { DemandCalculator, createDemandCalculator } from './sim/economy/demand.js';
+import { ModeIndicator, MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -160,6 +163,19 @@ export class Game {
 
         // Tutorial system
         this.tutorialManager = this.isHeadless ? null : createTutorialManager(this);
+
+        // Milestone F: Zoning system
+        this.zoningManager = createZoningManager(this.map.width, this.map.height);
+
+        // Milestone F: Demand calculator
+        this.demandCalculator = createDemandCalculator();
+
+        // Milestone F: Mode system (default to Street Mode)
+        this.mode = MODE_STREET;
+        if (!this.isHeadless) {
+            this.modeIndicator = new ModeIndicator(this);
+            this.modeIndicator.setMode(this.mode);
+        }
 
         this.isRunning = false;
         this.lastFrame = 0;
@@ -362,7 +378,11 @@ export class Game {
             this.powerShortageTicks = 0;
         }
 
-        // 5b. Emergent anomaly detectors
+        // 5b. Milestone F: Demand calculation
+        const demand = this.demandCalculator.calculate(this.state);
+        this.state.economy.demand = demand;
+
+        // 5c. Emergent anomaly detectors
         this.anomalyDetectors.run(this.state.time.tick);
         this.factionSystem.update();
 
@@ -761,6 +781,10 @@ export class Game {
             progression: this.state.progression || null,
             progress: this.state.progress || null,
             world: this.state.world || null,
+            // Milestone F: Zoning data
+            zoning: this.zoningManager?.serialize(),
+            // Milestone F: Current mode
+            mode: this.mode,
         };
 
         try {

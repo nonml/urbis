@@ -346,6 +346,30 @@ body {
     box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
 }
 
+/* Debug Info Button */
+.btn-debug-info {
+    padding: 6px 12px;
+    background: var(--stardew-blue);
+    color: #fff;
+    border: 2px solid var(--stardew-blue-dark);
+    border-radius: 8px;
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 2px 0 var(--stardew-blue-dark);
+    transition: all 0.1s ease;
+}
+
+.btn-debug-info:hover {
+    background: var(--stardew-blue-light);
+    transform: translateY(-1px);
+}
+
+.btn-debug-info:active {
+    transform: translateY(2px);
+    box-shadow: none;
+}
+
 /* Message Log - Paper Style */
 .message-log {
     height: 100%;
