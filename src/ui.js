@@ -1,7 +1,7 @@
 // UI manager for DOM + third-person 3D rendering
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
 import { MapScreen } from './ui/map_screen.js';
-import { MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
+import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
 import { BuildMenu } from './ui/build_menu.js';
@@ -599,10 +599,29 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     }
 
     setupInput() {
-        // Movement keys
+        // Movement keys + mode toggle + zone overlay
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
             if (['w', 'a', 's', 'd', 'shift'].includes(k)) this.keys.add(k);
+            // Mode toggle: Tab key
+            if (e.key === 'Tab') {
+                e.preventDefault(); // Prevent focus change
+                const newMode = this.game.mode === MODE_GOD ? MODE_STREET : MODE_GOD;
+                this.game.mode = newMode;
+                this.game.modeIndicator?.setMode(newMode);
+                this.game.showMessage(`Switched to ${MODE_LABELS[newMode]}`, 'normal');
+            }
+            // Zone overlay: Z key
+            if (e.key.toLowerCase() === 'z') {
+                const renderer = this.renderer3d;
+                if (renderer) {
+                    const modes = ['none', 'zones', 'zoned'];
+                    const currentIdx = modes.indexOf(renderer._zoneMode || 'none');
+                    const nextIdx = (currentIdx + 1) % modes.length;
+                    renderer.setZoneMode(modes[nextIdx]);
+                    this.game.showMessage(`Zone overlay: ${modes[nextIdx]}`, 'normal');
+                }
+            }
         });
         window.addEventListener('keyup', (e) => {
             const k = e.key.toLowerCase();
@@ -887,6 +906,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         this.updateEconomyReport();
         this.updateServicesReport();
+        this.updateDemandReport();
     }
 
     updateEconomyReport() {
@@ -947,6 +967,44 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         if (row) {
             row.textContent = `Power ${Math.round(m.powerSupply || 0)}/${Math.round(m.powerDemand || 0)} (${powerState})`;
         }
+    }
+
+    updateDemandReport() {
+        const statsPanel = document.getElementById('stats-panel');
+        if (!statsPanel || !this.game.demandCalculator) return;
+
+        let box = document.getElementById('demand-report');
+        if (!box) {
+            box = document.createElement('div');
+            box.id = 'demand-report';
+            box.className = 'stat-item full-width';
+            box.innerHTML = `
+                <div class="stat-label">Demand (R/C/I)</div>
+                <div class="stat-value" id="demand-res-row"></div>
+                <div class="stat-value" id="demand-com-row"></div>
+                <div class="stat-value" id="demand-ind-row"></div>
+            `;
+            statsPanel.appendChild(box);
+        }
+
+        const demand = this.game.state?.economy?.demand || { residential: 0, commercial: 0, industrial: 0 };
+
+        const fmtDemand = (val, label) => {
+            const percentage = Math.min(100, Math.round(val * 100));
+            const barColor = percentage < 30 ? '#ff6b6b' : percentage < 70 ? '#ffd93d' : '#6bcb77';
+            return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
+                <span>${label}</span>
+                <span style="color:${barColor};font-weight:600;">${percentage}%</span>
+            </div>`;
+        };
+
+        const resRow = document.getElementById('demand-res-row');
+        const comRow = document.getElementById('demand-com-row');
+        const indRow = document.getElementById('demand-ind-row');
+
+        if (resRow) resRow.innerHTML = fmtDemand(demand.residential || 0, 'Residential');
+        if (comRow) comRow.innerHTML = fmtDemand(demand.commercial || 0, 'Commercial');
+        if (indRow) indRow.innerHTML = fmtDemand(demand.industrial || 0, 'Industrial');
     }
 
     showVictory(condition, progress) {

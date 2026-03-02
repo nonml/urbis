@@ -74,7 +74,12 @@ function missingPersonChapters(base) {
             id: `${base.id}_ch3`,
             title: 'Resolution',
             steps: [
-                { id: 'investigate', kind: 'investigate', requiresEvidenceId: 'network_dump', text: 'Verify the final location with collected evidence.' },
+                {
+                    id: 'investigate',
+                    kind: 'investigate',
+                    requiresEvidenceId: ['network_dump', 'witness_statement'],
+                    text: 'Verify the final location with collected evidence.'
+                },
                 { id: 'resolve', kind: 'outcome', outcomes: [{ id: 'resolved', effect: ['reputation_high', 'district_security_up'] }] },
             ],
             rewards: [
@@ -194,19 +199,24 @@ export class CaseAssembler {
 
     assemble(type, options = {}) {
         const caseType = normalizeType(type);
-        const seed = (options.seed ?? 1) >>> 0;
-        const rng = new RNG(seed || 1);
+        const seed = options.seed ?? 1;
+        const rng = new RNG(seed >>> 0);
         const themeByType = {
             missing_person: 'residential',
             corruption: 'commercial',
             extortion: 'industrial',
         };
-        const district = pickDistrictByTheme(this.game.map, themeByType[caseType] || 'residential', rng);
+
+        // Defensive guarding: handle missing or incomplete game state
+        const citizensList = this.game?.citizens?.citizens || [];
+        const map = this.game?.map || { districts: [] };
+
+        const district = pickDistrictByTheme(map, themeByType[caseType] || 'residential', rng);
         const targetX = district.center?.x ?? 0;
         const targetY = district.center?.y ?? 0;
         const base = `${caseType}_${seed}`;
 
-        const suspects = pickSuspects(this.game.citizens.citizens, rng, 3);
+        const suspects = pickSuspects(citizensList, rng, 3);
         const leads = [
             { id: `${base}_lead_1`, label: 'Digital trace', status: 'open' },
             { id: `${base}_lead_2`, label: 'Witness account', status: 'open' },

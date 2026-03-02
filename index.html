@@ -224,6 +224,16 @@
         </div>
     </div>
 
+    <!-- Error Boundary -->
+    <div id="app-error-overlay" class="overlay hidden">
+        <div class="overlay-content">
+            <div class="victory-icon">⚠️</div>
+            <h2>Initialization Error</h2>
+            <p id="app-error-message">The game failed to load.</p>
+            <button class="btn btn-primary" id="app-retry-btn">Retry</button>
+        </div>
+    </div>
+
     <!-- Defeat Modal -->
     <div id="defeat-overlay" class="overlay hidden">
         <div class="overlay-content">
@@ -248,7 +258,7 @@
                     <div class="stat-value" id="defeat-gold">0</div>
                 </div>
             </div>
-                    </div>
+        </div>
     </div>
 
     <script type="module" src="src/main.js"></script>

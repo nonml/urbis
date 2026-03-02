@@ -152,7 +152,7 @@ export class CaseGenerator {
 
         // Check district types
         if (storylet.requires.districtTypes) {
-            const district = this.game.map.getDistrictAt(this.game.state.player.x, this.game.state.player.y);
+            const district = this.game.map?.getDistrictAt?.(this.game.state?.player?.x, this.game.state?.player?.y);
             if (!district || !storylet.requires.districtTypes.includes(district.theme)) {
                 return false;
             }
@@ -160,7 +160,7 @@ export class CaseGenerator {
 
         // Check crisis type
         if (storylet.requires.crisisType) {
-            const activeCrisis = this.game.crisisManager.activeCrisis;
+            const activeCrisis = this.game.crisisManager?.activeCrisis;
             if (!activeCrisis || activeCrisis.type !== storylet.requires.crisisType) {
                 return false;
             }
@@ -168,7 +168,7 @@ export class CaseGenerator {
 
         // Check happiness
         if (storylet.requires.happiness) {
-            const avgHappy = this.game.citizens.getAverageHappiness();
+            const avgHappy = this.game.citizens?.getAverageHappiness?.();
             if (storylet.requires.happiness === 'low' && avgHappy > 50) return false;
             if (storylet.requires.happiness === 'high' && avgHappy < 50) return false;
         }
@@ -181,7 +181,8 @@ export class CaseGenerator {
      */
     cityHasCorruption() {
         // Check if any officials have high debt or low happiness
-        return this.game.citizens.citizens.some(c =>
+        const citizens = this.game.citizens?.citizens || [];
+        return citizens.some(c =>
             c.job === 'official' && (c.happiness < 40 || c.personality?.includes('greedy'))
         );
     }
@@ -191,7 +192,7 @@ export class CaseGenerator {
      */
     cityHasGangActivity() {
         // Check for high crime districts
-        const districts = this.game.map.districts || [];
+        const districts = this.game.map?.districts || [];
         return districts.some(d => d.modifiers?.some(m => m.name === 'crime' && m.value > 0.2));
     }
 
@@ -200,7 +201,7 @@ export class CaseGenerator {
      */
     cityHasMissingPerson() {
         // Random chance based on population size
-        const pop = this.game.resources.population;
+        const pop = this.game.resources?.population || 0;
         return this.rng.chance(Math.min(0.5, pop / 100));
     }
 
@@ -209,26 +210,29 @@ export class CaseGenerator {
      * @returns {Object} Context object
      */
     buildCaseContext() {
-        const districts = this.game.map.districts || [];
-        const citizens = this.game.citizens.citizens;
+        const districts = this.game.map?.districts || [];
+        const citizens = this.game.citizens?.citizens || [];
+
+        const validCitizens = citizens.filter(c => c != null);
+        const validBuildings = (this.game.buildings?.buildings || []).filter(b =>
+            b != null && ['commercial', 'residential'].includes(b.type)
+        );
 
         return {
             districts,
             citizens,
-            playerX: this.game.state.player.x,
-            playerY: this.game.state.player.y,
-            timeOfDay: this.game.state.time.timeOfDay,
-            day: this.game.resources.day,
+            playerX: this.game.state?.player?.x,
+            playerY: this.game.state?.player?.y,
+            timeOfDay: this.game.state?.time?.timeOfDay,
+            day: this.game.resources?.day,
             // Find a random citizen as target
-            randomCitizen: this.rng.pick(citizens),
+            randomCitizen: validCitizens.length > 0 ? this.rng.pick(validCitizens) : null,
             // Find suspicious building (random commercial/residential)
-            suspiciousBuilding: this.rng.pick(
-                this.game.buildings.buildings.filter(b => ['commercial', 'residential'].includes(b.type))
-            ),
+            suspiciousBuilding: validBuildings.length > 0 ? this.rng.pick(validBuildings) : null,
             // Last seen location (player's current position)
             lastSeenLocation: {
-                x: this.game.state.player.x,
-                y: this.game.state.player.y
+                x: this.game.state?.player?.x,
+                y: this.game.state?.player?.y
             }
         };
     }
@@ -280,18 +284,18 @@ export class CaseGenerator {
         const instantiated = { ...step };
 
         // Resolve marker to coordinates if needed
-        if (step.marker === 'last_seen' && context.lastSeenLocation) {
+        if (step.marker === 'last_seen' && context?.lastSeenLocation) {
             instantiated.targetX = context.lastSeenLocation.x;
             instantiated.targetY = context.lastSeenLocation.y;
         }
 
-        if (step.marker === 'suspicious_building' && context.suspiciousBuilding) {
+        if (step.marker === 'suspicious_building' && context?.suspiciousBuilding) {
             instantiated.targetX = context.suspiciousBuilding.x;
             instantiated.targetY = context.suspiciousBuilding.y;
         }
 
         // Resolve interact target if citizen
-        if (step.interactType === 'citizen' && context.randomCitizen) {
+        if (step.interactType === 'citizen' && context?.randomCitizen) {
             instantiated.targetCitizen = context.randomCitizen;
         }
 
@@ -304,19 +308,22 @@ export class CaseGenerator {
      * @returns {Object|null} Picked item
      */
     weightedPick(weightedItems) {
-        if (weightedItems.length === 0) return null;
+        if (!weightedItems || weightedItems.length === 0) return null;
 
         const totalWeight = weightedItems.reduce((sum, item) => sum + item.weight, 0);
+        if (totalWeight === 0) return null;
+
         const random = this.rng.float(0, totalWeight);
 
         let cumulativeWeight = 0;
         for (const item of weightedItems) {
             cumulativeWeight += item.weight;
-            if (random <= cumulativeWeight) {
+            if (random < cumulativeWeight) {
                 return item;
             }
         }
 
+        // Fallback for edge cases where random >= totalWeight
         return weightedItems[weightedItems.length - 1];
     }
 

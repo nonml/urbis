@@ -40,6 +40,16 @@ import { IntelSystem } from './sim/intel/intel_system.js';
 import { ZoningManager, createZoningManager, ZONE_TYPES } from './sim/zoning/zoning.js';
 import { DemandCalculator, createDemandCalculator } from './sim/economy/demand.js';
 import { ModeIndicator, MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
+import { BudgetManager, createBudgetManager } from './sim/economy/budget.js';
+import { LoanManager, createLoanManager } from './sim/economy/loans.js';
+import { createNetworks } from './sim/networks/network_core.js';
+import { createPowerSystem } from './sim/networks/power.js';
+import { createWaterSystem } from './sim/networks/water.js';
+import { createDataGridSystem } from './sim/networks/data_grid.js';
+import { extractRoadGraph } from './sim/traffic/graph_extractor.js';
+import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
+import { TrafficManager } from './sim/agents/traffic_agent.js';
+import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -176,6 +186,27 @@ export class Game {
             this.modeIndicator = new ModeIndicator(this);
             this.modeIndicator.setMode(this.mode);
         }
+
+        // Milestone G: Budget & loans system
+        this.budgetManager = createBudgetManager(this);
+        this.loanManager = createLoanManager(this);
+
+        // Milestone H: Network systems
+        this.networks = createNetworks(this);
+        this.powerSystem = createPowerSystem(this);
+        this.waterSystem = createWaterSystem(this);
+        this.dataGridSystem = createDataGridSystem(this);
+
+        // Milestone I: Traffic system
+        this.trafficGraph = extractRoadGraph(this.map);
+        this.trafficPathfinder = new TrafficPathfinder(this.trafficGraph, null);
+        this.trafficManager = new TrafficManager(this);
+        this.serviceDispatcher = new ServiceDispatcher(this);
+        this.serviceDispatcher.setPathfinder(this.trafficPathfinder);
+        this.policeRouter = new PoliceRouter(this);
+        this.policeRouter.setPathfinder(this.trafficPathfinder);
+        this.emergencyRouter = new EmergencyRouter(this);
+        this.emergencyRouter.setPathfinder(this.trafficPathfinder);
 
         this.isRunning = false;
         this.lastFrame = 0;
@@ -366,6 +397,10 @@ export class Game {
         // 5a. Services + citizen effects
         this.servicesManager.update();
         this.servicesManager.applyCitizenEffects(this.citizens.citizens);
+
+        // Milestone I: Traffic system updates
+        this.trafficManager.update(this.state.time.tick);
+        this.policeRouter.updatePursuit();
         const policeCov = this.servicesManager.metrics?.city?.police || 0;
         if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
         else if (policeCov > 0.6) this.factionSystem.modifyRep('citizens', 0.25, 'safe_streets', 'services');
@@ -382,7 +417,16 @@ export class Game {
         const demand = this.demandCalculator.calculate(this.state);
         this.state.economy.demand = demand;
 
-        // 5c. Emergent anomaly detectors
+        // 5c. Milestone G: Budget calculation
+        this.budgetManager.processBudgetTick();
+
+        // 5d. Milestone G: Debt payment processing
+        this.loanManager.processDebtPayments();
+
+        // 5e. Milestone G: Bankruptcy check
+        this.loanManager.checkBankruptcyStatus();
+
+        // 5f. Emergent anomaly detectors
         this.anomalyDetectors.run(this.state.time.tick);
         this.factionSystem.update();
 
@@ -400,7 +444,12 @@ export class Game {
         this.crisisManager.checkForCrises();
         this.crisisManager.update();
 
-        // 8a. Interactables update (cooldowns, state management)
+        // 8a. Network systems update
+        this.powerSystem?.update();
+        this.waterSystem?.update();
+        this.dataGridSystem?.update();
+
+        // 8b. Interactables update (cooldowns, state management)
         this.interactables.updateAll(this.state.time.tick);
 
         // 8b. Quest engine update
@@ -785,6 +834,21 @@ export class Game {
             zoning: this.zoningManager?.serialize(),
             // Milestone F: Current mode
             mode: this.mode,
+            // Milestone G: Budget data
+            budget: this.budgetManager?.serialize(),
+            // Milestone G: Loans data
+            loans: this.loanManager?.serialize(),
+            // Milestone H: Network data
+            networks: this.networks?.serialize(),
+            power: this.powerSystem?.serialize(),
+            water: this.waterSystem?.serialize(),
+            dataGrid: this.dataGridSystem?.serialize(),
+            // Milestone I: Traffic data
+            trafficGraph: this.trafficGraph?.serialize(),
+            trafficManager: this.trafficManager?.serialize(),
+            serviceDispatcher: this.serviceDispatcher?.serialize(),
+            policeRouter: this.policeRouter?.serialize(),
+            emergencyRouter: this.emergencyRouter?.serialize(),
         };
 
         try {
@@ -974,6 +1038,58 @@ export class Game {
             this.evidenceSystem = new EvidenceSystem(this);
             this.factionSystem = new FactionSystem(this);
             this.caseManager.rebuildQuestMap?.();
+
+            // Milestone F: Restore zoning
+            if (data.zoning) {
+                this.zoningManager?.deserialize(data.zoning);
+            }
+
+            // Milestone F: Restore mode
+            if (data.mode !== undefined) {
+                this.mode = data.mode;
+                this.modeIndicator?.setMode(this.mode);
+            }
+
+            // Milestone G: Restore budget
+            if (data.budget) {
+                this.budgetManager?.deserialize(data.budget);
+            }
+
+            // Milestone G: Restore loans
+            if (data.loans) {
+                this.loanManager?.deserialize(data.loans);
+            }
+
+            // Milestone H: Restore networks
+            if (data.networks) {
+                this.networks?.deserialize(data.networks);
+            }
+            if (data.power) {
+                this.powerSystem?.deserialize(data.power);
+            }
+            if (data.water) {
+                this.waterSystem?.deserialize(data.water);
+            }
+            if (data.dataGrid) {
+                this.dataGridSystem?.deserialize(data.dataGrid);
+            }
+
+            // Milestone I: Restore traffic
+            if (data.trafficGraph) {
+                this.trafficGraph?.deserialize(data.trafficGraph);
+            }
+            if (data.trafficManager) {
+                this.trafficManager?.deserialize(data.trafficManager);
+            }
+            if (data.serviceDispatcher) {
+                this.serviceDispatcher?.deserialize(data.serviceDispatcher);
+            }
+            if (data.policeRouter) {
+                this.policeRouter?.deserialize(data.policeRouter);
+            }
+            if (data.emergencyRouter) {
+                this.emergencyRouter?.deserialize(data.emergencyRouter);
+            }
 
             this.ui.showMessage('Game loaded!', 'success');
             return true;

@@ -76,9 +76,17 @@ export class CaseManager {
     }
 
     startCurrentChapter(caseObj, triggerAnomaly = null) {
+        if (!caseObj.chapters || !Array.isArray(caseObj.chapters)) {
+            console.warn(`Case ${caseObj.id} missing valid chapters array.`);
+            return;
+        }
+
         const chapterIndex = caseObj.currentChapter || 0;
-        const chapter = caseObj.chapters?.[chapterIndex];
-        if (!chapter) return;
+        const chapter = caseObj.chapters[chapterIndex];
+        if (!chapter) {
+            console.warn(`Case ${caseObj.id} chapter ${chapterIndex} not found.`);
+            return;
+        }
 
         const questDef = {
             id: chapter.id,
@@ -108,21 +116,52 @@ export class CaseManager {
 
     onQuestCompleted(questId) {
         const caseId = this.getCaseIdByQuest(questId);
-        if (!caseId) return;
+        if (!caseId) {
+            console.warn(`[CaseManager] Quest ${questId} not found in active map.`);
+            return;
+        }
+
         const caseObj = (this.game.state.cases.active || []).find((c) => c.id === caseId);
-        if (!caseObj) return;
+        if (!caseObj) {
+            console.warn(`[CaseManager] Case ${caseId} not found in active state.`);
+            return;
+        }
+
+        if (!caseObj.chapters || !Array.isArray(caseObj.chapters)) {
+            console.warn(`[CaseManager] Case ${caseObj.id} has no valid chapters array.`);
+            return;
+        }
 
         const chapterIdx = caseObj.currentChapter || 0;
-        const chapter = caseObj.chapters?.[chapterIdx];
-        if (!chapter) return;
-        if (chapter.id !== questId) return;
+        const expectedChapter = caseObj.chapters[chapterIdx];
 
-        caseObj.currentChapter++;
+        if (!expectedChapter) {
+            console.error(`[CaseManager] Case ${caseObj.id} missing expected chapter at index ${chapterIdx}.`);
+            return;
+        }
+
+        if (expectedChapter.id === questId) {
+            caseObj.currentChapter++;
+        } else {
+            console.warn(`[CaseManager] Case ${caseObj.id} completed quest ${questId} but expected ${expectedChapter.id}. Scanning forward...`);
+            const foundChapterIdx = caseObj.chapters.findIndex((ch, idx) => idx >= chapterIdx && ch.id === questId);
+            if (foundChapterIdx !== -1) {
+                if (foundChapterIdx > chapterIdx) {
+                    console.warn(`[CaseManager] Case ${caseObj.id} skipped to chapter ${foundChapterIdx + 1} (expected ${chapterIdx + 1}).`);
+                }
+                caseObj.currentChapter = foundChapterIdx + 1;
+            } else {
+                console.error(`[CaseManager] Case ${caseObj.id} could not find quest ${questId} in remaining chapters.`);
+                return;
+            }
+        }
+
         if (caseObj.currentChapter >= caseObj.chapters.length) {
             caseObj.status = 'completed';
             this.game.state.cases.active = this.game.state.cases.active.filter((c) => c.id !== caseObj.id);
             this.game.state.cases.completed.push(caseObj);
             this.game.ui?.showMessage?.(`Case completed: ${caseObj.type.replace('_', ' ')}`, 'success');
+            this.rebuildQuestMap();
             return;
         }
 

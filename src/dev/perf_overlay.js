@@ -1,6 +1,9 @@
 // Performance overlay - toggle with F3 key
 // Shows FPS, instance counts, and tick time
 
+const FPS_UPDATE_INTERVAL = 500;
+const OVERLAY_Z_INDEX = 10000;
+
 export class PerfOverlay {
     constructor(game) {
         this.game = game;
@@ -19,11 +22,25 @@ export class PerfOverlay {
         this.lastFpsUpdate = 0;
         this.currentFps = 0;
 
+        // Store handler reference for cleanup
+        this.toggleHandler = (e) => {
+            if (e.key === 'F3') {
+                e.preventDefault();
+                this.toggle();
+            }
+        };
+
         this.createDOM();
         this.bindEvents();
     }
 
     createDOM() {
+        // Prevent duplicate IDs by removing existing overlay if present
+        const existing = document.getElementById('perf-overlay');
+        if (existing) {
+            existing.parentNode?.removeChild(existing);
+        }
+
         // Create overlay container
         this.container = document.createElement('div');
         this.container.id = 'perf-overlay';
@@ -38,7 +55,7 @@ export class PerfOverlay {
             padding: 10px;
             border-radius: 4px;
             font-size: 12px;
-            z-index: 10000;
+            z-index: ${OVERLAY_Z_INDEX};
             pointer-events: none;
         `;
 
@@ -66,15 +83,12 @@ export class PerfOverlay {
     }
 
     bindEvents() {
-        window.addEventListener('keydown', (e) => {
-            if (e.key === 'F3') {
-                e.preventDefault();
-                this.toggle();
-            }
-        });
+        window.addEventListener('keydown', this.toggleHandler);
     }
 
     toggle() {
+        if (!this.container) return;
+
         this.enabled = !this.enabled;
         if (this.enabled) {
             this.container.classList.remove('hidden');
@@ -92,7 +106,7 @@ export class PerfOverlay {
         // Update FPS
         this.frameCount++;
         const now = performance.now();
-        if (now - this.lastFpsUpdate >= 500) { // Update every 500ms
+        if (now - this.lastFpsUpdate >= FPS_UPDATE_INTERVAL) { // Update every 500ms
             this.currentFps = Math.round(this.frameCount * 1000 / (now - this.lastFpsUpdate));
             this.frameCount = 0;
             this.lastFpsUpdate = now;
@@ -107,13 +121,23 @@ export class PerfOverlay {
         this.drawCallsElement.textContent = perf.drawCalls ?? 0;
         this.terrainInstancesElement.textContent = perf.terrainInstances ?? 0;
         this.buildingInstancesElement.textContent = perf.buildingInstances ?? 0;
-        this.citizenInstancesElement.textContent = perf.citizenInstances ?? this.game.citizens.citizens.length;
+        this.citizenInstancesElement.textContent = perf.citizenInstances ?? (this.game?.citizens?.citizens?.length ?? 0);
         this.activeChunksElement.textContent = perf.activeChunks ?? 0;
     }
 
     destroy() {
+        // Remove event listener to prevent memory leaks
+        if (this.toggleHandler) {
+            window.removeEventListener('keydown', this.toggleHandler);
+        }
+
+        // Remove DOM node
         if (this.container && this.container.parentNode) {
             this.container.parentNode.removeChild(this.container);
         }
+
+        // Clear references to help GC
+        this.container = null;
+        this.toggleHandler = null;
     }
 }

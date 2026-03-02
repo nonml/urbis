@@ -12,13 +12,31 @@ This is a lightweight **third-person city-builder** prototype with:
 
 Because this uses ES modules, serve it via a local web server (not `file://`).
 
+**Prerequisites**: Node.js (v14+) or Python 3.x, and a **modern browser** (Chrome 61+, Firefox 60+, Safari 11.1+) that supports ES Modules natively. No build step is required; serve the source directory directly.
+
+Example (Node.js):
+
+```bash
+npx serve .
+# or
+npm install -g serve && serve .
+```
+
 Example (Python):
 
 ```bash
 python -m http.server 8000
+# or for a custom port:
+python -m http.server 9000
 ```
 
-Then open `http://localhost:8000`.
+Then open `http://localhost:8000/index.html` (or `http://localhost:9000/index.html` for the custom port).
+
+> **Note**: Opening the file directly via `file://` fails because ES modules enforce CORS policies that block local file access. Also, ensure you are using a modern browser as ES Modules are not fully supported in legacy environments.
+
+### Expected Behavior
+
+Upon successful launch, your browser should display a 3D viewport with a procedurally generated map. Use **WASD** to move the camera and **Left Click** to interact with tiles.
 
 ## Controls
 
@@ -32,5 +50,5 @@ Then open `http://localhost:8000`.
 
 ## Notes
 
-- Three.js is loaded from an ESM CDN.
+- Three.js is loaded from an ESM CDN (pinned to v0.150.0).
 - Crises are deterministic under the same seed (for a given play pattern).

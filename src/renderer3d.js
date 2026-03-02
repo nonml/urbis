@@ -7,7 +7,7 @@
 // - Camera rig: Orbit + Follow + Collision
 
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D, ZONE_TYPES } from './constants.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -89,6 +89,10 @@ export class Renderer3D {
         this._debugOverlayMesh = null;
         this._cameraHack = null;
 
+        // Zone overlay
+        this._zoneOverlayMesh = null;
+        this._zoneMode = 'none'; // 'none', 'zones', 'zoned'
+
         this._groundPlane = new THREE.Mesh(
             new THREE.PlaneGeometry(2000, 2000),
             new THREE.MeshBasicMaterial({ visible: false })
@@ -120,6 +124,11 @@ export class Renderer3D {
             this.scene.remove(this._debugOverlayMesh);
             this._debugOverlayMesh.geometry.dispose();
             this._debugOverlayMesh = null;
+        }
+        if (this._zoneOverlayMesh) {
+            this.scene.remove(this._zoneOverlayMesh);
+            this._zoneOverlayMesh.geometry.dispose();
+            this._zoneOverlayMesh = null;
         }
         for (const entry of this._chunkMeshes.values()) {
             this._disposeChunkEntry(entry);
@@ -561,6 +570,9 @@ export class Renderer3D {
         if (this._debugMode === 'services') {
             this.updateDebugOverlay();
         }
+        if (this._zoneMode !== 'none') {
+            this.updateZoneOverlay();
+        }
         this.updateVFX();
         this.renderer.render(this.scene, this.camera);
     }
@@ -744,6 +756,81 @@ export class Renderer3D {
             this._debugOverlayMesh.instanceColor.needsUpdate = true;
             this._debugOverlayMesh.count = i;
             this.scene.add(this._debugOverlayMesh);
+        }
+    }
+
+    /**
+     * Set zone overlay mode
+     * @param {string} mode - 'none', 'zones', 'zoned'
+     */
+    setZoneMode(mode) {
+        this._zoneMode = mode;
+        this.updateZoneOverlay();
+    }
+
+    /**
+     * Update zone overlay based on current mode
+     */
+    updateZoneOverlay() {
+        if (this._zoneOverlayMesh) {
+            this.scene.remove(this._zoneOverlayMesh);
+            this._zoneOverlayMesh.geometry.dispose();
+            this._zoneOverlayMesh = null;
+        }
+
+        if (this._zoneMode === 'none' || !this.game.zoningManager) return;
+
+        const map = this.game.map;
+        const width = map.width;
+        const height = map.height;
+        const count = width * height;
+
+        const geom = new THREE.BoxGeometry(1, 0.05, 1);
+        const mat = new THREE.MeshBasicMaterial({ vertexColors: true, transparent: true, opacity: 0.5 });
+        this._zoneOverlayMesh = new THREE.InstancedMesh(geom, mat, count);
+        this._zoneOverlayMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+        const dummy = new THREE.Object3D();
+        const color = new THREE.Color();
+
+        let i = 0;
+
+        // Zone colors
+        const zoneColors = {
+            0: 0x333333, // NONE - dark gray
+            1: 0xffcc80, // RESIDENTIAL - light orange
+            2: 0xe0f7fa, // COMMERCIAL - light cyan
+            3: 0xcfd8dc  // INDUSTRIAL - light gray
+        };
+
+        for (let y = 0; y < height; y++) {
+            for (let x = 0; x < width; x++) {
+                const wx = x - this._mapHalfW + 0.5;
+                const wz = y - this._mapHalfH + 0.5;
+                const idx = y * width + x;
+
+                let zoneType = this.game.zoningManager.getZone(x, y);
+
+                // For 'zoned' mode, only show tiles with zones
+                if (this._zoneMode === 'zoned' && zoneType === 0) continue;
+
+                const colorHex = zoneColors[zoneType] || 0x333333;
+
+                dummy.position.set(wx, 0, wz);
+                dummy.scale.set(1, 1, 1);
+                dummy.updateMatrix();
+                this._zoneOverlayMesh.setMatrixAt(i, dummy.matrix);
+
+                color.setHex(colorHex);
+                this._zoneOverlayMesh.setColorAt(i, color);
+                i++;
+            }
+        }
+
+        if (i > 0) {
+            this._zoneOverlayMesh.instanceColor.needsUpdate = true;
+            this._zoneOverlayMesh.count = i;
+            this.scene.add(this._zoneOverlayMesh);
         }
     }
 

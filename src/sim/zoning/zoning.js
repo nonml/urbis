@@ -2,12 +2,13 @@
 // Zones drive demand and auto-growth
 
 // Zone types
-export const ZONE_TYPES = {
+/** @readonly */
+export const ZONE_TYPES = Object.freeze({
     NONE: 0,
     RESIDENTIAL: 1,
     COMMERCIAL: 2,
     INDUSTRIAL: 3
-};
+});
 
 export const ZONE_NAMES = {
     [ZONE_TYPES.NONE]: 'None',
@@ -32,7 +33,8 @@ export class ZoningManager {
         this.height = mapHeight;
         // Use Uint8Array for memory efficiency on MEGA maps
         this.zoneMap = new Uint8Array(mapWidth * mapHeight);
-        this.dirtyTiles = new Set();
+        // Track dirty tiles by linear index to reduce GC pressure
+        this.dirtyIndices = new Set();
     }
 
     /**
@@ -56,13 +58,17 @@ export class ZoningManager {
      * Set zone at tile coordinates
      */
     setZone(x, y, zoneType) {
+        // Validate zoneType is valid
+        if (!Object.values(ZONE_TYPES).includes(zoneType)) {
+            return false;
+        }
         if (x < 0 || x >= this.width || y < 0 || y >= this.height) {
             return false;
         }
         const idx = this._getIndex(x, y);
         if (this.zoneMap[idx] !== zoneType) {
             this.zoneMap[idx] = zoneType;
-            this.dirtyTiles.add(`${x},${y}`);
+            this.dirtyIndices.add(idx);
             return true;
         }
         return false;
@@ -72,6 +78,10 @@ export class ZoningManager {
      * Paint zone in a brush area
      */
     paintZone(centerX, centerY, radius, zoneType) {
+        // Defensive input validation
+        if (typeof radius !== 'number' || radius <= 0 || !Number.isInteger(radius)) {
+            return [];
+        }
         const painted = [];
         for (let dy = -radius; dy <= radius; dy++) {
             for (let dx = -radius; dx <= radius; dx++) {
@@ -127,19 +137,24 @@ export class ZoningManager {
 
     /**
      * Get dirty tiles (changed since last clear)
+     * @returns {Array<{x: number, y: number}>}
      */
     getDirtyTiles() {
-        return Array.from(this.dirtyTiles).map(s => {
-            const [x, y] = s.split(',').map(Number);
-            return { x, y };
-        });
+        const tiles = [];
+        for (const idx of this.dirtyIndices) {
+            tiles.push({
+                x: idx % this.width,
+                y: Math.floor(idx / this.width)
+            });
+        }
+        return tiles;
     }
 
     /**
      * Clear dirty tiles
      */
     clearDirtyTiles() {
-        this.dirtyTiles.clear();
+        this.dirtyIndices.clear();
     }
 
     /**
@@ -152,12 +167,21 @@ export class ZoningManager {
 
     /**
      * Deserialize zoning data from save
+     * @param {Array<number>} data - Serialized zone data
+     * @returns {void}
+     * @throws {Error} If data length does not match expected map size.
      */
     deserialize(data) {
-        if (!Array.isArray(data)) return;
-        for (let i = 0; i < Math.min(data.length, this.zoneMap.length); i++) {
+        if (!Array.isArray(data)) {
+            throw new Error('Deserialization failed: expected array data');
+        }
+        if (data.length !== this.zoneMap.length) {
+            throw new Error(`Zone map size mismatch: expected ${this.zoneMap.length}, got ${data.length}`);
+        }
+        for (let i = 0; i < data.length; i++) {
             this.zoneMap[i] = data[i];
         }
+        this.dirtyIndices.clear();
     }
 
     /**
@@ -165,7 +189,7 @@ export class ZoningManager {
      */
     reset() {
         this.zoneMap.fill(ZONE_TYPES.NONE);
-        this.dirtyTiles.clear();
+        this.dirtyIndices.clear();
     }
 }
 
