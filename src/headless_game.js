@@ -5,6 +5,11 @@ import { Map } from './map.js';
 import { CitizenManager } from './citizen.js';
 import { BuildingManager } from './buildings.js';
 import { CrisisManager } from './crisis.js';
+import { CrisisDirector } from './sim/crisis/director.js';
+import { IncidentSystem } from './sim/crisis/incident_system.js';
+import { DispatchSystem } from './sim/crisis/dispatch.js';
+import { StreetModeManager } from './sim/crisis/street_mode.js';
+import { AftermathManager } from './sim/crisis/aftermath.js';
 import { DIFFICULTY, BUILDING_TYPES, BUILDING_SECURITY, MAP_PRESETS } from './constants.js';
 import { randomSeed32 } from './rng.js';
 import { createRNGStreams } from './rng_streams.js';
@@ -99,6 +104,13 @@ export class Game {
         this.citizens = new CitizenManager(this.rngStreams.sim);
         this.buildings = new BuildingManager(this);
         this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
+
+        // Milestone M: Crisis Director v2 system
+        this.crisisDirector = new CrisisDirector(this, this.rngStreams.sim);
+        this.incidentSystem = new IncidentSystem(this, this.rngStreams.sim);
+        this.dispatchSystem = new DispatchSystem(this, this.rngStreams.sim);
+        this.streetModeManager = new StreetModeManager(this, this.rngStreams.sim);
+        this.aftermathManager = new AftermathManager(this, this.rngStreams.sim);
 
         // Mock UI and minimap for headless mode
         this.ui = new MockUI(this);
@@ -317,6 +329,15 @@ export class Game {
         // 8. Crisis check
         this.crisisManager.checkForCrises();
         this.crisisManager.update();
+
+        // Milestone M: Crisis Director v2 systems update
+        this.crisisDirector.checkForCrisis(this.state.time.tick);
+        this.crisisDirector.updateCrises(this.state.time.tick);
+        this.incidentSystem.updateIncidents();
+        this.dispatchSystem.updateResponses();
+        this.streetModeManager.updateInterventions(this.state.time.tick);
+        this.aftermathManager.updateAftermaths();
+
         this.interactables.updateAll(this.state.time.tick);
         this.heatSystem.decay(false);
         this.questEngine.update();
@@ -561,6 +582,12 @@ export class Game {
                 active: this.crisisManager.activeCrisis,
                 history: this.crisisManager.eventHistory,
             },
+            // Milestone M: Crisis Director v2 state
+            crisisDirector: this.crisisDirector.serialize(),
+            incidentSystem: this.incidentSystem.serialize(),
+            dispatchSystem: this.dispatchSystem.serialize(),
+            streetModeManager: this.streetModeManager.serialize(),
+            aftermathManager: this.aftermathManager.serialize(),
             quests: this.questEngine.serialize(),
             cases: this.state.cases || { evidence: [] },
             factions: this.state.factions || { list: [] },
@@ -707,6 +734,24 @@ export class Game {
             // Restore crises
             this.crisisManager.activeCrisis = data.crises?.active || null;
             this.crisisManager.eventHistory = data.crises?.history || [];
+
+            // Milestone M: Restore crisis Director v2 systems
+            if (data.crisisDirector) {
+                this.crisisDirector.deserialize(data.crisisDirector);
+            }
+            if (data.incidentSystem) {
+                this.incidentSystem.deserialize(data.incidentSystem);
+            }
+            if (data.dispatchSystem) {
+                this.dispatchSystem.deserialize(data.dispatchSystem);
+            }
+            if (data.streetModeManager) {
+                this.streetModeManager.deserialize(data.streetModeManager);
+            }
+            if (data.aftermathManager) {
+                this.aftermathManager.deserialize(data.aftermathManager);
+            }
+
             this.state.cases = data.cases || this.state.cases || { active: [], completed: [], evidence: [], nextCaseSeed: 1 };
             this.state.factions = data.factions || this.state.factions || { list: ['citizens', 'police', 'gangs', 'corp'], reputation: {}, recentChanges: [] };
             this.state.factions.list = this.state.factions.list || ['citizens', 'police', 'gangs', 'corp'];

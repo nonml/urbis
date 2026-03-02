@@ -7,6 +7,8 @@ import { SettingsManager } from './ui/settings.js';
 import { BuildMenu } from './ui/build_menu.js';
 import { CaseFileUI } from './ui/case_file.js';
 import { FactionsPanel } from './ui/factions_panel.js';
+import { CitizenProfileUI } from './ui/citizen_profile.js';
+import { PoliticsPanel } from './ui/politics_panel.js';
 import { createAudioManager } from './audio/audio_manager.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
 import { updatePlayerMovement, createPlayerState } from './player/controller.js';
@@ -293,6 +295,8 @@ export class UIManager {
         this.buildMenu = new BuildMenu(this);
         this.caseFileUI = new CaseFileUI(this.game);
         this.factionsPanel = new FactionsPanel(this.game);
+        this.citizenProfileUI = new CitizenProfileUI(this.game);
+        this.politicsPanel = new PoliticsPanel(this.game);
         this.setupInfoTabs();
         this.setupInput();
         this.setupGlobalShortcuts();
@@ -542,6 +546,12 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             if (e.key.toLowerCase() === 'c') {
                 this.caseFileUI?.toggle();
             }
+
+            // Citizen profile: V key
+            if (e.key.toLowerCase() === 'v') {
+                this._showClosestCitizenProfile();
+            }
+
             // Milestone F: Mode toggle (Tab key)
             if (e.key === 'Tab') {
                 e.preventDefault();
@@ -621,6 +631,11 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     renderer.setZoneMode(modes[nextIdx]);
                     this.game.showMessage(`Zone overlay: ${modes[nextIdx]}`, 'normal');
                 }
+            }
+
+            // Citizen profile: C key
+            if (e.key.toLowerCase() === 'c') {
+                this._showClosestCitizenProfile();
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -752,6 +767,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         }
         if (this.caseFileUI?.open) this.caseFileUI.refresh();
         this.factionsPanel?.update();
+        this.politicsPanel?.update();
         try {
             this.renderer3d.render();
         } catch (e) {
@@ -1005,6 +1021,127 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         if (resRow) resRow.innerHTML = fmtDemand(demand.residential || 0, 'Residential');
         if (comRow) comRow.innerHTML = fmtDemand(demand.commercial || 0, 'Commercial');
         if (indRow) indRow.innerHTML = fmtDemand(demand.industrial || 0, 'Industrial');
+
+        this.updateIntelReport();
+    }
+
+    updateIntelReport() {
+        const statsPanel = document.getElementById('stats-panel');
+        if (!statsPanel) return;
+
+        // Intel Database
+        if (this.game.intelDatabase) {
+            let intelBox = document.getElementById('intel-report');
+            if (!intelBox) {
+                intelBox = document.createElement('div');
+                intelBox.id = 'intel-report';
+                intelBox.className = 'stat-item full-width';
+                intelBox.innerHTML = `
+                    <div class="stat-label">Intel Database</div>
+                    <div class="stat-value" id="intel-total-entries"></div>
+                    <div class="stat-value" id="intel-active-entries"></div>
+                `;
+                statsPanel.appendChild(intelBox);
+            }
+            const summary = this.game.intelDatabase.getSummary();
+            const totalEntries = document.getElementById('intel-total-entries');
+            const activeEntries = document.getElementById('intel-active-entries');
+            if (totalEntries) totalEntries.textContent = `Total entries: ${summary.totalEntries}`;
+            if (activeEntries) activeEntries.textContent = `Active entries: ${summary.activeEntries}`;
+        }
+
+        // Surveillance Sources
+        if (this.game.surveillanceSources) {
+            let surveillanceBox = document.getElementById('surveillance-report');
+            if (!surveillanceBox) {
+                surveillanceBox = document.createElement('div');
+                surveillanceBox.id = 'surveillance-report';
+                surveillanceBox.className = 'stat-item full-width';
+                surveillanceBox.innerHTML = `
+                    <div class="stat-label">Surveillance</div>
+                    <div class="stat-value" id="surv-source-count"></div>
+                    <div class="stat-value" id="surv-active-sources"></div>
+                `;
+                statsPanel.appendChild(surveillanceBox);
+            }
+            const summary = this.game.surveillanceSources.getSummary();
+            const sourceCount = document.getElementById('surv-source-count');
+            const activeSources = document.getElementById('surv-active-sources');
+            if (sourceCount) sourceCount.textContent = `Sources: ${summary.totalSources}`;
+            if (activeSources) activeSources.textContent = `Active: ${summary.activeSources}`;
+        }
+
+        // Influence Engine
+        if (this.game.influenceEngine) {
+            let influenceBox = document.getElementById('influence-report');
+            if (!influenceBox) {
+                influenceBox = document.createElement('div');
+                influenceBox.id = 'influence-report';
+                influenceBox.className = 'stat-item full-width';
+                influenceBox.innerHTML = `
+                    <div class="stat-label">Influence</div>
+                    <div class="stat-value" id="inf-score"></div>
+                    <div class="stat-value" id="inf-active-ops"></div>
+                `;
+                statsPanel.appendChild(influenceBox);
+            }
+            const overview = this.game.influenceEngine.getOverview();
+            const score = document.getElementById('inf-score');
+            const activeOps = document.getElementById('inf-active-ops');
+            if (score) score.textContent = `Score: ${Math.round(overview.score)}`;
+            if (activeOps) activeOps.textContent = `Active operations: ${overview.activeCount}`;
+        }
+
+        // Sentiment Manager
+        if (this.game.sentimentManager) {
+            let sentimentBox = document.getElementById('sentiment-report');
+            if (!sentimentBox) {
+                sentimentBox = document.createElement('div');
+                sentimentBox.id = 'sentiment-report';
+                sentimentBox.className = 'stat-item full-width';
+                sentimentBox.innerHTML = `
+                    <div class="stat-label">Sentiment</div>
+                    <div class="stat-value" id="sent-overall"></div>
+                    <div class="stat-value" id="sent-trust"></div>
+                `;
+                statsPanel.appendChild(sentimentBox);
+            }
+            const mood = this.game.sentimentManager.getMoodSummary();
+            const overall = document.getElementById('sent-overall');
+            const trust = document.getElementById('sent-trust');
+            const sentimentLevel = mood.overall.level;
+            const levelColor = sentimentLevel === 'highly_positive' ? '#6bcb77' :
+                              sentimentLevel === 'positive' ? '#a8d67b' :
+                              sentimentLevel === 'neutral' ? '#ffd93d' :
+                              sentimentLevel === 'negative' ? '#ff9f43' : '#ff6b6b';
+            if (overall) overall.innerHTML = `<span style="color:${levelColor};font-weight:600;">${mood.overall.level.toUpperCase()}</span>: ${Math.round(mood.overall.sentiment * 100)}%`;
+            if (trust) trust.textContent = `Trust (Gov/Police): ${Math.round(mood.trust.government * 100)}% / ${Math.round(mood.trust.police * 100)}%`;
+        }
+
+        // Heat Manager
+        if (this.game.heatManager) {
+            let heatBox = document.getElementById('heat-report');
+            if (!heatBox) {
+                heatBox = document.createElement('div');
+                heatBox.id = 'heat-report';
+                heatBox.className = 'stat-item full-width';
+                heatBox.innerHTML = `
+                    <div class="stat-label">Exposure/Heat</div>
+                    <div class="stat-value" id="heat-level"></div>
+                    <div class="stat-value" id="heat-exposure"></div>
+                `;
+                statsPanel.appendChild(heatBox);
+            }
+            const heatOverview = this.game.heatManager.getHeatOverview();
+            const heatLevel = document.getElementById('heat-level');
+            const heatExposure = document.getElementById('heat-exposure');
+            const heatColor = heatOverview.state === 'calm' ? '#6bcb77' :
+                             heatOverview.state === 'alert' ? '#ffd93d' :
+                             heatOverview.state === 'search' ? '#ff9f43' :
+                             heatOverview.state === 'pursuit' ? '#ff6b6b' : '#c44569';
+            if (heatLevel) heatLevel.innerHTML = `<span style="color:${heatColor};font-weight:600;">${heatOverview.state.toUpperCase()}</span>: ${Math.round(heatOverview.heat)}%`;
+            if (heatExposure) heatExposure.textContent = `Exposure score: ${Math.round(heatOverview.exposureScore)}`;
+        }
     }
 
     showVictory(condition, progress) {
@@ -1244,6 +1381,40 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
             this.actionPrompt = null;
             this.actionCallback = null;
+        }
+    }
+
+    /**
+     * Show citizen profile for closest citizen to player
+     */
+    _showClosestCitizenProfile() {
+        if (!this.game.citizens || !this.game.citizens.citizens) return;
+
+        const citizens = this.game.citizens.citizens;
+        if (citizens.length === 0) {
+            this.showMessage('No citizens nearby', 'normal');
+            return;
+        }
+
+        const playerX = this.game.player?.x || 0;
+        const playerY = this.game.player?.y || 0;
+
+        let closestCitizen = null;
+        let closestDist = Infinity;
+
+        for (const citizen of citizens) {
+            const dist = Math.abs(citizen.x - playerX) + Math.abs(citizen.y - playerY);
+            if (dist < closestDist) {
+                closestDist = dist;
+                closestCitizen = citizen;
+            }
+        }
+
+        if (closestCitizen) {
+            this.citizenProfileUI?.selectCitizen(closestCitizen.id);
+            this.showMessage(`Viewing citizen profile: #${closestCitizen.id}`, 'normal');
+        } else {
+            this.showMessage('No citizens nearby', 'normal');
         }
     }
 

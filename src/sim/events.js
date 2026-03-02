@@ -46,6 +46,37 @@ export const EVENT_TYPES = {
 
     // Intel events
     INTEL_REVEALED: 'intel_revealed',
+    INTEL_PING: 'intel_ping',
+    INTEL_GENERATED: 'intel_generated',
+
+    // Crisis events
+    CRISIS_DETECTED: 'crisis_detected',
+    CRISIS_ESCALATED: 'crisis_escalated',
+    CRISIS_DAMAGE: 'crisis_damage',
+    CRISIS_MITIGATED: 'crisis_mitigated',
+    INCIDENT_CREATED: 'incident_created',
+    INCIDENT_SPREAD: 'incident_spread',
+    INCIDENT_CONTAINED: 'incident_contained',
+    INCIDENT_DAMAGE: 'incident_damage',
+    RESPONSE_DISPATCHED: 'response_dispatched',
+    RESPONSE_ARRIVED: 'response_arrived',
+    RESPONSE_COMPLETE: 'response_complete',
+    INTERVENTION_CREATED: 'intervention_created',
+    INTERVENTION_EFFECT: 'intervention_effect',
+    AFTERMATH_CREATED: 'aftermath_created',
+    RECOVERY_PROGRESS: 'recovery_progress',
+    RECOVERY_COMPLETE: 'recovery_complete',
+
+    // Influence events
+    INFLUENCE_OP_STARTED: 'influence_op_started',
+    INFLUENCE_OP_COMPLETED: 'influence_op_completed',
+    INFLUENCE_OP_CANCELLED: 'influence_op_cancelled',
+
+    // Sentiment events
+    SENTIMENT_CHANGED: 'sentiment_changed',
+
+    // Heat events
+    HEAT_CHANGED: 'heat_changed',
 
     // Rival events
     RIVAL_ACTION_STARTED: 'rival_action_started',

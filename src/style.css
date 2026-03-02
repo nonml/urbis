@@ -1724,3 +1724,432 @@ body {
     font-size: 11px;
     opacity: 0.95;
 }
+
+/* Politics Panel */
+.politics-panel {
+    position: absolute;
+    right: 16px;
+    top: 470px;
+    width: min(360px, 40vw);
+    padding: 8px 10px;
+    border-radius: 10px;
+    background: rgba(20, 30, 24, 0.8);
+    border: 2px solid rgba(255, 255, 255, 0.24);
+    color: #eef6ef;
+    z-index: 65;
+    font-size: 12px;
+}
+
+.politics-tabs {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 8px;
+}
+
+.tab-btn {
+    flex: 1;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #eef6ef;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.tab-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
+
+.tab-btn.active {
+    background: rgba(79, 191, 116, 0.3);
+    border-color: rgba(79, 191, 116, 0.5);
+}
+
+.politics-content {
+    margin-bottom: 8px;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.policy-category {
+    margin-bottom: 8px;
+}
+
+.category-title {
+    font-weight: 700;
+    font-size: 11px;
+    margin-bottom: 4px;
+    color: #8fbf96;
+}
+
+.policy-row {
+    display: grid;
+    grid-template-columns: 1fr 40px 50px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.policy-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.policy-name {
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.policy-desc {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+.policy-cost, .policy-duration {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 10px;
+    text-align: right;
+}
+
+.cost, .duration {
+    opacity: 0.9;
+}
+
+.policy-btn {
+    padding: 4px 8px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 10px;
+}
+
+.policy-btn.enact {
+    background: rgba(79, 191, 116, 0.3);
+    color: #eef6ef;
+}
+
+.policy-btn.enact.enabled:hover {
+    background: rgba(79, 191, 116, 0.5);
+}
+
+.policy-btn.enact.disabled {
+    background: rgba(100, 100, 100, 0.3);
+    color: #888;
+    cursor: not-allowed;
+}
+
+.policy-btn.revoke {
+    background: rgba(222, 94, 94, 0.3);
+    color: #eef6ef;
+}
+
+.policy-btn.revoke:hover {
+    background: rgba(222, 94, 94, 0.5);
+}
+
+.appointment-row {
+    display: grid;
+    grid-template-columns: 1fr 50px;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 4px;
+    padding: 4px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 4px;
+}
+
+.appointment-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
+.appointment-title {
+    font-weight: 600;
+    font-size: 11px;
+}
+
+.appointment-desc {
+    font-size: 10px;
+    opacity: 0.8;
+}
+
+.appointment-status {
+    display: flex;
+    flex-direction: column;
+    gap: 1px;
+    font-size: 10px;
+    text-align: right;
+}
+
+.appointment-rep {
+    opacity: 0.9;
+}
+
+.politics-status {
+    font-size: 10px;
+    opacity: 0.8;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 6px;
+}
+
+/* Citizen Profile Panel */
+#citizen-profile-panel {
+    position: fixed;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 450px;
+    max-height: 85vh;
+    background: repeating-linear-gradient(
+        45deg,
+        #fff8e1,
+        #fff8e1 10px,
+        #fff0d1 10px,
+        #fff0d1 20px
+    );
+    border: 8px solid var(--stardew-green);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+}
+
+.citizen-overview {
+    padding: 16px;
+    border-bottom: 3px solid rgba(0, 0, 0, 0.1);
+    background: rgba(255, 255, 255, 0.6);
+    border-radius: 8px;
+    margin: 8px;
+}
+
+.citizen-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.citizen-avatar {
+    width: 50px;
+    height: 50px;
+    background: var(--stardew-green-light);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
+}
+
+.citizen-info .citizen-name {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+}
+
+.citizen-info .citizen-meta {
+    font-size: 12px;
+    color: #666;
+}
+
+.citizen-stats {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 12px;
+}
+
+.stat-box {
+    text-align: center;
+    background: #fff;
+    padding: 8px 12px;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+    flex: 1;
+}
+
+.stat-box .stat-label {
+    font-size: 11px;
+    color: var(--stardew-wood);
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    font-weight: 700;
+}
+
+.stat-box .stat-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+}
+
+.citizen-traits {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.trait-tag {
+    padding: 4px 10px;
+    background: var(--stardew-green);
+    color: #fff;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.citizen-section {
+    padding: 16px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.08);
+}
+
+.citizen-section h3 {
+    font-size: 14px;
+    color: var(--stardew-green-dark);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    font-weight: 700;
+}
+
+.needs-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 12px;
+}
+
+.need-item {
+    background: #fff;
+    padding: 10px;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+}
+
+.need-label {
+    font-size: 11px;
+    color: var(--stardew-wood);
+    font-weight: 700;
+    margin-bottom: 6px;
+}
+
+.need-bar {
+    height: 8px;
+    background: #e8d5b0;
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.need-fill {
+    height: 100%;
+    background: var(--stardew-green);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+}
+
+.employment-info {
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+}
+
+.job-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+    margin-bottom: 4px;
+}
+
+.job-income {
+    font-size: 13px;
+    color: var(--stardew-text);
+}
+
+.household-info {
+    background: #fff;
+    padding: 12px;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+}
+
+.hh-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+    margin-bottom: 4px;
+}
+
+.hh-capacity {
+    font-size: 12px;
+    color: var(--stardew-wood);
+    margin-bottom: 2px;
+}
+
+.hh-quality {
+    font-size: 12px;
+    color: #666;
+}
+
+.connections-list, .crime-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.connection-item {
+    padding: 8px 10px;
+    background: #fff;
+    border-radius: 6px;
+    border: 2px solid #d4c598;
+    font-size: 12px;
+}
+
+.conn-name {
+    font-weight: 700;
+    color: var(--stardew-blue);
+}
+
+.conn-relationship {
+    color: var(--stardew-green-dark);
+    font-weight: 600;
+}
+
+.conn-affinity {
+    color: #888;
+}
+
+.crime-item {
+    padding: 8px 10px;
+    background: #fff8e1;
+    border-radius: 6px;
+    border: 2px solid #e6b800;
+    font-size: 12px;
+}
+
+.crime-type {
+    font-weight: 700;
+    color: var(--stardew-heat);
+}
+
+.crime-severity {
+    color: var(--stardew-text);
+}
+
+.crime-status {
+    color: #888;
+    font-size: 10px;
+    text-transform: uppercase;
+}

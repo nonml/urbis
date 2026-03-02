@@ -17,10 +17,10 @@ This document tracks progress toward Milestone U (1.0.0 release).
 | G | 0.16.x | ✅ Complete | 100% | Budget, loans, coverage implemented |
 | H | 0.18.x | ✅ Complete | 100% | Power, water, sewage, data grid implemented |
 | I | 0.20.x | ✅ Complete | 100% | Traffic simulation completed |
-| J | 0.22.x | ⚪ Pending | 0% | Citizen simulation v2 |
-| K | 0.24.x | ⚪ Pending | 0% | Surveillance/influence |
-| L | 0.26.x | ⚪ Pending | 0% | Factions/politics |
-| M | 0.28.x | ⚪ Pending | 0% | Dynamic crises v2 |
+| J | 0.22.x | ✅ Complete | 100% | Citizen simulation v2 |
+| K | 0.24.x | ✅ Complete | 100% | Surveillance/influence complete |
+| L | 0.26.x | ✅ Complete | 100% | Factions/politics system implemented |
+| M | 0.28.x | ✅ Complete | 100% | Dynamic crises v2 |
 | N | 0.30.x | ⚪ Pending | 0% | Campaign expansion |
 | O | 0.32.x | ⚪ Pending | 0% | Roguelike meta |
 | P | 0.34.x | ⚪ Pending | 0% | Dev tooling |
@@ -172,33 +172,139 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Graph and traffic data saved/loaded with saveGame/loadGame
 - Police router state persisted in save data
 
-### Milestone J — Citizen Simulation v2
-- Household model + housing - `src/sim/citizens/household.js`
-- Job market v1 - `src/sim/economy/job_market.js`
-- Crime incident generator - `src/sim/citizens/crime_generator.js`
-- Social graph v1 - `src/sim/citizens/social_graph.js`
-- Citizen profile UI - `src/ui/citizen_profile.js`
+### Milestone J — Citizen Simulation v2 ✅ Complete
+- **Household model + housing** - `src/sim/citizens/household.js`
+  - `Household` class with members, housing capacity, happiness calculations
+  - `HousingManager` with household allocation, capacity tracking, stats
+  - `PopulationManager` with births, deaths, immigration, emigration
 
-### Milestone K — Surveillance + Influence
-- Intel database - `src/sim/intel/database.js`
-- Surveillance sources - `src/sim/intel/sources.js`
-- Influence operations engine - `src/sim/intel/influence_engine.js`
-- Public sentiment + media - `src/sim/intel/sentiment.js`
-- Exposure/heat v2 - `src/sim/intel/heat_manager.js`
+- **Job market v1** - `src/sim/economy/job_market.js`
+  - Job openings with salary and requirements
+  - Citizen job matching based on traits and availability
+  - Employment tracking and stats
 
-### Milestone L — Factions + Politics
-- Faction system core - `src/sim/politics/factions.js`
-- Policy/law system - `src/sim/politics/policies.js`
-- Key roles & appointments - `src/sim/politics/appointments.js`
-- Territory/pressure mapping - `src/sim/politics/pressure_map.js`
-- Rival AI integration - `src/sim/ai/rival_integration.js`
+- **Crime incident generator** - `src/sim/citizens/crime_generator.js`
+  - Crime types: vandalism, theft, assault, burglary, robbery, arson, murder, corruption
+  - Crime probability modifiers based on citizen conditions
+  - Incident tracking with detection and solving
 
-### Milestone M — Dynamic Crises v2
-- Crisis Director v2 - `src/sim/crisis/director.js`
-- Incident system - `src/sim/crisis/incident_system.js`
-- Dispatch/response v1 - `src/sim/crisis/dispatch.js`
-- Street Mode interventions - `src/sim/crisis/street_mode.js`
-- Aftermath system - `src/sim/crisis/aftermath.js`
+- **Social graph v1** - `src/sim/citizens/social_graph.js`
+  - `SocialRelationship` class with affinity, trust, familiarity
+  - `SocialGraph` with relationship management, connection tracking
+  - Trait-based interaction modifiers and family bonds
+
+- **Citizen profile UI** - `src/ui/citizen_profile.js`
+  - `CitizenProfileData` class for citizen display data
+  - `CitizenProfileUI` panel with needs, employment, household, social connections
+  - Keyboard shortcut (V key) to show closest citizen's profile
+  - Full CSS styling integrated
+
+- **Additional** - `src/citizen.js`
+  - Added `getCitizenById()` method to `CitizenManager`
+  - Added new simulation properties (`needs`, `mood`, `traits`, etc.) to `Citizen`
+
+### Milestone K — Surveillance + Influence ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Intel database (K-01) - `src/sim/intel/database.js` with categories, priorities, and search
+- ✅ Surveillance sources (K-02) - `src/sim/intel/sources.js` with camera, data grid, informant sources
+- ✅ Influence operations (K-03) - `src/sim/intel/influence_engine.js` with operations and reputation
+- ✅ Public sentiment (K-04) - `src/sim/intel/sentiment.js` with demographics and media coverage
+- ✅ Exposure/heat v2 (K-05) - `src/sim/intel/heat_manager.js` with exposure tracking
+
+**Files Created:**
+- `src/sim/intel/database.js` - Intel entry storage with indexing and retrieval
+- `src/sim/intel/sources.js` - Surveillance source management with intel generation
+- `src/sim/intel/influence_engine.js` - Influence operations engine with operations tracking
+- `src/sim/intel/sentiment.js` - Public sentiment tracking by demographic
+- `src/sim/intel/heat_manager.js` - Enhanced heat management with exposure tracking
+
+**Integration Completed:**
+- Connected to game state initialization - `src/game.js`
+- Integrated into tickOnce() update loop
+- Added to saveGame/loadGame state persistence
+- Added UI report panels in `src/ui.js` stats panel
+- Added new event types in `src/sim/events.js`
+
+**Features:**
+- Intel entries with categories (rival, citizen, location, event, building, vehicle, crime)
+- Surveillance sources (cameras, data hubs, cell towers, informants)
+- Influence operations with cost, heat, and sentiment effects
+- Public sentiment tracking with demographic breakdown
+- Heat management with exposure tracking and state levels
+- UI display of intel statistics in stats panel
+
+### Milestone L — Factions + Politics ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Policy system (L-01) - `src/sim/politics/policies.js` with enactment, revocation, expiration
+- ✅ Appointments system (L-02) - `src/sim/politics/appointments.js` with key roles
+- ✅ Pressure map (L-03) - `src/sim/politics/pressure_map.js` with territory influence
+- ✅ Rival integration (L-04) - `src/sim/politics/rival_integration.js` with political responses
+- ✅ Faction system (L-05) - `src/sim/factions/faction_system.js` with reputation
+
+**Files Created:**
+- `src/sim/politics/policies.js` - Policy/law system with categories, effects, costs
+- `src/sim/politics/appointments.js` - Political appointments with requirements and duration
+- `src/sim/politics/pressure_map.js` - District-based territory pressure mapping
+- `src/sim/politics/rival_integration.js` - Rival AI political response system
+- `src/ui/politics_panel.js` - UI panel for policy management
+
+**Integration Completed:**
+- Connected to game state initialization - `src/game.js`
+- Integrated into tickOnce() update loop
+- Added PoliticsPanel to UIManager - `src/ui.js`
+- CSS styling for politics panel in `src/style.css`
+
+**Features:**
+- 5 policy categories (Economic, Social, Security, Infrastructure, Diplomacy)
+- Enact policies with cost, duration, and faction impact
+- Revoke policies before expiration
+- Political appointments (Mayor, Chief of Police, Advisor, etc.)
+- Territory pressure tracking (Faction, Crime, Economic, Service, Surveillance)
+- Rival AI political responses based on heat and threat levels
+- UI panel with tabs for policies, appointments, and pressure map
+- Event system integration with custom event types
+
+### Milestone M — Dynamic Crises v2 ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Crisis Director v2 (M-01) - `src/sim/crisis/director.js`
+- ✅ Incident system (M-02) - `src/sim/crisis/incident_system.js`
+- ✅ Dispatch/response system (M-03) - `src/sim/crisis/dispatch.js`
+- ✅ Street Mode interventions (M-04) - `src/sim/crisis/street_mode.js`
+- ✅ Aftermath system (M-05) - `src/sim/crisis/aftermath.js`
+- ✅ Game state integration - `src/game.js`
+- ✅ Headless game integration - `src/headless_game.js`
+
+**Files Created:**
+- `src/sim/crisis/director.js` - Crisis Director v2 with escalation, resolution, and mitigation
+- `src/sim/crisis/incident_system.js` - Localized incident tracking with spatial impact
+- `src/sim/crisis/dispatch.js` - Response team management and dispatch system
+- `src/sim/crisis/street_mode.js` - Player-directed interventions in street mode
+- `src/sim/crisis/aftermath.js` - Long-term recovery and reputation tracking
+
+**New Crisis Types:**
+- `BLACKOUT` - Power grid collapse
+- `BRIDGE_FAILURE` - Bridge collapse
+- `MARKET_CRASH` - Market crash
+
+**Integration Completed:**
+- Crisis Director v2 initialized in `src/game.js` and `src/headless_game.js`
+- Tick updates integrated into `tickOnce()` update loop
+- Save/load state serialization implemented
+- Event types added to `src/sim/events.js`
+
+**Features:**
+- Dynamic crisis generation based on city stress levels
+- Crisis escalation over time with heat tracking
+- Mitigation options with success probabilities
+- Localized incidents with spatial spread mechanics
+- Response team dispatch with travel time and cooldown
+- Street Mode direct intervention system
+- Long-term aftermath recovery tracking
+- Reputation impact and faction reactions
+- 10 new crisis types beyond original 7
 
 ### Milestone N — Campaign Structure
 - Campaign model - `src/sim/campaign/model.js`
@@ -272,8 +378,8 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 4. Surveillance/influence operations
 
 ### Phase 3: Narrative & Politics (Milestones L-N)
-1. Factions + politics
-2. Dynamic crises v2
+1. Factions + politics ✅ Complete
+2. Dynamic crises v2 ✅ Complete
 3. Campaign expansion
 
 ### Phase 4: Meta & Polish (Milestones O-R)
@@ -291,16 +397,17 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 
 ## Next Steps
 
-1. **Immediate**: Complete Milestone J (citizen simulation v2 - households, job market)
-2. **Short-term**: Build surveillance/influence systems (Milestone K)
-3. **Medium-term**: Implement factions/politics (Milestone L) and dynamic crises v2 (Milestone M)
-4. **Long-term**: Complete narrative expansion, meta progression, and release preparation
+1. **Immediate**: Implement campaign expansion (Milestone N)
+2. **Short-term**: Complete roguelike meta progression (Milestone O)
+3. **Medium-term**: Dev tooling, performance optimization
+4. **Long-term**: Visual/audio polish, QA automation, release prep
 
 ---
 
 ## Notes
 
 - Smoke tests pass: 165/165 tests
+- Milestone M complete (dynamic crises v2)
 - Milestone F complete (dual-mode foundation, zoning, demand)
 - Math.random() audit complete (replaced in vehicle_controller.js)
 - Save schema versioning exists
@@ -309,3 +416,8 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Mode toggle: Tab key (Street/God)
 - Zone overlay: Z key (none/zones/zoned)
 - Network toggle: 1-4 keys (power/water/sewage/data)
+- Crisis Director v2 with 10 crisis types
+- Incident system with spatial spread mechanics
+- Dispatch system with response team tracking
+- Street Mode interventions for direct player control
+- Aftermath recovery tracking with reputation impacts

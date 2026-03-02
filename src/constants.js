@@ -150,7 +150,10 @@ export const CRISIS_TYPES = {
     PLAGUE: 'plague',
     INFLATION: 'inflation',
     RIOT: 'riot',
-    MIGRATION: 'migration'
+    MIGRATION: 'migration',
+    BLACKOUT: 'blackout',
+    BRIDGE_FAILURE: 'bridge_failure',
+    MARKET_CRASH: 'market_crash'
 };
 
 // Difficulty levels

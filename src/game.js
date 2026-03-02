@@ -4,6 +4,11 @@ import { Map } from './map.js';
 import { CitizenManager } from './citizen.js';
 import { BuildingManager } from './buildings.js';
 import { CrisisManager } from './crisis.js';
+import { CrisisDirector, Crisis, CRISIS_STATE, CRISIS_SEVERITY } from './sim/crisis/director.js';
+import { IncidentSystem, Incident } from './sim/crisis/incident_system.js';
+import { DispatchSystem, RESPONSE_TEAM_TYPES, RESPONSE_STATE } from './sim/crisis/dispatch.js';
+import { StreetModeManager, StreetIntervention, INTERVENTION_TYPES } from './sim/crisis/street_mode.js';
+import { AftermathManager, CrisisAftermath, RECOVERY_STATE, RECOVERY_PHASE } from './sim/crisis/aftermath.js';
 import { UIManager } from './ui.js';
 import { Minimap } from './minimap.js';
 import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY } from './constants.js';
@@ -37,9 +42,18 @@ import { FactionSystem } from './sim/factions/faction_system.js';
 import { PoliceSystem } from './sim/police/police_system.js';
 import { PursuitAI } from './sim/police/pursuit_ai.js';
 import { IntelSystem } from './sim/intel/intel_system.js';
+import { createIntelDatabase } from './sim/intel/database.js';
+import { createSurveillanceSources } from './sim/intel/sources.js';
+import { createInfluenceEngine } from './sim/intel/influence_engine.js';
+import { createSentimentManager } from './sim/intel/sentiment.js';
+import { createHeatManager } from './sim/intel/heat_manager.js';
 import { ZoningManager, createZoningManager, ZONE_TYPES } from './sim/zoning/zoning.js';
 import { DemandCalculator, createDemandCalculator } from './sim/economy/demand.js';
 import { ModeIndicator, MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
+import { PolicyManager } from './sim/politics/policies.js';
+import { AppointmentsManager } from './sim/politics/appointments.js';
+import { PressureMapManager } from './sim/politics/pressure_map.js';
+import { RivalIntegrationManager } from './sim/politics/rival_integration.js';
 import { BudgetManager, createBudgetManager } from './sim/economy/budget.js';
 import { LoanManager, createLoanManager } from './sim/economy/loans.js';
 import { createNetworks } from './sim/networks/network_core.js';
@@ -121,6 +135,14 @@ export class Game {
         this.citizens = new CitizenManager(this.rngStreams.sim);
         this.buildings = new BuildingManager(this);
         this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
+
+        // Milestone M: Crisis Director v2 system
+        this.crisisDirector = new CrisisDirector(this, this.rngStreams.sim);
+        this.incidentSystem = new IncidentSystem(this, this.rngStreams.sim);
+        this.dispatchSystem = new DispatchSystem(this, this.rngStreams.sim);
+        this.streetModeManager = new StreetModeManager(this, this.rngStreams.sim);
+        this.aftermathManager = new AftermathManager(this, this.rngStreams.sim);
+
         this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
         this.interactables.game = this; // Pass game reference for player heat updates
 
@@ -158,12 +180,25 @@ export class Game {
         this.heatSystem = new HeatSystem(this);
         this.heatSystem.setHeat(this.state.player.heat || 0);
 
+        // Milestone K: Intel systems
+        this.intelDatabase = createIntelDatabase(this);
+        this.surveillanceSources = createSurveillanceSources(this);
+        this.influenceEngine = createInfluenceEngine(this);
+        this.sentimentManager = createSentimentManager(this);
+        this.heatManager = createHeatManager(this);
+
         // Quest system
         this.questEngine = new QuestEngine(this);
         this.caseManager = new CaseManager(this);
         this.evidenceSystem = new EvidenceSystem(this);
         this.factionSystem = new FactionSystem(this);
         this.questLogUI = this.isHeadless ? null : new QuestLogUI(this);
+
+        // Milestone L: Politics systems
+        this.policyManager = new PolicyManager(this, this.rngStreams.sim);
+        this.appointmentsManager = new AppointmentsManager(this, this.rngStreams.sim);
+        this.pressureMapManager = new PressureMapManager(this, this.map, this.rngStreams.sim);
+        this.rivalIntegrationManager = new RivalIntegrationManager(this, this.rivalAI, this.policyManager, this.pressureMapManager);
 
         // Rival AI system - uses rival stream for independent determinism
         this.rivalAI = new RivalAI(this.rngStreams.rival);
@@ -428,7 +463,21 @@ export class Game {
 
         // 5f. Emergent anomaly detectors
         this.anomalyDetectors.run(this.state.time.tick);
+
+        // Milestone K: Intel systems update
+        this.intelDatabase.update();
+        this.surveillanceSources.update();
+        this.influenceEngine.update();
+        this.sentimentManager.update();
+        this.heatManager.update();
+
         this.factionSystem.update();
+
+        // Milestone L: Politics systems update
+        this.policyManager.update(this.state.time.tick);
+        this.appointmentsManager.update(this.state.time.tick);
+        this.pressureMapManager.update(this.state.time.tick);
+        this.rivalIntegrationManager.update(this.state, this.state.time.tick);
 
         // 6. Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {
@@ -443,6 +492,14 @@ export class Game {
         // 8. Crisis check
         this.crisisManager.checkForCrises();
         this.crisisManager.update();
+
+        // Milestone M: Crisis Director v2 systems update
+        this.crisisDirector.checkForCrisis(this.state.time.tick);
+        this.crisisDirector.updateCrises(this.state.time.tick);
+        this.incidentSystem.updateIncidents();
+        this.dispatchSystem.updateResponses();
+        this.streetModeManager.updateInterventions(this.state.time.tick);
+        this.aftermathManager.updateAftermaths();
 
         // 8a. Network systems update
         this.powerSystem?.update();
@@ -610,6 +667,14 @@ export class Game {
         const crisisDamage = this.crisisManager.getAccumulatedDamage();
         if (crisisDamage >= 500) {
             this.ui.showDefeat('Civil Collapse', 'Your city has been destroyed by cascading crises.');
+            this.stop();
+            return;
+        }
+
+        // Milestone M: Additional crisis v2 checks
+        const aftermathStats = this.aftermathManager.getStats();
+        if (aftermathStats.totalDamage.gold >= 500 || aftermathStats.totalDamage.population >= 50) {
+            this.ui.showDefeat('Cascading Collapse', 'Your city has been overwhelmed by crisis aftermaths.');
             this.stop();
             return;
         }
@@ -811,6 +876,12 @@ export class Game {
                 active: this.crisisManager.activeCrisis,
                 history: this.crisisManager.eventHistory,
             },
+            // Milestone M: Crisis Director v2 state
+            crisisDirector: this.crisisDirector.serialize(),
+            incidentSystem: this.incidentSystem.serialize(),
+            dispatchSystem: this.dispatchSystem.serialize(),
+            streetModeManager: this.streetModeManager.serialize(),
+            aftermathManager: this.aftermathManager.serialize(),
             quests: this.questEngine.serialize(),
             cases: this.state.cases,
             factions: this.state.factions,
@@ -849,6 +920,12 @@ export class Game {
             serviceDispatcher: this.serviceDispatcher?.serialize(),
             policeRouter: this.policeRouter?.serialize(),
             emergencyRouter: this.emergencyRouter?.serialize(),
+            // Milestone K: Intel systems
+            intelDatabase: this.intelDatabase?.serialize(),
+            surveillanceSources: this.surveillanceSources?.serialize(),
+            influenceEngine: this.influenceEngine?.serialize(),
+            sentimentManager: this.sentimentManager?.serialize(),
+            heatManager: this.heatManager?.serialize(),
         };
 
         try {
@@ -988,6 +1065,23 @@ export class Game {
             this.crisisManager.activeCrisis = data.crises?.active || null;
             this.crisisManager.eventHistory = data.crises?.history || [];
 
+            // Milestone M: Restore crisis Director v2 systems
+            if (data.crisisDirector) {
+                this.crisisDirector.deserialize(data.crisisDirector);
+            }
+            if (data.incidentSystem) {
+                this.incidentSystem.deserialize(data.incidentSystem);
+            }
+            if (data.dispatchSystem) {
+                this.dispatchSystem.deserialize(data.dispatchSystem);
+            }
+            if (data.streetModeManager) {
+                this.streetModeManager.deserialize(data.streetModeManager);
+            }
+            if (data.aftermathManager) {
+                this.aftermathManager.deserialize(data.aftermathManager);
+            }
+
             // Restore quests
             this.questEngine.deserialize(data.quests);
 
@@ -1089,6 +1183,23 @@ export class Game {
             }
             if (data.emergencyRouter) {
                 this.emergencyRouter?.deserialize(data.emergencyRouter);
+            }
+
+            // Milestone K: Restore intel systems
+            if (data.intelDatabase) {
+                this.intelDatabase?.loadState();
+            }
+            if (data.surveillanceSources) {
+                this.surveillanceSources?.deserialize(data.surveillanceSources);
+            }
+            if (data.influenceEngine) {
+                this.influenceEngine?.loadState();
+            }
+            if (data.sentimentManager) {
+                this.sentimentManager?.loadState();
+            }
+            if (data.heatManager) {
+                this.heatManager?.loadState();
             }
 
             this.ui.showMessage('Game loaded!', 'success');

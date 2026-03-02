@@ -18,6 +18,26 @@ export class Citizen {
         this.personality = personality || this.generatePersonality();
         this.createdAt = Date.now();
         this.isDead = false;
+        // Needs for new citizen simulation system
+        this.needs = {
+            food: 100,
+            rest: 100,
+            safety: 100,
+        };
+        this.mood = 'content';
+        this.traits = [];
+        this.householdId = null;
+        this.homeParcel = null;
+        this.workBuildingId = null;
+        this.unemployedTicks = 0;
+        this.schedule = {
+            night: 'home',
+            morning: 'work',
+            day: 'work',
+            evening: 'leisure',
+            dusk: 'home',
+        };
+        this.relationshipEdges = [];
     }
 
     generatePersonality() {
@@ -361,5 +381,9 @@ export class CitizenManager {
     getEmploymentRate() {
         const employed = this.citizens.filter(c => c.job !== 'unemployed').length;
         return this.citizens.length > 0 ? Math.floor(employed / this.citizens.length * 100) : 0;
+    }
+
+    getCitizenById(id) {
+        return this.citizens.find(c => c.id === id) || null;
     }
 }
