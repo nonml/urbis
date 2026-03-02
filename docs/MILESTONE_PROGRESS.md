@@ -21,7 +21,7 @@ This document tracks progress toward Milestone U (1.0.0 release).
 | K | 0.24.x | ✅ Complete | 100% | Surveillance/influence complete |
 | L | 0.26.x | ✅ Complete | 100% | Factions/politics system implemented |
 | M | 0.28.x | ✅ Complete | 100% | Dynamic crises v2 |
-| N | 0.30.x | ⚪ Pending | 0% | Campaign expansion |
+| N | 0.30.x | ✅ Complete | 100% | Campaign expansion complete |
 | O | 0.32.x | ⚪ Pending | 0% | Roguelike meta |
 | P | 0.34.x | ⚪ Pending | 0% | Dev tooling |
 | Q | 0.36.x | ⚪ Pending | 0% | Performance finalization |
@@ -306,12 +306,48 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Reputation impact and faction reactions
 - 10 new crisis types beyond original 7
 
-### Milestone N — Campaign Structure
-- Campaign model - `src/sim/campaign/model.js`
-- Case generator v2 - `src/sim/campaign/case_generator.js`
-- Dialogue + choice presentation - `src/sim/campaign/dialogue.js`
-- News feed + briefing - `src/sim/campaign/news_feed.js`
-- Content validation scripts - `tools/validate_campaign.js`
+### Milestone N — Campaign Expansion ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Campaign model (N-01) - `src/sim/campaign/model.js`
+- ✅ Case generator v2 (N-02) - `src/sim/campaign/case_generator.js`
+- ✅ Dialogue system (N-03) - `src/sim/campaign/dialogue.js`
+- ✅ News feed + briefing (N-04) - `src/sim/campaign/news_feed.js`
+- ✅ Campaign UI panel (N-05) - `src/ui/campaign_panel.js`
+- ✅ Event system integration (N-06) - Added 10 event types to `src/sim/events.js`
+- ✅ Game state integration (N-07) - `src/game.js` and `src/headless_game.js`
+- ✅ Save/load persistence (N-08) - Full campaign state serialization
+- ✅ Content validation (N-09) - `tools/validate_campaign.js`
+
+**Files Created:**
+- `src/sim/campaign/model.js` - CampaignModel class with case management, dialogue, briefings
+- `src/sim/campaign/case_generator.js` - CaseGeneratorV2 with narrative context generation
+- `src/sim/campaign/dialogue.js` - DialogueManager with choice presentation and effects
+- `src/sim/campaign/news_feed.js` - NewsFeed and BriefingSystem classes
+- `src/ui/campaign_panel.js` - CampaignPanel UI with news, briefings, and cases tabs
+- `tools/validate_campaign.js` - Campaign content validation script
+
+**Integration Completed:**
+- Campaign systems initialized in `src/game.js` and `src/headless_game.js`
+- Tick updates integrated into `tickOnce()` update loop
+- Save/load state serialization with campaign data
+- 10 new event types for campaign events in `src/sim/events.js`
+- UI integration with keyboard shortcut (C key) to toggle panel
+
+**Features:**
+- Case-based investigation progression with chapters
+- Narrative dialogue with player choice selection
+- City news feed with important alert highlighting
+- Briefing system with priority-based notifications
+- Case case tracking with progress indicators
+- Dialogue choice effects (heat, reputation, clues)
+- Content validation for case templates and storylets
+
+**CSS Styling:**
+- Campaign panel with open/close toggle
+- News feed with important/critical highlighting
+- Briefing system with priority badges
+- Active case progress bar
 
 ### Milestone O — Roguelike Meta
 - Run-end summary + scoring - `src/ui/run_summary.js`
@@ -380,7 +416,7 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 ### Phase 3: Narrative & Politics (Milestones L-N)
 1. Factions + politics ✅ Complete
 2. Dynamic crises v2 ✅ Complete
-3. Campaign expansion
+3. Campaign expansion ✅ Complete
 
 ### Phase 4: Meta & Polish (Milestones O-R)
 1. Roguelike meta progression
@@ -397,7 +433,7 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 
 ## Next Steps
 
-1. **Immediate**: Implement campaign expansion (Milestone N)
+1. **Immediate**: Complete roguelike meta progression (Milestone O)
 2. **Short-term**: Complete roguelike meta progression (Milestone O)
 3. **Medium-term**: Dev tooling, performance optimization
 4. **Long-term**: Visual/audio polish, QA automation, release prep
@@ -409,6 +445,7 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Smoke tests pass: 165/165 tests
 - Milestone M complete (dynamic crises v2)
 - Milestone F complete (dual-mode foundation, zoning, demand)
+- Milestone N complete (campaign expansion with dialogue, news feed, UI panel)
 - Math.random() audit complete (replaced in vehicle_controller.js)
 - Save schema versioning exists
 - Deterministic RNG streams verified

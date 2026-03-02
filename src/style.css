@@ -2153,3 +2153,314 @@ body {
     font-size: 10px;
     text-transform: uppercase;
 }
+
+/* Campaign Panel */
+.campaign-panel {
+    position: fixed;
+    top: 50px;
+    right: 20px;
+    width: 320px;
+    max-height: 85vh;
+    background: repeating-linear-gradient(
+        45deg,
+        #fff8e1,
+        #fff8e1 10px,
+        #fff0d1 10px,
+        #fff0d1 20px
+    );
+    border: 8px solid var(--stardew-wood);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
+    z-index: 200;
+    display: none;
+    flex-direction: column;
+    font-size: 14px;
+}
+
+.campaign-panel.open {
+    display: flex;
+}
+
+.campaign-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.1);
+    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+    border-radius: 16px 16px 0 0;
+    overflow: hidden;
+}
+
+.campaign-panel-header h2 {
+    font-size: 16px;
+    color: var(--stardew-green-dark);
+    text-transform: uppercase;
+    font-weight: 700;
+    margin: 0;
+}
+
+.campaign-panel-close {
+    background: none;
+    border: none;
+    font-size: 24px;
+    color: var(--stardew-green-dark);
+    cursor: pointer;
+    padding: 0;
+    line-height: 1;
+}
+
+.campaign-content {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.campaign-tabs {
+    display: flex;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.campaign-tab {
+    flex: 1;
+    padding: 10px;
+    background: none;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    color: #888;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.campaign-tab:hover {
+    background: rgba(0, 0, 0, 0.05);
+}
+
+.campaign-tab.active {
+    color: var(--stardew-green-dark);
+    border-bottom-color: var(--stardew-green);
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.campaign-section {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+}
+
+.campaign-section-title {
+    font-size: 12px;
+    color: var(--stardew-wood);
+    text-transform: uppercase;
+    font-weight: 700;
+    margin-bottom: 8px;
+    padding-bottom: 4px;
+    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+}
+
+.campaign-section.empty {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+    font-style: italic;
+}
+
+/* News Feed Styles */
+.news-item {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 8px;
+    border-left: 4px solid #ccc;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.news-item:hover {
+    background: var(--stardew-card-bg);
+}
+
+.news-item.important {
+    border-left-color: var(--stardew-heat);
+    background: #fff8e8;
+}
+
+.news-item.critical {
+    border-left-color: var(--stardew-heat);
+    background: #ffe8e8;
+}
+
+.news-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 4px;
+}
+
+.news-title {
+    font-weight: 700;
+    color: var(--stardew-text);
+    font-size: 13px;
+}
+
+.news-source {
+    font-size: 10px;
+    color: #888;
+    text-transform: uppercase;
+}
+
+.news-time {
+    font-size: 10px;
+    color: #aaa;
+}
+
+.news-description {
+    font-size: 12px;
+    color: var(--stardew-text);
+    line-height: 1.4;
+}
+
+/* Briefing Styles */
+.briefing-item {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+    margin-bottom: 8px;
+}
+
+.briefing-item.priority-high {
+    border-color: var(--stardew-heat);
+}
+
+.briefing-item.priority-critical {
+    border-color: var(--stardew-heat);
+    background: #fff0e8;
+}
+
+.briefing-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+.briefing-title {
+    font-weight: 700;
+    color: var(--stardew-text);
+    font-size: 13px;
+}
+
+.briefing-priority {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.briefing-priority.critical {
+    color: var(--stardew-heat);
+}
+
+.briefing-priority.high {
+    color: var(--stardew-gold);
+}
+
+.briefing-priority.medium {
+    color: var(--stardew-blue);
+}
+
+.briefing-priority.low {
+    color: var(--stardew-green);
+}
+
+.briefing-content {
+    font-size: 12px;
+    color: var(--stardew-text);
+    line-height: 1.4;
+}
+
+/* Active Case Display */
+.active-case-display {
+    padding: 12px;
+    background: var(--stardew-card-bg);
+    border-radius: 12px;
+    margin-bottom: 12px;
+}
+
+.active-case-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--stardew-green-dark);
+    margin-bottom: 4px;
+}
+
+.active-case-meta {
+    font-size: 11px;
+    color: var(--stardew-text);
+    opacity: 0.8;
+}
+
+.active-case-progress {
+    margin-top: 8px;
+}
+
+.progress-bar {
+    height: 6px;
+    background: #d4c598;
+    border-radius: 3px;
+    overflow: hidden;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--stardew-green), var(--stardew-green-dark));
+    transition: width 0.3s ease;
+}
+
+/* Case List */
+.case-list-item {
+    padding: 10px 12px;
+    background: #fff;
+    border-radius: 8px;
+    border: 2px solid #d4c598;
+    margin-bottom: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.case-list-item:hover {
+    border-color: var(--stardew-green-light);
+    background: var(--stardew-card-bg);
+}
+
+.case-list-item.completed {
+    opacity: 0.6;
+    background: #f0f0f0;
+}
+
+.case-list-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.case-list-type {
+    font-weight: 700;
+    color: var(--stardew-text);
+    font-size: 12px;
+}
+
+.case-list-status {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.case-list-status.active {
+    color: var(--stardew-green);
+}
+
+.case-list-status.completed {
+    color: #888;
+}

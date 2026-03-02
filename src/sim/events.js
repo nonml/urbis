@@ -86,6 +86,18 @@ export const EVENT_TYPES = {
     POLICE_UNIT_SPAWNED: 'police_unit_spawned',
     POLICE_UNIT_DESPAWNED: 'police_unit_despawned',
     POLICE_ENCOUNTER: 'police_encounter',
+
+    // Campaign events
+    CAMPAIGN_CASE_STARTED: 'campaign_case_started',
+    CAMPAIGN_CASE_COMPLETED: 'campaign_case_completed',
+    CAMPAIGN_BRIEFING_GENERATED: 'campaign_briefing_generated',
+    CAMPAIGN_BRIEFING_ADDED: 'campaign_briefing_added',
+    CAMPAIGN_DIALOGUE_TRIGGERED: 'campaign_dialogue_triggered',
+    CAMPAIGN_DIALOGUE_STARTED: 'campaign_dialogue_started',
+    CAMPAIGN_DIALOGUE_RESOLVED: 'campaign_dialogue_resolved',
+    CAMPAIGN_DIALOGUE_CANCELLED: 'campaign_dialogue_cancelled',
+    CAMPAIGN_DIALOGUE_CHOICE: 'campaign_dialogue_choice',
+    CAMPAIGN_NEWS_ADDED: 'campaign_news_added',
 };
 
 /**
@@ -314,6 +326,62 @@ export const Events = {
     playerInteract(interactable) {
         eventBus.emit(EVENT_TYPES.PLAYER_INTERACT, {
             interactable,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Campaign case started
+     */
+    campaignCaseStarted(caseId, caseType) {
+        eventBus.emit(EVENT_TYPES.CAMPAIGN_CASE_STARTED, {
+            caseId,
+            caseType,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Campaign case completed
+     */
+    campaignCaseCompleted(caseId, caseType) {
+        eventBus.emit(EVENT_TYPES.CAMPAIGN_CASE_COMPLETED, {
+            caseId,
+            caseType,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Campaign briefing generated
+     */
+    campaignBriefingGenerated(briefingId, event) {
+        eventBus.emit(EVENT_TYPES.CAMPAIGN_BRIEFING_GENERATED, {
+            briefingId,
+            event,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Campaign dialogue triggered
+     */
+    campaignDialogueTriggered(dialogueId, caseId, type) {
+        eventBus.emit(EVENT_TYPES.CAMPAIGN_DIALOGUE_TRIGGERED, {
+            dialogueId,
+            caseId,
+            type,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Campaign news added
+     */
+    campaignNewsAdded(newsId, type) {
+        eventBus.emit(EVENT_TYPES.CAMPAIGN_NEWS_ADDED, {
+            newsId,
+            type,
             tick: Date.now()
         });
     }

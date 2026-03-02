@@ -38,6 +38,11 @@ import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
+import { CampaignModel } from './sim/campaign/model.js';
+import { CaseGeneratorV2 } from './sim/campaign/case_generator.js';
+import { DialogueManager } from './sim/campaign/dialogue.js';
+import { NewsFeed, BriefingSystem } from './sim/campaign/news_feed.js';
+import { CampaignPanel } from './ui/campaign_panel.js';
 import { FactionSystem } from './sim/factions/faction_system.js';
 import { PoliceSystem } from './sim/police/police_system.js';
 import { PursuitAI } from './sim/police/pursuit_ai.js';
@@ -191,6 +196,17 @@ export class Game {
         this.questEngine = new QuestEngine(this);
         this.caseManager = new CaseManager(this);
         this.evidenceSystem = new EvidenceSystem(this);
+
+        // Milestone N: Campaign systems
+        this.campaign = new CampaignModel(this);
+        this.caseGenerator = new CaseGeneratorV2(this);
+        this.dialogueManager = new DialogueManager(this);
+        this.newsFeed = new NewsFeed(this);
+        this.briefingSystem = new BriefingSystem(this);
+        if (!this.isHeadless) {
+            this.campaignPanel = new CampaignPanel(this);
+        }
+
         this.factionSystem = new FactionSystem(this);
         this.questLogUI = this.isHeadless ? null : new QuestLogUI(this);
 
@@ -513,7 +529,13 @@ export class Game {
         this.questEngine.update();
         this.caseManager.update();
 
-        // 8c. Progression update
+        // 8c. Campaign update
+        this.campaign.update();
+        this.dialogueManager.update();
+        this.newsFeed.update();
+        this.briefingSystem.update();
+
+        // 8d. Progression update
         this.progressionManager.update();
 
         // 8d. Rival AI update
@@ -926,6 +948,8 @@ export class Game {
             influenceEngine: this.influenceEngine?.serialize(),
             sentimentManager: this.sentimentManager?.serialize(),
             heatManager: this.heatManager?.serialize(),
+            // Milestone N: Campaign data
+            campaign: this.campaign?.serialize(),
         };
 
         try {
@@ -994,6 +1018,8 @@ export class Game {
                 this.caseManager = new CaseManager(this);
                 this.evidenceSystem = new EvidenceSystem(this);
                 this.factionSystem = new FactionSystem(this);
+                // Initialize campaign case generator with loaded content
+                this.caseGenerator?.init();
                 this.questEngine.rng = this.rngStreams.quest;
                 this.ui.onWorldRebuilt();
                 this.minimap.onWorldRebuilt?.();
@@ -1087,6 +1113,12 @@ export class Game {
 
             // Restore cases evidence
             this.state.cases = data.cases || { active: [], completed: [], evidence: [], nextCaseSeed: 1 };
+            // Restore campaign cases
+            if (data.campaign?.cases) {
+                this.state.campaign = this.state.campaign || {};
+                this.state.campaign.cases = data.campaign.cases;
+                this.state.campaign.activeCaseId = data.campaign.activeCaseId;
+            }
             this.state.factions = data.factions || { list: ['citizens', 'police', 'gangs', 'corp'], reputation: {}, recentChanges: [] };
             this.state.factions.list = this.state.factions.list || ['citizens', 'police', 'gangs', 'corp'];
             this.state.factions.reputation = this.state.factions.reputation || {};
@@ -1130,6 +1162,12 @@ export class Game {
             this.heatSystem.setHeat(this.state.player.heat ?? 0);
             this.caseManager = new CaseManager(this);
             this.evidenceSystem = new EvidenceSystem(this);
+
+            // Milestone N: Restore campaign
+            if (data.campaign) {
+                this.campaign?.deserialize(data.campaign);
+            }
+
             this.factionSystem = new FactionSystem(this);
             this.caseManager.rebuildQuestMap?.();
 

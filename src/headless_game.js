@@ -30,6 +30,10 @@ import { QuestEngine } from './sim/quests/quest_engine.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
 import { FactionSystem } from './sim/factions/faction_system.js';
+import { CampaignModel } from './sim/campaign/model.js';
+import { CaseGeneratorV2 } from './sim/campaign/case_generator.js';
+import { DialogueManager } from './sim/campaign/dialogue.js';
+import { NewsFeed, BriefingSystem } from './sim/campaign/news_feed.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -142,6 +146,15 @@ export class Game {
         this.questEngine = new QuestEngine(this);
         this.caseManager = new CaseManager(this);
         this.evidenceSystem = new EvidenceSystem(this);
+
+        // Milestone N: Campaign systems
+        this.campaign = new CampaignModel(this);
+        this.caseGenerator = new CaseGeneratorV2(this);
+        this.dialogueManager = new DialogueManager(this);
+        this.newsFeed = new NewsFeed(this);
+        this.briefingSystem = new BriefingSystem(this);
+        this.campaignPanel = null; // No UI in headless mode
+
         this.factionSystem = new FactionSystem(this);
 
         this.isRunning = false;
@@ -342,6 +355,12 @@ export class Game {
         this.heatSystem.decay(false);
         this.questEngine.update();
         this.caseManager.update();
+
+        // 8c. Campaign update
+        this.campaign.update();
+        this.dialogueManager.update();
+        this.newsFeed.update();
+        this.briefingSystem.update();
 
         // 9/10. Goals + win/lose checks
         this.goalsManager.update();
@@ -591,6 +610,8 @@ export class Game {
             quests: this.questEngine.serialize(),
             cases: this.state.cases || { evidence: [] },
             factions: this.state.factions || { list: [] },
+            // Milestone N: Campaign data
+            campaign: this.campaign?.serialize(),
             player: {
                 x: this.state.player.x,
                 y: this.state.player.y,
@@ -761,6 +782,11 @@ export class Game {
             this.state.meta.devTuning.factionMultipliers = this.state.meta.devTuning.factionMultipliers || { hacks: 1, quests: 1, services: 1 };
             this.questEngine.deserialize(data.quests);
 
+            // Milestone N: Restore campaign
+            if (data.campaign) {
+                this.campaign?.deserialize(data.campaign);
+            }
+
             // Restore player
             if (data.player) {
                 this.state.player.x = data.player.x;
@@ -789,6 +815,10 @@ export class Game {
             this.heatSystem.setHeat(this.state.player.heat ?? 0);
             this.caseManager = new CaseManager(this);
             this.evidenceSystem = new EvidenceSystem(this);
+
+            // Milestone N: Initialize campaign case generator
+            this.caseGenerator?.init();
+
             this.factionSystem = new FactionSystem(this);
             this.caseManager.rebuildQuestMap?.();
 
