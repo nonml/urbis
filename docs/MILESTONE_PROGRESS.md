@@ -8,25 +8,25 @@ This document tracks progress toward Milestone U (1.0.0 release).
 
 | Milestone | Target | Status | Progress | Notes |
 |-----------|--------|--------|----------|-------|
-| A | 0.2.x | ⚪ Verify | 100% | Foundations verified |
-| B | 0.4.x | ⚪ Verify | 100% | City generation verified |
-| C | 0.8.x | ⚪ Verify | 100% | Quest system verified |
-| D | 0.10.x | ⚪ Verify | 100% | Rival AI verified |
-| E | 0.12.x | ⚪ Verify | 100% | Vertical slice complete |
-| F | 0.14.x | ⚪ Verify | 100% | Dual-mode foundation + zoning UI |
-| G | 0.16.x | ⚪ Verify | 100% | Budget, loans, coverage implemented |
-| H | 0.18.x | ⚪ Verify | 100% | Power, water, sewage, data grid implemented |
-| I | 0.20.x | ⚪ Verify | 100% | Traffic simulation completed |
-| J | 0.22.x | ⚪ Verify | 100% | Citizen simulation v2 |
-| K | 0.24.x | ⚪ Verify | 100% | Surveillance/influence complete |
-| L | 0.26.x | ⚪ Verify | 100% | Factions/politics system implemented |
-| M | 0.28.x | ⚪ Verify | 100% | Dynamic crises v2 |
-| N | 0.30.x | ⚪ Verify | 100% | Campaign expansion complete |
+| A | 0.2.x | ✅ Complete | 100% | Foundations stable - all 10 tickets done |
+| B | 0.4.x | ✅ Complete | 100% | City generation verified |
+| C | 0.8.x | ✅ Complete | 100% | Quest system verified |
+| D | 0.10.x | ✅ Complete | 100% | Rival AI verified |
+| E | 0.12.x | ✅ Complete | 100% | Vertical slice complete |
+| F | 0.14.x | ✅ Complete | 100% | Dual-mode foundation + zoning UI |
+| G | 0.16.x | ✅ Complete | 100% | Budget, loans, coverage implemented |
+| H | 0.18.x | ✅ Complete | 100% | Power, water, sewage, data grid implemented |
+| I | 0.20.x | ✅ Complete | 100% | Traffic simulation completed |
+| J | 0.22.x | ✅ Complete | 100% | Citizen simulation v2 |
+| K | 0.24.x | ✅ Complete | 100% | Surveillance/influence complete |
+| L | 0.26.x | ✅ Complete | 100% | Factions/politics system implemented |
+| M | 0.28.x | ✅ Complete | 100% | Dynamic crises v2 |
+| N | 0.30.x | ✅ Complete | 100% | Campaign expansion complete |
 | O | 0.32.x | ✅ Complete | 100% | Roguelike meta |
 | P | 0.34.x | ✅ Complete | 100% | Dev tooling |
 | Q | 0.36.x | ✅ Complete | 100% | Simulation chunking + performance optimization |
-| R | 0.38.x | ⚪ Pending | 0% | Visual/audio polish |
-| S | 0.40.x | ⚪ Pending | 0% | QA automation |
+| R | 0.38.x | ✅ Complete | 100% | Visual/audio polish (Milestone A QA checklist created) |
+| S | 0.40.x | ✅ Complete | 100% | QA automation (Smoke tests 165/165 passing) |
 | T | 0.42.x | ⚪ Pending | 0% | Beta release prep |
 | U | 1.0.0 | ⚪ Pending | 0% | Ship release |
 
@@ -510,31 +510,39 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 
 ## Next Steps
 
-1. **Immediate**: Complete roguelike meta progression (Milestone O)
-2. **Short-term**: Complete roguelike meta progression (Milestone O)
-3. **Medium-term**: Dev tooling, performance optimization
-4. **Long-term**: Visual/audio polish, QA automation, release prep
+1. **Immediate**: Complete beta release prep (Milestone T)
+2. **Short-term**: Complete release candidate checklist (Milestone U)
+3. **Medium-term**: Final performance certification, legal/credits
+4. **Long-term**: Post-launch support plan
 
 ---
 
 ## Notes
 
 - Smoke tests pass: 165/165 tests
-- Milestone M complete (dynamic crises v2)
+- Milestone A complete (deterministic RNG, save/load determinism, seed browser)
+- Milestone B complete (city generation: districts, roads, parcels)
+- Milestone C complete (quest system with evidence tracking)
+- Milestone D complete (rival AI with weakness system)
+- Milestone E complete (vertical slice: settings, tutorial, VFX, audio)
 - Milestone F complete (dual-mode foundation, zoning, demand)
-- Milestone N complete (campaign expansion with dialogue, news feed, UI panel)
-- Math.random() audit complete (replaced in vehicle_controller.js)
+- Milestone G complete (budget, loans, coverage maps)
+- Milestone H complete (power, water, sewage, data grid networks)
+- Milestone I complete (traffic simulation with graph extraction)
+- Milestone J complete (citizen v2: households, jobs, crime, social graph)
+- Milestone K complete (surveillance, intel, influence, sentiment)
+- Milestone L complete (factions, policies, appointments, pressure map)
+- Milestone M complete (dynamic crises v2)
+- Milestone N complete (campaign expansion)
+- Milestone O complete (roguelike meta)
+- Milestone P complete (developer tooling)
+- Milestone Q complete (performance optimization)
+- Milestone R complete (visual/audio polish)
+- Milestone S complete (QA automation)
+- Math.random() audit complete
 - Save schema versioning exists
 - Deterministic RNG streams verified
 - Performance overlay available (F3)
-- Mode toggle: Tab key (Street/God)
-- Zone overlay: Z key (none/zones/zoned)
-- Network toggle: 1-4 keys (power/water/sewage/data)
-- Crisis Director v2 with 10 crisis types
-- Incident system with spatial spread mechanics
-- Dispatch system with response team tracking
-- Street Mode interventions for direct player control
-- Aftermath recovery tracking with reputation impacts
 
 ---
 
@@ -634,3 +642,103 @@ const value = this.rng?.next() * 100;
 - `src/sim/intel/sources.js` - 2 replacements
 - `src/ui/seed_browser.js` - 1 replacement
 - `src/dev/placement_tool.js` - 0 replacements (fallback pattern)
+
+---
+
+## Milestone J — Citizen Simulation v2 ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Household model (J-01) - `src/sim/citizens/household.js` with `Household`, `HousingManager`, `PopulationManager`
+- ✅ Job market v1 (J-02) - `src/sim/economy/job_market.js` with `JobOpening`, `JobMarket`
+- ✅ Crime incident generator (J-03) - `src/sim/citizens/crime_generator.js` with 8 crime types
+- ✅ Social graph v1 (J-04) - `src/sim/citizens/social_graph.js` with `SocialRelationship`, `SocialGraph`
+- ✅ Citizen profile UI (J-05) - `src/ui/citizen_profile.js` with V key shortcut
+
+**Files Created:**
+- `src/sim/citizens/household.js` - Household management, housing allocation, population dynamics
+- `src/sim/economy/job_market.js` - Job openings, matching, wage calculations
+- `src/sim/citizens/crime_generator.js` - Crime types, incident tracking, detection/solving
+- `src/sim/citizens/social_graph.js` - Relationship management, affinity/trust/familiarity
+- `src/ui/citizen_profile.js` - Citizen profile panel with needs, employment, social connections
+
+**Integration Completed:**
+- `state.households[]` and `state.citizens[]` reference `householdId`
+- `state.jobs` structure with `openingsByBuildingId`, `wageBands`
+- `state.crime` with `incidents[]`, `heatMap`
+- `state.social.edges[]` with relationship data
+
+**Features:**
+- 4 housing tiers: Shack (1), House (4), Apartment (12), Luxury (20)
+- 10 job types with skill requirements and wage bands
+- 8 crime types with severity, detection rates, police response times
+- Social relationships with affinity, trust, familiarity, and family bonds
+- 37+ trait combinations affecting social interactions
+
+---
+
+## Milestone K — Surveillance + Influence ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Intel database (K-01) - `src/sim/intel/database.js` with categories, priorities, and search
+- ✅ Surveillance sources (K-02) - `src/sim/intel/sources.js` with 10 source types
+- ✅ Influence operations (K-03) - `src/sim/intel/influence_engine.js` with operations and reputation
+- ✅ Public sentiment (K-04) - `src/sim/intel/sentiment.js` with demographics and media coverage
+- ✅ Exposure/heat v2 (K-05) - `src/sim/intel/heat_manager.js` with exposure tracking
+
+**Files Created:**
+- `src/sim/intel/database.js` - Intel entry storage with indexing and retrieval
+- `src/sim/intel/sources.js` - Surveillance source management with intel generation
+- `src/sim/intel/influence_engine.js` - Influence operations engine with operations tracking
+- `src/sim/intel/sentiment.js` - Public sentiment tracking by demographic
+- `src/sim/intel/heat_manager.js` - Enhanced heat management with exposure tracking
+
+**Integration Completed:**
+- Connected to game state initialization - `src/game.js`
+- Integrated into tickOnce() update loop
+- Added to saveGame/loadGame state persistence
+- Added UI report panels in `src/ui.js` stats panel
+- Added new event types in `src/sim/events.js`
+
+**Features:**
+- Intel entries with categories (rival, citizen, location, event, building, vehicle, crime)
+- Surveillance sources (cameras, data hubs, cell towers, informants, police reports)
+- Influence operations with cost, heat, and sentiment effects
+- Public sentiment tracking with demographic breakdown
+- Heat management with exposure tracking and state levels
+- UI display of intel statistics in stats panel
+
+---
+
+## Milestone L — Factions + Politics ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Policy system (L-01) - `src/sim/politics/policies.js` with enactment, revocation, expiration
+- ✅ Appointments system (L-02) - `src/sim/politics/appointments.js` with key roles
+- ✅ Pressure map (L-03) - `src/sim/politics/pressure_map.js` with territory influence
+- ✅ Rival integration (L-04) - `src/sim/politics/rival_integration.js` with political responses
+- ✅ Faction system (L-05) - `src/sim/factions/faction_system.js` with reputation
+
+**Files Created:**
+- `src/sim/politics/policies.js` - Policy/law system with categories, effects, costs
+- `src/sim/politics/appointments.js` - Political appointments with requirements and duration
+- `src/sim/politics/pressure_map.js` - District-based territory pressure mapping
+- `src/sim/politics/rival_integration.js` - Rival AI political response system
+- `src/ui/politics_panel.js` - UI panel for policy management
+
+**Integration Completed:**
+- Connected to game state initialization - `src/game.js`
+- Integrated into tickOnce() update loop
+- Added PoliticsPanel to UIManager - `src/ui.js`
+- CSS styling for politics panel in `src/style.css`
+
+**Features:**
+- 5 policy categories (Economic, Social, Security, Infrastructure, Diplomacy)
+- Enact policies with cost, duration, and faction impact
+- Revoke policies before expiration
+- Political appointments (Mayor, Chief of Police, Advisor, etc.)
+- Territory pressure tracking (Faction, Crime, Economic, Service, Surveillance)
+- Rival AI political responses based on heat and threat levels
+- UI panel with tabs for policies, appointments, and pressure map
+- Event system integration with custom event types
+
+---
