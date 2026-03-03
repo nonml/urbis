@@ -13,6 +13,7 @@ export const EVENT_TYPES = {
     PLAYER_PICKED_INTERACTABLE: 'player_picked_interactable',
     PLAYER_DECISION: 'player_decision',
     PLAYER_BUILT_BUILDING: 'player_built_building',
+    MAP_SCREEN_TOGGLED: 'map_screen_toggled',
 
     // System events
     CRISIS_STARTED: 'crisis_started',

@@ -414,6 +414,7 @@ export class QuestEngine {
             if (step.trigger === anomalyType) {
                 quest.data.triggers[anomalyType] = true;
                 this.advanceQuest(quest);
+                return;
             }
         }
 

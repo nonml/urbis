@@ -115,7 +115,6 @@ export class TutorialManager {
         // Listen for quest started
         this.questStartHandler = (data) => {
             if (this.activeQuest && data.questId === this.activeQuest.id) {
-                // Check if main case started
                 if (data.questTitle?.includes('Main') || data.questTitle?.includes('Case')) {
                     if (!this.completedSteps.includes('start_main_case')) {
                         this.game.questEngine.handleAnomaly('main_case_started', { case: data.questTitle });
@@ -131,10 +130,20 @@ export class TutorialManager {
             }
         };
 
+        this.questCompleteHandler = (data) => {
+            if (this.activeQuest && data.questId === this.activeQuest.id) {
+                if (data.outcome === 'success') {
+                    this.completeStep();
+                }
+            }
+        };
+
         eventBus.on('player_built_building', this.houseBuildHandler, this);
         eventBus.on('player_built_building', this.jobBuildHandler, this);
         eventBus.on('crisis_resolved', this.crisisHandler, this);
         eventBus.on('quest_started', this.questStartHandler, this);
+        eventBus.on('map_screen_toggled', this.mapToggleHandler, this);
+        eventBus.on('quest_completed', this.questCompleteHandler, this);
     }
 
     /**
@@ -335,6 +344,7 @@ export class TutorialManager {
         if (this.jobBuildHandler) eventBus.off('player_built_building', this.jobBuildHandler);
         if (this.crisisHandler) eventBus.off('crisis_resolved', this.crisisHandler);
         if (this.questStartHandler) eventBus.off('quest_started', this.questStartHandler);
+        if (this.mapToggleHandler) eventBus.off('map_screen_toggled', this.mapToggleHandler);
     }
 }
 

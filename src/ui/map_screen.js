@@ -3,6 +3,7 @@ import { TERRAIN_COLORS, TERRAIN_ICONS } from '../constants.js';
 import { getInteractableTypeInfo, getInteractableStateName } from '../sim/interactables.js';
 import { ROAD_COLORS } from '../gen/roads.js';
 import { ZONE_COLORS } from '../gen/parcels.js';
+import { eventBus } from '../sim/events.js';
 
 const MAP_WIDTH = 256;  // Max map dimension to render
 const MAP_HEIGHT = 256;
@@ -93,8 +94,10 @@ export class MapScreen {
         if (this.isvisible) {
             this.element.classList.remove('hidden');
             this.drawMap();
+            eventBus.emit('map_screen_toggled', { visible: true });
         } else {
             this.element.classList.add('hidden');
+            eventBus.emit('map_screen_toggled', { visible: false });
         }
     }
 
