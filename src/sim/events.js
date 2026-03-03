@@ -12,6 +12,7 @@ export const EVENT_TYPES = {
     PLAYER_INTERACT: 'player_interact',
     PLAYER_PICKED_INTERACTABLE: 'player_picked_interactable',
     PLAYER_DECISION: 'player_decision',
+    PLAYER_BUILT_BUILDING: 'player_built_building',
 
     // System events
     CRISIS_STARTED: 'crisis_started',
@@ -382,6 +383,18 @@ export const Events = {
         eventBus.emit(EVENT_TYPES.CAMPAIGN_NEWS_ADDED, {
             newsId,
             type,
+            tick: Date.now()
+        });
+    },
+
+    /**
+     * Player built a building
+     */
+    playerBuiltBuilding(buildingType, x, y) {
+        eventBus.emit(EVENT_TYPES.PLAYER_BUILT_BUILDING, {
+            buildingType,
+            x,
+            y,
             tick: Date.now()
         });
     }

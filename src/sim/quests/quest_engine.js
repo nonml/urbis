@@ -218,7 +218,7 @@ export class QuestEngine {
     tryAdvanceQuest(quest) {
         const currentStep = quest?.steps?.[quest.currentStepIndex];
         if (!currentStep) return false;
-        if (currentStep.autoAdvance) return this.advanceQuest(quest);
+        if (currentStep.autoAdvance && currentStep.kind !== STEP_KINDS.TRIGGER) return this.advanceQuest(quest);
         return false;
     }
 

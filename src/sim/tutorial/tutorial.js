@@ -23,7 +23,7 @@ const TUTORIAL_STEPS = [
         id: 'place_house',
         title: 'Build a House',
         description: 'Select the House building and place it on the map.',
-        kind: 'TRIGGER',
+        kind: 'trigger',
         trigger: 'house_built',
         autoAdvance: true
     },
@@ -31,7 +31,7 @@ const TUTORIAL_STEPS = [
         id: 'place_job',
         title: 'Build a Job Building',
         description: 'Place a Farm or Lumber Mill to produce resources.',
-        kind: 'TRIGGER',
+        kind: 'trigger',
         trigger: 'job_building_built',
         autoAdvance: true
     },
@@ -39,7 +39,7 @@ const TUTORIAL_STEPS = [
         id: 'handle_crisis',
         title: 'Handle a Crisis',
         description: 'A crisis may appear - select the best response option.',
-        kind: 'TRIGGER',
+        kind: 'trigger',
         trigger: 'crisis_handled',
         autoAdvance: true
     },
@@ -47,7 +47,7 @@ const TUTORIAL_STEPS = [
         id: 'hack_node',
         title: 'Hack a Node',
         description: 'Move near a hacking node and press E to hack it.',
-        kind: 'HACK_NODE',
+        kind: 'hack_node',
         nodeType: 'POWER_SUBSTATION',
         autoAdvance: true
     },
@@ -55,7 +55,7 @@ const TUTORIAL_STEPS = [
         id: 'open_quest_log',
         title: 'Open Quest Log',
         description: 'Press M to open the map screen.',
-        kind: 'TRIGGER',
+        kind: 'trigger',
         trigger: 'quest_log_opened',
         autoAdvance: true
     },

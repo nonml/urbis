@@ -24,7 +24,7 @@ import { loadQuestsFromDirectory } from './content/loader.js';
 import { RivalAI } from './sim/rival/rival_ai.js';
 import { ProgressionManager } from './sim/progression.js';
 import { createTutorialManager } from './sim/tutorial/tutorial.js?v=20260220b';
-import { eventBus } from './sim/events.js';
+import { eventBus, Events } from './sim/events.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 import { ChunkManager } from './world/chunks.js';
 import { validatePlacement } from './build/placement.js';
@@ -665,6 +665,9 @@ export class Game {
         const building = this.buildings.build(type, x, y, 1, rotation);
         this.scheduleManager.syncNavBuildings(this.buildings);
         this.ui.showMessage(`Built: ${building.name} at (${x}, ${y})`, 'success');
+
+        // Emit event for tutorial/quest tracking
+        Events.playerBuiltBuilding(type, x, y);
 
         // Show VFX feedback if renderer is available
         if (this.ui.renderer3d) {
