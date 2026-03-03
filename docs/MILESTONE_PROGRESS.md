@@ -1,6 +1,6 @@
-# Milestone Progress Tracker
+# Project Milestones - City Builder
 
-This document tracks progress toward Milestone U (1.0.0 release).
+This document tracks progress toward the 1.0.0 release and all subsequent milestones.
 
 ---
 
@@ -28,7 +28,7 @@ This document tracks progress toward Milestone U (1.0.0 release).
 | R | 0.38.x | ✅ Complete | 100% | Visual/audio polish (Milestone A QA checklist created) |
 | S | 0.40.x | ✅ Complete | 100% | QA automation (Smoke tests 165/165 passing) |
 | T | 0.42.x | ✅ Complete | 100% | Beta release prep - all 5 tickets done |
-| U | 1.0.0 | ⚪ Pending | 0% | Ship release |
+| U | 1.0.0 | ✅ Complete | 100% | Release 1.0.0 - all 5 tickets done |
 
 ---
 
@@ -468,12 +468,40 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Content completeness - `tools/check_content.js`
 - Known issues + feedback - `docs/KNOWN_ISSUES.md`
 
-### Milestone U — 1.0.0 Release
-- Release candidate checklist - `docs/RC_CHECKLIST.md`
-- Final performance certification - `tests/perf_cert.js`
-- Legal/credits/licenses - `docs/CREDITS.md`
-- Release notes finalization - `CHANGELOG.md`
-- Post-launch plan - `docs/POST_LAUNCH.md`
+### Milestone U — 1.0.0 Release ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Release candidate checklist (U-01) - `docs/RC_CHECKLIST.md` with 0 S0 bugs, 30-min MEGA test
+- ✅ Performance certification (U-02) - `tests/perf_cert.js` for Small/City/MEGA presets
+- ✅ Legal/Credits (U-03) - `docs/CREDITS.md` with third-party licenses
+- ✅ Release notes (U-04) - CHANGELOG.md updated for 1.0.0
+- ✅ Post-launch plan (U-05) - `docs/POST_LAUNCH.md` with hotfix process + roadmap
+
+**Files Created:**
+- `docs/RC_CHECKLIST.md` - Complete release candidate checklist with QA gates
+- `tests/perf_cert.js` - Performance certification script for all presets
+- `docs/CREDITS.md` - Credits, license, and third-party acknowledgments
+- `docs/POST_LAUNCH.md` - Hotfix process, triage guidelines, 1.1 roadmap
+- `CHANGELOG.md` - Updated with 1.0.0 release notes
+
+**Integration Completed:**
+- RC checklist integrated with build pipeline
+- Performance targets documented and measurable
+- Hotfix process defined with S0-S4 severity levels
+- 1.1 feature candidates identified
+- MILESTONE_PROGRESS.md updated to reflect completion
+
+**Release Artifacts:**
+- Production build: `npm run build`
+- Beta build: `npm run build:beta 1.0.0`
+- Version stamping in build-version.json
+- Complete documentation package
+
+**Keyboard Shortcuts:**
+- `?` - Open Codex (help/reference)
+- `F12` - Open Known Issues & Feedback
+- `Shift+S` - Open Shop (meta progression)
+- `Shift+B` - Open Seed Browser (replay management)
 
 ---
 
@@ -508,14 +536,13 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 
 ---
 
-## Next Steps
+## Project Status: COMPLETE 🎉
 
-1. **Immediate**: Complete beta release prep (Milestone T)
-2. **Short-term**: Complete release candidate checklist (Milestone U)
-3. **Medium-term**: Final performance certification, legal/credits
-4. **Long-term**: Post-launch support plan
+**All Milestones Complete - City Builder 1.0.0 Ready for Launch**
 
 ---
+
+## Notes
 
 ## Notes
 
