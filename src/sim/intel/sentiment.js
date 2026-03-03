@@ -3,6 +3,7 @@
 // across the city and different demographics.
 
 import { EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 // Demographic groups
 export const DEMOGRAPHICS = {
@@ -257,7 +258,7 @@ export class SentimentManager {
             type,
             sentimentImpact,
             tick,
-            id: `coverage_${tick}_${Math.random().toString(36).substr(2, 9)}`,
+            id: randomId('coverage'),
         };
 
         this.mediaCoverage[channel].push(coverage);

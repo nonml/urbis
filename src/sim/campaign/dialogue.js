@@ -2,6 +2,7 @@
 // Integrates with Quest Engine for in-quest dialogue
 
 import { eventBus, EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 /**
  * Dialogue manager for case-driven narrative choices
@@ -47,7 +48,7 @@ export class DialogueManager {
      */
     startDialogue(questId, dialogueDef) {
         const dialogue = {
-            id: `dialogue_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: randomId('dialogue'),
             questId: questId,
             type: dialogueDef.type || 'narrative',
             speaker: dialogueDef.speaker || 'narrator',

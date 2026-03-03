@@ -590,6 +590,29 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     }
                 }
             }
+
+            // Milestone O: Roguelike meta shortcuts
+            if (e.key.toLowerCase() === 's' && e.shiftKey) {
+                e.preventDefault();
+                this.game.shop?.show();
+                this.showMessage('Open shop', 'normal');
+            }
+            if (e.key.toLowerCase() === 'b' && e.shiftKey) {
+                e.preventDefault();
+                this.game.seedBrowser?.show();
+                this.showMessage('Open seed browser', 'normal');
+            }
+
+            // Milestone P: Placement tool shortcuts
+            if (e.key.toLowerCase() === 'p' && e.ctrlKey) {
+                e.preventDefault();
+                this.game.placementTool?.toggleMode();
+            }
+            if (e.key === 'Enter' && e.ctrlKey) {
+                e.preventDefault();
+                this.game.placementTool?.placeItem();
+            }
+
             const handlers = this._keyHandlers.get(e.key.toLowerCase());
             if (handlers) {
                 for (const fn of handlers) fn(e);

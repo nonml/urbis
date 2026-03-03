@@ -2,6 +2,7 @@
 // Integrates with CampaignModel for story-driven updates
 
 import { eventBus, EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 /**
  * News feed for city events and case updates
@@ -76,7 +77,7 @@ export class NewsFeed {
      */
     addNews(news) {
         const newsItem = {
-            id: `news_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+            id: randomId('news'),
             type: news.type,
             timestamp: Date.now(),
             tick: news.tick || this.game.state.time?.tick || 0,

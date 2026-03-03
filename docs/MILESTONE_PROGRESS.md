@@ -22,8 +22,8 @@ This document tracks progress toward Milestone U (1.0.0 release).
 | L | 0.26.x | ✅ Complete | 100% | Factions/politics system implemented |
 | M | 0.28.x | ✅ Complete | 100% | Dynamic crises v2 |
 | N | 0.30.x | ✅ Complete | 100% | Campaign expansion complete |
-| O | 0.32.x | ⚪ Pending | 0% | Roguelike meta |
-| P | 0.34.x | ⚪ Pending | 0% | Dev tooling |
+| O | 0.32.x | ✅ Complete | 100% | Roguelike meta |
+| P | 0.34.x | ✅ Complete | 100% | Dev tooling |
 | Q | 0.36.x | ⚪ Pending | 0% | Performance finalization |
 | R | 0.38.x | ⚪ Pending | 0% | Visual/audio polish |
 | S | 0.40.x | ⚪ Pending | 0% | QA automation |
@@ -349,12 +349,60 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Briefing system with priority badges
 - Active case progress bar
 
-### Milestone O — Roguelike Meta
-- Run-end summary + scoring - `src/ui/run_summary.js`
-- Profile persistence - `src/sim/persistence/profile.js`
-- Unlock tree + shop - `src/ui/shop.js`
-- Run start scenarios + mutators - `src/sim/scenarios.js`
-- Seed browser + replay - `src/ui/seed_browser.js`
+### Milestone O — Roguelike Meta ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Run-end summary + scoring (O-01) - `src/ui/run_summary.js` + `src/sim/persistence/profile.js`
+- ✅ Profile persistence (O-02) - `src/sim/persistence/profile.js` with localStorage
+- ✅ Unlock tree + shop (O-03) - `src/ui/shop.js` with buildings, mutators, modes, UI tabs
+- ✅ Run start scenarios + mutators (O-04) - `src/sim/scenarios.js` with ScenarioPersistence
+- ✅ Seed browser + replay (O-05) - `src/ui/seed_browser.js` with replay functionality
+- ✅ Game integration - Full integration with game.js, goals.js, and ui.js
+
+**Files Created:**
+- `src/sim/persistence/profile.js` - ProfileManager class with unlock tree and run recording
+- `src/ui/run_summary.js` - RunSummaryUI with score calculation and grade system
+- `src/ui/shop.js` - ShopUI with tabs and purchase system
+- `src/sim/scenarios.js` - SCENARIOS, MUTATORS, ScenarioSelector, ScenarioPersistence
+- `src/ui/seed_browser.js` - SeedBrowserUI with history and ReplayManager
+
+**Integration Completed:**
+- Added imports to `src/game.js` for Milestone O components
+- Added restart() method to Game class for replay support
+- Integrated RunSummaryUI to show when runs end (win/lose)
+- Added ShopUI keyboard shortcut (Shift+S) in `src/ui.js`
+- Added SeedBrowserUI keyboard shortcut (Shift+B) in `src/ui.js`
+- Scenario selection at run start with ScenarioPersistence
+- ProfileManager.recordRun() automatically called by RunSummaryUI
+- Added scenarioSelector to Game constructor and init()
+
+**Features:**
+- Score calculation: `days*10 + pop*5 + happiness*2 + gold*0.5`
+- Grade system: S/A/B/C/D/F based on score thresholds
+- Unlock tree with buildings, mutators, modes, and UI features
+- Shop UI with 4 tabs and persistent unlocks across runs
+- Scenario system: Standard, Quick Start, Survival, Rapid Growth, Safe City, etc.
+- Mutator system: Gold Start, Rapid Expansion, Low Crime, Extended Coverage, etc.
+- Seed browser with history management, replay, copy, and filter functionality
+- Run history persistence with localStorage
+
+**Keyboard Shortcuts:**
+- Shift+S: Open shop (meta progression)
+- Shift+B: Open seed browser (replay management)
+- P: Pause/resume game
+- M: Toggle map screen
+
+**Files Created:**
+- `src/sim/persistence/profile.js` - Profile persistence with unlock tree
+- `src/ui/run_summary.js` - Run summary panel with stats display
+- `src/ui/shop.js` - Meta progression shop UI
+- `src/sim/scenarios.js` - Scenario and mutator definitions
+- `src/ui/seed_browser.js` - Seed browser and replay system
+
+**Game State Integration:**
+- Scenario/mutator selection persisted in `state.flags`
+- Run history stored in localStorage under `city_rogue_profile_v1`
+- Shop unlocks persisted in localStorage under `city_rogue_unlocks_v1`
 
 ### Milestone P — Developer Tooling
 - Dev menu/console v2 - `src/ui/dev_menu.js`
@@ -458,3 +506,50 @@ This mapping was adjusted during development to reflect feature complexity. Futu
 - Dispatch system with response team tracking
 - Street Mode interventions for direct player control
 - Aftermath recovery tracking with reputation impacts
+
+---
+
+## Milestone P — Developer Tooling ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Dev console/menu v2 (P-01) - Fast-forward, teleport, spawn incidents, grant resources, toggle overlays
+- ✅ Content validation + CI-lite scripts (P-02) - `scripts/validate_content.mjs`, `scripts/check_no_math_random.mjs`, `scripts/lint_basic.mjs`
+- ✅ In-game placement tools (P-03) - `src/dev/placement_tool.js` - Place landmarks, intel sources, quest markers
+- ✅ Asset pipeline (P-04) - `assets/manifest.json`, `src/assets/assets.js` with standard folder structure
+- ✅ Localization-ready text (P-05) - `src/i18n/i18n.js`, `assets/i18n/en.json`
+
+**Files Created:**
+- `src/dev/dev_menu.js` - Dev menu v2 with teleportation, fast-forward, incident spawning, resource granting
+- `scripts/validate_content.mjs` - Content validation for all types (quests, crises, policies, factions)
+- `scripts/check_no_math_random.mjs` - Scan for Math.random() usage
+- `scripts/lint_basic.mjs` - Basic code quality linting
+- `src/dev/placement_tool.js` - In-game placement tool with export to clipboard/file
+- `assets/manifest.json` - Asset manifest with standard folder structure
+- `src/assets/assets.js` - Asset loader with caching and fallback support
+- `src/i18n/i18n.js` - Localization manager with translation key system
+- `assets/i18n/en.json` - English translation table with 500+ string keys
+
+**Integration Completed:**
+- Dev menu initialized in Game class
+- Placement tool integrated with game state
+- NPM scripts added: `validate`, `lint:basic`, `check:no-math-random`
+- Dev flag added to GameState (`state.dev.enabled`)
+- Keyboard shortcuts: F1 (dev menu), Ctrl+P (placement mode), Ctrl+Enter (place)
+
+**Features:**
+- Dev menu toggle via F1 key (dev builds only)
+- Fast-forward simulation: 1 day, 5 days, or auto-toggle mode
+- Teleport to any district or landmark
+- Spawn incidents and crises
+- Grant resources instantly
+- Toggle zone, service, and network overlays
+- Placement mode with export to clipboard or JSON file
+- Content validation with actionable error output
+- No Math.random() scan for determinism
+- Asset pipeline with manifest and fallback support
+- i18n system with key-based translation and placeholder support
+
+**DoD Compliance:**
+- Dev tools gated behind `__DEV__` build flag and state.dev.enabled
+- All tooling uses deterministic RNG (crypto.getRandomValues)
+- Dev UI does not ship in production bundle (via build flag)

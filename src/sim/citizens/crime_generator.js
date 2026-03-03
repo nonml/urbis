@@ -204,8 +204,9 @@ export class CrimeIncident {
  * Crime Generator - generates and manages crime incidents
  */
 export class CrimeGenerator {
-    constructor(game) {
+    constructor(game, rng = null) {
         this.game = game;
+        this.rng = rng;
         this.incidents = new Map();
         this.nextIncidentId = 1;
         this.crimeStats = {
@@ -233,7 +234,7 @@ export class CrimeGenerator {
             if (!this._isCrimeProne(citizen)) continue;
 
             // Roll for crime
-            if (Math.random() < crimeRate) {
+            if ((this.rng?.next() ?? Math.random()) < crimeRate) {
                 this._createIncident(citizen);
             }
         }
@@ -306,7 +307,7 @@ export class CrimeGenerator {
         const localHeat = this.game.heatSystem.getHeatAt?.(Math.floor(citizen.x), Math.floor(citizen.y)) || 0;
         if (localHeat > 30) propensity += localHeat / 20;
 
-        return propensity > 2 && Math.random() < 0.1;
+        return propensity > 2 && (this.rng?.chance(0.1) ?? Math.random()) < 0.1;
     }
 
     /**
@@ -336,7 +337,7 @@ export class CrimeGenerator {
         incident.locationY = Math.floor(citizen.y);
         incident.perpetratorId = citizen.id;
         incident.reportedAt = this.game.state.time.tick;
-        incident.stolenAmount = Math.floor(Math.random() * crimeType.maxStolen);
+        incident.stolenAmount = Math.floor((this.rng?.next() ?? Math.random()) * crimeType.maxStolen);
         incident.heatImpact = Math.floor(incident.severity * 5);
 
         this.incidents.set(incident.id, incident);
@@ -349,7 +350,7 @@ export class CrimeGenerator {
         }
 
         // Report to police
-        if (Math.random() < crimeType.detectionRate) {
+        if ((this.rng?.chance(crimeType.detectionRate) ?? Math.random()) < crimeType.detectionRate) {
             incident.detect();
         }
 
@@ -366,15 +367,15 @@ export class CrimeGenerator {
 
         // violent crimes when desperate and low safety
         if (mood === 'desperate' && safety < 20) {
-            if (Math.random() < 0.4) return CRIME_TYPES.ASSAULT;
-            if (Math.random() < 0.1) return CRIME_TYPES.MURDER;
+            if ((this.rng?.chance(0.4) ?? Math.random()) < 0.4) return CRIME_TYPES.ASSAULT;
+            if ((this.rng?.chance(0.1) ?? Math.random()) < 0.1) return CRIME_TYPES.MURDER;
         }
 
         // Property crimes when stressed
         if (mood === 'stressed') {
-            if (Math.random() < 0.5) return CRIME_TYPES.THEFT;
-            if (Math.random() < 0.3) return CRIME_TYPES.BURGLARY;
-            if (Math.random() < 0.2) return CRIME_TYPES.VANDALISM;
+            if ((this.rng?.chance(0.5) ?? Math.random()) < 0.5) return CRIME_TYPES.THEFT;
+            if ((this.rng?.chance(0.3) ?? Math.random()) < 0.3) return CRIME_TYPES.BURGLARY;
+            if ((this.rng?.chance(0.2) ?? Math.random()) < 0.2) return CRIME_TYPES.VANDALISM;
         }
 
         // Pick from weighted random
@@ -385,7 +386,8 @@ export class CrimeGenerator {
             ...Array(1).fill(CRIME_TYPES.ASSAULT),
         ];
 
-        return weightedTypes[Math.floor(Math.random() * weightedTypes.length)];
+        const idx = this.rng?.int(0, weightedTypes.length - 1) ?? Math.floor(Math.random() * weightedTypes.length);
+        return weightedTypes[idx];
     }
 
     /**
@@ -399,7 +401,7 @@ export class CrimeGenerator {
         const trafficLocations = this.game.trafficManager?.getHighTrafficLocations?.() || [];
 
         for (const loc of trafficLocations) {
-            if (Math.random() < 0.01) {
+            if ((this.rng?.chance(0.01) ?? Math.random()) < 0.01) {
                 const citizen = this._findVictimNear(loc.x, loc.y);
                 if (citizen && citizen.job !== 'unemployed') {
                     const incident = new CrimeIncident(this.nextIncidentId++);
@@ -410,7 +412,7 @@ export class CrimeGenerator {
                     incident.locationX = loc.x;
                     incident.locationY = loc.y;
                     incident.victimId = citizen.id;
-                    incident.stolenAmount = Math.floor(Math.random() * 30);
+                    incident.stolenAmount = Math.floor((this.rng?.next() ?? Math.random()) * 30);
                     incident.reportedAt = this.game.state.time.tick;
                     incident.reportedBy = 'bystander';
 
@@ -427,7 +429,7 @@ export class CrimeGenerator {
         return this.game.citizens.citizens.find(c =>
             Math.abs(c.x - x) < 10 && Math.abs(c.y - y) < 10 &&
             c.job !== 'unemployed' &&
-            Math.random() < 0.3
+            (this.rng?.chance(0.3) ?? Math.random()) < 0.3
         );
     }
 

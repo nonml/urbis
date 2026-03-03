@@ -2,6 +2,7 @@
 // Vehicle agents with routing and congestion management
 
 import { TrafficPathfinder } from '../traffic/pathfinder.js';
+import { randomId } from '../../rng.js';
 
 // Vehicle types
 export const VEHICLE_TYPES = Object.freeze({
@@ -153,7 +154,7 @@ export class TrafficAgent {
         // If stuck for too long, wait
         if (this.stuckTicks > 15) {
             this.state = 'WAITING';
-            this.waitTimer = 5 + Math.random() * 5;
+            this.waitTimer = 7 + (this.id % 3);
             this.consecutiveWaitTicks++;
             this.speed = 0;
             return { moved: false, x: this.x, y: this.y, waited: true };

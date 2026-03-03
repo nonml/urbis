@@ -3,6 +3,7 @@
 // rivals, citizens, and world state.
 
 import { EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 // Intel entry categories
 export const INTEL_CATEGORIES = {
@@ -64,7 +65,7 @@ export const INTEL_TYPES = {
  */
 export class IntelEntry {
     constructor(data) {
-        this.id = data.id || `intel_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.id = data.id || randomId('intel');
         this.category = data.category || 'location';
         this.type = data.type || 'generic';
         this.priority = data.priority || INTEL_PRIORITIES.MEDIUM;

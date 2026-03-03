@@ -3,6 +3,7 @@
 // and public perception control.
 
 import { EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 // Influence operation types
 export const INFLUENCE_TYPES = {
@@ -194,7 +195,7 @@ export const INFLUENCE_CHANNELS = {
  */
 export class InfluenceOperation {
     constructor(data) {
-        this.id = data.id || `influence_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.id = data.id || randomId('influence');
         this.type = data.type;
         this.name = data.name || 'Unknown Operation';
         this.startTime = data.startTime || 0;

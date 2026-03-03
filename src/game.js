@@ -35,6 +35,9 @@ import { CitizenSim } from './sim/citizens/citizen_sim.js';
 import { JobsManager } from './sim/economy/jobs.js';
 import { AnomalyDetectors } from './sim/anomalies/detectors.js';
 import { ensureCitizenState } from './sim/citizens/citizen_state.js';
+import { SocialGraph } from './sim/citizens/social_graph.js';
+import { CrimeGenerator } from './sim/citizens/crime_generator.js';
+import { HousingManager, PopulationManager } from './sim/citizens/household.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
@@ -69,6 +72,17 @@ import { extractRoadGraph } from './sim/traffic/graph_extractor.js';
 import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
 import { TrafficManager } from './sim/agents/traffic_agent.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
+
+// Roguelike meta imports (Milestone O)
+import { createRunSummary, RunSummaryUI } from './ui/run_summary.js';
+import { profileManager, calculateRunScore } from './sim/persistence/profile.js';
+import { createShop, ShopUI } from './ui/shop.js';
+import { SCENARIOS, MUTATORS, ScenarioSelector, scenarioPersistence } from './sim/scenarios.js';
+import { createSeedBrowser, SeedBrowserUI, ReplayManager } from './ui/seed_browser.js';
+
+// Dev tools imports (Milestone P)
+import { DevMenu } from './dev/dev_menu.js';
+import { PlacementTool } from './dev/placement_tool.js';
 
 // Mock UI class for headless mode
 class MockUI {
@@ -179,6 +193,19 @@ export class Game {
         this.powerShortageTicks = 0;
         this.goalsManager = new GoalsManager(this);
         this.goalsManager.setMode(mode);
+
+        // Milestone P: Dev menu (only if not headless)
+        this.devMenu = this.isHeadless ? null : new DevMenu(this);
+        this.placementTool = this.isHeadless ? null : new PlacementTool(this);
+
+        // Milestone O: Roguelike meta systems
+        this.runSummary = this.isHeadless ? null : createRunSummary(this);
+        this.shop = this.isHeadless ? null : createShop(this);
+        this.seedBrowser = this.isHeadless ? null : createSeedBrowser(this);
+        this.scenarioSelector = new ScenarioSelector(this);
+        this.scenarioSelector.selectScenario(options.scenario || scenarioPersistence.getDefaultScenario());
+        this.scenarioSelector.activeMutators = options.mutators || scenarioPersistence.getDefaultMutators();
+
         this.citizenSim = new CitizenSim(this);
         this.jobsManager = new JobsManager(this);
         this.anomalyDetectors = new AnomalyDetectors(this);
@@ -251,7 +278,17 @@ export class Game {
         // Milestone I: Traffic system
         this.trafficGraph = extractRoadGraph(this.map);
         this.trafficPathfinder = new TrafficPathfinder(this.trafficGraph, null);
-        this.trafficManager = new TrafficManager(this);
+        this.trafficManager = new TrafficManager(this, this.rngStreams.sim);
+
+        // Social graph system (Milestone J)
+        this.socialGraph = new SocialGraph(this, this.rngStreams.sim);
+
+        // Crime generator system (Milestone J)
+        this.crimeGenerator = new CrimeGenerator(this, this.rngStreams.sim);
+
+        // Housing/Population system (Milestone J)
+        this.housingManager = new HousingManager(this, this.rngStreams.sim);
+        this.populationManager = new PopulationManager(this, this.rngStreams.sim);
         this.serviceDispatcher = new ServiceDispatcher(this);
         this.serviceDispatcher.setPathfinder(this.trafficPathfinder);
         this.policeRouter = new PoliceRouter(this);
@@ -306,6 +343,9 @@ export class Game {
         this.state.resources.wood = 100;
         this.state.resources.population = this.citizens.getPopulation();
 
+        // Apply scenario and mutators
+        this.scenarioSelector.applyToGameState(this.state);
+
         // Start tutorial if enabled
         if (this.ui.settings.get('showTutorial')) {
             this.tutorialManager.start();
@@ -331,6 +371,14 @@ export class Game {
         // Initial UI paint
         this.ui.updateResources(this.resources);
 
+        // Enable dev tools (if in dev mode)
+        if (this.devMenu) {
+            this.devMenu.enable();
+        }
+        if (this.placementTool) {
+            this.placementTool.enable();
+        }
+
         this.start();
     }
 
@@ -343,6 +391,22 @@ export class Game {
 
     stop() {
         this.isRunning = false;
+    }
+
+    /**
+     * Restart the game with a new or same seed
+     * @param {Object} options - Restart options
+     * @param {number} options.seed - Specific seed for replay
+     * @param {boolean} options.newSeed - Generate new random seed
+     */
+    restart(options = {}) {
+        const seed = options.newSeed ? undefined : (options.seed || randomSeed32());
+        const preset = this.state.map.preset || 'CITY';
+        const mode = this.state.progress?.mode || 'standard';
+
+        // Create new game state with the same or new seed
+        window.game = new Game({ mapPreset: preset, seed, mode });
+        window.game.init();
     }
 
     /**

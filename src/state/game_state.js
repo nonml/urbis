@@ -27,6 +27,9 @@ export function createNewGameState(options = {}) {
             createdAt: Date.now(),
             runId: randomId('run'),
             rngStreams: rngStreamSeeds,
+            dev: {
+                enabled: true // Enable dev tools in dev builds
+            },
             devTuning: {
                 factionMultipliers: {
                     hacks: 1,

@@ -119,8 +119,9 @@ export class Household {
  * Housing Manager - manages all households and housing allocation
  */
 export class HousingManager {
-    constructor(game) {
+    constructor(game, rng = null) {
         this.game = game;
+        this.rng = rng;
         this.households = new Map();
         this.nextHouseholdId = 1;
         this.housingStats = {
@@ -487,7 +488,8 @@ export class PopulationManager {
         if (households.length === 0) return;
 
         for (let i = 0; i < count; i++) {
-            const household = households[Math.floor(Math.random() * households.length)];
+            const idx = this.rng?.int(0, households.length - 1) ?? Math.floor(Math.random() * households.length);
+            const household = households[idx];
             const x = household.homeX || Math.floor(this.game.map.width / 2);
             const y = household.homeY || Math.floor(this.game.map.height / 2);
 

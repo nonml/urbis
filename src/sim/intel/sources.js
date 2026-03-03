@@ -3,6 +3,7 @@
 // cameras, data grid, informants, public reports, etc.
 
 import { EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 // Source types and their characteristics
 export const SURVEILLANCE_SOURCES = {
@@ -145,8 +146,8 @@ export const SOURCE_STATES = {
  * Represents a surveillance source that generates intel
  */
 export class SurveillanceSource {
-    constructor(data) {
-        this.id = data.id || `source_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    constructor(data, rng = null) {
+        this.id = data.id || randomId('source');
         this.type = data.type;
         this.name = data.name || SURVEILLANCE_SOURCES[data.type]?.name || 'Unknown Source';
         this.x = data.x || 0;
@@ -157,6 +158,7 @@ export class SurveillanceSource {
         this.confidenceModifier = data.confidenceModifier || 1.0;
         this.owner = data.owner || 'player';
         this.metadata = data.metadata || {};
+        this.rng = rng;
     }
 
     /**
@@ -183,7 +185,7 @@ export class SurveillanceSource {
         }
 
         const intelRate = this.getIntelRate();
-        const intelGenerated = Math.random() < intelRate ? 1 : 0;
+        const intelGenerated = (this.rng?.chance(intelRate) ?? Math.random()) < intelRate ? 1 : 0;
 
         if (intelGenerated > 0) {
             this.lastTickGenerated = currentTick;
@@ -240,8 +242,9 @@ export class SurveillanceSource {
  * Manages all surveillance sources
  */
 export class SurveillanceSourceManager {
-    constructor(game) {
+    constructor(game, rng = null) {
         this.game = game;
+        this.rng = rng;
         this.sources = [];
         this._sourceMap = new Map(); // id -> source
     }
@@ -270,7 +273,7 @@ export class SurveillanceSourceManager {
         for (const b of this.game.buildings.buildings) {
             for (const sourceDef of buildingSources) {
                 // Add source based on building type and capacity
-                if (Math.random() < 0.3) { // 30% chance of having surveillance
+                if ((this.rng?.chance(0.3) ?? Math.random()) < 0.3) {
                     const source = new SurveillanceSource({
                         type: sourceDef.type,
                         x: b.x,

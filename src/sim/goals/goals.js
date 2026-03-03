@@ -1,4 +1,5 @@
 import goalsData from '../../content/goals.json' assert { type: 'json' };
+import { createRunSummary } from '../ui/run_summary.js';
 
 const DEFAULT_GOALS = {
     win: {
@@ -97,11 +98,13 @@ export class GoalsManager {
         this.game.state.progress = this.game.state.progress || {};
         this.game.state.progress.goalState = { ...this.state };
 
-        if (kind === 'win') {
-            this.game.ui?.showVictory?.(title, 100);
-        } else {
-            this.game.ui?.showDefeat?.(title, detail);
+        // Show run summary UI with the current state
+        if (this.game.ui) {
+            // Create run summary and show it with current game state
+            const runSummary = createRunSummary(this.game);
+            runSummary.show(this.game.state, this.state.endState);
         }
+
         this.game.stop();
     }
 }

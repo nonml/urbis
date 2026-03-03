@@ -4,6 +4,7 @@
 // Tracks exposure to authorities and overall heat level.
 
 import { EVENT_TYPES } from '../events.js';
+import { randomId } from '../../rng.js';
 
 // Heat thresholds for different levels
 export const HEAT_THRESHOLDS = {
@@ -48,7 +49,7 @@ export const EXPOSURE_LEVELS = {
  */
 export class ExposureEvent {
     constructor(data) {
-        this.id = data.id || `exposure_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.id = data.id || randomId('exposure');
         this.source = data.source || 'unknown';
         this.amount = data.amount || 0;
         this.description = data.description || '';
@@ -82,7 +83,7 @@ export class ExposureEvent {
  */
 export class HeatSource {
     constructor(data) {
-        this.id = data.id || `heat_source_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        this.id = data.id || randomId('heat_source');
         this.name = data.name || 'Unknown';
         this.baseAmount = data.baseAmount || 0;
         this.maxAmount = data.maxAmount || this.baseAmount;

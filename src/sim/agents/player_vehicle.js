@@ -3,6 +3,7 @@
 
 import { TrafficAgent, VEHICLE_TYPES } from './traffic_agent.js';
 import { PathFollower } from '../traffic/pathfinder.js';
+import { randomId } from '../../rng.js';
 
 /**
  * Player vehicle - player-controlled vehicle with routing
@@ -159,7 +160,7 @@ export class PlayerVehicle extends TrafficAgent {
             // If stuck for too long, wait
             if (this.stuckTicks > 20) {
                 this.state = 'WAITING';
-                this.waitTimer = 5 + Math.random() * 5;
+                this.waitTimer = 8 + (this.id % 4);
                 this.controlMode = 'MANUAL';
                 this.speed = 0;
                 return { moved: false, x: this.x, y: this.y, waited: true };

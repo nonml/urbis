@@ -1,0 +1,181 @@
+{
+  "version": "1.0.0",
+  "language": "en",
+  "fallbackLanguage": "en",
+  "strings": {
+    "ui": {
+      "main_menu": {
+        "title": "City Builder",
+        "new_game": "New Game",
+        "load_game": "Load Game",
+        "settings": "Settings",
+        "credits": "Credits",
+        "exit": "Exit"
+      },
+      "game_ui": {
+        "pause": "Pause",
+        "resume": "Resume",
+        "save": "Save Game",
+        "quit": "Quit",
+        "stats": "Statistics",
+        "info": "Information",
+        "resources": "Resources",
+        "time": "Time"
+      },
+      "resources": {
+        "gold": "Gold",
+        "wood": "Wood",
+        "food": "Food",
+        "population": "Population",
+        "housing": "Housing",
+        "jobs": "Jobs"
+      },
+      "time": {
+        "day": "Day",
+        "days": "Days",
+        "tick": "Tick",
+        "ticks": "Ticks"
+      },
+      "buttons": {
+        "confirm": "Confirm",
+        "cancel": "Cancel",
+        "close": "Close",
+        "next": "Next",
+        "prev": "Previous",
+        "build": "Build",
+        "demolish": "Demolish",
+        "rotate": "Rotate",
+        "place": "Place",
+        "select": "Select",
+        "info": "Info",
+        "stats": "Stats"
+      },
+      "messages": {
+        "welcome": "Welcome to your new city!",
+        "resources_low": "Resources are running low!",
+        "crisis_escalating": "Crisis is escalating!",
+        "crisis_resolved": "Crisis has been resolved!",
+        "pop_growth": "Population is growing!",
+        "pop_shrinking": "Population is shrinking!",
+        "budget_deficit": "Budget deficit detected!",
+        "budget_surplus": "Budget surplus detected!"
+      },
+      "building_types": {
+        "house": "House",
+        "apartment": "Apartment Building",
+        "commercial": "Commercial Zone",
+        "industrial": "Industrial Zone",
+        "police": "Police Station",
+        "fire": "Fire Station",
+        "hospital": "Hospital",
+        "school": "School",
+        "power": "Power Plant",
+        "water": "Water Treatment"
+      },
+      "crisis_types": {
+        "flood": "Flood",
+        "fire": "Fire",
+        "crime_spree": "Crime Spree",
+        "police_strike": "Police Strike",
+        "blackout": "Blackout",
+        "bridge_failure": "Bridge Failure",
+        "market_crash": "Market Crash",
+        "disease": "Disease Outbreak"
+      },
+      "districts": {
+        "central": "Central District",
+        "north": "North District",
+        "south": "South District",
+        "east": "East District",
+        "west": "West District"
+      }
+    },
+    "game": {
+      "day_1": "Day 1 - The Beginning",
+      "day_1_desc": "Welcome, Mayor. Your city awaits. Build housing to attract citizens.",
+      "day_30": "Day 30 - First Month",
+      "day_30_desc": "A month has passed. Your city is taking shape.",
+      "day_100": "Day 100 - City Grows",
+      "day_100_desc": "Your city has grown significantly. Consider expanding services.",
+      "day_365": "Day 365 - Annual Review",
+      "day_365_desc": "A year has passed. The citizens look to you for leadership."
+    },
+    "quest": {
+      "title_missing_person": "Missing Person",
+      "desc_missing_person": "A citizen has gone missing in the North District. Investigate the area.",
+      "step1_missing_person": "Investigate the missing person's last known location",
+      "step2_missing_person": "Interview neighbors about the disappearance",
+      "step3_missing_person": "Review surveillance footage",
+      "step4_missing_person": "Find and rescue the missing citizen"
+    },
+    "crisis": {
+      "flood_title": "Flood Warning",
+      "flood_desc": "Severe flooding has been reported in the low-lying areas. Immediate action required!",
+      "flood_action_1": "Deploy sandbags ($100 gold)",
+      "flood_action_2": "Evacuate residents (No cost)",
+      "flood_action_3": "Ignore warning (High risk)",
+      "fire_title": "Fire Alert",
+      "fire_desc": "A fire has broken out in the industrial district. Firefighters are responding!",
+      "fire_action_1": "Send more fire crews ($50 gold)",
+      "fire_action_2": "Create firebreaks (No cost)",
+      "fire_action_3": "Wait for natural resolution (High risk)",
+      "blackout_title": "Power Outage",
+      "blackout_desc": "The power grid has collapsed. Critical services are affected!",
+      "blackout_action_1": "Restore power grid ($200 gold)",
+      "blackout_action_2": "Use backup generators (No cost)",
+      "blackout_action_3": "Wait for natural recovery (High risk)"
+    },
+    "building": {
+      "house_desc": "Basic housing for citizens. Increases population capacity.",
+      "apartment_desc": "High-density housing. Attracts more citizens.",
+      "commercial_desc": "Commercial zones for business and trade.",
+      "industrial_desc": "Industrial zones for production and jobs.",
+      "police_desc": "Reduces crime rate. Deters criminal activity.",
+      "fire_desc": "Reduces fire risk. Responds to emergencies.",
+      "hospital_desc": "Improves citizen health. Reduces disease spread.",
+      "school_desc": "Educates citizens. Increases productivity.",
+      "power_desc": "Generates electricity for the city.",
+      "water_desc": "Purifies water for citizens."
+    },
+    "notification": {
+      "crisis_detected": "Crisis Detected!",
+      "crime_spotted": "Crime Spotted!",
+      "pop_growth": "Population Growth!",
+      "budget_update": "Budget Update",
+      "quest_complete": "Quest Complete!",
+      "quest_failed": "Quest Failed!"
+    },
+    "settings": {
+      "title": "Settings",
+      "volume": "Volume",
+      "sound": "Sound Effects",
+      "music": "Music",
+      "visual": "Visual Effects",
+      "language": "Language",
+      "keyboard": "Keyboard Shortcuts"
+    },
+    "factions": {
+      "citizens": "Citizens",
+      "police": "Police Department",
+      "gangs": "Gangs",
+      "corp": "Corporations"
+    },
+    "crisis_actions": {
+      "sandbags": "Deploy Sandbags",
+      "evacuate": "Evacuate Residents",
+      "ignore": "Ignore Warning",
+      "more_crews": "Send More Crews",
+      "create_breaks": "Create Firebreaks",
+      "restore_grid": "Restore Power Grid",
+      "backup_gen": "Use Backup Generators",
+      "wait_natural": "Wait for Natural Resolution"
+    },
+    "crisis_costs": {
+      "sandbags_cost": "$100 Gold",
+      "evacuate_cost": "Free",
+      "more_crews_cost": "$50 Gold",
+      "restore_grid_cost": "$200 Gold",
+      "wait_natural_risk": "High Risk"
+    }
+  }
+}
