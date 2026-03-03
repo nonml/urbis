@@ -185,7 +185,7 @@ export class SurveillanceSource {
         }
 
         const intelRate = this.getIntelRate();
-        const intelGenerated = (this.rng?.chance(intelRate) ?? Math.random()) < intelRate ? 1 : 0;
+        const intelGenerated = this.rng?.chance(intelRate) ? 1 : 0;
 
         if (intelGenerated > 0) {
             this.lastTickGenerated = currentTick;
@@ -273,7 +273,7 @@ export class SurveillanceSourceManager {
         for (const b of this.game.buildings.buildings) {
             for (const sourceDef of buildingSources) {
                 // Add source based on building type and capacity
-                if ((this.rng?.chance(0.3) ?? Math.random()) < 0.3) {
+                if (this.rng?.chance(0.3)) {
                     const source = new SurveillanceSource({
                         type: sourceDef.type,
                         x: b.x,

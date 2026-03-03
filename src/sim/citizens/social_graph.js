@@ -223,10 +223,10 @@ export class SocialGraph {
 
         // Adult relationship potential
         if (ageA >= 18 && ageB >= 18 && ageA <= 60 && ageB <= 60) {
-            if (rel.affinity > 60 && this.rng?.chance(0.05) ?? Math.random() < 0.05) {
+            if (rel.affinity > 60 && this.rng?.chance(0.05)) {
                 rel.relationshipType = 'friend';
                 // Spouse potential based on compatibility
-                if ((this.rng?.chance(0.3) ?? Math.random()) < 0.3 && ageA !== ageB) {
+                if (this.rng?.chance(0.3) && ageA !== ageB) {
                     rel.familyRelation = 'spouse';
                 }
             }
@@ -259,7 +259,7 @@ export class SocialGraph {
                 for (let j = i + 1; j < members.length; j++) {
                     const rel = this.getOrCreateRelationship(members[i], members[j]);
                     rel.familyRelation = 'household_member';
-                    rel.affinity = 50 + ((this.rng?.next() ?? Math.random()) * 30);
+                    rel.affinity = 50 + (this.rng?.next() * 30);
                     rel.updateType();
                 }
             }
@@ -363,7 +363,7 @@ export class SocialGraph {
 
                 // Check if close enough for interaction
                 const dist = Math.abs(a.x - b.x) + Math.abs(a.y - b.y);
-                if (dist <= 3 && (this.rng?.chance(0.1) ?? Math.random()) < 0.1) {
+                if (dist <= 3 && this.rng?.chance(0.1)) {
                     this.processInteraction(a.id, b.id, tick);
                 }
             }

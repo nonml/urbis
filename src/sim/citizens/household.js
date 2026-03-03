@@ -488,7 +488,7 @@ export class PopulationManager {
         if (households.length === 0) return;
 
         for (let i = 0; i < count; i++) {
-            const idx = this.rng?.int(0, households.length - 1) ?? Math.floor(Math.random() * households.length);
+            const idx = this.rng?.int(0, households.length - 1);
             const household = households[idx];
             const x = household.homeX || Math.floor(this.game.map.width / 2);
             const y = household.homeY || Math.floor(this.game.map.height / 2);

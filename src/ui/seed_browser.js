@@ -644,7 +644,7 @@ export class SeedBrowserUI {
     }
 
     handleNewSeed() {
-        const randomSeed = (this.game?.rng?.int(1, 2147483647) ?? Math.floor(Math.random() * 2147483647)).toString();
+        const randomSeed = this.game?.rng?.int(1, 2147483647)?.toString() ?? '123456789';
         const input = this.panel.querySelector('.seed-search-input');
         if (input) {
             input.value = randomSeed;

@@ -38,6 +38,7 @@ import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { SocialGraph } from './sim/citizens/social_graph.js';
 import { CrimeGenerator } from './sim/citizens/crime_generator.js';
 import { HousingManager, PopulationManager } from './sim/citizens/household.js';
+import { SimChunkManager } from './sim/streaming/sim_cells.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
@@ -302,6 +303,9 @@ export class Game {
         this.tickRate = 1000; // 1 second per day (1000ms)
         this.paused = false;
 
+        // Simulation chunking (Milestone Q-01)
+        this.chunkManager = new SimChunkManager(this, 64);
+
         // Player state
         const cx = Math.floor(this.map.width / 2);
         const cy = Math.floor(this.map.height / 2);
@@ -497,6 +501,9 @@ export class Game {
         const citizenResult = this.citizens.updateAll(this.map, this.buildings);
         this.state.resources.population = this.citizens.getPopulation();
         this.state.resources.housing = this.buildings.totalHousing;
+
+        // Milestone Q-01: Simulation chunking update
+        this.chunkManager.update(this.state.time.tick);
 
         // 5. Job production (from employed citizens)
         if (citizenResult?.jobProduction) {
@@ -1012,6 +1019,8 @@ export class Game {
             influenceEngine: this.influenceEngine?.serialize(),
             sentimentManager: this.sentimentManager?.serialize(),
             heatManager: this.heatManager?.serialize(),
+            // Milestone Q-01: Simulation chunking
+            chunkManager: this.chunkManager?.serialize(),
             // Milestone N: Campaign data
             campaign: this.campaign?.serialize(),
         };
@@ -1302,6 +1311,9 @@ export class Game {
             }
             if (data.heatManager) {
                 this.heatManager?.loadState();
+            }
+            if (data.chunkManager) {
+                this.chunkManager.deserialize(data.chunkManager);
             }
 
             this.ui.showMessage('Game loaded!', 'success');
