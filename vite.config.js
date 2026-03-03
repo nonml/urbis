@@ -17,6 +17,6 @@ export default defineConfig({
     },
     define: {
         'import.meta.env.VITE_BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
-        'import.meta.env.VITE_BUILD_NUMBER': JSON.stringify('local')
+        'import.meta.env.VITE_BUILD_NUMBER': JSON.stringify('0.42.0-13d04a2')
     }
 });

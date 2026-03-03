@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:beta": "node tools/release_build.js",
     "preview": "vite preview",
     "test": "node scripts/smoke_test.mjs",
     "validate": "node scripts/validate_content.mjs",
@@ -15,6 +16,7 @@
   "keywords": ["city-builder"],
   "license": "MIT",
   "devDependencies": {
+    "glob": "^10.0.0",
     "vite": "^5.0.0"
   }
 }

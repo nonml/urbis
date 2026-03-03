@@ -89,7 +89,7 @@ export class HeatSource {
         this.maxAmount = data.maxAmount || this.baseAmount;
         this.currentAmount = data.currentAmount || this.baseAmount;
         this.sourceType = data.sourceType || 'active';
-        this decayRate = data.decayRate || 0.1;
+        this.decayRate = data.decayRate || 0.1;
         this.createdAt = data.createdAt || 0;
         this.expiryTick = data.expiryTick || null;
         this.tags = data.tags || [];

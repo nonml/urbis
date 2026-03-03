@@ -77,7 +77,7 @@ export function createVehicle(options = {}) {
         exitTimer: 0,
         driverId: options.driverId || null,
         spawnTick: options.spawnTick || 0,
-        last RoadTile: -1,
+        lastRoadTile: -1,
         driftFactor: 0
     };
 }

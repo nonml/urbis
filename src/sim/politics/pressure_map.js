@@ -1,7 +1,7 @@
 // Territory/Pressure Map System - Manages district pressure, influence zones, and territorial control
 // Creates dynamic territory effects based on faction presence and control
 
-import { getDistrictAt, getDistrictName } from '../gen/districts.js';
+import { getDistrictAt, getDistrictName } from '../../gen/districts.js';
 
 // Pressure levels
 export const PRESSURE_LEVELS = {

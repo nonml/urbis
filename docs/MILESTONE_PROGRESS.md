@@ -27,7 +27,7 @@ This document tracks progress toward Milestone U (1.0.0 release).
 | Q | 0.36.x | ✅ Complete | 100% | Simulation chunking + performance optimization |
 | R | 0.38.x | ✅ Complete | 100% | Visual/audio polish (Milestone A QA checklist created) |
 | S | 0.40.x | ✅ Complete | 100% | QA automation (Smoke tests 165/165 passing) |
-| T | 0.42.x | ⚪ Pending | 0% | Beta release prep |
+| T | 0.42.x | ✅ Complete | 100% | Beta release prep - all 5 tickets done |
 | U | 1.0.0 | ⚪ Pending | 0% | Ship release |
 
 ---
@@ -740,5 +740,47 @@ const value = this.rng?.next() * 100;
 - Rival AI political responses based on heat and threat levels
 - UI panel with tabs for policies, appointments, and pressure map
 - Event system integration with custom event types
+
+---
+
+## Milestone T — Beta Release Prep ✅ Complete
+
+**Exit Criteria Met:**
+- ✅ Beta build pipeline (T-01) - `tools/release_build.js` + `npm run build:beta`
+- ✅ Error boundary UX (T-02) - `src/dev/error_capture.js` with crash recovery
+- ✅ Onboarding finalization (T-03) - `src/ui/codex.js` + `src/sim/tutorial/tutorial.js`
+- ✅ Content completeness (T-04) - `tools/check_content.js` + content validation
+- ✅ Feedback UX (T-05) - `src/ui/feedback.js` + known issues UI
+
+**Files Created:**
+- `tools/release_build.js` - Reproducible beta build script with version stamping
+- `src/dev/error_capture.js` - Error boundary with bundle export and save recovery
+- `src/ui/codex.js` - Codex UI with search, categories, and help documentation
+- `tools/check_content.js` - Content validation script with target counts
+- `src/ui/feedback.js` - Known issues display and issue reporting UI
+- `package.json` - Added `build:beta` and `glob` dependency
+
+**Integration Completed:**
+- Version system integrated with build pipeline
+- Error handler installed globally via `window.onerror` and `unhandledrejection`
+- Codex accessible via `?` key and shows on first load
+- Content validation integrated into CI-lite workflow
+- Feedback UI links to GitHub issue template
+
+**Features:**
+- `npm run build:beta [version]` - Generate beta build with commit hash
+- Error screen shows version, seed, run ID with copy/export buttons
+- Codex organized by category (Core, Controls, Buildings, Advanced)
+- Content validation targets: 3+ cases, 30+ storylets, 10+ ops, 12+ policies
+- Feedback UI with known issues table and issue template generator
+
+**Keyboard Shortcuts:**
+- `?` - Open Codex
+- `Shift+C` - Open Codex via UI (if integrated)
+
+**Build Metadata:**
+- Version: `MAJOR.MINOR.PATCH-(SHORT_COMMIT_HASH)`
+- Build timestamp: ISO 8601 format
+- Full version displayed in main menu and error screens
 
 ---

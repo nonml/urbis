@@ -45,6 +45,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [0.42.0] - 2026-03-04
+
+### Added - Milestone T: Beta Release Prep
+- **Release Build Pipeline (T-01)**: Reproducible beta build with `npm run build:beta`, version stamping, and build metadata embedding
+- **Error Boundary UX (T-02)**: Global error handler with crash recovery screen, save bundle export, and debug info copying
+- **Codex System (T-03)**: In-game help and reference guide with search and categories (Core, Controls, Buildings, Advanced)
+- **Content Validation (T-04)**: `tools/check_content.js` script to validate content completeness targets
+- **Feedback UX (T-05)**: Known issues display with issue reporting template integration
+
+### Changes
+- Updated `package.json` with `build:beta` script and `glob` dependency
+- Updated `src/ui.js` with CodexUI and FeedbackUI integration
+- Updated `src/ui/settings.js` with Known Issues button in settings menu
+- Fixed syntax errors in `src/sim/intel/heat_manager.js`, `src/ui/feedback.js`, `src/vehicles/vehicle_state.js`
+- Fixed import paths in `src/sim/politics/pressure_map.js` and `src/sim/services/services.js`
+
+### Technical
+- Added `tools/release_build.js` - Build pipeline script
+- Added `src/dev/error_capture.js` - Error handling system
+- Added `src/ui/codex.js` - Codex reference system
+- Added `tools/check_content.js` - Content validation script
+- Added `src/ui/feedback.js` - Feedback and known issues system
+- Added `build-version.json` - Build metadata in output
+
+---
+
 ## [Unreleased]
 
 ### Planned

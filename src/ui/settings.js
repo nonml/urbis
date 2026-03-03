@@ -194,6 +194,14 @@ export class SettingsManager {
                         <div class="setting-row">
                             <button class="btn" id="reset-settings">Reset to Defaults</button>
                         </div>
+                        <div class="setting-row">
+                            <button class="btn btn-secondary" id="known-issues-btn">
+                                <svg width="16" height="16" viewBox="0 0 24 24" style="margin-right: 8px;">
+                                    <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+                                </svg>
+                                Known Issues & Feedback
+                            </button>
+                        </div>
                     </div>
                 </div>
                 <div class="overlay-footer">
@@ -285,6 +293,12 @@ export class SettingsManager {
         // Action buttons
         overlay.querySelectorAll('[data-action="close"]').forEach(btn => {
             btn.addEventListener('click', () => this.close());
+        });
+
+        // Milestone T: Known Issues button
+        overlay.querySelector('#known-issues-btn')?.addEventListener('click', () => {
+            this.game.feedbackUI?.toggle();
+            this.playUISound('click');
         });
 
         overlay.querySelector('#reset-settings')?.addEventListener('click', () => {

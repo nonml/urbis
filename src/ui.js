@@ -9,6 +9,8 @@ import { CaseFileUI } from './ui/case_file.js';
 import { FactionsPanel } from './ui/factions_panel.js';
 import { CitizenProfileUI } from './ui/citizen_profile.js';
 import { PoliticsPanel } from './ui/politics_panel.js';
+import { CodexUI } from './ui/codex.js';
+import { FeedbackUI } from './ui/feedback.js';
 import { createAudioManager } from './audio/audio_manager.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
 import { updatePlayerMovement, createPlayerState } from './player/controller.js';
@@ -297,6 +299,8 @@ export class UIManager {
         this.factionsPanel = new FactionsPanel(this.game);
         this.citizenProfileUI = new CitizenProfileUI(this.game);
         this.politicsPanel = new PoliticsPanel(this.game);
+        this.codexUI = new CodexUI(this.game);
+        this.feedbackUI = new FeedbackUI(this.game);
         this.setupInfoTabs();
         this.setupInput();
         this.setupGlobalShortcuts();
@@ -601,6 +605,20 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 e.preventDefault();
                 this.game.seedBrowser?.show();
                 this.showMessage('Open seed browser', 'normal');
+            }
+
+            // Milestone T: Codex (help) shortcut - press ?
+            if (e.key === '?') {
+                e.preventDefault();
+                this.codexUI?.open();
+                this.showMessage('Open Codex', 'normal');
+            }
+
+            // Milestone T: Feedback shortcut - press F12
+            if (e.key === 'F12') {
+                e.preventDefault();
+                this.feedbackUI?.open();
+                this.showMessage('Known Issues & Feedback', 'normal');
             }
 
             // Milestone P: Placement tool shortcuts
