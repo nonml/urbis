@@ -19,9 +19,10 @@ const SIM_DIR = path.join(__dirname, '../src/sim');
 const ASSETS_DIR = path.join(__dirname, '../assets');
 
 // Valid content types
-const VALID_QUEST_TYPES = [
-    'investigate', 'interact', 'go_to', 'hack', 'collect',
-    'interview', 'analyze', 'wait', 'build', 'zone'
+const VALID_QUEST_KINDS = [
+    'trigger', 'hack_node', 'go_to', 'choice', 'investigate', 'interact',
+    'outcome', 'conditional', 'spawn_clue', 'investigate', 'interact',
+    'go_to', 'hack', 'collect', 'interview', 'analyze', 'wait', 'build', 'zone'
 ];
 
 const VALID_CRISIS_TYPES = [
@@ -121,10 +122,10 @@ function validateQuestTemplate(file, data) {
             if (!step.id) {
                 warn(file, `Step ${i}: Missing "id" field`);
             }
-            if (!step.type) {
-                warn(file, `Step ${i}: Missing "type" field`);
-            } else if (!VALID_QUEST_TYPES.includes(step.type)) {
-                warn(file, `Step ${i}: Unknown step type "${step.type}"`);
+            if (!step.kind) {
+                warn(file, `Step ${i}: Missing "kind" field`);
+            } else if (!VALID_QUEST_KINDS.includes(step.kind)) {
+                warn(file, `Step ${i}: Unknown step kind "${step.kind}"`);
             }
         }
     }

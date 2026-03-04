@@ -11,17 +11,14 @@ export async function loadJsonFile(url) {
     try {
         const response = await fetch(url);
         if (!response.ok) {
-            console.warn(`Content loader: Failed to fetch ${url}: ${response.status}`);
             return null;
         }
         const text = await response.text();
         if (!text.trim()) {
-            console.warn(`Content loader: Empty file ${url}`);
             return null;
         }
         return JSON.parse(text);
     } catch (e) {
-        console.error(`Content loader: Parse error in ${url}: ${e.message}`);
         return null;
     }
 }
@@ -205,11 +202,7 @@ export function logLoadResult(result, type) {
     const errors = result?.errors || [];
 
     if (errors.length > 0) {
-        console.warn(`Content loader: ${errors.length} ${type} skipped due to validation errors`);
         errors.forEach(err => {
-            console.warn(`  - ${err.file}: ${Array.isArray(err.errors) ? err.errors.join('; ') : err.error}`);
         });
     }
-
-    console.log(`Content loader: Loaded ${count} ${type}`);
 }

@@ -43,9 +43,6 @@ export class CaseGenerator {
         // Instantiate the quest
         const quest = this.instantiateQuest(template, context);
 
-        // Log generation info
-        console.log(`Case generator: Created main case "${quest.title}" (${quest.id})`);
-
         return quest;
     }
 
@@ -60,8 +57,6 @@ export class CaseGenerator {
 
         const context = this.buildCaseContext();
         const quest = this.instantiateQuest(candidate, context);
-
-        console.log(`Case generator: Created minor case "${quest.title}" (${quest.id})`);
 
         return quest;
     }

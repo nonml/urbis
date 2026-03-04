@@ -157,7 +157,6 @@ export class TutorialManager {
      */
     start() {
         if (!this.isFirstTime) {
-            console.log('Tutorial already completed, skipping...');
             return;
         }
 

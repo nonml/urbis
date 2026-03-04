@@ -179,8 +179,6 @@ export class ModeIndicator {
             : 'God Mode controls: MMB pan, Scroll zoom, RMB rotate, Zones: 1-3';
         if (this.game.ui?.showMessage) {
             this.game.ui.showMessage(help, 'normal');
-        } else {
-            console.log(help);
         }
     }
 

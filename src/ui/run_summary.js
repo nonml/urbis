@@ -423,8 +423,6 @@ export class RunSummaryUI {
         // Show profile/stats panel
         if (this.game && this.game.ui && typeof this.game.ui.showStatsPanel === 'function') {
             this.game.ui.showStatsPanel();
-        } else {
-            console.log('Profile stats:', profileManager.getProfileData());
         }
     }
 }

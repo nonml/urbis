@@ -32,7 +32,7 @@ export class CaseGeneratorV2 {
             this.storylets = storyletsResult.storylets;
         }
 
-        console.log(`CaseGeneratorV2: Loaded ${this.caseTemplates.length} case templates and ${this.storylets.length} storylets`);
+
     }
 
     /**

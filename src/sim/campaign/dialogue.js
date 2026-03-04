@@ -117,9 +117,6 @@ export class DialogueManager {
         // Apply choice effects
         this.applyChoiceEffects(choice, dialogue);
 
-        // Log choice
-        console.log(`Dialogue choice: ${choice.label} (dialogue: ${dialogue.id})`);
-
         // Emit event
         eventBus.emit(EVENT_TYPES.CAMPAIGN_DIALOGUE_RESOLVED, {
             dialogueId: dialogue.id,

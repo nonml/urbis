@@ -192,7 +192,6 @@ async function loadQuestContent() {
     // Load case templates
     const caseResult = await loadQuestsFromDirectory('/src/content/quests');
     window.game.content = { quests: caseResult.quests, questErrors: caseResult.errors || [] };
-    console.log(`Loaded ${caseResult.quests.length} quest templates`);
     if (caseResult.errors?.length) {
         window.game.ui?.showMessage(`Quest load warnings: ${caseResult.errors.length} invalid files skipped.`, 'crisis');
     }
@@ -200,12 +199,10 @@ async function loadQuestContent() {
     // Load storylets
     const storyletResult = await loadStoryletsFromDirectory('/src/content/storylets');
     window.game.content.storylets = storyletResult.storylets;
-    console.log(`Loaded ${storyletResult.storylets.length} storylets`);
 
     // Load outcomes
     const outcomeResult = await loadOutcomes('/src/content/outcomes.json');
     window.game.content.outcomes = outcomeResult.outcomes;
-    console.log(`Loaded ${outcomeResult.outcomes.length} outcomes`);
 
     // Seed initial case files if missing (managed through CaseManager).
     if ((window.game.state.cases?.active || []).length === 0 && window.game.spawnCase) {
@@ -213,8 +210,6 @@ async function loadQuestContent() {
         window.game.spawnCase('corruption');
         window.game.spawnCase('extortion');
     }
-
-    console.log(`Game initialized with ${(window.game.state.cases?.active || []).length} active case(s)`);
 }
 
 // Add global keyboard shortcuts
