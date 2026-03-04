@@ -49,7 +49,7 @@ export const RESPONSE_STATE = {
     AVAILABLE: 'available',
     EN_ROUTE: 'en_route',
     ON_SCENE: 'on_scene',
-    REcovering: 'recovering',
+    RECOVERING: 'recovering',
     RETURNING: 'returning'
 };
 

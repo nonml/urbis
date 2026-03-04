@@ -31,6 +31,10 @@ export function saveGame(state) {
     } catch (e) {
         if (e.name === 'QuotaExceededError') {
             console.error('Save failed: localStorage quota exceeded');
+        } else if (e.name === 'SyntaxError') {
+            console.error('Save failed: Invalid JSON in save data');
+        } else if (e.name === 'SecurityError') {
+            console.error('Save failed: Security restriction prevented write');
         } else {
             console.error('Save failed:', e);
         }
@@ -63,7 +67,11 @@ export function loadGame() {
 
         return migratedState;
     } catch (e) {
-        console.error('Load failed:', e);
+        if (e.name === 'SyntaxError') {
+            console.error('Load failed: Invalid JSON in save data');
+        } else {
+            console.error('Load failed:', e);
+        }
         return null;
     }
 }
@@ -77,7 +85,11 @@ export function deleteSave() {
         localStorage.removeItem(SAVE_KEY);
         return true;
     } catch (e) {
-        console.error('Delete save failed:', e);
+        if (e.name === 'SecurityError') {
+            console.error('Delete save failed: Security restriction prevented removal');
+        } else {
+            console.error('Delete save failed:', e);
+        }
         return false;
     }
 }
@@ -109,6 +121,11 @@ export function getSaveMetadata() {
             schemaVersion: state.schemaVersion,
         };
     } catch (e) {
-        return null;
+        if (e.name === 'SyntaxError') {
+            console.error('Get save metadata failed: Invalid JSON in save data');
+            return null;
+        } else {
+            return null;
+        }
     }
 }

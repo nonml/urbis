@@ -4,6 +4,7 @@
 
 import { NetworkCore, createDataGridNetwork } from './network_core.js';
 import { EVENT_TYPES } from '../events.js';
+import { BUILDING_TYPES } from '../../constants.js';
 
 const DEFAULT_DATA_VALUES = {
     cellTower: { capacity: 60, demand: 2, upkeep: 3 },
@@ -69,7 +70,7 @@ export class DataGridSystem {
         this.network.consumers = [];
 
         for (const b of this.game.buildings.buildings) {
-            const buildingDef = this.game.constants.BUILDING_TYPES[b.type] || {};
+            const buildingDef = BUILDING_TYPES[b.type] || {};
             const capacity = buildingDef.dataCapacity || 0;
             const demand = buildingDef.dataDemand || 0;
 

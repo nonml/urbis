@@ -32,7 +32,7 @@ export class ScheduleManager {
     getPhaseAt(timeOfDay) {
         for (const key in DAY_PHASES) {
             const phase = DAY_PHASES[key];
-            if (timeOfDay >= phase.start && timeOfDay < phase.end) {
+            if (timeOfDay >= phase.start && timeOfDay <= phase.end) {
                 return phase;
             }
         }
@@ -262,7 +262,7 @@ export class ScheduleManager {
 export function getDayPhase(timeOfDay) {
     for (const key in DAY_PHASES) {
         const phase = DAY_PHASES[key];
-        if (timeOfDay >= phase.start && timeOfDay < phase.end) {
+        if (timeOfDay >= phase.start && timeOfDay <= phase.end) {
             return phase;
         }
     }

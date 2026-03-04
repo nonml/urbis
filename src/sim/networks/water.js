@@ -3,6 +3,7 @@
 // If sewage capacity insufficient, pollution rises and illness crises increase.
 
 import { NetworkCore, createWaterNetwork, createSewageNetwork } from './network_core.js';
+import { BUILDING_TYPES } from '../../constants.js';
 
 const DEFAULT_WATER_VALUES = {
     waterPlant: { capacity: 80, demand: 3, upkeep: 2 },
@@ -46,7 +47,7 @@ export class WaterSystem {
         this.sewageNetwork.consumers = [];
 
         for (const b of this.game.buildings.buildings) {
-            const buildingDef = this.game.constants.BUILDING_TYPES[b.type] || {};
+            const buildingDef = BUILDING_TYPES[b.type] || {};
             const waterCap = buildingDef.waterCapacity || 0;
             const waterDemand = buildingDef.waterDemand || 0;
             const sewageCap = buildingDef.sewageCapacity || 0;
@@ -115,7 +116,7 @@ export class WaterSystem {
     getWaterDemand() {
         let demand = 0;
         for (const b of this.game.buildings.buildings) {
-            demand += (this.game.constants.BUILDING_TYPES[b.type]?.waterDemand || 0) + (b.level * 0.5);
+            demand += (BUILDING_TYPES[b.type]?.waterDemand || 0) + (b.level * 0.5);
         }
         return demand;
     }
@@ -126,7 +127,7 @@ export class WaterSystem {
     getSewageDemand() {
         let demand = 0;
         for (const b of this.game.buildings.buildings) {
-            demand += (this.game.constants.BUILDING_TYPES[b.type]?.sewageDemand || 0) + (b.level * 0.3);
+            demand += (BUILDING_TYPES[b.type]?.sewageDemand || 0) + (b.level * 0.3);
         }
         return demand;
     }

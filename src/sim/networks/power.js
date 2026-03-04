@@ -3,7 +3,7 @@
 // If demand > supply, underpowered districts suffer penalties and blackout crises.
 
 import { NetworkCore, createPowerNetwork } from './network_core.js';
-import { BUILDING_POWER_PLANT, BUILDING_SUBSTATION, BUILDING_TOWN_HALL } from '../../constants.js';
+import { BUILDING_POWER_PLANT, BUILDING_SUBSTATION, BUILDING_TOWN_HALL, BUILDING_TYPES } from '../../constants.js';
 
 // Default power values
 const DEFAULT_POWER_VALUES = {
@@ -40,7 +40,7 @@ export class PowerSystem {
         this.network.consumers = [];
 
         for (const b of this.game.buildings.buildings) {
-            const buildingDef = this.game.constants.BUILDING_TYPES[b.type] || {};
+            const buildingDef = BUILDING_TYPES[b.type] || {};
             const capacity = buildingDef.powerCapacity || 0;
             const demand = buildingDef.powerDemand || 0;
 
@@ -62,7 +62,7 @@ export class PowerSystem {
     getBuildingDemand() {
         let demand = 0;
         for (const b of this.game.buildings.buildings) {
-            const demandFactor = this.game.constants.BUILDING_TYPES[b.type]?.powerDemand || 0;
+            const demandFactor = BUILDING_TYPES[b.type]?.powerDemand || 0;
             demand += demandFactor + (b.level * BUILDING_POWER_FACTOR);
         }
         return demand;

@@ -2,6 +2,8 @@
 // Monthly (tick-based) budget calculates income and expenses.
 // Tax sliders for R/C/I affect demand and citizen happiness.
 
+import { BUILDING_TYPES } from '../../constants.js';
+
 const DEFAULT_TAX_RATES = {
     residential: 0.05,  // 5%
     commercial: 0.08,   // 8%
@@ -49,7 +51,7 @@ export class BudgetManager {
         // Building upkeep
         let buildingUpkeep = 0;
         for (const b of buildings.buildings) {
-            const buildingDef = this.game.constants.BUILDING_TYPES[b.type] || {};
+            const buildingDef = BUILDING_TYPES[b.type] || {};
             buildingUpkeep += buildingDef.upkeep || 0;
         }
 
