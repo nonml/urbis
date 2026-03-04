@@ -3,6 +3,8 @@ import { validateGameState, migrateState, getSchemaVersion } from '../state/game
 
 const SAVE_KEY = 'cityBuilderSave_v1';
 
+const QUOTA_THRESHOLD = 4500000;
+
 /**
  * Saves the game state to localStorage
  * @param {Object} state - Complete GameState object
@@ -18,10 +20,20 @@ export function saveGame(state) {
                 savedAt: Date.now(),
             },
         };
-        localStorage.setItem(SAVE_KEY, JSON.stringify(versionedState));
+        const serializedState = JSON.stringify(versionedState);
+        
+        if (serializedState.length > QUOTA_THRESHOLD) {
+            console.warn('Save data exceeds 4.5MB quota, truncating may be needed');
+        }
+        
+        localStorage.setItem(SAVE_KEY, serializedState);
         return true;
     } catch (e) {
-        console.error('Save failed:', e);
+        if (e.name === 'QuotaExceededError') {
+            console.error('Save failed: localStorage quota exceeded');
+        } else {
+            console.error('Save failed:', e);
+        }
         return false;
     }
 }

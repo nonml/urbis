@@ -15,7 +15,6 @@ const TUTORIAL_STEPS = [
         kind: 'go_to',
         targetX: null, // Will be resolved at runtime
         targetY: null,
-        autoAdvance: true,
         autoAdvance: 600
     },
     {
