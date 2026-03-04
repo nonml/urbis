@@ -5,7 +5,6 @@
 import { STEP_KINDS, createQuestInstance, QuestEngine } from '../quests/quest_engine.js';
 import { createInteractable, INTERACTABLE_TYPES } from '../interactables.js';
 import { eventBus } from '../events.js';
-import { DISTRICT_AMBIENT } from '../../audio/audio_manager.js';
 
 // Tutorial steps
 const TUTORIAL_STEPS = [
@@ -17,7 +16,7 @@ const TUTORIAL_STEPS = [
         targetX: null, // Will be resolved at runtime
         targetY: null,
         autoAdvance: true,
-        autoAdvanceTime: 10000 // 10 seconds to explore
+        autoAdvance: 600
     },
     {
         id: 'place_house',
@@ -63,7 +62,7 @@ const TUTORIAL_STEPS = [
         id: 'start_main_case',
         title: 'Start the Main Case',
         description: 'Once a case is available, open it in the quest log.',
-        kind: 'OUTCOME',
+        kind: 'outcome',
         outcomes: [{
             label: 'Main Case Started',
             effect: ['gains_clue:main_case_started']

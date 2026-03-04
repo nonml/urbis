@@ -26,8 +26,7 @@ export class MapScreen {
         this.canvas = null;
         this.ctx = null;
         this.element = null;
-        this.overlay = null;
-        this.isvisible = false;
+        this.isVisible = false;
         this.mapCache = null;
         this.mapCacheTimestamp = 0;
         this.waypoint = null;
@@ -90,8 +89,8 @@ export class MapScreen {
     }
 
     toggle() {
-        this.isvisible = !this.isvisible;
-        if (this.isvisible) {
+        this.isVisible = !this.isVisible;
+        if (this.isVisible) {
             this.element.classList.remove('hidden');
             this.drawMap();
             eventBus.emit('map_screen_toggled', { visible: true });
@@ -302,7 +301,7 @@ export class MapScreen {
      * Update map display when game state changes
      */
     update() {
-        if (this.isvisible) {
+        if (this.isVisible) {
             this.drawMap();
         }
     }

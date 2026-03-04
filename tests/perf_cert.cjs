@@ -286,7 +286,7 @@ class PerformanceTestRunner {
     }
 
     // Check for frame spikes
-    const frameSpikes = stats.frameTimes.filter(t => t > 50).length;
+    const frameSpikes = stats.frameTimes && stats.frameTimes.length > 0 ? stats.frameTimes.filter(t => t > 50).length : 0;
     if (frameSpikes > 10) {
       issues.push({
         type: 'warn',
@@ -359,7 +359,8 @@ class PerformanceTestRunner {
 }
 
 // Run if executed directly
-if (require.main === module) {
+const isMain = require.main === module;
+if (isMain) {
   const runner = new PerformanceTestRunner();
   runner.run()
     .then(code => process.exit(code))
@@ -369,4 +370,6 @@ if (require.main === module) {
     });
 }
 
-module.exports = { PerformanceTestRunner, PERFTARGETS };
+if (!isMain) {
+  module.exports = { PerformanceTestRunner, PERFTARGETS };
+}

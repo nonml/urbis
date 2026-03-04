@@ -26,14 +26,20 @@ export const TERRAIN_COLORS = {
     [TERRAIN_WATER]: '#4da6ff',
     [TERRAIN_GRASS]: '#66cdaa',
     [TERRAIN_FOREST]: '#2d6a4f',
-    [TERRAIN_MOUNTAIN]: '#8b4513'
+    [TERRAIN_MOUNTAIN]: '#8b4513',
+    [TERRAIN_ROAD]: '#888888',
+    [TERRAIN_SIDEWALK]: '#dddddd',
+    [TERRAIN_PARK]: '#90ee90'
 };
 
 export const TERRAIN_ICONS = {
     [TERRAIN_WATER]: '💧',
     [TERRAIN_GRASS]: '🟩',
     [TERRAIN_FOREST]: '🌲',
-    [TERRAIN_MOUNTAIN]: '⛰️'
+    [TERRAIN_MOUNTAIN]: '⛰️',
+    [TERRAIN_ROAD]: '🛣️',
+    [TERRAIN_SIDEWALK]: '🚶',
+    [TERRAIN_PARK]: '🌳'
 };
 
 // Building types
