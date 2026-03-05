@@ -328,6 +328,25 @@ export class PolicyManager {
     }
 
     /**
+     * Get enacted policies (for UI compatibility)
+     * @returns {Array} Array of policy objects with full definition
+     */
+    getEnactedPolicies() {
+        return this.activePolicies.map(ap => {
+            const def = POLICY_DEFINITIONS[ap.policyId];
+            return def ? { ...def, ...ap } : null;
+        }).filter(Boolean);
+    }
+
+    /**
+     * Get available/pending policies (for UI compatibility)
+     * @returns {Array} Array of pending policy IDs
+     */
+    getAvailablePolicies() {
+        return this.pendingPolicies.map(pid => POLICY_DEFINITIONS[pid]).filter(Boolean);
+    }
+
+    /**
      * Get policy by ID
      * @param {string} policyId - Policy identifier
      * @returns {Object|null} Policy definition or null
@@ -615,6 +634,31 @@ export class PolicyManager {
             this.pendingPolicies.push(policyId);
             eventBus.emit(EVENT_TYPES.POLICY_CONSIDERED, { policyId });
         }
+    }
+
+    /**
+     * Get remaining ticks for a policy
+     * @param {string} policyId - Policy ID
+     * @returns {number} Remaining ticks
+     */
+    getPolicyRemainingTicks(policyId) {
+        const ap = this.activePolicies.find(p => p.policyId === policyId);
+        return ap ? ap.ticksRemaining : 0;
+    }
+
+    /**
+     * Get monthly cost of all enacted policies
+     * @returns {number} Total monthly cost
+     */
+    getMonthlyCost() {
+        let total = 0;
+        for (const ap of this.activePolicies) {
+            const policy = POLICY_DEFINITIONS[ap.policyId];
+            if (policy) {
+                total += policy.monthlyCost || 0;
+            }
+        }
+        return total;
     }
 
     /**

@@ -10,9 +10,26 @@ This is a lightweight **third-person city-builder** prototype with:
 
 ## Run
 
-Because this uses ES modules, serve it via a local web server (not `file://`).
+Because this uses ES modules + dynamic imports, run it via a local web server (not `file://`).
 
-**Prerequisites**: Node.js (v14+) or Python 3.x, and a **modern browser** (Chrome 61+, Firefox 60+, Safari 11.1+) that supports ES Modules natively. No build step is required; serve the source directory directly.
+### Recommended (most reliable): Vite dev server
+
+This path installs **Three.js locally** (no CDN required) and avoids firewall/adblock issues.
+
+```bash
+npm install
+npm run dev
+```
+
+Then open the URL printed in your terminal (usually `http://localhost:5173`).
+
+### Alternative: simple static server (may require CDN access)
+
+If you don't want Vite, you can serve the directory directly. In this mode the game will try:
+1) local `three` (will fail without a bundler), then
+2) CDN fallbacks (unpkg/jsdelivr/cdnjs).
+
+**Prerequisites**: Node.js or Python 3.x, and a modern WebGL-capable browser.
 
 Example (Node.js):
 
@@ -50,5 +67,5 @@ Upon successful launch, your browser should display a 3D viewport with a procedu
 
 ## Notes
 
-- Three.js is loaded from an ESM CDN (pinned to v0.150.0).
+- Three.js loads via **local dependency** when using Vite; otherwise it falls back to CDNs.
 - Crises are deterministic under the same seed (for a given play pattern).

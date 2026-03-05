@@ -47,15 +47,12 @@ function createRendererStub(game, canvas) {
         _lastFrameMs: 0,
         _lastFrameAt: 0,
         _ensureCtx() {
+            // IMPORTANT:
+            // Never call getContext('2d') on the main canvas.
+            // If we do, the browser locks that canvas to a 2D context and Three.js
+            // cannot create a WebGL context later (exactly the error you saw).
             if (!this.canvas) return null;
             if (!this.ctx) {
-                let ctx = this.canvas.getContext('2d');
-                if (ctx) {
-                    removeFallbackCanvas(this.canvas);
-                    this.drawCanvas = this.canvas;
-                    this.ctx = ctx;
-                    return this.ctx;
-                }
                 const parent = this.canvas.parentElement;
                 if (!parent) return null;
                 const id = getFallbackCanvasId(this.canvas);
@@ -65,7 +62,12 @@ function createRendererStub(game, canvas) {
                     overlay.id = id;
                     overlay.style.position = 'absolute';
                     overlay.style.pointerEvents = 'none';
-                    overlay.style.zIndex = '1';
+                    overlay.style.zIndex = '2';
+                    overlay.style.left = '0';
+                    overlay.style.top = '0';
+                    overlay.style.width = '100%';
+                    overlay.style.height = '100%';
+                    parent.style.position = parent.style.position || 'relative';
                     parent.appendChild(overlay);
                 }
                 this.drawCanvas = overlay;
@@ -261,9 +263,9 @@ export class UIManager {
         this.audioManager = createAudioManager(game);
 
         // 3D
+        // Start in a lightweight stub so UI is responsive immediately, then upgrade to real 3D.
+        // If 3D fails, we stay on the stub (compatibility mode).
         this.renderer3d = createRendererStub(this.game, this.canvas);
-        // Keep compatibility renderer as default until 3D init is stabilized in plain static-server runs.
-        this.useCompatibilityRenderer('default_2d');
 
         // Input
         this.keys = new Set();
@@ -304,17 +306,26 @@ export class UIManager {
         this.setupInfoTabs();
         this.setupInput();
         this.setupGlobalShortcuts();
+
+        // Auto-init 3D renderer on boot (City Skylines-style). If it fails, we fall back gracefully.
+        this.loadRenderer3D();
     }
 
     async loadRenderer3D() {
         try {
             const mod = await import('./renderer3d.js');
-            const Renderer3D = mod?.Renderer3D;
-            if (!Renderer3D) throw new Error('Renderer3D export missing.');
-            this.renderer3d = new Renderer3D(this.game, this.canvas);
+            // Prefer async factory (robust Three.js loading + WebGL checks)
+            if (typeof mod?.createRenderer3D === 'function') {
+                this.renderer3d = await mod.createRenderer3D(this.game, this.canvas);
+            } else {
+                const Renderer3D = mod?.Renderer3D;
+                if (!Renderer3D) throw new Error('Renderer3D export missing.');
+                this.renderer3d = new Renderer3D(this.game, this.canvas);
+            }
             this.renderer3d.isFallback = false;
             removeFallbackCanvas(this.canvas);
             this.applySettings();
+            this.showMessage('3D renderer ready.', 'success');
         } catch (e) {
             this.useCompatibilityRenderer(e);
         }
@@ -326,7 +337,9 @@ export class UIManager {
         }
         this.renderer3d = createRendererStub(this.game, this.canvas);
         this.applySettings();
-        this.showMessage('3D renderer unavailable; running in compatibility mode.', 'crisis');
+        const msg = (reason && (reason.message || String(reason))) ? (reason.message || String(reason)) : '';
+        const short = msg ? msg.split('\n')[0].slice(0, 140) : 'Unknown error';
+        this.showMessage(`3D renderer unavailable: ${short} (see console)`, 'crisis');
     }
 
     onWorldRebuilt() {

@@ -1,7 +1,8 @@
 // Mode Indicator UI - Shows current gameplay mode (God/Street)
 
 // Configuration constants
-export const MODE_INDICATOR_FALLBACK_ID = '#settings-btn';
+// NOTE: getElementById expects raw id, not a CSS selector.
+export const MODE_INDICATOR_FALLBACK_ID = 'settings-btn';
 
 export const MODE_STREET = 'street';
 export const MODE_GOD = 'god';

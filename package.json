@@ -9,13 +9,22 @@
     "build:beta": "node tools/release_build.js",
     "preview": "vite preview",
     "test": "node scripts/smoke_test.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:debug": "playwright test --debug",
     "validate": "node scripts/validate_content.mjs",
     "lint:basic": "node scripts/lint_basic.mjs",
     "check:no-math-random": "node scripts/check_no_math_random.mjs"
   },
-  "keywords": ["city-builder"],
+  "keywords": [
+    "city-builder"
+  ],
   "license": "MIT",
+  "dependencies": {
+    "three": "^0.160.0"
+  },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "glob": "^10.0.0",
     "vite": "^5.0.0"
   }

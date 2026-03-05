@@ -3,7 +3,8 @@ import { DIFFICULTY, RIVAL_CONFIG } from '../constants.js';
 import { randomSeed32, randomId } from '../rng.js';
 import { createRNGStreamSeeds } from '../rng_streams.js';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+// v2 adds `economy` (demand/budget/debt) used by multiple sim modules.
+export const CURRENT_SCHEMA_VERSION = 2;
 
 /**
  * Creates a new GameState with default values
@@ -56,6 +57,19 @@ export function createNewGameState(options = {}) {
             totalGoldEarned: 0,
             totalFoodProduced: 0,
             totalWoodProduced: 0,
+        },
+        economy: {
+            // Demand is normalized to residential/commercial/industrial in [0..1]
+            demand: { residential: 0.5, commercial: 0.5, industrial: 0.5 },
+            // Budget/debt state (BudgetManager/LoanManager)
+            debt: 0,
+            lastBudget: {
+                income: 0,
+                expenses: 0,
+                deficit: 0,
+                balanced: true,
+                tick: 0,
+            },
         },
         map: {
             width: mapPreset === 'SMALL' ? 40 : mapPreset === 'CITY' ? 96 : 256,
@@ -165,7 +179,7 @@ export function validateGameState(state) {
         return { valid: false, error: 'Missing schemaVersion' };
     }
 
-    const requiredFields = ['meta', 'time', 'resources', 'map', 'buildings', 'citizens', 'crises', 'quests', 'cases', 'factions', 'player'];
+    const requiredFields = ['meta', 'time', 'resources', 'economy', 'map', 'buildings', 'citizens', 'crises', 'quests', 'cases', 'factions', 'player'];
 
     for (const field of requiredFields) {
         if (state[field] === undefined) {
@@ -183,16 +197,38 @@ export function validateGameState(state) {
  * @returns {Object} Migrated state
  */
 export function migrateState(state) {
-    // If already current version, no migration needed
-    if (state.schemaVersion === CURRENT_SCHEMA_VERSION) {
-        return state;
-    }
+    const from = Number(state.schemaVersion || 0);
+    if (from === CURRENT_SCHEMA_VERSION) return state;
 
     // Migration chain: v1 -> v2 -> ... -> CURRENT
     // For now, we only have v1 so this is a placeholder
     // Add migration steps as schema evolves
 
     console.warn(`Migrating state from v${state.schemaVersion} to v${CURRENT_SCHEMA_VERSION}`);
+
+    // v1 -> v2: add economy container
+    if (from < 2) {
+        if (!state.economy || typeof state.economy !== 'object') {
+            state.economy = {
+                demand: { residential: 0.5, commercial: 0.5, industrial: 0.5 },
+                debt: 0,
+                lastBudget: { income: 0, expenses: 0, deficit: 0, balanced: true, tick: 0 },
+            };
+        }
+        // Normalize demand keys if older saves used {res,com,ind}
+        const d = state.economy.demand;
+        if (d && typeof d === 'object') {
+            const hasOld = ('res' in d) || ('com' in d) || ('ind' in d);
+            const hasNew = ('residential' in d) || ('commercial' in d) || ('industrial' in d);
+            if (hasOld && !hasNew) {
+                state.economy.demand = {
+                    residential: Number(d.res ?? 0.5),
+                    commercial: Number(d.com ?? 0.5),
+                    industrial: Number(d.ind ?? 0.5),
+                };
+            }
+        }
+    }
 
     // Example migration pattern (uncomment when needed):
     // if (state.schemaVersion === 0) {

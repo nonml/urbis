@@ -14,7 +14,7 @@ import { Minimap } from './minimap.js';
 import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY } from './constants.js';
 import { RNG, randomSeed32 } from './rng.js';
 import { createRNGStreams, createRNGStreamSeeds, createRNGsFromSeeds } from './rng_streams.js';
-import { createNewGameState, validateGameState as validateState } from './state/game_state.js';
+import { createNewGameState, validateGameState as validateState, migrateState, CURRENT_SCHEMA_VERSION } from './state/game_state.js';
 import { validateGameState, assertStateShape } from './state/validate.js';
 import { ScheduleManager } from './sim/schedule.js';
 import { InteractableManager } from './sim/interactables.js';
@@ -540,7 +540,16 @@ export class Game {
         this.state.economy.demand = demand;
 
         // 5c. Milestone G: Budget calculation
-        this.budgetManager.processBudgetTick();
+        const budgetResult = this.budgetManager.processBudgetTick();
+        if (this.state.economy) {
+            this.state.economy.lastBudget = {
+                income: budgetResult?.income ?? 0,
+                expenses: budgetResult?.expenses ?? 0,
+                deficit: budgetResult?.deficit ?? 0,
+                balanced: budgetResult?.balanced ?? true,
+                tick: this.state.time.tick,
+            };
+        }
 
         // 5d. Milestone G: Debt payment processing
         this.loanManager.processDebtPayments();
@@ -899,7 +908,7 @@ export class Game {
     saveGame() {
         // Build save data from GameState
         const saveData = {
-            schemaVersion: 1,
+            schemaVersion: CURRENT_SCHEMA_VERSION,
             meta: {
                 ...this.state.meta,
                 savedAt: Date.now(),
@@ -924,6 +933,7 @@ export class Game {
                 totalFoodProduced: this.resources.totalFoodProduced,
                 totalWoodProduced: this.resources.totalWoodProduced,
             },
+            economy: this.state.economy || { demand: { residential: 0.5, commercial: 0.5, industrial: 0.5 }, debt: 0, lastBudget: { income: 0, expenses: 0, deficit: 0, balanced: true, tick: 0 } },
             map: {
                 width: this.map.width,
                 height: this.map.height,
@@ -1029,6 +1039,8 @@ export class Game {
         };
 
         try {
+            localStorage.setItem('cityBuilderSave_v2', JSON.stringify(saveData));
+            // Back-compat: also write v1 key so older builds can still load a save.
             localStorage.setItem('cityBuilderSave_v1', JSON.stringify(saveData));
             this.ui.showMessage('Game saved!', 'success');
             return true;
@@ -1041,13 +1053,16 @@ export class Game {
 
     loadGame() {
         try {
-            const saveData = localStorage.getItem('cityBuilderSave_v1');
+            const saveData = localStorage.getItem('cityBuilderSave_v2') || localStorage.getItem('cityBuilderSave_v1');
             if (!saveData) {
                 this.ui.showMessage('No save game found!', 'crisis');
                 return false;
             }
 
-            const data = JSON.parse(saveData);
+            let data = JSON.parse(saveData);
+
+            // Migrate older saves (e.g. v1 missing economy) before validation.
+            data = migrateState(data);
 
             // Validate basic shape
             const validation = validateGameState(data);
@@ -1116,6 +1131,20 @@ export class Game {
             this.resources.totalGoldEarned = data.resources.totalGoldEarned || 0;
             this.resources.totalFoodProduced = data.resources.totalFoodProduced || 0;
             this.resources.totalWoodProduced = data.resources.totalWoodProduced || 0;
+
+            // Restore economy (v2+)
+            if (!this.state.economy) this.state.economy = { demand: { residential: 0.5, commercial: 0.5, industrial: 0.5 }, debt: 0, lastBudget: { income: 0, expenses: 0, deficit: 0, balanced: true, tick: 0 } };
+            if (data.economy && typeof data.economy === 'object') {
+                this.state.economy.debt = Number(data.economy.debt || 0);
+                const d = data.economy.demand || {};
+                // Accept old format {res,com,ind}
+                this.state.economy.demand = {
+                    residential: Number(d.residential ?? d.res ?? 0.5),
+                    commercial: Number(d.commercial ?? d.com ?? 0.5),
+                    industrial: Number(d.industrial ?? d.ind ?? 0.5),
+                };
+                this.state.economy.lastBudget = data.economy.lastBudget || this.state.economy.lastBudget;
+            }
 
             // Restore map tiles
             if (data.map && data.map.tiles) {

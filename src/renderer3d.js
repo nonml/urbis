@@ -1,4 +1,4 @@
-// Third-person 3D renderer (Three.js via ESM CDN)
+// Third-person 3D renderer (Three.js)
 // Renders:
 // - Terrain: Instanced boxes with per-instance colors
 // - Buildings: Instanced boxes per building type
@@ -6,8 +6,84 @@
 // - Player: simple capsule-like stack
 // - Camera rig: Orbit + Follow + Collision
 
-import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D, ZONE_TYPES } from './constants.js';
+// IMPORTANT: Do NOT import Three.js from a single CDN at module-load time.
+// Many users run behind corporate firewalls / adblockers that block unpkg.
+// If that static import fails, the entire module fails to load and the UI
+// can never upgrade from the compatibility renderer.
+//
+// Instead, we lazy-load Three.js at runtime with multiple fallbacks:
+//  1) local dependency ("three") when running under Vite / npm
+//  2) a small list of CDNs
+
+let THREE = null;
+
+function isWebGLAvailable() {
+    try {
+        const canvas = document.createElement('canvas');
+        const gl2 = canvas.getContext('webgl2');
+        if (gl2) return true;
+        const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+        return !!gl;
+    } catch {
+        return false;
+    }
+}
+
+async function loadThreeJS() {
+    if (THREE) return THREE;
+
+    const attempts = [];
+
+    // 1) Preferred: local dependency (works with Vite bundling)
+    try {
+        THREE = await import('three');
+        return THREE;
+    } catch (e) {
+        attempts.push({ target: 'three (local dependency)', error: e });
+    }
+
+    // 2) CDN fallbacks (ESM)
+    const cdns = [
+        'https://unpkg.com/three@0.160.0/build/three.module.js',
+        'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js',
+        'https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.module.js',
+    ];
+
+    for (const url of cdns) {
+        try {
+            THREE = await import(url);
+            return THREE;
+        } catch (e) {
+            attempts.push({ target: url, error: e });
+        }
+    }
+
+    const last = attempts[attempts.length - 1];
+    const msg = [
+        'Failed to load Three.js.\n',
+        'Fix options:\n',
+        '  - Recommended: run `npm install` (this project expects `three` as a dependency under Vite)\n',
+        '  - Or allow a CDN (unpkg/jsdelivr/cdnjs) through your firewall/adblock\n',
+        '',
+        'Attempted sources:',
+        ...attempts.map((a) => `- ${a.target}: ${String(a.error?.message || a.error)}`),
+    ].join('\n');
+
+    const err = new Error(msg);
+    // Keep the last error for console debugging
+    err.cause = last?.error;
+    throw err;
+}
+
+export async function createRenderer3D(game, canvas) {
+    if (!isWebGLAvailable()) {
+        throw new Error('WebGL is unavailable or disabled in this browser/device.');
+    }
+    await loadThreeJS();
+    return new Renderer3D(game, canvas);
+}
+import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { ZONE_TYPES } from './sim/zoning/zoning.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {

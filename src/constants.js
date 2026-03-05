@@ -207,6 +207,10 @@ export const BUILDING_CCTV_NETWORK = 'cctv-network';
 export const BUILDING_COUNTERINTEL = 'counterintel';
 export const BUILDING_PROPAGANDA_OFFICE = 'propaganda-office';
 
+// Power network buildings
+export const BUILDING_POWER_PLANT = 'power-plant';
+export const BUILDING_SUBSTATION = 'substation';
+
 export const BUILDING_SECURITY = {
     [BUILDING_POLICE_STATION]: {
         name: 'Police Station',

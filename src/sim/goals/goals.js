@@ -1,4 +1,4 @@
-import goalsData from '../../content/goals.json' assert { type: 'json' };
+import goalsData from '../../content/goals.json' with { type: 'json' };
 import { createRunSummary } from '../../ui/run_summary.js';
 
 const DEFAULT_GOALS = {

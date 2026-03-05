@@ -462,8 +462,10 @@ body {
 
 .overlay-content {
     text-align: center;
-    max-width: 500px;
-    padding: 40px;
+    max-width: 90vw;
+    max-height: 90vh;
+    padding: 20px;
+    overflow-y: auto;
     background: repeating-linear-gradient(
         45deg,
         #fff8e1,
@@ -491,29 +493,29 @@ body {
 }
 
 .overlay h1 {
-    font-size: 48px;
+    font-size: clamp(24px, 8vw, 48px);
     margin-bottom: 20px;
     color: var(--stardew-green-dark);
     text-shadow: 2px 2px 0 rgba(230, 184, 0, 0.3);
 }
 
 .overlay p {
-    font-size: 18px;
+    font-size: clamp(14px, 4vw, 18px);
     color: #5d5d5d;
     margin-bottom: 30px;
     line-height: 1.6;
 }
 
 .btn {
-    padding: 15px 40px;
-    font-size: 18px;
+    padding: 12px 30px;
+    font-size: clamp(14px, 4vw, 18px);
     font-weight: 700;
     border: 3px solid var(--stardew-green-dark);
     border-radius: 50px;
     cursor: pointer;
-    margin: 10px;
+    margin: 8px;
     text-transform: uppercase;
-    letter-spacing: 2px;
+    letter-spacing: 1px;
     transition: all 0.2s ease;
     background: var(--stardew-green-light);
     color: #fff;

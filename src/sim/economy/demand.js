@@ -18,9 +18,9 @@ const CONFIG = {
 export class DemandCalculator {
     constructor() {
         this.demand = {
-            res: CONFIG.DEFAULT_DEMAND,
-            com: CONFIG.DEFAULT_DEMAND,
-            ind: CONFIG.DEFAULT_DEMAND
+            residential: CONFIG.DEFAULT_DEMAND,
+            commercial: CONFIG.DEFAULT_DEMAND,
+            industrial: CONFIG.DEFAULT_DEMAND,
         };
     }
 
@@ -77,9 +77,9 @@ export class DemandCalculator {
         }
 
         // Apply smoothing (demand doesn't change instantly)
-        this.demand.res = this.smooth(this.demand.res, resDemand, CONFIG.SMOOTHING_FACTOR);
-        this.demand.com = this.smooth(this.demand.com, comDemand, CONFIG.SMOOTHING_FACTOR);
-        this.demand.ind = this.smooth(this.demand.ind, indDemand, CONFIG.SMOOTHING_FACTOR);
+        this.demand.residential = this.smooth(this.demand.residential, resDemand, CONFIG.SMOOTHING_FACTOR);
+        this.demand.commercial = this.smooth(this.demand.commercial, comDemand, CONFIG.SMOOTHING_FACTOR);
+        this.demand.industrial = this.smooth(this.demand.industrial, indDemand, CONFIG.SMOOTHING_FACTOR);
 
         return { ...this.demand };
     }
@@ -130,15 +130,21 @@ export class DemandCalculator {
      */
     deserialize(data) {
         if (data) {
-            // Sanitize deserialization: validate types before merging
-            const validRes = typeof data.res === 'number' ? data.res : CONFIG.DEFAULT_DEMAND;
-            const validCom = typeof data.com === 'number' ? data.com : CONFIG.DEFAULT_DEMAND;
-            const validInd = typeof data.ind === 'number' ? data.ind : CONFIG.DEFAULT_DEMAND;
+            // Accept both old ({res,com,ind}) and new ({residential,commercial,industrial}) formats.
+            const src = {
+                residential: data.residential ?? data.res,
+                commercial: data.commercial ?? data.com,
+                industrial: data.industrial ?? data.ind,
+            };
+
+            const validRes = typeof src.residential === 'number' ? src.residential : CONFIG.DEFAULT_DEMAND;
+            const validCom = typeof src.commercial === 'number' ? src.commercial : CONFIG.DEFAULT_DEMAND;
+            const validInd = typeof src.industrial === 'number' ? src.industrial : CONFIG.DEFAULT_DEMAND;
 
             this.demand = {
-                res: validRes,
-                com: validCom,
-                ind: validInd
+                residential: validRes,
+                commercial: validCom,
+                industrial: validInd,
             };
         }
     }
