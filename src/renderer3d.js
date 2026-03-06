@@ -51,7 +51,7 @@ async function loadThreeJS() {
 
     for (const url of cdns) {
         try {
-            THREE = await import(url);
+            THREE = await import(/* @vite-ignore */ url);
             return THREE;
         } catch (e) {
             attempts.push({ target: url, error: e });
@@ -84,6 +84,7 @@ export async function createRenderer3D(game, canvas) {
 }
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
+import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -111,6 +112,7 @@ export class Renderer3D {
         this.yaw = 0;
         this.pitch = -0.4;
         this.followDist = 8;
+        this.targetFollowDist = 8;
         this.followHeight = 4;
         this.minFollowDist = 4;
         this.maxFollowDist = 15;
@@ -118,6 +120,8 @@ export class Renderer3D {
         this.invertY = false;
         this.cameraCollision = true;
         this.cameraCollisionRadius = 1.0;
+        this.zoomSensitivity = 0.1;
+        this.zoomDampening = 0.15;
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
@@ -127,11 +131,14 @@ export class Renderer3D {
         this.setRenderScale(1.0);
 
         // Lighting
-        const amb = new THREE.AmbientLight(0xffffff, 0.7);
-        this.scene.add(amb);
-        const sun = new THREE.DirectionalLight(0xffffff, 0.8);
-        sun.position.set(12, 20, 8);
-        this.scene.add(sun);
+        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        this.scene.add(this.ambientLight);
+        this.sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
+        this.sunLight.position.set(12, 20, 8);
+        this.scene.add(this.sunLight);
+        
+        // Day/Night cycle
+        this.dayNightCycle = createDayNightCycle();
 
         // Internal
         this._mapHalfW = 0;
@@ -191,7 +198,7 @@ export class Renderer3D {
 
     handleWheel(e) {
         const delta = Math.sign(e.deltaY);
-        this.followDist = Math.max(this.minFollowDist, Math.min(this.maxFollowDist, this.followDist - delta * 0.5));
+        this.targetFollowDist = Math.max(this.minFollowDist, Math.min(this.maxFollowDist, this.targetFollowDist - delta * this.zoomSensitivity * 5));
     }
 
     rebuildWorld() {
@@ -621,7 +628,8 @@ export class Renderer3D {
             }
         }
 
-        // Smoothly interpolate camera position (damped follow)
+        this.followDist += (this.targetFollowDist - this.followDist) * this.zoomDampening;
+
         this.camera.position.lerp(idealCamPos, 0.15);
         this.camera.lookAt(p.x, p.y + 1.0, p.z);
     }
@@ -637,6 +645,9 @@ export class Renderer3D {
             }
         }
 
+        // Update day/night cycle lighting
+        this._updateDayNightLighting();
+
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
 
@@ -651,6 +662,32 @@ export class Renderer3D {
         }
         this.updateVFX();
         this.renderer.render(this.scene, this.camera);
+    }
+
+    /**
+     * Update lighting based on day/night cycle
+     */
+    _updateDayNightLighting() {
+        if (!this.dayNightCycle || !this.game?.state?.time) return;
+        
+        const timeOfDay = this.game.state.time.timeOfDay || 0;
+        const lighting = this.dayNightCycle.update(timeOfDay);
+        
+        // Apply lighting changes
+        this.ambientLight.intensity = lighting.ambientIntensity;
+        this.sunLight.intensity = lighting.sunIntensity;
+        
+        // Update ambient color
+        this.ambientLight.color.copy(lighting.lightColor);
+        
+        // Update sky background color (lerp for smoothness)
+        const targetSkyColor = lighting.lightColor.clone();
+        if (this.scene.background) {
+            this.scene.background.lerp(targetSkyColor, 0.05);
+        }
+        
+        // Store current phase for debugging
+        this.currentPhase = lighting.phase;
     }
 
     /**

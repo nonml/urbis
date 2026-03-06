@@ -1,8 +1,9 @@
 // Audio Manager - Handles game audio with Web Audio API
-// Supports: ambient loops, footsteps, UI sounds, crisis stingers
+// Supports: ambient loops, footsteps, UI sounds, crisis stinger
 // Audio assets are loaded from assets/audio/ directory
 
 import { SETTINGS_KEYS, DEFAULT_SETTINGS } from '../ui/settings.js';
+import { createSoundscape } from './soundscape.js';
 
 // Audio source configuration (paths can be placeholders for development)
 export const AUDIO_SOURCES = {
@@ -70,6 +71,9 @@ export class AudioManager {
 
         // Current district theme for ambient
         this.currentTheme = 'residential';
+        
+        // Soundscape system
+        this.soundscape = null;
     }
 
     /**
@@ -111,6 +115,10 @@ export class AudioManager {
 
             // Start ambient if available
             await this.startAmbient();
+
+            // Initialize soundscape system
+            this.soundscape = createSoundscape(this, game);
+            this.soundscape.initialize();
 
         } catch (e) {
             console.warn('Audio initialization failed:', e);
@@ -451,6 +459,11 @@ export class AudioManager {
         if (this.uiGain) {
             this.uiGain.gain.value = uiVol;
         }
+        
+        // Update soundscape volumes
+        if (this.soundscape) {
+            this.soundscape.update();
+        }
     }
 
     /**
@@ -476,6 +489,10 @@ export class AudioManager {
      */
     destroy() {
         this.stopAmbient();
+        if (this.soundscape) {
+            this.soundscape.destroy();
+            this.soundscape = null;
+        }
         if (this.context) {
             this.context.close();
         }

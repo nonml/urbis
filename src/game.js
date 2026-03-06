@@ -31,6 +31,7 @@ import { validatePlacement } from './build/placement.js';
 import { EconomyLedger } from './sim/economy/ledger.js';
 import { ServiceManager } from './sim/services/services.js';
 import { GoalsManager } from './sim/goals/goals.js';
+import { createVictoryManager } from './sim/victory_conditions.js';
 import { CitizenSim } from './sim/citizens/citizen_sim.js';
 import { JobsManager } from './sim/economy/jobs.js';
 import { AnomalyDetectors } from './sim/anomalies/detectors.js';
@@ -93,6 +94,9 @@ class MockUI {
     }
     showMessage(message, type) {
         this.messages.push({ message, type });
+    }
+    showTip(message, duration) {
+        this.messages.push({ message, type: 'tip', duration });
     }
     setPlayerTile(x, y) {}
     updateResources() {}
@@ -194,6 +198,7 @@ export class Game {
         this.powerShortageTicks = 0;
         this.goalsManager = new GoalsManager(this);
         this.goalsManager.setMode(mode);
+        this.victoryManager = createVictoryManager(this);
 
         // Milestone P: Dev menu (only if not headless)
         this.devMenu = this.isHeadless ? null : new DevMenu(this);
@@ -353,6 +358,11 @@ export class Game {
         // Start tutorial if enabled
         if (this.ui.settings.get('showTutorial')) {
             this.tutorialManager.start();
+        }
+
+        // Initialize tutorial overlay if player hasn't completed it
+        if (this.ui.initTutorial) {
+            this.ui.initTutorial();
         }
 
         this.ui.showMessage('Welcome to your new city! Build houses to grow your population.', 'success');
@@ -635,6 +645,17 @@ export class Game {
         // 9/10. Goals + win/lose checks
         this.goalsManager.update();
 
+        // 10b. Victory conditions + achievements
+        const victoryResult = this.victoryManager.update();
+        if (victoryResult && this.ui) {
+            // Show victory screen
+            const victoryScreen = this.ui.victoryScreen;
+            if (victoryScreen) {
+                victoryScreen.show(this.state, victoryResult.victoryDetails);
+            }
+            this.stop();
+        }
+
         // 11. Update UI
         this.ui.updateResources(this.resources);
         this.economyLedger.commitTick(ledgerTick);
@@ -821,6 +842,10 @@ export class Game {
 
     showMessage(message, type) {
         this.ui.showMessage(message, type);
+    }
+
+    showTip(message, duration = 5000) {
+        this.ui.showTip(message, duration);
     }
 
     getDay() {

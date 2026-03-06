@@ -1,6 +1,9 @@
 // Game Constants
 export const TILE_SIZE = 40;
 
+// Extended buildings import for unified exports
+export * from './buildings_extended.js';
+
 // Map presets (tiles)
 export const MAP_PRESETS = {
     SMALL: { label: 'Small', width: 40, height: 40 },

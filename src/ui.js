@@ -13,10 +13,12 @@ import { CodexUI } from './ui/codex.js';
 import { FeedbackUI } from './ui/feedback.js';
 import { createAudioManager } from './audio/audio_manager.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
+import { createVictoryScreen, AchievementNotification } from './ui/victory_screen.js';
 import { updatePlayerMovement, createPlayerState } from './player/controller.js';
 import { validatePlacement } from './build/placement.js';
 import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
+import { createTutorialOverlay, TutorialOverlay } from './ui/tutorial_overlay.js';
 
 function getFallbackCanvasId(mainCanvas) {
     return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
@@ -262,6 +264,13 @@ export class UIManager {
         // Audio
         this.audioManager = createAudioManager(game);
 
+        // Victory screen
+        this.victoryScreen = createVictoryScreen();
+        this.achievementNotification = new AchievementNotification();
+
+        // Tutorial
+        this.tutorial = createTutorialOverlay(this.game);
+
         // 3D
         // Start in a lightweight stub so UI is responsive immediately, then upgrade to real 3D.
         // If 3D fails, we stay on the stub (compatibility mode).
@@ -346,6 +355,18 @@ export class UIManager {
         this.renderer3d.rebuildWorld();
         this._lastBuildingCount = 0;
         this._lastCitizenCount = 0;
+    }
+
+    /**
+     * Initialize tutorial if player hasn't completed it
+     */
+    initTutorial() {
+        if (TutorialOverlay.shouldShowTutorial()) {
+            this.tutorial.onComplete = () => {
+                this.showMessage('Tutorial complete! Build your city!', 'success');
+            };
+            this.tutorial.start();
+        }
     }
 
     resetCamera() {
@@ -750,8 +771,8 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             this.lastMouseX = e.clientX;
             this.lastMouseY = e.clientY;
 
-            this.renderer3d.yaw -= dx * 0.005;
-            this.renderer3d.pitch -= dy * 0.003;
+            this.renderer3d.yaw -= dx * this.renderer3d.mouseSensitivity;
+            this.renderer3d.pitch -= dy * this.renderer3d.mouseSensitivity * 0.6;
             this.renderer3d.pitch = Math.max(-1.2, Math.min(-0.1, this.renderer3d.pitch));
         });
     }
@@ -933,6 +954,62 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         log.scrollTop = log.scrollHeight;
 
         if (log.children.length > 80) log.removeChild(log.firstChild);
+    }
+
+    showTip(message, duration = 5000) {
+        let tipsContainer = document.getElementById('tips-container');
+        if (!tipsContainer) {
+            tipsContainer = document.createElement('div');
+            tipsContainer.id = 'tips-container';
+            tipsContainer.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);z-index:9999;pointer-events:none;';
+            document.body.appendChild(tipsContainer);
+        }
+
+        const tip = document.createElement('div');
+        tip.className = 'tip-box';
+        tip.style.cssText = `
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 12px 20px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.2);
+            animation: tipFadeIn 0.3s ease-out;
+            pointer-events: auto;
+        `;
+        tip.textContent = message;
+
+        const closeBtn = document.createElement('span');
+        closeBtn.textContent = ' ×';
+        closeBtn.style.cssText = 'cursor:pointer;font-weight:bold;margin-left:8px;';
+        closeBtn.onclick = () => this.hideTip(tip);
+        tip.appendChild(closeBtn);
+
+        tipsContainer.appendChild(tip);
+
+        const timer = setTimeout(() => {
+            this.hideTip(tip);
+        }, duration);
+
+        tip.dataset.timer = timer;
+
+        return tip;
+    }
+
+    hideTip(tip) {
+        if (!tip) return;
+        const timer = tip.dataset.timer;
+        if (timer) clearTimeout(Number(timer));
+        tip.style.animation = 'tipFadeOut 0.3s ease-out forwards';
+        setTimeout(() => {
+            if (tip.parentNode) {
+                tip.parentNode.removeChild(tip);
+            }
+        }, 300);
     }
 
     updateStats() {
@@ -1589,7 +1666,19 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         this.renderer3d.setDebugMode('services');
         this.showMessage(`Service heatmap: ${next}`, 'normal');
     }
+
+    /**
+     * Handle building completion for tutorial
+     */
+    onBuildingCompleted(buildingType) {
+        if (this.tutorial?.isActive) {
+            this.tutorial.onBuildingBuilt(buildingType);
+        }
+    }
 }
+
+// Export TutorialOverlay for use in UIManager
+export { TutorialOverlay } from './ui/tutorial_overlay.js';
 
 function formatOption(opt) {
     const parts = [opt.label];
