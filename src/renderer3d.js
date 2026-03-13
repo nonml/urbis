@@ -85,6 +85,9 @@ export async function createRenderer3D(game, canvas) {
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
+import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_night.js';
+import { createFXSystem } from './render/fx/fx_system.js';
+import { createParticleSystem } from './world/particle_pool.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -139,7 +142,18 @@ export class Renderer3D {
         
         // Day/Night cycle
         this.dayNightCycle = createDayNightCycle();
-
+        
+        // Lighting manager for enhanced visual effects
+        this.lightingManager = createLightingManager(this.scene, this.renderer);
+        
+        // VFX system
+        this.fxSystem = createFXSystem(this.scene, this.renderer);
+        window.fxSystem = this.fxSystem;
+        
+        // Particle system
+        this.particleSystem = createParticleSystem(this.scene, this.renderer);
+        window.particleSystem = this.particleSystem;
+        
         // Internal
         this._mapHalfW = 0;
         this._mapHalfH = 0;
@@ -660,7 +674,18 @@ export class Renderer3D {
         if (this._zoneMode !== 'none') {
             this.updateZoneOverlay();
         }
+        
+        // Update VFX systems
         this.updateVFX();
+        if (this.fxSystem) {
+            this.fxSystem.update();
+        }
+        
+        // Update particle system
+        if (this.particleSystem) {
+            this.particleSystem.update();
+        }
+        
         this.renderer.render(this.scene, this.camera);
     }
 
@@ -671,20 +696,12 @@ export class Renderer3D {
         if (!this.dayNightCycle || !this.game?.state?.time) return;
         
         const timeOfDay = this.game.state.time.timeOfDay || 0;
-        const lighting = this.dayNightCycle.update(timeOfDay);
         
-        // Apply lighting changes
-        this.ambientLight.intensity = lighting.ambientIntensity;
-        this.sunLight.intensity = lighting.sunIntensity;
+        // Update lighting manager with current time
+        const lighting = this.lightingManager.update(timeOfDay);
         
-        // Update ambient color
-        this.ambientLight.color.copy(lighting.lightColor);
-        
-        // Update sky background color (lerp for smoothness)
-        const targetSkyColor = lighting.lightColor.clone();
-        if (this.scene.background) {
-            this.scene.background.lerp(targetSkyColor, 0.05);
-        }
+        // Apply lighting to scene lights
+        this.lightingManager.applyToScene(this.ambientLight, this.sunLight);
         
         // Store current phase for debugging
         this.currentPhase = lighting.phase;

@@ -4,6 +4,7 @@ import { MapScreen } from './ui/map_screen.js';
 import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
+import { createThemeManager } from './ui/theme.js';
 import { BuildMenu } from './ui/build_menu.js';
 import { CaseFileUI } from './ui/case_file.js';
 import { FactionsPanel } from './ui/factions_panel.js';
@@ -19,6 +20,7 @@ import { validatePlacement } from './build/placement.js';
 import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
 import { createTutorialOverlay, TutorialOverlay } from './ui/tutorial_overlay.js';
+import { TooltipManager } from './ui/tooltips.js';
 
 function getFallbackCanvasId(mainCanvas) {
     return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
@@ -260,6 +262,10 @@ export class UIManager {
 
         // Settings
         this.settings = new SettingsManager(game);
+
+        // Theme manager
+        this.themeManager = createThemeManager();
+        window.themeManager = this.themeManager;
 
         // Audio
         this.audioManager = createAudioManager(game);
@@ -775,6 +781,25 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             this.renderer3d.pitch -= dy * this.renderer3d.mouseSensitivity * 0.6;
             this.renderer3d.pitch = Math.max(-1.2, Math.min(-0.1, this.renderer3d.pitch));
         });
+
+        // Tooltip hover events
+        this.canvas.addEventListener('mousemove', (e) => {
+            const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
+            if (tile) {
+                const tooltipData = this.getTooltipData(tile.x, tile.y);
+                if (tooltipData) {
+                    this.game.tooltipManager?.show(e.clientX, e.clientY, tooltipData);
+                } else {
+                    this.game.tooltipManager?.hide();
+                }
+            } else {
+                this.game.tooltipManager?.hide();
+            }
+        });
+
+        this.canvas.addEventListener('mouseleave', () => {
+            this.game.tooltipManager?.hide();
+        });
     }
 
     updatePlayerMovement(dtMs) {
@@ -843,6 +868,12 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         if (this.caseFileUI?.open) this.caseFileUI.refresh();
         this.factionsPanel?.update();
         this.politicsPanel?.update();
+        
+        // Update audio volumes and soundscape
+        if (this.audioManager) {
+            this.audioManager.updateVolumes();
+        }
+        
         try {
             this.renderer3d.render();
         } catch (e) {
@@ -1633,6 +1664,14 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             this.renderer3d.setRenderScale(this.settings.get('renderScale'));
             this.renderer3d.setShowFPS(this.settings.get('showFPS'));
         }
+
+        // Apply theme settings
+        if (this.themeManager) {
+            this.themeManager.setTheme(this.settings.get('theme'));
+            this.themeManager.setFontScale(this.settings.get('fontScale'));
+            this.themeManager.setReducedMotion(this.settings.get('reducedMotion'));
+            this.themeManager.setHighContrast(this.settings.get('highContrast'));
+        }
     }
 
     /**
@@ -1674,6 +1713,85 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         if (this.tutorial?.isActive) {
             this.tutorial.onBuildingBuilt(buildingType);
         }
+    }
+
+    /**
+     * Get tooltip data for a tile position
+     */
+    getTooltipData(x, y) {
+        const game = this.game;
+        if (!game) return null;
+
+        // Check for buildings at this tile
+        const buildings = game.buildings?.getBuildingsAt?.(x, y) || [];
+        
+        // Get terrain info
+        const terrain = game.map?.getTileAt?.(x, y);
+        const terrainNames = { 0: 'Water', 1: 'Grass', 2: 'Forest', 3: 'Mountain' };
+        const terrainName = terrainNames[terrain] || 'Unknown';
+
+        // Check for interactables
+        const interactable = game.interactables?.getInteractableAt?.(x, y);
+
+        // Check for citizens
+        const citizensAtTile = game.citizens?.citizens?.filter?.(c => c.x === x && c.y === y) || [];
+
+        // Build tooltip content
+        const sections = [];
+
+        // Terrain section
+        sections.push({
+            title: 'Terrain',
+            content: terrainName
+        });
+
+        // Building section
+        if (buildings.length > 0) {
+            const buildingNames = buildings.map(b => {
+                const staffing = game.jobsManager?.getStaffingRatio?.(b.id);
+                const staffText = staffing !== undefined ? ` (Staff: ${Math.round(staffing * 100)}%)` : '';
+                return `${b.name}${staffText}`;
+            });
+            sections.push({
+                title: 'Buildings',
+                content: buildingNames.join(', ')
+            });
+        }
+
+        // Interactable section
+        if (interactable) {
+            const typeInfo = getInteractableTypeInfo(interactable.type);
+            sections.push({
+                title: 'Hacking Node',
+                content: `${typeInfo.name} (Security: ${interactable.securityLevel || 1})`
+            });
+        }
+
+        // Citizens section
+        if (citizensAtTile.length > 0) {
+            sections.push({
+                title: 'Citizens',
+                content: `${citizensAtTile.length} citizen(s) here`
+            });
+        }
+
+        // District info
+        const district = game.map?.getDistrictAt?.(x, y);
+        if (district) {
+            sections.push({
+                title: 'District',
+                content: district
+            });
+        }
+
+        // Only return if we have content
+        if (sections.length === 0) return null;
+
+        return {
+            x,
+            y,
+            sections
+        };
     }
 }
 

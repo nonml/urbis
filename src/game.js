@@ -75,6 +75,11 @@ import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
 import { TrafficManager } from './sim/agents/traffic_agent.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
+// Weather and particle systems (new)
+import { WeatherSystem, createWeatherSystem } from './weather_system.js';
+import { getParticleSystem, createParticleSystem } from './world/particle_pool.js';
+import { TooltipManager, createTooltipManager } from './ui/tooltips.js';
+
 // Roguelike meta imports (Milestone O)
 import { createRunSummary, RunSummaryUI } from './ui/run_summary.js';
 import { profileManager, calculateRunScore } from './sim/persistence/profile.js';
@@ -286,6 +291,11 @@ export class Game {
         this.trafficPathfinder = new TrafficPathfinder(this.trafficGraph, null);
         this.trafficManager = new TrafficManager(this, this.rngStreams.sim);
 
+        // Weather and particle systems
+        this.weatherSystem = new WeatherSystem(this);
+        this.particleSystem = createParticleSystem(this);
+        this.tooltipManager = this.isHeadless ? null : new TooltipManager(this);
+
         // Social graph system (Milestone J)
         this.socialGraph = new SocialGraph(this, this.rngStreams.sim);
 
@@ -384,6 +394,9 @@ export class Game {
 
         // Initial UI paint
         this.ui.updateResources(this.resources);
+
+        // Initialize weather system
+        this.weatherSystem.init();
 
         // Enable dev tools (if in dev mode)
         if (this.devMenu) {
@@ -598,6 +611,9 @@ export class Game {
         // 8. Crisis check
         this.crisisManager.checkForCrises();
         this.crisisManager.update();
+
+        // Weather and particle system updates
+        this.weatherSystem.update();
 
         // Milestone M: Crisis Director v2 systems update
         this.crisisDirector.checkForCrisis(this.state.time.tick);
@@ -1061,6 +1077,8 @@ export class Game {
             chunkManager: this.chunkManager?.serialize(),
             // Milestone N: Campaign data
             campaign: this.campaign?.serialize(),
+            // Weather and particle systems
+            weatherSystem: this.weatherSystem?.serialize(),
         };
 
         try {
@@ -1371,6 +1389,11 @@ export class Game {
             }
             if (data.chunkManager) {
                 this.chunkManager.deserialize(data.chunkManager);
+            }
+
+            // Weather and particle systems
+            if (data.weatherSystem) {
+                this.weatherSystem?.deserialize(data.weatherSystem);
             }
 
             this.ui.showMessage('Game loaded!', 'success');

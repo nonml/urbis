@@ -180,6 +180,79 @@ export const BUILDING_LEVELS = {
     4: { name: 'Premium', multiplier: 2.0, description: '+100% efficiency' }
 };
 
+// Weather types
+export const WEATHER_CLEAR = 'clear';
+export const WEATHER_RAIN = 'rain';
+export const WEATHER_STORM = 'storm';
+export const WEATHER_FOG = 'fog';
+export const WEATHER_SNOW = 'snow';
+
+export const WEATHER_TYPES = {
+    [WEATHER_CLEAR]: {
+        name: 'Clear',
+        icon: '☀️',
+        description: 'Pleasant weather',
+        visibility: 1.0,
+        citizenSpeedModifier: 1.0,
+        ambientColor: 0xffffff,
+        fogDensity: 0.0001
+    },
+    [WEATHER_RAIN]: {
+        name: 'Rain',
+        icon: '🌧️',
+        description: 'Light rain',
+        visibility: 0.7,
+        citizenSpeedModifier: 0.9,
+        ambientColor: 0x8899aa,
+        fogDensity: 0.002
+    },
+    [WEATHER_STORM]: {
+        name: 'Storm',
+        icon: '⛈️',
+        description: 'Heavy storm',
+        visibility: 0.5,
+        citizenSpeedModifier: 0.7,
+        ambientColor: 0x445566,
+        fogDensity: 0.005
+    },
+    [WEATHER_FOG]: {
+        name: 'Fog',
+        icon: '🌫️',
+        description: 'Dense fog',
+        visibility: 0.3,
+        citizenSpeedModifier: 0.8,
+        ambientColor: 0x999999,
+        fogDensity: 0.01
+    },
+    [WEATHER_SNOW]: {
+        name: 'Snow',
+        icon: '❄️',
+        description: 'Snowy conditions',
+        visibility: 0.6,
+        citizenSpeedModifier: 0.75,
+        ambientColor: 0xaabbcc,
+        fogDensity: 0.003
+    }
+};
+
+// Shadow configuration
+export const SHADOW_CONFIG = {
+    enabled: true,
+    mapSize: 2048,
+    cameraNear: 0.5,
+    cameraFar: 50,
+    bias: -0.0005,
+    softShadows: true,
+    shadowOpacity: 0.65
+};
+
+// Level of Detail thresholds
+export const LOD_THRESHOLDS = {
+    HIGH: 15,      // Full detail within 15 tiles
+    MEDIUM: 40,    // Reduced detail within 40 tiles
+    LOW: 80        // Minimal detail beyond 40 tiles
+};
+
 // Rival AI constants
 export const RIVAL_CONFIG = {
     baseInfluence: 50,

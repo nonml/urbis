@@ -1,6 +1,8 @@
 // Settings UI - Mouse sensitivity, volume, render scale, toggles
 // Settings persist in localStorage (not in save file)
 
+import { THEMES, DEFAULT_THEME, DEFAULT_THEME_SETTINGS } from './theme.js';
+
 // Default settings
 export const DEFAULT_SETTINGS = {
     mouseSensitivity: 0.005,
@@ -11,7 +13,12 @@ export const DEFAULT_SETTINGS = {
     renderScale: 1.0,
     showFPS: false,
     showTutorial: true,
-    autoSave: true
+    autoSave: true,
+    // Theme and accessibility settings
+    theme: DEFAULT_THEME,
+    fontScale: 1.0,
+    reducedMotion: false,
+    highContrast: false
 };
 
 // Settings keys for localStorage
@@ -24,7 +31,11 @@ export const SETTINGS_KEYS = {
     renderScale: 'game_settings_render_scale',
     showFPS: 'game_settings_show_fps',
     showTutorial: 'game_settings_show_tutorial',
-    autoSave: 'game_settings_auto_save'
+    autoSave: 'game_settings_auto_save',
+    theme: 'game_settings_theme',
+    fontScale: 'game_settings_font_scale',
+    reducedMotion: 'game_settings_reduced_motion',
+    highContrast: 'game_settings_high_contrast'
 };
 
 /**
@@ -94,6 +105,29 @@ export class SettingsManager {
                     window.renderer3d.setRenderScale(value);
                 }
                 break;
+            case 'theme':
+                if (window.themeManager) {
+                    window.themeManager.setTheme(value);
+                }
+                break;
+            case 'fontScale':
+                if (window.themeManager) {
+                    window.themeManager.setFontScale(value);
+                }
+                break;
+            case 'reducedMotion':
+                if (window.themeManager) {
+                    window.themeManager.setReducedMotion(value);
+                }
+                if (window.fxSystem) {
+                    window.fxSystem.setReducedMotion(value);
+                }
+                break;
+            case 'highContrast':
+                if (window.themeManager) {
+                    window.themeManager.setHighContrast(value);
+                }
+                break;
         }
     }
 
@@ -151,6 +185,37 @@ export class SettingsManager {
                                 <input type="checkbox" id="show-fps" ${this.settings.showFPS ? 'checked' : ''}>
                                 <span>Show FPS Overlay</span>
                             </label>
+                        </div>
+                        <div class="setting-row">
+                            <label for="theme-select">Theme</label>
+                            <select id="theme-select" class="setting-select">
+                                ${Object.entries(THEMES).map(([key, theme]) =>
+                                    `<option value="${key}" ${this.settings.theme === key ? 'selected' : ''}>${theme.name}</option>`
+                                ).join('')}
+                            </select>
+                            <small class="setting-hint">Change the visual appearance</small>
+                        </div>
+                        <div class="setting-row">
+                            <label for="font-scale">Font Scale</label>
+                            <div class="slider-container">
+                                <input type="range" id="font-scale" min="0.8" max="1.5" step="0.05" value="${this.settings.fontScale}">
+                                <span class="value-display" id="font-scale-value">${(this.settings.fontScale * 100).toFixed(0)}%</span>
+                            </div>
+                            <small class="setting-hint">Adjust UI text size</small>
+                        </div>
+                        <div class="setting-row">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="reduced-motion" ${this.settings.reducedMotion ? 'checked' : ''}>
+                                <span>Reduce Motion</span>
+                            </label>
+                            <small class="setting-hint">Disable animations and effects</small>
+                        </div>
+                        <div class="setting-row">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="high-contrast" ${this.settings.highContrast ? 'checked' : ''}>
+                                <span>High Contrast</span>
+                            </label>
+                            <small class="setting-hint">Increase color contrast</small>
                         </div>
                     </div>
                     <!-- Audio Tab -->
@@ -248,6 +313,18 @@ export class SettingsManager {
             this.playUISound('slider');
         });
 
+        overlay.querySelector('#font-scale')?.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            this.set('fontScale', value);
+            overlay.querySelector('#font-scale-value').textContent = (value * 100).toFixed(0);
+            this.playUISound('slider');
+        });
+
+        overlay.querySelector('#theme-select')?.addEventListener('change', (e) => {
+            this.set('theme', e.target.value);
+            this.playUISound('click');
+        });
+
         overlay.querySelector('#master-volume')?.addEventListener('input', (e) => {
             const value = parseFloat(e.target.value);
             this.set('masterVolume', value);
@@ -287,6 +364,16 @@ export class SettingsManager {
 
         overlay.querySelector('#auto-save')?.addEventListener('change', (e) => {
             this.set('autoSave', e.target.checked);
+            this.playUISound('click');
+        });
+
+        overlay.querySelector('#reduced-motion')?.addEventListener('change', (e) => {
+            this.set('reducedMotion', e.target.checked);
+            this.playUISound('click');
+        });
+
+        overlay.querySelector('#high-contrast')?.addEventListener('change', (e) => {
+            this.set('highContrast', e.target.checked);
             this.playUISound('click');
         });
 
@@ -389,6 +476,9 @@ export class SettingsManager {
         this.uiElement.querySelector('#render-scale').value = this.settings.renderScale;
         this.uiElement.querySelector('#render-scale-value').textContent = (this.settings.renderScale * 100).toFixed(0);
 
+        this.uiElement.querySelector('#font-scale').value = this.settings.fontScale;
+        this.uiElement.querySelector('#font-scale-value').textContent = (this.settings.fontScale * 100).toFixed(0);
+
         this.uiElement.querySelector('#master-volume').value = this.settings.masterVolume;
         this.uiElement.querySelector('#master-volume-value').textContent = (this.settings.masterVolume * 100).toFixed(0);
 
@@ -398,11 +488,16 @@ export class SettingsManager {
         this.uiElement.querySelector('#ui-volume').value = this.settings.uiVolume;
         this.uiElement.querySelector('#ui-volume-value').textContent = (this.settings.uiVolume * 100).toFixed(0);
 
+        // Update select values
+        this.uiElement.querySelector('#theme-select').value = this.settings.theme;
+
         // Update checkbox values
         this.uiElement.querySelector('#invert-y').checked = this.settings.invertY;
         this.uiElement.querySelector('#show-fps').checked = this.settings.showFPS;
         this.uiElement.querySelector('#show-tutorial').checked = this.settings.showTutorial;
         this.uiElement.querySelector('#auto-save').checked = this.settings.autoSave;
+        this.uiElement.querySelector('#reduced-motion').checked = this.settings.reducedMotion;
+        this.uiElement.querySelector('#high-contrast').checked = this.settings.highContrast;
     }
 
     /**

@@ -4,6 +4,7 @@
 
 import { SETTINGS_KEYS, DEFAULT_SETTINGS } from '../ui/settings.js';
 import { createSoundscape } from './soundscape.js';
+import { createAudioMixer, AUDIO_CHANNELS, MIXER_PRESETS } from './mixer.js';
 
 // Audio source configuration (paths can be placeholders for development)
 export const AUDIO_SOURCES = {
@@ -74,6 +75,9 @@ export class AudioManager {
         
         // Soundscape system
         this.soundscape = null;
+        
+        // Audio mixer for channel management
+        this.mixer = null;
     }
 
     /**
@@ -119,6 +123,9 @@ export class AudioManager {
             // Initialize soundscape system
             this.soundscape = createSoundscape(this, game);
             this.soundscape.initialize();
+
+            // Initialize audio mixer
+            this.mixer = createAudioMixer(this.context, this.masterGain);
 
         } catch (e) {
             console.warn('Audio initialization failed:', e);
@@ -460,6 +467,13 @@ export class AudioManager {
             this.uiGain.gain.value = uiVol;
         }
         
+        // Update mixer channel volumes
+        if (this.mixer) {
+            this.mixer.setVolume(AUDIO_CHANNELS.AMBIENT, audioVol, 0);
+            this.mixer.setVolume(AUDIO_CHANNELS.UI, uiVol, 0);
+            this.mixer.update();
+        }
+        
         // Update soundscape volumes
         if (this.soundscape) {
             this.soundscape.update();
@@ -493,9 +507,48 @@ export class AudioManager {
             this.soundscape.destroy();
             this.soundscape = null;
         }
+        if (this.mixer) {
+            this.mixer.destroy();
+            this.mixer = null;
+        }
         if (this.context) {
             this.context.close();
         }
+    }
+    
+    /**
+     * Set mixer preset
+     * @param {string} presetName - Name of preset (BALANCED, QUIET, IMMERSIVE, UI_FOCUS)
+     */
+    setPreset(presetName) {
+        if (!this.mixer) return;
+        
+        const preset = MIXER_PRESETS[presetName.toUpperCase()];
+        if (preset) {
+            for (const [channel, volume] of Object.entries(preset)) {
+                if (channel !== 'name') {
+                    this.mixer.setVolume(channel, volume, 0.5);
+                }
+            }
+        }
+    }
+    
+    /**
+     * Get current mixer state
+     * @returns {Object} Mixer state
+     */
+    getMixerState() {
+        if (!this.mixer) return null;
+        return this.mixer.exportState();
+    }
+    
+    /**
+     * Restore mixer state
+     * @param {Object} state - Saved mixer state
+     */
+    restoreMixerState(state) {
+        if (!this.mixer) return;
+        this.mixer.importState(state);
     }
 }
 

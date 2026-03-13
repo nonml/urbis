@@ -1374,6 +1374,37 @@ body {
     box-shadow: 0 2px 0 #c62828;
 }
 
+.settings-content .setting-select {
+    flex: 1;
+    min-width: 150px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: var(--text-primary, #e0e0e0);
+    font-size: 14px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: border-color 0.2s ease, background-color 0.2s ease;
+}
+
+.settings-content .setting-select:hover {
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.settings-content .setting-select:focus {
+    outline: none;
+    border-color: var(--primary-color, #00d4ff);
+    background: rgba(0, 0, 0, 0.4);
+}
+
+.settings-content .setting-select option {
+    background: rgba(20, 20, 30, 0.95);
+    color: var(--text-primary, #e0e0e0);
+    padding: 8px 12px;
+}
+
 /* Quest Choice Overlay */
 .quest-choice-overlay {
     position: fixed;
