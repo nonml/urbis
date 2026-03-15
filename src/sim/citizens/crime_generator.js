@@ -303,6 +303,11 @@ export class CrimeGenerator {
             propensity += 3;
         }
 
+        // Criminal record — prior arrests increase recidivism
+        if (citizen.criminalRecord > 0) {
+            propensity += Math.min(3, citizen.criminalRecord);
+        }
+
         // Check local heat
         const localHeat = this.game.heatSystem.getHeatAt?.(Math.floor(citizen.x), Math.floor(citizen.y)) || 0;
         if (localHeat > 30) propensity += localHeat / 20;
@@ -352,6 +357,9 @@ export class CrimeGenerator {
         // Report to police
         if (this.rng?.chance(crimeType.detectionRate)) {
             incident.detect();
+            // Mark citizen's criminal record on apprehension
+            citizen.criminalRecord = (citizen.criminalRecord || 0) + 1;
+            citizen.lastArrestedTick = this.game.state.time.tick;
         }
 
         // Update stats
