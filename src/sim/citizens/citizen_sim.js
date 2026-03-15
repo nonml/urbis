@@ -1,10 +1,36 @@
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
+import CitizenWorkerConstructor from '../../workers/citizen_worker.js?worker';
 
 export class CitizenSim {
     constructor(game) {
         this.game = game;
         this.lastTickMs = 0;
         this.lodCounts = { near: 0, mid: 0, far: 0 };
+
+        // WebWorker for needs/mood/relationship calculations (3D)
+        this._worker = null;
+        this._workerReady = false;
+        this._pendingWorkerResult = null; // results from last async tick, applied next tick
+        this._workerMsgId = 0;
+        this._initWorker();
+    }
+
+    _initWorker() {
+        try {
+            this._worker = new CitizenWorkerConstructor();
+            this._worker.onmessage = (e) => {
+                if (e.data?.type === 'UPDATE_RESULT') {
+                    this._pendingWorkerResult = e.data.results;
+                }
+            };
+            this._worker.onerror = (err) => {
+                console.warn('[CitizenSim] Worker error, falling back to main thread:', err?.message);
+                this._worker = null;
+            };
+            this._workerReady = true;
+        } catch (err) {
+            console.info('[CitizenSim] WebWorker unavailable, running sync:', err.message);
+        }
     }
 
     enforceCitizenCap() {
@@ -95,22 +121,88 @@ export class CitizenSim {
         }
     }
 
+    /**
+     * Apply results that arrived from the worker during the previous tick.
+     * Only updates needs/mood/relationships; position stays authoritative on main thread.
+     */
+    _applyWorkerResults(citizens) {
+        if (!this._pendingWorkerResult) return;
+        const byId = new Map(citizens.map(c => [c.id, c]));
+        for (const r of this._pendingWorkerResult) {
+            const c = byId.get(r.id);
+            if (!c) continue;
+            c.needs = r.needs;
+            c.happiness = r.happiness;
+            c.mood = r.mood;
+            c.relationshipEdges = r.relationshipEdges;
+            if (c._sim) c._sim.lodTier = r.lodTier;
+        }
+        this._pendingWorkerResult = null;
+    }
+
+    /**
+     * Dispatch citizen state snapshot to worker for async needs/mood update.
+     * Only serializable fields are sent (no circular references).
+     */
+    _dispatchToWorker(citizens, tick) {
+        if (!this._worker) return;
+        const px = this.game.player.x;
+        const py = this.game.player.y;
+        const snapshot = citizens.map(c => ({
+            id: c.id,
+            x: c.x,
+            y: c.y,
+            needs: { ...c.needs },
+            happiness: c.happiness,
+            mood: c.mood,
+            relationshipEdges: c.relationshipEdges?.map(e => ({ ...e })) ?? [],
+        }));
+        this._worker.postMessage({
+            type: 'UPDATE_CITIZENS',
+            id: ++this._workerMsgId,
+            payload: { citizens: snapshot, playerX: px, playerY: py, tick },
+        });
+    }
+
     updateAll(citizens, timeOfDay, tick) {
         const t0 = performance.now();
         this.enforceCitizenCap();
         this.lodCounts = { near: 0, mid: 0, far: 0 };
 
         citizens.sort((a, b) => a.id - b.id);
+
+        // Apply worker results from previous tick (double-buffered async)
+        if (this._worker) {
+            this._applyWorkerResults(citizens);
+        }
+
         for (const citizen of citizens) {
             ensureCitizenState(citizen, this.game.map);
             const tier = this.getLODTier(citizen);
-            citizen._sim.lodTier = tier;
+            if (citizen._sim) citizen._sim.lodTier = tier;
             this.lodCounts[tier]++;
 
-            this.updateNeeds(citizen, tier);
+            // When worker is active, skip needs/relationships on main thread
+            // (worker handles them async; movement always stays here)
+            if (!this._worker) {
+                this.updateNeeds(citizen, tier);
+                this.updateRelationships(citizen, tier, tick);
+            }
             this.updateMovement(citizen, timeOfDay, tier, tick);
-            this.updateRelationships(citizen, tier, tick);
         }
+
+        // Dispatch current state to worker for next tick
+        if (this._worker) {
+            this._dispatchToWorker(citizens, tick);
+        }
+
         this.lastTickMs = performance.now() - t0;
+    }
+
+    destroy() {
+        if (this._worker) {
+            this._worker.terminate();
+            this._worker = null;
+        }
     }
 }
