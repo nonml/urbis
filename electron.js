@@ -3,6 +3,63 @@ const path = require('path');
 const fs = require('fs');
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 
+// ─── Greenworks / Steam ───────────────────────────────────────────────────────
+// Loaded once at startup; null if Steam is unavailable.
+let gw = null;
+let gwEnabled = false;
+
+function initSteam() {
+    try {
+        // greenworks must be a native addon built for this Electron version.
+        // It lives next to the binary in production, or in node_modules in dev.
+        const greenworks = (() => {
+            try { return require('greenworks'); } catch { return null; }
+        })();
+        if (!greenworks) return;
+        if (!greenworks.initAPI()) {
+            console.info('[Steam] initAPI() returned false — Steam not running.');
+            return;
+        }
+        gw = greenworks;
+        gwEnabled = true;
+        console.info('[Steam] Initialised. SteamId:', gw.getSteamId?.() ?? 'n/a');
+    } catch (err) {
+        console.warn('[Steam] Init error:', err.message);
+    }
+}
+
+function setupSteamIpc() {
+    // Synchronous: renderer can call this at preload time to get init status
+    ipcMain.on('steam:enabled', (e) => { e.returnValue = gwEnabled; });
+
+    ipcMain.handle('steam:get-steam-id', () => gwEnabled ? (gw.getSteamId?.() ?? null) : null);
+
+    ipcMain.handle('steam:activate-achievement', (_, steamId) => new Promise((resolve, reject) => {
+        if (!gwEnabled) { resolve(false); return; }
+        gw.activateAchievement(steamId, () => resolve(true), (err) => reject(err));
+    }));
+
+    ipcMain.handle('steam:clear-achievement', (_, steamId) => new Promise((resolve, reject) => {
+        if (!gwEnabled) { resolve(false); return; }
+        gw.clearAchievement(steamId, () => resolve(true), (err) => reject(err));
+    }));
+
+    ipcMain.handle('steam:set-stat-int', (_, stat, value) => new Promise((resolve, reject) => {
+        if (!gwEnabled) { resolve(false); return; }
+        gw.setStatInt(stat, value, () => resolve(true), (err) => reject(err));
+    }));
+
+    ipcMain.handle('steam:store-stats', () => new Promise((resolve, reject) => {
+        if (!gwEnabled) { resolve(false); return; }
+        gw.storeStats(() => resolve(true), (err) => reject(err));
+    }));
+
+    ipcMain.handle('steam:activate-overlay', (_, dialog) => {
+        if (!gwEnabled) return;
+        try { gw.activateGameOverlay(dialog); } catch { /* ignore */ }
+    });
+}
+
 function createWindow() {
     const win = new BrowserWindow({
         width: 1280,
@@ -36,6 +93,8 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
+    initSteam();
+    setupSteamIpc();
     createWindow();
     app.on('activate', () => {
         if (BrowserWindow.getAllWindows().length === 0) createWindow();

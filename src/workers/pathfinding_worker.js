@@ -124,14 +124,13 @@ self.onmessage = function(e) {
         self.postMessage({ type: 'READY' });
 
     } else if (type === 'UPDATE') {
-        // Bulk replace walkability data (e.g. after building placement)
-        if (walkable && e.data.data) {
-            walkable.set(e.data.data);
-        }
+        // SAB is already shared — no copy needed. Re-create the view in case
+        // the buffer reference was lost (shouldn't happen, but defensive).
+        if (e.data.sab) walkable = new Uint8Array(e.data.sab);
 
     } else if (type === 'FIND') {
-        const { id, sx, sy, tx, ty } = e.data;
+        const { id, citizenId, sx, sy, tx, ty } = e.data;
         const path = aStar(sx, sy, tx, ty);
-        self.postMessage({ type: 'RESULT', id, path });
+        self.postMessage({ type: 'RESULT', id, citizenId, path });
     }
 };

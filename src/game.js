@@ -511,8 +511,8 @@ export class Game {
      * This is called at fixed intervals (tickRate)
      */
     tickOnce(dt) {
-        // Multiplayer lockstep gate (no-op when not connected)
-        if (this.mp?.connected) this.mp.onTick(this.state.time.tick);
+        // Multiplayer lockstep gate — skip simulation body if waiting for server advance
+        if (this.mp?.connected && !this.mp.onTick(this.state.time.tick)) return;
 
         const oldTime = this.state.time.timeOfDay;
         const tickPerDay = this.state.time.tickPerDay || 24;
@@ -822,6 +822,9 @@ export class Game {
         const building = this.buildings.build(type, x, y, 1, rotation);
         this.scheduleManager.syncNavBuildings(this.buildings);
         this.ui.showMessage(`Built: ${building.name} at (${x}, ${y})`, 'success');
+
+        // Broadcast to multiplayer peers (no-op when not connected or action is remote)
+        if (!options.remote) this.mp?.recordAction('build', { buildingType: type, x, y, rotation });
 
         // Emit event for tutorial/quest tracking
         Events.playerBuiltBuilding(type, x, y);

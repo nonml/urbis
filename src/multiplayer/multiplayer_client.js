@@ -27,17 +27,13 @@ export class MultiplayerClient {
         this.seed       = null;
         this.lockInterval = 3;
 
-        /** Actions queued since last lock tick flush */
         this._pendingActions = [];
-        /** Current lockstep tick index (counts lock advances, not game ticks) */
-        this._lockTick = 0;
-        /** Game tick counter since last flush */
+        this._lockTick  = 0;
         this._gameTicks = 0;
-        /** Whether we're waiting for server advance before proceeding */
-        this._waiting = false;
-        /** Resolved when server sends 'advance' for current lockTick */
-        this._advancePromise = null;
-        this._advanceResolve = null;
+        /** True while waiting for the server's 'advance' message. */
+        this._waiting   = false;
+        /** Queued advance payload to apply on the next allowed tick. */
+        this._pendingAdvance = null;
     }
 
     // ── Connection ────────────────────────────────────────────────────────────
@@ -98,9 +94,8 @@ export class MultiplayerClient {
 
             this.ws.onclose = () => {
                 this.connected = false;
+                this._waiting = false; // unblock simulation
                 this.game.ui?.showMessage('🌐 Disconnected from multiplayer', 'event');
-                // Unblock any waiting tick so the game can continue solo
-                this._advanceResolve?.({ tick: this._lockTick, inputs: {} });
             };
         });
     }
@@ -128,51 +123,51 @@ export class MultiplayerClient {
     // ── Lockstep tick hook ────────────────────────────────────────────────────
 
     /**
-     * Called by game.js each game tick.
-     * Returns a Promise that resolves when the simulation may advance.
-     * In single-player the promise resolves immediately.
+     * Called synchronously by game.js at the top of tickOnce().
+     * Returns false if the simulation should be skipped this tick (waiting for server).
+     * Returns true when the simulation may proceed.
      *
      * @param {number} gameTick
-     * @returns {Promise<void>}
+     * @returns {boolean}  true = proceed, false = skip
      */
-    async onTick(gameTick) {
-        if (!this.connected) return;
-        this._gameTicks++;
+    onTick(gameTick) {
+        if (!this.connected) return true;
 
-        if (this._gameTicks < this.lockInterval) return;
+        // If we received an advance while paused, apply remote actions now and unblock
+        if (this._waiting && this._pendingAdvance) {
+            const advance = this._pendingAdvance;
+            this._pendingAdvance = null;
+            this._waiting = false;
+            for (const [pid, pidActions] of Object.entries(advance.inputs ?? {})) {
+                if (pid === this.playerId) continue;
+                for (const action of pidActions) this._applyRemoteAction(action);
+            }
+            return true;
+        }
+
+        // Still waiting — skip this simulation tick
+        if (this._waiting) return false;
+
+        this._gameTicks++;
+        if (this._gameTicks < this.lockInterval) return true;
         this._gameTicks = 0;
 
-        // Flush pending actions and signal ready
+        // Flush actions and notify server we're ready for next lockstep
         const actions = this._pendingActions.splice(0);
         const tick = this._lockTick;
-
-        this._advancePromise = new Promise((resolve) => {
-            this._advanceResolve = resolve;
-        });
-
         this.ws?.send(JSON.stringify({ type: 'input', tick, actions }));
         this.ws?.send(JSON.stringify({ type: 'ready', tick }));
+        this._waiting = true;
 
-        // Pause the game tick until server says advance
-        this.game.state.time.paused = true;
-        const advance = await this._advancePromise;
-        this.game.state.time.paused = false;
-
-        // Apply other players' actions
-        if (advance?.inputs) {
-            for (const [pid, pidActions] of Object.entries(advance.inputs)) {
-                if (pid === this.playerId) continue;
-                for (const action of pidActions) {
-                    this._applyRemoteAction(action);
-                }
-            }
-        }
+        return true; // let this tick through; next tick will be blocked until advance
     }
 
     _onAdvance(msg) {
         this._lockTick++;
-        this._advanceResolve?.(msg);
-        this._advanceResolve = null;
+        if (this._waiting) {
+            // Store for application at the start of the next allowed tick
+            this._pendingAdvance = msg;
+        }
     }
 
     _applyRemoteAction(action) {

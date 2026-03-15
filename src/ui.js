@@ -273,6 +273,10 @@ export class UIManager {
         if (window._settingsPanelComponent) {
             window._settingsPanelComponent.$set({ manager: this.settings });
         }
+        // Wire game reference into the Svelte NewsFeedPanel
+        if (window._newsFeedComponent) {
+            window._newsFeedComponent.$set({ game });
+        }
 
         // Theme manager
         this.themeManager = createThemeManager();

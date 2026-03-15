@@ -9,6 +9,19 @@ import { loadOutcomes } from './content/loader.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 import ResourceBar from './ui/components/ResourceBar.svelte';
 import SettingsPanel from './ui/components/SettingsPanel.svelte';
+import NewsFeedPanel from './ui/components/NewsFeedPanel.svelte';
+import BuildModeHUD from './ui/components/BuildModeHUD.svelte';
+import FactionsPanel from './ui/components/FactionsPanel.svelte';
+import PoliticsPanel from './ui/components/PoliticsPanel.svelte';
+import CitizenProfile from './ui/components/CitizenProfile.svelte';
+import QuestLog from './ui/components/QuestLog.svelte';
+import TechScreen from './ui/components/TechScreen.svelte';
+import CaseFile from './ui/components/CaseFile.svelte';
+import Codex from './ui/components/Codex.svelte';
+import CampaignPanel from './ui/components/CampaignPanel.svelte';
+import RunSummary from './ui/components/RunSummary.svelte';
+import Shop from './ui/components/Shop.svelte';
+import SeedBrowser from './ui/components/SeedBrowser.svelte';
 
 // Display version
 document.addEventListener('DOMContentLoaded', () => {
@@ -148,6 +161,117 @@ document.addEventListener('DOMContentLoaded', async () => {
     settingsMount.id = 'settings-panel-mount';
     document.body.appendChild(settingsMount);
     window._settingsPanelComponent = new SettingsPanel({ target: settingsMount, props: { manager: null } });
+
+    // News Feed panel (game prop injected after game init)
+    const newsFeedMount = document.createElement('div');
+    newsFeedMount.id = 'news-feed-mount';
+    document.body.appendChild(newsFeedMount);
+    window._newsFeedComponent = new NewsFeedPanel({ target: newsFeedMount, props: { game: null } });
+
+    // Build Mode HUD — mounts into sidebar-header once DOM is ready
+    const hudMount = document.createElement('div');
+    hudMount.id = 'build-mode-hud-mount';
+    const sidebarHeader = document.querySelector('.sidebar-header');
+    if (sidebarHeader) sidebarHeader.appendChild(hudMount);
+    else document.getElementById('game-container')?.appendChild(hudMount);
+    new BuildModeHUD({ target: hudMount });
+
+    // Factions panel — mounts into game-container
+    const factionsMount = document.createElement('div');
+    factionsMount.id = 'factions-panel-mount';
+    (document.getElementById('game-container') || document.body).appendChild(factionsMount);
+    new FactionsPanel({ target: factionsMount });
+
+    // Politics panel — mounts into game-container; callbacks wired after game init via window.game
+    const politicsMount = document.createElement('div');
+    politicsMount.id = 'politics-panel-mount';
+    (document.getElementById('game-container') || document.body).appendChild(politicsMount);
+    new PoliticsPanel({
+        target: politicsMount,
+        props: {
+            onEnact:  (id) => window.game?.policyManager?.enactPolicy?.(id),
+            onRevoke: (id) => window.game?.policyManager?.revokePolicy?.(id),
+        },
+    });
+
+    // Citizen profile panel
+    const citizenProfileMount = document.createElement('div');
+    citizenProfileMount.id = 'citizen-profile-mount';
+    document.body.appendChild(citizenProfileMount);
+    new CitizenProfile({ target: citizenProfileMount });
+
+    // Quest log panel
+    const questLogMount = document.createElement('div');
+    questLogMount.id = 'quest-log-mount';
+    document.body.appendChild(questLogMount);
+    new QuestLog({
+        target: questLogMount,
+        props: {
+            onComplete: (id) => window.game?.ui?.questLog?.markCurrentComplete?.(id),
+            onCancel:   (id) => window.game?.ui?.questLog?.cancelQuest?.(id),
+        },
+    });
+
+    // Tech screen
+    const techMount = document.createElement('div');
+    techMount.id = 'tech-screen-mount';
+    document.body.appendChild(techMount);
+    new TechScreen({ target: techMount });
+
+    // Case file panel
+    const caseFileMount = document.createElement('div');
+    caseFileMount.id = 'case-file-mount';
+    document.body.appendChild(caseFileMount);
+    new CaseFile({ target: caseFileMount });
+
+    // Codex / help system
+    const codexMount = document.createElement('div');
+    codexMount.id = 'codex-mount';
+    document.body.appendChild(codexMount);
+    new Codex({ target: codexMount });
+
+    // Campaign panel
+    const campaignMount = document.createElement('div');
+    campaignMount.id = 'campaign-panel-mount';
+    document.body.appendChild(campaignMount);
+    new CampaignPanel({ target: campaignMount });
+
+    // Run summary overlay
+    const runSummaryMount = document.createElement('div');
+    runSummaryMount.id = 'run-summary-mount';
+    document.body.appendChild(runSummaryMount);
+    new RunSummary({
+        target: runSummaryMount,
+        props: {
+            onReplay:    (d) => window.game?.ui?.runSummary?.onReplay?.(d),
+            onNewRun:    ()  => window.game?.ui?.runSummary?.onNewRun?.(),
+            onViewStats: ()  => window.game?.ui?.runSummary?.onViewStats?.(),
+        },
+    });
+
+    // Meta shop
+    const shopMount = document.createElement('div');
+    shopMount.id = 'shop-mount';
+    document.body.appendChild(shopMount);
+    new Shop({
+        target: shopMount,
+        props: {
+            onUnlock: (cat, key) => window.game?.ui?.shop?.unlock?.(cat, key),
+        },
+    });
+
+    // Seed browser
+    const seedBrowserMount = document.createElement('div');
+    seedBrowserMount.id = 'seed-browser-mount';
+    document.body.appendChild(seedBrowserMount);
+    new SeedBrowser({
+        target: seedBrowserMount,
+        props: {
+            onReplay:  (run) => window.game?.ui?.seedBrowser?.handleReplay?.(run),
+            onNewSeed: ()    => window.game?.ui?.seedBrowser?.handleNewSeed?.(),
+            onPlaySeed:(seed)=> window.game?.ui?.seedBrowser?.handlePlaySeed?.(seed),
+        },
+    });
 
     // Show main menu on load
     const menu = document.getElementById('main-menu-overlay');

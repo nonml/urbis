@@ -107,7 +107,10 @@ export class SteamManager {
             }
             this._gw = gw;
             this._enabled = true;
-            console.info('[Steam] Initialised. AppId:', gw.getSteamId?.() ?? 'n/a');
+            // getSteamId may be async when routed through IPC proxy
+            Promise.resolve(gw.getSteamId?.()).then(id =>
+                console.info('[Steam] Initialised. SteamId:', id ?? 'n/a')
+            ).catch(() => console.info('[Steam] Initialised.'));
             return true;
         } catch (err) {
             console.warn('[Steam] Init error:', err);

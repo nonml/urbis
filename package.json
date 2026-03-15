@@ -22,7 +22,8 @@
     "electron:build": "npm run build && electron-builder",
     "electron:pack": "electron-builder --dir",
     "mp:server": "node server/multiplayer_server.js",
-    "mp:server:dev": "node --watch server/multiplayer_server.js"
+    "mp:server:dev": "node --watch server/multiplayer_server.js",
+    "greenworks:rebuild": "node_modules/.bin/electron-rebuild -f -w greenworks"
   },
   "main": "electron.js",
   "build": {
@@ -35,7 +36,10 @@
     "files": [
       "build/**/*",
       "electron.js",
-      "electron-preload.js"
+      "electron-preload.js",
+      "steam_appid.txt",
+      "greenworks.json",
+      "node_modules/greenworks/**/*"
     ],
     "win": {
       "target": [

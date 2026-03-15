@@ -63,18 +63,30 @@ export class ScheduleManager {
         const currentPhase = this.getPhaseAt(timeOfDay);
         this.ensureNav(map, buildings);
 
-        // Determine target based on phase
-        let target = this.getTargetLocation(citizen, currentPhase, map, buildings);
+        const target = this.getTargetLocation(citizen, currentPhase, map, buildings);
 
         if (target && (citizen.x !== target.x || citizen.y !== target.y)) {
-            // Try to move toward target using deterministic nav grid pathfinding.
-            const path = this.findPath({ x: citizen.x, y: citizen.y }, target);
+            const start = { x: citizen.x, y: citizen.y };
+
+            // 1. Try worker-cached path (free — no computation)
+            const workerNext = this.pfProxy?.consumeStep(citizen.id, start, target);
+            if (workerNext && this.isWalkable(workerNext.x, workerNext.y)) {
+                citizen.x = workerNext.x;
+                citizen.y = workerNext.y;
+                // Pre-warm cache for the step after this one
+                this.pfProxy?.prefetch(citizen.id, { x: citizen.x, y: citizen.y }, target);
+                return { moved: true, target, phase: currentPhase.name };
+            }
+
+            // 2. Sync NavGrid fallback
+            const path = this.findPath(start, target);
             if (path.length > 1) {
-                // Move to next position in path
                 const nextPos = path[1];
                 if (this.isWalkable(nextPos.x, nextPos.y)) {
                     citizen.x = nextPos.x;
                     citizen.y = nextPos.y;
+                    // Fire worker prefetch so next tick is a cache hit
+                    this.pfProxy?.prefetch(citizen.id, { x: citizen.x, y: citizen.y }, target);
                     return { moved: true, target, phase: currentPhase.name };
                 }
             }

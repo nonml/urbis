@@ -1,0 +1,10 @@
+{
+    "versions": [
+        {
+            "electronVersion": "41.0.2",
+            "nodeVersion": "22",
+            "arch": "x64",
+            "platform": "win32"
+        }
+    ]
+}
