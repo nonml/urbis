@@ -149,6 +149,11 @@ export class ModeIndicator {
             this.label.textContent = MODE_LABELS[mode];
             this.label.style.color = MODE_COLORS[mode];
         }
+        
+        // Notify renderer to update camera mode
+        if (this.game && this.game.renderer3D) {
+            this.game.renderer3D.setCameraMode(mode);
+        }
     }
 
     /**

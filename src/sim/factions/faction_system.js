@@ -1,4 +1,13 @@
 import { getFactionPerks, getRepBand } from './perks.js';
+import { eventBus, EVENT_TYPES } from '../events.js';
+
+// Faction rivalry pairs: helping one hurts the other
+const FACTION_RIVALS = {
+    citizens: 'corp',
+    corp: 'citizens',
+    police: 'gangs',
+    gangs: 'police',
+};
 
 const FACTION_IDS = ['citizens', 'police', 'gangs', 'corp'];
 
@@ -49,7 +58,37 @@ export class FactionSystem {
 
     modifyRep(factionId, delta, reason = 'unknown', category = 'quests') {
         const scaled = delta * this.getTuningMultiplier(category);
-        return this.setReputation(factionId, this.getReputation(factionId) + scaled, reason);
+        const result = this.setReputation(factionId, this.getReputation(factionId) + scaled, reason);
+
+        if (Math.abs(scaled) >= 5) {
+            eventBus.emit(EVENT_TYPES.FACTION_REP_CHANGED, {
+                factionId,
+                delta: scaled,
+                reason,
+                tick: this.game.state.time?.tick || 0,
+            });
+        }
+
+        // Cascade: rival faction reacts to significant rep changes
+        if (!this._cascading && Math.abs(scaled) >= 10) {
+            const rival = FACTION_RIVALS[factionId];
+            if (rival) {
+                const cascadeDelta = -(scaled * 0.4);
+                this._cascading = true;
+                this.modifyRep(rival, cascadeDelta, `faction_conflict:${factionId}`, 'faction_conflict');
+                this._cascading = false;
+                eventBus.emit(EVENT_TYPES.FACTION_CONFLICT_TRIGGERED, {
+                    sourceFaction: factionId,
+                    affectedFaction: rival,
+                    sourceDelta: scaled,
+                    cascadeDelta,
+                    reason,
+                    tick: this.game.state.time?.tick || 0,
+                });
+            }
+        }
+
+        return result;
     }
 
     logChange(factionId, delta, reason, prev, next) {

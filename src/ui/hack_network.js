@@ -494,22 +494,94 @@ export class HackNetwork {
         }
     }
     
+    // -----------------------------------------------------------------------
+    // Per-node-type intel rewards (meaningful gameplay effects)
+    // -----------------------------------------------------------------------
+
+    /** Returns a description and gameplay effect for a node type. */
+    _getNodeReward(nodeType) {
+        const rewards = {
+            power_substation: {
+                label: '⚡ Power Disruption',
+                description: 'Disables security cameras in this district for 120 ticks',
+                apply: (game) => {
+                    const state = game.state.player || {};
+                    state.camerasDisabledUntil = (game.state.time?.tick || 0) + 120;
+                    state.detectionMultiplier = (state.detectionMultiplier || 1) * 0.5;
+                    game.state.player = state;
+                    game.heatSystem?.addHeat(-8);
+                }
+            },
+            cctv_pole: {
+                label: '📡 Surveillance Tap',
+                description: 'Reveals rival AI positions + reduces heat by 10',
+                apply: (game) => {
+                    game.heatSystem?.addHeat(-10);
+                    // Reveal rival position intel
+                    const rival = game.state.rival;
+                    if (rival) {
+                        game.intelSystem?.generateEntry?.('rival_location', {
+                            text: `Rival network traced to sector ${Math.floor(Math.random() * 9) + 1}`,
+                            source: 'cctv_tap', tier: 2,
+                        });
+                    }
+                    if (game.ui) game.ui.showMessage('📡 Rival position logged to intel database', 'success');
+                }
+            },
+            telecom_box: {
+                label: '📶 Comms Intercept',
+                description: 'Intercepts faction comms — unlocks faction intel & slows detection for 60 ticks',
+                apply: (game) => {
+                    const state = game.state.player || {};
+                    state.commsInterceptUntil = (game.state.time?.tick || 0) + 60;
+                    game.state.player = state;
+                    // Boost faction visibility
+                    game.intelSystem?.generateEntry?.('faction_comms', {
+                        text: 'Faction communication patterns decoded — rep changes reduced by 30%',
+                        source: 'comms_intercept', tier: 2,
+                    });
+                    if (game.ui) game.ui.showMessage('📶 Faction comms intercepted — rep penalties reduced', 'success');
+                }
+            },
+            server: {
+                label: '💾 Data Exfil',
+                description: 'Extracts financial data — gain 25-80 gold',
+                apply: (game) => {
+                    const bonus = 25 + Math.floor(Math.random() * 56);
+                    game.resources?.add?.({ gold: bonus });
+                    if (game.ui) game.ui.showMessage(`💾 Exfiltrated data sold for +${bonus} gold`, 'success');
+                }
+            },
+        };
+        return rewards[nodeType] || rewards.server;
+    }
+
     _completeBreach(node, success) {
         if (success) {
             node.hacked = true;
-            
+
             // Award XP based on security level
             const xpGained = node.securityLevel * 10;
             this._awardHackingXP(xpGained);
-            
-            // Trigger VFX
-            this.game.fxTriggerManager?.trigger('PLAYER_HACKED_NODE', {
-                x: node.x,
-                y: node.y,
-                name: node.name,
-                securityLevel: node.securityLevel
-            });
-            
+
+            // Apply per-node-type gameplay reward
+            const reward = this._getNodeReward(node.type);
+            if (reward?.apply) {
+                try { reward.apply(this.game); } catch (e) { console.warn('[HackNetwork] reward apply failed:', e); }
+            }
+
+            // Show reward popup inside the network UI
+            const infoEl = this.overlay.querySelector('#hack-network-info');
+            if (infoEl) {
+                infoEl.classList.remove('hidden');
+                infoEl.innerHTML = `
+                    <h3 style="color:#4caf50">✅ ${node.name} — Breached</h3>
+                    <p style="color:#aaffaa"><strong>${reward.label}</strong></p>
+                    <p>${reward.description}</p>
+                    <p style="opacity:0.7">+${xpGained} Hack XP (Skill Lv.${this.hackingSkill})</p>
+                `;
+            }
+
             // Check if all nodes hacked
             const allHacked = this.nodes.every(n => n.hacked);
             if (allHacked && this.onComplete) {
@@ -518,7 +590,7 @@ export class HackNetwork {
                 return;
             }
         }
-        
+
         this.breachMode = false;
         this.breachTarget = null;
         this.breachHolding = false;
@@ -665,13 +737,16 @@ export class HackNetwork {
             breachEl.classList.add('hidden');
             
             const status = node.hacked ? '✅ HACKED' : '🔒 LOCKED';
+            const reward = this._getNodeReward(node.type);
+            const skillOk = (this.hackingSkill || 1) >= node.securityLevel;
+            const skillWarning = !skillOk ? `<p style="color:#ff9800">⚠ Security Lv.${node.securityLevel} — Hacking Skill Lv.${this.hackingSkill} may be insufficient</p>` : '';
             infoEl.innerHTML = `
                 <h3>${node.icon} ${node.name}</h3>
                 <p><strong>Status:</strong> ${status}</p>
                 <p><strong>Security:</strong> Level ${node.securityLevel}</p>
                 <p><strong>Owner:</strong> ${node.ownerFaction}</p>
                 <p><strong>Distance:</strong> ${Math.round(node.distance)}m</p>
-                ${!node.hacked ? '<p class="hack-prompt">Click to initiate breach</p>' : ''}
+                ${!node.hacked ? `<p style="color:#7ec8e3"><strong>Reward:</strong> ${reward.label}</p><p style="opacity:0.8">${reward.description}</p>${skillWarning}<p class="hack-prompt">Click to initiate breach</p>` : `<p style="color:#9c27b0">Intel acquired: ${reward.label}</p>`}
             `;
         } else {
             infoEl.classList.add('hidden');

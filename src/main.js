@@ -77,10 +77,11 @@ window.startGame = async function() {
         const seedStr = document.getElementById('world-seed')?.value?.trim();
         const seed = seedStr ? parseInt(seedStr, 10) : undefined;
         const mode = document.getElementById('game-mode')?.value || 'standard';
+        const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
         updateLoading(35, 'Generating world...');
-        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
+        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
         updateLoading(60, 'Booting systems...');
         window.perfOverlay = new PerfOverlay(window.game);
         window.devMenu = new DevMenu(window.game);
@@ -107,10 +108,11 @@ window.restartGame = async function() {
         const seedStr = document.getElementById('world-seed')?.value?.trim();
         const seed = seedStr ? parseInt(seedStr, 10) : undefined;
         const mode = document.getElementById('game-mode')?.value || 'standard';
+        const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
         updateLoading(35, 'Generating world...');
-        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode });
+        window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
 
         updateLoading(60, 'Booting systems...');
         window.perfOverlay = new PerfOverlay(window.game);

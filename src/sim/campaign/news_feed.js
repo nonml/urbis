@@ -1,15 +1,39 @@
 // News Feed + Briefing System - Manages campaign notifications and city news
 // Integrates with CampaignModel for story-driven updates
+// Tier 2B: Enhanced with NPC generator for emergent narrative
 
 import { eventBus, EVENT_TYPES } from '../events.js';
 import { randomId } from '../../rng.js';
+
+// Maps case types to the faction most likely involved
+const CASE_TYPE_FACTION = {
+    corruption: 'government',
+    gang: 'criminal',
+    extortion: 'criminal',
+    missing_person: 'civilian',
+    sabotage: 'corporate',
+    whistleblower: 'civilian',
+};
+
+// Human-readable faction names for news copy
+const FACTION_DISPLAY = {
+    citizens: 'Citizens',
+    police: 'Police Department',
+    gangs: 'Gang Networks',
+    corp: 'Corporate Sector',
+    government: 'City Government',
+    criminal: 'Criminal Underworld',
+    corporate: 'Corporate Interests',
+    civilian: 'General Public',
+};
 
 /**
  * News feed for city events and case updates
  */
 export class NewsFeed {
-    constructor(game) {
+    constructor(game, npcGenerator = null) {
         this.game = game;
+        this.npcGenerator = npcGenerator;
         this.items = [];
         this.sources = [];
         this.setupListeners();
@@ -45,7 +69,7 @@ export class NewsFeed {
             });
         });
 
-        eventBus.on(EVENT_TYPES.PLAYER_DECISION, (data) => {
+        eventBus.on(EVENT_TYPES.PLAYER_DECISION, () => {
             this.addNews({
                 type: 'player_action',
                 decision: true,
@@ -69,6 +93,86 @@ export class NewsFeed {
                 tick: data.tick,
             });
         });
+
+        eventBus.on(EVENT_TYPES.RIVAL_ACTION_STARTED, (data) => {
+            this.addNews({
+                type: 'rival_action',
+                actionType: data.action,
+                tick: data.tick,
+            });
+        });
+
+        eventBus.on(EVENT_TYPES.QUEST_COMPLETED, (data) => {
+            this.addNews({
+                type: 'quest_completed',
+                questId: data.questId,
+                questType: data.questType,
+                tick: data.tick || this.game.state.time?.tick || 0,
+            });
+        });
+
+        // Faction conflict cascade: rival factions react
+        eventBus.on(EVENT_TYPES.FACTION_CONFLICT_TRIGGERED, (data) => {
+            this.addNews({
+                type: 'faction_conflict',
+                sourceFaction: data.sourceFaction,
+                affectedFaction: data.affectedFaction,
+                sourceDelta: data.sourceDelta,
+                reason: data.reason,
+                tick: data.tick,
+            });
+        });
+
+        // Rival influence milestones: rival is gaining ground
+        eventBus.on(EVENT_TYPES.RIVAL_INFLUENCE_MILESTONE, (data) => {
+            this.addNews({
+                type: 'rival_milestone',
+                threshold: data.threshold,
+                influence: data.influence,
+                tick: data.tick,
+            });
+        });
+    }
+
+    /**
+     * Determine which NPC faction to use for a given news event
+     * @param {Object} news
+     * @returns {string|null}
+     */
+    _getFactionForNews(news) {
+        switch (news.type) {
+            case 'case_started':
+            case 'case_completed':
+                return CASE_TYPE_FACTION[news.caseType] || 'civilian';
+            case 'crisis':
+                return 'criminal';
+            case 'crisis_resolved':
+                return 'government';
+            case 'rival_action':
+            case 'rival_milestone':
+                return 'criminal';
+            case 'quest_completed':
+                return 'civilian';
+            case 'faction_conflict':
+                return news.sourceDelta > 0 ? news.affectedFaction : news.sourceFaction;
+            case 'conspiracy_link':
+                return null; // NPC is pre-set; skip generation
+            default:
+                return null;
+        }
+    }
+
+    /**
+     * Determine NPC importance for a given news type
+     * @param {Object} news
+     * @returns {string}
+     */
+    _getImportanceForNews(news) {
+        const key = ['crisis_resolved', 'conspiracy_link', 'rival_milestone'];
+        const major = ['crisis', 'rival_action', 'faction_conflict'];
+        if (key.includes(news.type)) return 'key';
+        if (major.includes(news.type)) return 'major';
+        return 'moderate';
     }
 
     /**
@@ -76,6 +180,19 @@ export class NewsFeed {
      * @param {Object} news - News data
      */
     addNews(news) {
+        // Generate NPC once per article (skip if pre-set by caller, e.g. conspiracy follow-up)
+        if (this.npcGenerator && !news._npc) {
+            const faction = this._getFactionForNews(news);
+            if (faction) {
+                const importance = this._getImportanceForNews(news);
+                news._npc = this.npcGenerator.generateNPC({ faction, importance });
+                if (news.caseId) {
+                    this.npcGenerator.addNPCToCase(news._npc.id, news.caseId);
+                    news._npc.firstMentionTick = news.tick || 0;
+                }
+            }
+        }
+
         const newsItem = {
             id: randomId('news'),
             type: news.type,
@@ -85,20 +202,52 @@ export class NewsFeed {
             description: this.getNewsDescription(news),
             isImportant: this.isImportant(news),
             source: news.source || this.getDefaultSource(news.type),
+            caseId: news.caseId || null,
+            npcId: news._npc?.id || null,
         };
 
         this.items.unshift(newsItem);
 
-        // Keep only last 100 news items
         if (this.items.length > 100) {
             this.items = this.items.slice(0, 100);
         }
 
-        // Emit news event
         eventBus.emit(EVENT_TYPES.CAMPAIGN_NEWS_ADDED, {
             newsId: newsItem.id,
             type: newsItem.type,
             tick: newsItem.tick,
+        });
+
+        // After case completion: check if this NPC links multiple cases (conspiracy)
+        if (news.type === 'case_completed' && news._npc) {
+            this._checkConspiracyLinks(news._npc, news.caseId);
+        }
+    }
+
+    /**
+     * Check if a completed-case NPC connects to other cases; if so, generate a conspiracy article
+     * @param {Object} npc
+     * @param {string} completedCaseId
+     */
+    _checkConspiracyLinks(npc, completedCaseId) {
+        const otherCases = (npc.involvedCases || []).filter(id => id !== completedCaseId);
+        if (otherCases.length === 0) return;
+
+        // Fire-and-forget: create a follow-up conspiracy article with the same NPC
+        this.addNews({
+            type: 'conspiracy_link',
+            _npc: npc, // reuse existing NPC — no new generation
+            caseIds: [completedCaseId, ...otherCases],
+            primaryCaseId: completedCaseId,
+            tick: this.game.state.time?.tick || 0,
+        });
+
+        // Also pulse the VFX intel system
+        eventBus.emit(EVENT_TYPES.INTEL_REVEALED, {
+            type: 'conspiracy',
+            npcId: npc.id,
+            caseIds: [completedCaseId, ...otherCases],
+            tick: this.game.state.time?.tick || 0,
         });
     }
 
@@ -108,19 +257,63 @@ export class NewsFeed {
      * @returns {string}
      */
     getNewsTitle(news) {
-        const titles = {
-            case_started: 'New Case Started',
-            case_completed: 'Case Resolved',
-            briefing: 'Briefing Update',
-            player_action: 'Player Action',
-            crisis: 'Crisis Alert',
-            crisis_resolved: 'Crisis Resolved',
-            anomaly: 'Anomaly Detected',
-            reputation_change: 'Reputation Update',
-            heat_change: 'Heat Update',
-        };
+        const npc = news._npc;
 
-        return titles[news.type] || 'City News';
+        switch (news.type) {
+            case 'case_started': {
+                const caseName = this.getCaseTypeName(news.caseType);
+                return npc
+                    ? `${caseName} Case: ${npc.fullName} Under Scrutiny`
+                    : `${caseName} Investigation Started`;
+            }
+            case 'case_completed': {
+                const caseName = this.getCaseTypeName(news.caseType);
+                return npc
+                    ? `${caseName} Resolved: ${npc.fullName} Identified`
+                    : `${caseName} Case Closed`;
+            }
+            case 'crisis': {
+                const crisisName = news.crisisType.replace(/_/g, ' ').toUpperCase();
+                return npc
+                    ? `CRISIS: ${crisisName} — ${npc.fullName} Suspected`
+                    : `CRISIS ALERT: ${crisisName}`;
+            }
+            case 'crisis_resolved': {
+                const crisisName = news.crisisType.replace(/_/g, ' ').toUpperCase();
+                return `Crisis Resolved: ${crisisName}`;
+            }
+            case 'rival_action': {
+                const actionName = this.getRivalActionName(news.actionType);
+                return npc
+                    ? `RIVAL MOVE: ${actionName} — ${npc.fullName}`
+                    : `RIVAL MOVE: ${actionName}`;
+            }
+            case 'quest_completed':
+                return npc
+                    ? `Operation Success: ${npc.fullName} Cooperated`
+                    : 'Operation Complete';
+            case 'faction_conflict': {
+                const src = FACTION_DISPLAY[news.sourceFaction] || news.sourceFaction;
+                const aff = FACTION_DISPLAY[news.affectedFaction] || news.affectedFaction;
+                return `Faction Tensions: ${src} vs ${aff}`;
+            }
+            case 'conspiracy_link':
+                return npc
+                    ? `CONSPIRACY: ${npc.fullName} Connects ${news.caseIds?.length || 2} Cases`
+                    : 'Conspiracy Threads Uncovered';
+            case 'rival_milestone': {
+                const level = news.threshold >= 80 ? 'CRITICAL' : 'WARNING';
+                return npc
+                    ? `${level}: Rival Surge — ${npc.fullName} Rising`
+                    : `${level}: Rival Influence Expanding`;
+            }
+            case 'briefing':
+                return 'Intelligence Briefing';
+            case 'player_action':
+                return 'Operation Complete';
+            default:
+                return 'City News';
+        }
     }
 
     /**
@@ -129,26 +322,108 @@ export class NewsFeed {
      * @returns {string}
      */
     getNewsDescription(news) {
+        const npc = news._npc;
+        const npcSpan = npc ? `<span class="npc-mention">${npc.fullName}</span>` : null;
+
         switch (news.type) {
-            case 'case_started':
-                return `Investigation begun: ${this.getCaseTypeName(news.caseType)}`;
-            case 'case_completed':
-                return `Case resolved: ${this.getCaseTypeName(news.caseType)}`;
+            case 'case_started': {
+                const caseName = this.getCaseTypeName(news.caseType);
+                const location = this._getRandomLocation();
+                if (npc) {
+                    return `${npcSpan}, ${npc.title}, has been identified in connection with a ${caseName.toLowerCase()} case near ${location}. ${npc.backstory} Investigation underway.`;
+                }
+                return `Investigation begun: ${caseName}. Authorities are gathering evidence.`;
+            }
+            case 'case_completed': {
+                const caseName = this.getCaseTypeName(news.caseType);
+                if (npc) {
+                    // Check if this NPC is connected to other cases (conspiracy link)
+                    const linkedCases = npc.involvedCases?.length > 1
+                        ? ` This individual has been linked to ${npc.involvedCases.length - 1} other case(s).`
+                        : '';
+                    return `${npcSpan} (${npc.title}) has been identified as the primary suspect in the ${caseName.toLowerCase()} case.${linkedCases} The case is now closed.`;
+                }
+                return `Case resolved: ${caseName}. All leads have been pursued.`;
+            }
             case 'briefing':
-                return 'New briefing available';
-            case 'crisis':
-                return `Crisis alert: ${news.crisisType.replace('_', ' ').toUpperCase()}`;
-            case 'crisis_resolved':
-                return `Crisis resolved: ${news.crisisType.replace('_', ' ').toUpperCase()}`;
-            case 'anomaly':
-                return `Anomaly detected: ${news.anomalyType || 'Unknown'}`;
-            case 'reputation_change':
-                return `Reputation ${news.change > 0 ? 'increased' : 'decreased'}: ${Math.abs(news.change)} points`;
-            case 'heat_change':
-                return `Heat ${news.change > 0 ? 'increased' : 'decreased'}: ${Math.abs(news.change)} points`;
+                return 'New intelligence briefing available. Review your case files for updated information.';
+            case 'crisis': {
+                const crisisName = news.crisisType.replace(/_/g, ' ').toUpperCase();
+                if (npc) {
+                    return `URGENT: ${crisisName} detected across the city. ${npcSpan} (${npc.title}) is suspected of orchestrating this event. ${npc.backstory} Emergency services have been deployed.`;
+                }
+                return `CRISIS ALERT: ${crisisName}. Emergency response teams are being mobilized.`;
+            }
+            case 'crisis_resolved': {
+                const crisisName = news.crisisType.replace(/_/g, ' ').toUpperCase();
+                const outcome = news.outcome || 'contained';
+                return `The ${crisisName} has been ${outcome}. City services are returning to normal operations. Damage assessment ongoing.`;
+            }
+            case 'rival_action': {
+                const actionName = this.getRivalActionName(news.actionType);
+                const actionDesc = this.getRivalActionDescription(news.actionType);
+                const location = this._getRandomLocation();
+                if (npc) {
+                    return `INTEL: ${npcSpan} (${npc.title}) has orchestrated a ${actionName.toLowerCase()} operation near ${location}. ${actionDesc} Countermeasures recommended.`;
+                }
+                return `INTEL: Rival operation detected — ${actionName}. ${actionDesc}`;
+            }
+            case 'quest_completed': {
+                if (npc) {
+                    return `${npcSpan} (${npc.title}) provided critical cooperation in your latest operation. Their ${npc.personality} disposition proved decisive.`;
+                }
+                return 'Your recent operation concluded successfully. Faction responses may vary.';
+            }
+            case 'faction_conflict': {
+                const src = FACTION_DISPLAY[news.sourceFaction] || news.sourceFaction;
+                const aff = FACTION_DISPLAY[news.affectedFaction] || news.affectedFaction;
+                const direction = news.sourceDelta > 0 ? 'rise' : 'fall';
+                if (npc) {
+                    return `The ${direction} of your standing with the ${src} has triggered a reaction from the ${aff}. ${npcSpan} (${npc.title}) has been vocal in opposition. Expect heightened tensions.`;
+                }
+                return `Your actions with the ${src} have angered the ${aff}. Faction tensions are rising.`;
+            }
+            case 'conspiracy_link': {
+                const count = (news.caseIds?.length || 2);
+                if (npc) {
+                    const loc = this._getRandomLocation();
+                    return `INTEL BREAKTHROUGH: Cross-referencing case files reveals ${npcSpan} (${npc.title}) is a common thread across ${count} separate investigations. Last known location: ${loc}. ${npc.backstory} Analysts recommend elevating threat level.`;
+                }
+                return `Cross-case analysis has revealed a shared suspect connecting ${count} investigations. Threat level elevated.`;
+            }
+            case 'rival_milestone': {
+                const level = news.threshold >= 80 ? 'critical' : 'elevated';
+                const territory = this._getRandomLocation();
+                if (npc) {
+                    return `RIVAL ALERT: Influence has reached ${level} levels (${news.influence?.toFixed(0) || news.threshold}%). ${npcSpan} (${npc.title}) is coordinating expansion efforts near ${territory}. ${npc.backstory} Countermeasures are urgently recommended.`;
+                }
+                return `RIVAL ALERT: Adversarial influence has reached ${level} levels near ${territory}. Recommend immediate countermeasures.`;
+            }
+            case 'player_action':
+                return 'Your recent actions have impacted the city. Faction responses may vary.';
             default:
                 return 'City news update';
         }
+    }
+
+    /**
+     * Get a random location for news stories
+     * @returns {string}
+     */
+    _getRandomLocation() {
+        const locations = [
+            'Downtown District',
+            'Industrial Zone',
+            'Waterfront',
+            'Old Town',
+            'Tech Park',
+            'University Quarter',
+            'Harbor District',
+            'Financial Center',
+            'Residential Area',
+            'Suburban Outskirts'
+        ];
+        return locations[Math.floor(this.game.rngStreams.narrative.next() * locations.length)];
     }
 
     /**
@@ -162,6 +437,10 @@ export class NewsFeed {
             'crisis',
             'crisis_resolved',
             'case_completed',
+            'rival_action',
+            'faction_conflict',
+            'conspiracy_link',
+            'rival_milestone',
         ];
         return importantTypes.includes(news.type);
     }
@@ -178,9 +457,11 @@ export class NewsFeed {
             briefing: 'Intelligence Briefing',
             crisis: 'Emergency Alert',
             crisis_resolved: 'Emergency Resolution',
-            anomaly: 'Surveillance System',
-            reputation_change: 'Public Sentiment',
-            heat_change: 'Heat Monitor',
+            rival_action: 'Rival Intel Network',
+            quest_completed: 'Operations Debrief',
+            faction_conflict: 'Faction Monitor',
+            conspiracy_link: 'Cross-Case Analysis',
+            rival_milestone: 'Threat Assessment',
         };
         return sources[type] || 'City News Service';
     }
@@ -200,6 +481,45 @@ export class NewsFeed {
             whistleblower: 'Whistleblower',
         };
         return names[type] || type.replace('_', ' ').toUpperCase();
+    }
+
+    /**
+     * Get rival action name
+     * @param {string} actionType
+     * @returns {string}
+     */
+    // Tier 2B: Rival action visibility
+    getRivalActionName(actionType) {
+        const names = {
+            sabotage_grid: 'Grid Sabotage',
+            spread_propaganda: 'Propaganda Campaign',
+            poach_workers: 'Worker Poaching',
+            trigger_gang_activity: 'Gang Incitement',
+            bribe_officials: 'Official Bribery',
+            economic_spying: 'Economic Espionage',
+            media_blackout: 'Media Blackout',
+            cooldown: 'Reorganization',
+        };
+        return names[actionType] || actionType.replace('_', ' ').toUpperCase();
+    }
+
+    /**
+     * Get rival action description
+     * @param {string} actionType
+     * @returns {string}
+     */
+    getRivalActionDescription(actionType) {
+        const descriptions = {
+            sabotage_grid: 'Resource production has been disrupted across multiple facilities.',
+            spread_propaganda: 'Anti-government sentiment is spreading among citizens.',
+            poach_workers: 'Skilled workers are being recruited away from your city.',
+            trigger_gang_activity: 'Criminal organizations are causing unrest in your districts.',
+            bribe_officials: 'Key officials have been compromised by rival interests.',
+            economic_spying: 'Trade secrets have been stolen and markets destabilized.',
+            media_blackout: 'Positive news coverage has been suppressed.',
+            cooldown: 'The rival is regrouping and planning their next move.',
+        };
+        return descriptions[actionType] || 'Unknown rival operation detected.';
     }
 
     /**
@@ -276,6 +596,15 @@ export class NewsFeed {
     }
 
     /**
+     * Get news items involving a specific NPC
+     * @param {string} npcId
+     * @returns {Array}
+     */
+    getNewsForNPC(npcId) {
+        return this.items.filter(n => n.npcId === npcId);
+    }
+
+    /**
      * Serialize news state
      * @returns {Object} Serialized state
      */
@@ -291,6 +620,7 @@ export class NewsFeed {
                 timestamp: n.timestamp,
                 tick: n.tick,
                 caseId: n.caseId,
+                npcId: n.npcId,
             })),
         };
     }
@@ -312,6 +642,7 @@ export class NewsFeed {
             timestamp: n.timestamp,
             tick: n.tick,
             caseId: n.caseId,
+            npcId: n.npcId,
         }));
     }
 

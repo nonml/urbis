@@ -6,6 +6,7 @@
 //   rngStreams.quest.next()  // For quest logic
 //   rngStreams.rival.next()  // For rival AI
 //   rngStreams.vfx.next()    // For visual effects
+//   rngStreams.narrative.next()  // For NPC/narrative generation
 //
 // All streams derive from the same base seed but are independent.
 
@@ -22,6 +23,7 @@ export function createRNGStreams(seed) {
     const QUEST_SEED_CONST = 0xE4F5A6B7;
     const RIVAL_SEED_CONST = 0x1C2D3E4F;
     const VFX_SEED_CONST = 0x5A6B7C8D;
+    const NARRATIVE_SEED_CONST = 0x7B8C9D0E;
 
     const baseSeed = (seed >>> 0) || 1;
 
@@ -31,6 +33,7 @@ export function createRNGStreams(seed) {
         quest: new RNG(baseSeed ^ QUEST_SEED_CONST),
         rival: new RNG(baseSeed ^ RIVAL_SEED_CONST),
         vfx: new RNG(baseSeed ^ VFX_SEED_CONST),
+        narrative: new RNG(baseSeed ^ NARRATIVE_SEED_CONST),
     };
 }
 
@@ -44,6 +47,7 @@ export function createRNGStreamSeeds(seed) {
     const QUEST_SEED_CONST = 0xE4F5A6B7;
     const RIVAL_SEED_CONST = 0x1C2D3E4F;
     const VFX_SEED_CONST = 0x5A6B7C8D;
+    const NARRATIVE_SEED_CONST = 0x7B8C9D0E;
 
     const baseSeed = (seed >>> 0) || 1;
 
@@ -53,6 +57,7 @@ export function createRNGStreamSeeds(seed) {
         questSeed: (baseSeed ^ QUEST_SEED_CONST) >>> 0,
         rivalSeed: (baseSeed ^ RIVAL_SEED_CONST) >>> 0,
         vfxSeed: (baseSeed ^ VFX_SEED_CONST) >>> 0,
+        narrativeSeed: (baseSeed ^ NARRATIVE_SEED_CONST) >>> 0,
     };
 }
 
@@ -66,6 +71,7 @@ export function createRNGsFromSeeds(streamSeeds) {
         quest: new RNG(streamSeeds.questSeed),
         rival: new RNG(streamSeeds.rivalSeed),
         vfx: new RNG(streamSeeds.vfxSeed),
+        narrative: new RNG(streamSeeds.narrativeSeed),
     };
 }
 

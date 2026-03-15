@@ -83,6 +83,11 @@ export const EVENT_TYPES = {
     // Rival events
     RIVAL_ACTION_STARTED: 'rival_action_started',
     RIVAL_ACTION_COMPLETED: 'rival_action_completed',
+    RIVAL_INFLUENCE_MILESTONE: 'rival_influence_milestone',
+
+    // Faction events
+    FACTION_REP_CHANGED: 'faction_rep_changed',
+    FACTION_CONFLICT_TRIGGERED: 'faction_conflict_triggered',
 
     // Police events
     POLICE_UNIT_SPAWNED: 'police_unit_spawned',

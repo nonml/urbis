@@ -304,6 +304,9 @@ export class FXSystem {
         this.reducedMotion = false;
         this.enabled = true;
         
+        // Optional renderer callback for camera shake
+        this.onShakeCamera = null;
+        
         // Initialize pools
         this._initPools();
     }
@@ -427,6 +430,11 @@ export class FXSystem {
     shakeCamera(intensity, duration) {
         if (!this.enabled || this.reducedMotion) return;
         this.screenShake.start(intensity, duration);
+        
+        // Call renderer callback if provided
+        if (this.onShakeCamera) {
+            this.onShakeCamera(intensity, duration);
+        }
     }
 
     /**

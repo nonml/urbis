@@ -31,6 +31,9 @@ export class RivalAI {
         this.nextActionDelay = RIVAL_CONFIG.actionInterval;
     }
 
+    // Influence levels that trigger milestone news articles
+    static INFLUENCE_MILESTONES = [60, 80];
+
     /**
      * Creates initial rival state
      * @returns {Object} Rival state object
@@ -44,7 +47,8 @@ export class RivalAI {
             lastActionTick: 0,
             currentAction: null,
             actionDuration: 0,
-            pastActions: []
+            pastActions: [],
+            reachedMilestones: [], // tracks which thresholds have already fired
         };
     }
 
@@ -63,7 +67,22 @@ export class RivalAI {
         rival.budget = Math.min(RIVAL_CONFIG.maxBudget, (rival.budget || 0) + RIVAL_CONFIG.budgetRegen);
 
         // Update influence based on city state
+        const prevInfluence = rival.influence || RIVAL_CONFIG.baseInfluence;
         rival.influence = this.calculateInfluence(state);
+        rival.reachedMilestones = rival.reachedMilestones || [];
+
+        // Emit milestone events when influence crosses key thresholds
+        for (const threshold of RivalAI.INFLUENCE_MILESTONES) {
+            if (prevInfluence < threshold && rival.influence >= threshold
+                && !rival.reachedMilestones.includes(threshold)) {
+                rival.reachedMilestones.push(threshold);
+                eventBus.emit(EVENT_TYPES.RIVAL_INFLUENCE_MILESTONE, {
+                    threshold,
+                    influence: rival.influence,
+                    tick,
+                });
+            }
+        }
 
         // Check if we can/should take an action
         if (tick - rival.lastActionTick >= this.nextActionDelay) {

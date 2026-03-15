@@ -165,11 +165,70 @@ export const CRISIS_TYPES = {
     MARKET_CRASH: 'market_crash'
 };
 
-// Difficulty levels
+// Difficulty presets (Tier 2D)
+// Each preset is fully self-contained and drives all tunable systems.
 export const DIFFICULTY = {
-    EASY: { resourceMultiplier: 1.5, crisisChance: 0.005, enemyStrength: 0.5 },
-    NORMAL: { resourceMultiplier: 1.0, crisisChance: 0.01, enemyStrength: 1.0 },
-    HARD: { resourceMultiplier: 0.7, crisisChance: 0.02, enemyStrength: 1.5 }
+    EASY: {
+        label: 'Easy',
+        description: 'Forgiving economy, rare crises, slow rivals. Good for learning.',
+        resourceMultiplier: 1.5,
+        crisisChance:    0.004,
+        enemyStrength:   0.5,
+        startingGold:    200,
+        startingFood:    150,
+        startingWood:    150,
+        incomeBonus:     0.25,   // +25% all building income
+        decayMultiplier: 0.5,    // buildings decay at half speed
+    },
+    NORMAL: {
+        label: 'Normal',
+        description: 'Balanced challenge. The intended experience.',
+        resourceMultiplier: 1.0,
+        crisisChance:    0.01,
+        enemyStrength:   1.0,
+        startingGold:    100,
+        startingFood:    100,
+        startingWood:    100,
+        incomeBonus:     0.0,
+        decayMultiplier: 1.0,
+    },
+    HARD: {
+        label: 'Hard',
+        description: 'Tight budget, frequent crises, aggressive rivals.',
+        resourceMultiplier: 0.7,
+        crisisChance:    0.022,
+        enemyStrength:   1.5,
+        startingGold:    60,
+        startingFood:    60,
+        startingWood:    60,
+        incomeBonus:    -0.10,   // -10% income
+        decayMultiplier: 1.5,
+    },
+    BRUTAL: {
+        label: 'Brutal',
+        description: 'Near-impossible. Resources scarce, crises relentless, no mercy.',
+        resourceMultiplier: 0.5,
+        crisisChance:    0.04,
+        enemyStrength:   2.5,
+        startingGold:    30,
+        startingFood:    30,
+        startingWood:    30,
+        incomeBonus:    -0.20,
+        decayMultiplier: 2.0,
+    },
+    SANDBOX: {
+        label: 'Sandbox',
+        description: 'No win/lose conditions. Unlimited resources. Build freely.',
+        resourceMultiplier: 2.0,
+        crisisChance:    0.001,
+        enemyStrength:   0.1,
+        startingGold:    9999,
+        startingFood:    9999,
+        startingWood:    9999,
+        incomeBonus:     0.5,
+        decayMultiplier: 0.0,    // buildings never decay
+        sandbox:         true,
+    },
 };
 
 // Building upgrade levels
