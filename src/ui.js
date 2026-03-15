@@ -995,6 +995,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         // Weather indicator (6B)
         this.updateWeatherIndicator();
+
+        // Rival influence indicator (2B)
+        this.updateRivalIndicator();
     }
 
     /** Animate a resource counter from its current displayed value to `to`. */
@@ -1082,6 +1085,29 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             // Visual warning at high heat
             heatContainer.style.borderColor = heat >= 70 ? '#ff4444' : (heat >= 30 ? '#ffaa00' : '#44ff44');
         }
+    }
+
+    /** Show rival influence level and active action in the HUD (2B) */
+    updateRivalIndicator() {
+        const rival = this.game?.state?.rival;
+        if (!rival) return;
+
+        let el = document.getElementById('rival-indicator');
+        if (!el) {
+            const resourceBar = document.getElementById('resource-bar');
+            if (!resourceBar) return;
+            el = document.createElement('div');
+            el.id = 'rival-indicator';
+            el.className = 'resource';
+            el.style.cssText = 'padding:2px 8px;font-size:12px;cursor:default;white-space:nowrap;';
+            resourceBar.appendChild(el);
+        }
+
+        const influence = Math.round(rival.influence ?? 0);
+        const action = rival.currentAction ? ` — ${rival.currentAction.replace(/_/g, ' ')}` : '';
+        const dangerColor = influence >= 80 ? '#ff4444' : influence >= 60 ? '#ffaa00' : '#aaaaaa';
+        el.innerHTML = `<span style="color:${dangerColor}">🕵️ ${influence}%${action}</span>`;
+        el.title = `Rival influence: ${influence}%${action ? '\nActive: ' + action : ''}`;
     }
 
     updateWeatherIndicator() {
@@ -1844,6 +1870,12 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         eventBus.on(EVENT_TYPES.RIVAL_INFLUENCE_MILESTONE, ({ influence }) => {
             sr.announceUrgent(`Warning: rival influence has reached ${influence}%.`);
+        });
+
+        eventBus.on(EVENT_TYPES.RIVAL_ACTION_STARTED, ({ action }) => {
+            const label = action ? action.replace(/_/g, ' ') : 'unknown operation';
+            this.showMessage(`🕵️ Rival operative started: ${label}`, 'crisis');
+            sr.announceUrgent(`Rival is executing: ${label}`);
         });
 
         eventBus.on(EVENT_TYPES.DAY_START, ({ day }) => {
