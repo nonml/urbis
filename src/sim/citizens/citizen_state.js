@@ -1,3 +1,23 @@
+// Deterministic name pool — seeded by citizen ID so names are stable across saves
+const _FIRST = [
+    'James','John','Robert','Michael','William','David','Richard','Joseph','Thomas','Charles',
+    'Mary','Patricia','Jennifer','Linda','Barbara','Elizabeth','Susan','Jessica','Sarah','Karen',
+    'Alex','Jordan','Taylor','Morgan','Casey','Riley','Quinn','Avery','Dakota','Reese',
+    'Kai','Lena','Marco','Nina','Omar','Priya','Sam','Tae','Uma','Victor',
+];
+const _LAST = [
+    'Smith','Johnson','Williams','Brown','Jones','Garcia','Miller','Davis','Rodriguez','Martinez',
+    'Hernandez','Lopez','Wilson','Anderson','Thomas','Taylor','Moore','Jackson','Martin','Lee',
+    'Perez','Thompson','White','Harris','Sanchez','Clark','Ramirez','Lewis','Robinson','Walker',
+    'Young','Allen','King','Wright','Scott','Torres','Nguyen','Hill','Flores','Rivera',
+];
+
+/** Stable name from citizen ID — no external deps, no Random() calls */
+function _citizenName(id) {
+    const h = (id * 2654435769) >>> 0; // FNV-like 1-round mix
+    return `${_FIRST[h % _FIRST.length]} ${_LAST[(h >>> 10) % _LAST.length]}`;
+}
+
 export const CITIZEN_CAPS = {
     SMALL: 300,
     CITY: 2000,
@@ -31,6 +51,9 @@ export function ensureCitizenState(citizen, map = null) {
     }
     if (citizen.mood === undefined) {
         citizen.mood = 'content';
+    }
+    if (!citizen.name) {
+        citizen.name = _citizenName(citizen.id ?? 0);
     }
     if (!citizen.traits) {
         const primary = citizen.personality?.primary || 'adaptive';

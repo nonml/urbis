@@ -477,9 +477,20 @@ export class NewsFeed {
         const day = state.time?.tick ?? 0;
 
         // Pick NPC to feature in the story
+        // Use a real citizen name when available (6A: procedural storytelling from sim state)
+        const citizens = game.citizens?.citizens;
+        const realCitizen = citizens?.length
+            ? citizens[Math.abs((day * 1301 + 7) % citizens.length)]
+            : null;
         const npc = this.npcGenerator?.generateNPC({ faction: 'civilian', importance: 'minor' });
-        const name = npc?.fullName ?? 'A local official';
+        const name = realCitizen?.name || npc?.fullName || 'A local official';
         const title = npc?.title ?? 'resident';
+
+        // Second named citizen for richer quotes
+        const realCitizen2 = citizens?.length > 1
+            ? citizens[Math.abs((day * 2503 + 13) % citizens.length)]
+            : null;
+        const name2 = realCitizen2?.name || this.npcGenerator?.generateNPC({ faction: 'civilian' })?.fullName || 'Another resident';
 
         // Build story pool based on current sim data
         const stories = [];
@@ -498,14 +509,14 @@ export class NewsFeed {
         if (happiness >= 75) {
             stories.push({
                 headline: `Satisfaction Survey: ${happiness}% of Citizens Report High Morale`,
-                body: `A new city survey found ${happiness}% satisfaction among ${pop} residents. ${name} attributed the results to recent infrastructure investments. "This city is on the right track," said the ${title}.`,
+                body: `A new city survey found ${happiness}% satisfaction among ${pop} residents. ${name} attributed the results to recent infrastructure investments. ${name2} agreed: "This city is on the right track."`,
                 category: NEWS_CATEGORIES.SOCIETY,
                 severity: NEWS_SEVERITY.MEDIUM
             });
         } else if (happiness < 40) {
             stories.push({
                 headline: `Citizens Express Frustration as Happiness Drops to ${happiness}%`,
-                body: `Public discontent is rising with satisfaction at only ${happiness}%. ${name} organized a community forum. "The city needs to listen to its ${pop} residents," said the ${title}.`,
+                body: `Public discontent is rising with satisfaction at only ${happiness}%. ${name} organized a community forum alongside ${name2}. "The city needs to listen to its ${pop} residents," said the ${title}.`,
                 category: NEWS_CATEGORIES.POLITICS,
                 severity: happiness < 25 ? NEWS_SEVERITY.HIGH : NEWS_SEVERITY.MEDIUM
             });
