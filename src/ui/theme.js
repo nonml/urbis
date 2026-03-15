@@ -263,6 +263,9 @@ export class ThemeManager {
             case 'highContrast':
                 this.setHighContrast(value);
                 break;
+            case 'colorblindMode':
+                this.setColorblindMode(value);
+                break;
             case 'showGrid':
                 this.setShowGrid(value);
                 break;
@@ -309,7 +312,11 @@ export class ThemeManager {
         
         // Apply high contrast
         this.setHighContrast(this.settings.highContrast);
-        
+
+        // Apply colorblind mode (from settings manager if available)
+        const cbMode = window.settingsManager?.get?.('colorblindMode');
+        if (cbMode && cbMode !== 'none') this.setColorblindMode(cbMode);
+
         this.initialized = true;
     }
 
@@ -364,6 +371,35 @@ export class ThemeManager {
                 root.style.setProperty(k, v);
             }
         }
+    }
+
+    /**
+     * Apply colorblind simulation filter to the entire page.
+     * Uses SVG feColorMatrix — affects canvas + UI identically.
+     * @param {'none'|'deuteranopia'|'protanopia'|'tritanopia'} mode
+     */
+    setColorblindMode(mode) {
+        // Remove previous filter SVG and body class
+        document.querySelector('#_colorblind_svg')?.remove();
+        document.body.style.removeProperty('filter');
+        document.body.classList.remove('colorblind-deuteranopia', 'colorblind-protanopia', 'colorblind-tritanopia');
+
+        const matrices = {
+            deuteranopia: '0.367 0.861 -0.228 0 0  0.280 0.673 0.047 0 0  -0.012 0.043 0.969 0 0  0 0 0 1 0',
+            protanopia:   '0.152 1.053 -0.205 0 0  0.115 0.786 0.099 0 0  -0.004 -0.048 1.052 0 0  0 0 0 1 0',
+            tritanopia:   '1.256 -0.077 -0.179 0 0  -0.079 0.931 0.148 0 0  0.005 0.691 0.304 0 0  0 0 0 1 0',
+        };
+        const matrix = matrices[mode];
+        if (!matrix) return;
+
+        const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+        svg.id = '_colorblind_svg';
+        svg.setAttribute('aria-hidden', 'true');
+        svg.style.cssText = 'position:absolute;width:0;height:0;overflow:hidden;pointer-events:none';
+        svg.innerHTML = `<defs><filter id="_cb_filter_${mode}"><feColorMatrix type="matrix" values="${matrix}"/></filter></defs>`;
+        document.body.appendChild(svg);
+        document.body.style.filter = `url(#_cb_filter_${mode})`;
+        document.body.classList.add(`colorblind-${mode}`);
     }
 
     /**

@@ -18,7 +18,8 @@ export const DEFAULT_SETTINGS = {
     theme: DEFAULT_THEME,
     fontScale: 1.0,
     reducedMotion: false,
-    highContrast: false
+    highContrast: false,
+    colorblindMode: 'none'
 };
 
 // Settings keys for localStorage
@@ -35,7 +36,8 @@ export const SETTINGS_KEYS = {
     theme: 'game_settings_theme',
     fontScale: 'game_settings_font_scale',
     reducedMotion: 'game_settings_reduced_motion',
-    highContrast: 'game_settings_high_contrast'
+    highContrast: 'game_settings_high_contrast',
+    colorblindMode: 'game_settings_colorblind_mode'
 };
 
 /**
@@ -128,6 +130,11 @@ export class SettingsManager {
                     window.themeManager.setHighContrast(value);
                 }
                 break;
+            case 'colorblindMode':
+                if (window.themeManager) {
+                    window.themeManager.setColorblindMode(value);
+                }
+                break;
         }
     }
 
@@ -140,21 +147,24 @@ export class SettingsManager {
         this.uiElement = document.createElement('div');
         this.uiElement.id = 'settings-overlay';
         this.uiElement.className = 'overlay settings-overlay hidden';
+        this.uiElement.setAttribute('role', 'dialog');
+        this.uiElement.setAttribute('aria-modal', 'true');
+        this.uiElement.setAttribute('aria-label', 'Settings');
         this.uiElement.innerHTML = `
             <div class="overlay-content settings-content">
                 <div class="overlay-header">
                     <h2>Settings</h2>
-                    <button class="btn-close" data-action="close">✕</button>
+                    <button class="btn-close" data-action="close" aria-label="Close settings">✕</button>
                 </div>
-                <div class="settings-tabs">
-                    <button class="tab active" data-tab="controls">Controls</button>
-                    <button class="tab" data-tab="graphics">Graphics</button>
-                    <button class="tab" data-tab="audio">Audio</button>
-                    <button class="tab" data-tab="system">System</button>
+                <div class="settings-tabs" role="tablist" aria-label="Settings categories">
+                    <button class="tab active" data-tab="controls" role="tab" aria-selected="true" aria-controls="settings-tab-controls">Controls</button>
+                    <button class="tab" data-tab="graphics" role="tab" aria-selected="false" aria-controls="settings-tab-graphics">Graphics</button>
+                    <button class="tab" data-tab="audio" role="tab" aria-selected="false" aria-controls="settings-tab-audio">Audio</button>
+                    <button class="tab" data-tab="system" role="tab" aria-selected="false" aria-controls="settings-tab-system">System</button>
                 </div>
                 <div class="settings-content-tabs">
                     <!-- Controls Tab -->
-                    <div class="settings-tab-content active" data-content="controls">
+                    <div class="settings-tab-content active" data-content="controls" id="settings-tab-controls" role="tabpanel" aria-labelledby tabindex="0">
                         <div class="setting-row">
                             <label for="mouse-sensitivity">Mouse Sensitivity</label>
                             <div class="slider-container">
@@ -171,7 +181,7 @@ export class SettingsManager {
                         </div>
                     </div>
                     <!-- Graphics Tab -->
-                    <div class="settings-tab-content" data-content="graphics">
+                    <div class="settings-tab-content" data-content="graphics" id="settings-tab-graphics" role="tabpanel" tabindex="0">
                         <div class="setting-row">
                             <label for="render-scale">Render Scale</label>
                             <div class="slider-container">
@@ -217,9 +227,19 @@ export class SettingsManager {
                             </label>
                             <small class="setting-hint">Increase color contrast</small>
                         </div>
+                        <div class="setting-row">
+                            <label for="colorblind-mode">Color Vision</label>
+                            <select id="colorblind-mode">
+                                <option value="none" ${this.settings.colorblindMode === 'none' ? 'selected' : ''}>Normal</option>
+                                <option value="deuteranopia" ${this.settings.colorblindMode === 'deuteranopia' ? 'selected' : ''}>Deuteranopia (red-green)</option>
+                                <option value="protanopia" ${this.settings.colorblindMode === 'protanopia' ? 'selected' : ''}>Protanopia (red-green, severe)</option>
+                                <option value="tritanopia" ${this.settings.colorblindMode === 'tritanopia' ? 'selected' : ''}>Tritanopia (blue-yellow)</option>
+                            </select>
+                            <small class="setting-hint">Adjusts colors for color vision deficiencies</small>
+                        </div>
                     </div>
                     <!-- Audio Tab -->
-                    <div class="settings-tab-content" data-content="audio">
+                    <div class="settings-tab-content" data-content="audio" id="settings-tab-audio" role="tabpanel" tabindex="0">
                         <div class="setting-row">
                             <label for="master-volume">Master Volume</label>
                             <div class="slider-container">
@@ -243,7 +263,7 @@ export class SettingsManager {
                         </div>
                     </div>
                     <!-- System Tab -->
-                    <div class="settings-tab-content" data-content="system">
+                    <div class="settings-tab-content" data-content="system" id="settings-tab-system" role="tabpanel" tabindex="0">
                         <div class="setting-row">
                             <label class="checkbox-label">
                                 <input type="checkbox" id="show-tutorial" ${this.settings.showTutorial ? 'checked' : ''}>
@@ -267,6 +287,10 @@ export class SettingsManager {
                                 Known Issues & Feedback
                             </button>
                         </div>
+                        <div class="setting-row">
+                            <button class="btn btn-secondary" id="load-mod-btn">Load Mod Pack (.json)</button>
+                            <small class="setting-hint" id="loaded-mods-display">No mods loaded</small>
+                        </div>
                     </div>
                 </div>
                 <div class="overlay-footer">
@@ -286,15 +310,24 @@ export class SettingsManager {
     setupEventListeners() {
         const overlay = this.uiElement;
 
-        // Tab switching
-        overlay.querySelectorAll('.tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const tabName = tab.dataset.tab;
-                overlay.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-                overlay.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('active'));
-                tab.classList.add('active');
-                overlay.querySelector(`[data-content="${tabName}"]`).classList.add('active');
-                this.playUISound('click');
+        // Tab switching (click + arrow keys for keyboard nav)
+        const tabs = Array.from(overlay.querySelectorAll('.tab'));
+        const activateTab = (tab) => {
+            const tabName = tab.dataset.tab;
+            tabs.forEach(t => { t.classList.remove('active'); t.setAttribute('aria-selected', 'false'); });
+            overlay.querySelectorAll('.settings-tab-content').forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            tab.setAttribute('aria-selected', 'true');
+            overlay.querySelector(`[data-content="${tabName}"]`).classList.add('active');
+            this.playUISound('click');
+        };
+        tabs.forEach((tab, idx) => {
+            tab.addEventListener('click', () => activateTab(tab));
+            tab.addEventListener('keydown', (e) => {
+                if (e.key === 'ArrowRight') { e.preventDefault(); const next = tabs[(idx + 1) % tabs.length]; next.focus(); activateTab(next); }
+                if (e.key === 'ArrowLeft')  { e.preventDefault(); const prev = tabs[(idx - 1 + tabs.length) % tabs.length]; prev.focus(); activateTab(prev); }
+                if (e.key === 'Home') { e.preventDefault(); tabs[0].focus(); activateTab(tabs[0]); }
+                if (e.key === 'End')  { e.preventDefault(); tabs[tabs.length - 1].focus(); activateTab(tabs[tabs.length - 1]); }
             });
         });
 
@@ -377,6 +410,11 @@ export class SettingsManager {
             this.playUISound('click');
         });
 
+        overlay.querySelector('#colorblind-mode')?.addEventListener('change', (e) => {
+            this.set('colorblindMode', e.target.value);
+            this.playUISound('click');
+        });
+
         // Action buttons
         overlay.querySelectorAll('[data-action="close"]').forEach(btn => {
             btn.addEventListener('click', () => this.close());
@@ -385,6 +423,22 @@ export class SettingsManager {
         // Milestone T: Known Issues button
         overlay.querySelector('#known-issues-btn')?.addEventListener('click', () => {
             this.game.feedbackUI?.toggle();
+            this.playUISound('click');
+        });
+
+        // Phase 8: Load mod pack
+        overlay.querySelector('#load-mod-btn')?.addEventListener('click', async () => {
+            const modLoader = this.game?.modLoader;
+            if (!modLoader) return;
+            const result = await modLoader.loadFromFile();
+            const display = overlay.querySelector('#loaded-mods-display');
+            if (result.success) {
+                const names = modLoader.getLoadedModNames();
+                if (display) display.textContent = `Loaded: ${names.join(', ')}`;
+                if (result.warnings?.length) console.warn('[ModLoader]', result.warnings);
+            } else {
+                if (display) display.textContent = `Error: ${result.error}`;
+            }
             this.playUISound('click');
         });
 
@@ -427,8 +481,14 @@ export class SettingsManager {
      */
     open() {
         this.createUI();
+        this._triggerElement = document.activeElement;
         this.uiElement.classList.remove('hidden');
         this.isOpen = true;
+        // Move focus to the first active tab for keyboard users
+        requestAnimationFrame(() => {
+            const firstTab = this.uiElement.querySelector('.tab.active');
+            firstTab?.focus();
+        });
     }
 
     /**
@@ -439,6 +499,8 @@ export class SettingsManager {
             this.uiElement.classList.add('hidden');
         }
         this.isOpen = false;
+        // Return focus to the element that opened the panel
+        this._triggerElement?.focus();
     }
 
     /**
@@ -498,6 +560,8 @@ export class SettingsManager {
         this.uiElement.querySelector('#auto-save').checked = this.settings.autoSave;
         this.uiElement.querySelector('#reduced-motion').checked = this.settings.reducedMotion;
         this.uiElement.querySelector('#high-contrast').checked = this.settings.highContrast;
+        const cbSelect = this.uiElement.querySelector('#colorblind-mode');
+        if (cbSelect) cbSelect.value = this.settings.colorblindMode ?? 'none';
     }
 
     /**

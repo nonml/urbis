@@ -902,6 +902,29 @@ export class Renderer3D {
     }
 
     // -----------------------------------------------------------------------
+    // Seasonal visuals (6B: living city feel)
+    // -----------------------------------------------------------------------
+
+    static SEASON_PALETTES = {
+        spring: { sky: 0xb9d6ff, fog: 0xc8e0ff, fogDensity: 0.0001, ambient: 0xffffff,  sun: 0xfff5e0 },
+        summer: { sky: 0x87ceeb, fog: 0x87ceeb, fogDensity: 0.00005,ambient: 0xfff5e0,  sun: 0xffd87a },
+        autumn: { sky: 0xd4a08c, fog: 0xe8c09a, fogDensity: 0.00015,ambient: 0xffd090,  sun: 0xffa040 },
+        winter: { sky: 0xc0d4e8, fog: 0xd0dde8, fogDensity: 0.00025,ambient: 0xd0e0ff,  sun: 0xffffff },
+    };
+
+    _applySeasonalColors(season) {
+        const p = Renderer3D.SEASON_PALETTES[season] ?? Renderer3D.SEASON_PALETTES.spring;
+        this._seasonFogDensity = p.fogDensity;
+        this.scene.background.setHex(p.sky);
+        if (this.scene.fog) {
+            this.scene.fog.color.setHex(p.fog);
+            this.scene.fog.density = p.fogDensity;
+        }
+        this.ambientLight.color.setHex(p.ambient);
+        this.sunLight.color.setHex(p.sun);
+    }
+
+    // -----------------------------------------------------------------------
     // Building spawn flash (1D: game feel)
     // -----------------------------------------------------------------------
 
@@ -1102,10 +1125,17 @@ export class Renderer3D {
             this.updateZoneOverlay();
         }
         
-        // Sync fog density from weather system (6B)
+        // Seasonal sky/fog/light palette (6B — changes once per season)
+        const season = this.game?.weatherSystem?.state?.season;
+        if (season && season !== this._lastSeason) {
+            this._lastSeason = season;
+            this._applySeasonalColors(season);
+        }
+
+        // Sync fog density from weather system — overrides seasonal base (6B)
         const wfx = this.game?.weatherSystem?.currentEffects;
         if (this.scene.fog && wfx) {
-            this.scene.fog.density = wfx.fogDensity ?? 0.0001;
+            this.scene.fog.density = wfx.fogDensity ?? (this._seasonFogDensity ?? 0.0001);
             if (wfx.ambientColor != null) {
                 this.scene.background.setHex(wfx.ambientColor);
                 this.scene.fog.color.setHex(wfx.ambientColor);
