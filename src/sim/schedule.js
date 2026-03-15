@@ -1,5 +1,6 @@
 // Daily schedule system - manages citizen movement and activities
 import { NavGrid } from './nav/nav_grid.js';
+import { PathfindingProxy } from './nav/pathfinding_proxy.js';
 
 // Day phases (0.0 to 1.0 normalized time)
 export const DAY_PHASES = {
@@ -21,6 +22,8 @@ export class ScheduleManager {
         this.phaseTimer = 0;
         this.nav = map ? new NavGrid(map) : null;
         this._lastBuildingCount = -1;
+        // Async pathfinding proxy (WebWorker A* with SharedArrayBuffer fallback)
+        this.pfProxy = (map && this.nav) ? new PathfindingProxy(this.nav, map) : null;
         if (this.nav && buildings) {
             this.syncNavBuildings(buildings);
         }
@@ -84,6 +87,7 @@ export class ScheduleManager {
         if (!this.nav && map) {
             this.nav = new NavGrid(map);
             this._lastBuildingCount = -1;
+            if (!this.pfProxy) this.pfProxy = new PathfindingProxy(this.nav, map);
         }
         this.syncNavBuildings(buildings);
     }
@@ -93,7 +97,14 @@ export class ScheduleManager {
         const count = buildings.buildings?.length ?? 0;
         if (count === this._lastBuildingCount) return;
         this.nav.setBlockedTilesFromBuildings(buildings.buildings || []);
+        this.pfProxy?.invalidate();
         this._lastBuildingCount = count;
+    }
+
+    /** Async path query — uses WebWorker when available, sync NavGrid otherwise. */
+    findPathAsync(a, b) {
+        if (this.pfProxy) return this.pfProxy.findPath(a, b);
+        return Promise.resolve(this.nav?.findPath(a, b) ?? { path: [], success: false });
     }
 
     isWalkable(x, y) {

@@ -51,29 +51,8 @@
             </svg>
         </button>
 
-        <!-- Top Resource Bar -->
-        <div id="resource-bar">
-            <div class="resource" id="gold-display">
-                <span class="icon">💰</span>
-                <span class="amount" id="gold-amount">100</span>
-            </div>
-            <div class="resource" id="food-display">
-                <span class="icon">🌾</span>
-                <span class="amount" id="food-amount">100</span>
-            </div>
-            <div class="resource" id="wood-display">
-                <span class="icon">🌲</span>
-                <span class="amount" id="wood-amount">100</span>
-            </div>
-            <div class="resource" id="population-display">
-                <span class="icon">👥</span>
-                <span class="amount" id="population-amount">3</span>
-            </div>
-            <div class="resource" id="day-display">
-                <span class="icon">📅</span>
-                <span class="amount" id="day-amount">Day 1</span>
-            </div>
-        </div>
+        <!-- Top Resource Bar (mounted by Svelte in main.js) -->
+        <div id="resource-bar-mount"></div>
 
         <!-- Main Game Area -->
         <div id="main-area">

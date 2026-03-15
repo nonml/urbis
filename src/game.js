@@ -32,6 +32,8 @@ import { EconomyLedger } from './sim/economy/ledger.js';
 import { ServiceManager } from './sim/services/services.js';
 import { GoalsManager } from './sim/goals/goals.js';
 import { createVictoryManager } from './sim/victory_conditions.js';
+import { steam } from './platform/steam.js';
+import { MultiplayerClient } from './multiplayer/multiplayer_client.js';
 import { CitizenSim } from './sim/citizens/citizen_sim.js';
 import { JobsManager } from './sim/economy/jobs.js';
 import { AnomalyDetectors } from './sim/anomalies/detectors.js';
@@ -39,6 +41,7 @@ import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { SocialGraph } from './sim/citizens/social_graph.js';
 import { CrimeGenerator } from './sim/citizens/crime_generator.js';
 import { HousingManager, PopulationManager } from './sim/citizens/household.js';
+import { NarrativeEngine } from './sim/narrative/narrative_engine.js';
 import { SimChunkManager } from './sim/streaming/sim_cells.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
@@ -214,6 +217,11 @@ export class Game {
         this.goalsManager = new GoalsManager(this);
         this.goalsManager.setMode(mode);
         this.victoryManager = createVictoryManager(this);
+        this.steam = steam;
+        steam.init();
+
+        // Multiplayer (opt-in — call game.mp.connect() to activate)
+        this.mp = new MultiplayerClient(this);
 
         // Milestone P: Dev menu (only if not headless)
         this.devMenu = this.isHeadless ? null : new DevMenu(this);
@@ -316,6 +324,9 @@ export class Game {
 
         // Crime generator system (Milestone J)
         this.crimeGenerator = new CrimeGenerator(this, this.rngStreams.sim);
+
+        // Emergent narrative engine
+        this.narrativeEngine = new NarrativeEngine(this);
 
         // Housing/Population system (Milestone J)
         this.housingManager = new HousingManager(this, this.rngStreams.sim);
@@ -500,6 +511,9 @@ export class Game {
      * This is called at fixed intervals (tickRate)
      */
     tickOnce(dt) {
+        // Multiplayer lockstep gate (no-op when not connected)
+        if (this.mp?.connected) this.mp.onTick(this.state.time.tick);
+
         const oldTime = this.state.time.timeOfDay;
         const tickPerDay = this.state.time.tickPerDay || 24;
 
@@ -678,6 +692,9 @@ export class Game {
             this.ui.showMessage(`Day ${this.resources.day} begins...`, 'day-start');
         }
 
+        // Emergent narrative beats (once per tick)
+        if (this.narrativeEngine) this.narrativeEngine.update();
+
         // 7. Daily happiness check
         if (this.citizens.getAverageHappiness() < 30) {
             this.ui.showMessage('⚠️ Citizens are unhappy!', 'crisis');
@@ -744,8 +761,27 @@ export class Game {
             if (victoryScreen) {
                 victoryScreen.show(this.state, victoryResult.victoryDetails);
             }
+            // Steam: unlock victory achievement
+            if (victoryResult.type) {
+                steam.unlock(`victory_${victoryResult.type}`);
+            }
             this.stop();
         }
+
+        // Steam: sync achievements and stats each day
+        if (this.victoryManager.achievements) {
+            for (const ach of this.victoryManager.achievements) {
+                if (ach.unlocked && !steam._unlocked.has(ach.id)) {
+                    steam.unlock(ach.id);
+                }
+            }
+        }
+        steam.setStat('days_survived', this.resources.day ?? 1);
+        steam.setStat('buildings_built', this.buildings.buildings?.length ?? 0);
+        steam.setStat('population_peak', Math.max(
+            this.steam?._stats?.population_peak ?? 0,
+            this.resources.population ?? 0
+        ));
 
         // 11. Update UI
         this.ui.updateResources(this.resources);

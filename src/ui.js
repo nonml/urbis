@@ -1,5 +1,6 @@
 // UI manager for DOM + third-person 3D rendering
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
+import { resourceStore } from './stores/resources.js';
 import { MapScreen } from './ui/map_screen.js';
 import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
@@ -268,6 +269,10 @@ export class UIManager {
 
         // Settings
         this.settings = new SettingsManager(game);
+        // Wire manager into the Svelte SettingsPanel once it's mounted
+        if (window._settingsPanelComponent) {
+            window._settingsPanelComponent.$set({ manager: this.settings });
+        }
 
         // Theme manager
         this.themeManager = createThemeManager();
@@ -970,166 +975,53 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         );
     }
 
-    updateResources(resources) {
+    updateResources(resources = this.game?.resources) {
+        if (!resources) return;
         const g = Math.floor(resources.gold), f = Math.floor(resources.food), w = Math.floor(resources.wood);
-        this._animateResourceCounter('gold-amount', g);
-        this._animateResourceCounter('food-amount', f);
-        this._animateResourceCounter('wood-amount', w);
-        document.getElementById('population-amount').textContent = resources.population;
-        document.getElementById('day-amount').textContent = `Day ${resources.day}`;
 
-        // Overcrowding warning
-        const popDisplay = document.getElementById('population-display');
-        if (resources.population > resources.housing) {
-            popDisplay.style.border = '3px solid #ff6b6b';
-            popDisplay.style.boxShadow = '0 4px 0 #ff6b6b';
-        } else {
-            popDisplay.style.border = '3px solid #fff';
-            popDisplay.style.boxShadow = '0 4px 0 rgba(0,0,0,0.15)';
-        }
+        // Emit VFX events for floating text (unchanged logic, just use local vars)
+        this._emitResourceVFX('gold-amount', g);
+        this._emitResourceVFX('food-amount', f);
+        this._emitResourceVFX('wood-amount', w);
 
-        // Heat meter
+        // Push all data to the Svelte reactive store (ResourceBar.svelte reads from it)
         const player = this.game.state.player || {};
-        const heat = player.heat || 0;
-        this.updateHeatMeter(heat);
+        const ws = this.game?.weatherSystem;
+        const rival = this.game?.state?.rival;
 
-        // Weather indicator (6B)
-        this.updateWeatherIndicator();
-
-        // Rival influence indicator (2B)
-        this.updateRivalIndicator();
+        resourceStore.set({
+            gold: g, food: f, wood: w,
+            population: resources.population,
+            housing: resources.housing ?? 0,
+            day: resources.day,
+            heat: player.heat ?? 0,
+            weather: {
+                icon: ws?.getWeatherIcon?.() ?? '☀️',
+                type: ws?.state?.type ?? 'clear',
+                speedModifier: ws?.currentEffects?.speedModifier ?? 1,
+            },
+            rival: {
+                influence: Math.round(rival?.influence ?? 0),
+                currentAction: rival?.currentAction ?? null,
+            },
+        });
     }
 
-    /** Animate a resource counter from its current displayed value to `to`. */
-    _animateResourceCounter(id, to) {
+    /** Emit VFX resource gain/loss events without touching the DOM counter directly. */
+    _emitResourceVFX(id, to) {
         const el = document.getElementById(id);
         if (!el) return;
         const from = parseInt(el.textContent, 10);
-        if (isNaN(from) || from === to) { el.textContent = to; return; }
-
-        // Flash class
+        if (isNaN(from) || from === to) return;
         const delta = to - from;
-
-        // Emit VFX resource events so VFXTriggerManager can show floating text (Phase 6)
         if (Math.abs(delta) >= 3) {
             const resourceType = id.replace('-amount', '').replace(/-/g, ' ');
-            if (delta > 0) {
-                eventBus.emit('ui_resource_gained', { type: resourceType, amount: delta });
-            } else {
-                eventBus.emit('ui_resource_lost', { type: resourceType, amount: Math.abs(delta) });
-            }
-        }
-
-        el.classList.remove('res-gain', 'res-loss');
-        // Force reflow so animation restarts if called rapidly
-        void el.offsetWidth;
-        el.classList.add(delta > 0 ? 'res-gain' : 'res-loss');
-
-        // Floating delta label
-        if (Math.abs(delta) >= 3) {
-            const parent = el.closest('.resource');
-            if (parent) {
-                parent.style.position = 'relative';
-                const lbl = document.createElement('span');
-                lbl.className = 'resource-delta';
-                lbl.textContent = (delta > 0 ? '+' : '') + delta;
-                lbl.style.color = delta > 0 ? '#00ff88' : '#ff4444';
-                parent.appendChild(lbl);
-                setTimeout(() => lbl.remove(), 1200);
-            }
-        }
-
-        // Tick number up/down
-        const duration = Math.min(500, Math.abs(delta) * 3 + 100);
-        const start = performance.now();
-        const tick = (now) => {
-            const t = Math.min(1, (now - start) / duration);
-            const ease = t * (2 - t);
-            el.textContent = Math.round(from + delta * ease);
-            if (t < 1) requestAnimationFrame(tick);
-        };
-        requestAnimationFrame(tick);
-    }
-
-    updateHeatMeter(heat) {
-        // Check if heat meter already exists, create if not
-        let heatContainer = document.getElementById('heat-meter');
-        if (!heatContainer) {
-            const resourceBar = document.getElementById('resource-bar');
-            if (!resourceBar) return;
-
-            heatContainer = document.createElement('div');
-            heatContainer.id = 'heat-meter';
-            heatContainer.className = 'resource heat-meter';
-            heatContainer.innerHTML = `
-                <span class="icon">🔥</span>
-                <div class="heat-bar-container">
-                    <div class="heat-bar" id="heat-bar">
-                        <div class="heat-fill" id="heat-fill"></div>
-                    </div>
-                    <span class="heat-label" id="heat-label">0</span>
-                </div>
-            `;
-            resourceBar.appendChild(heatContainer);
-        }
-
-        const heatFill = document.getElementById('heat-fill');
-        const heatLabel = document.getElementById('heat-label');
-
-        if (heatFill) {
-            heatFill.style.width = `${heat}%`;
-        }
-
-        if (heatLabel) {
-            heatLabel.textContent = `${heat}`;
-            // Visual warning at high heat
-            heatContainer.style.borderColor = heat >= 70 ? '#ff4444' : (heat >= 30 ? '#ffaa00' : '#44ff44');
+            if (delta > 0) eventBus.emit('ui_resource_gained', { type: resourceType, amount: delta });
+            else           eventBus.emit('ui_resource_lost',   { type: resourceType, amount: Math.abs(delta) });
         }
     }
 
-    /** Show rival influence level and active action in the HUD (2B) */
-    updateRivalIndicator() {
-        const rival = this.game?.state?.rival;
-        if (!rival) return;
-
-        let el = document.getElementById('rival-indicator');
-        if (!el) {
-            const resourceBar = document.getElementById('resource-bar');
-            if (!resourceBar) return;
-            el = document.createElement('div');
-            el.id = 'rival-indicator';
-            el.className = 'resource';
-            el.style.cssText = 'padding:2px 8px;font-size:12px;cursor:default;white-space:nowrap;';
-            resourceBar.appendChild(el);
-        }
-
-        const influence = Math.round(rival.influence ?? 0);
-        const action = rival.currentAction ? ` — ${rival.currentAction.replace(/_/g, ' ')}` : '';
-        const dangerColor = influence >= 80 ? '#ff4444' : influence >= 60 ? '#ffaa00' : '#aaaaaa';
-        el.innerHTML = `<span style="color:${dangerColor}">🕵️ ${influence}%${action}</span>`;
-        el.title = `Rival influence: ${influence}%${action ? '\nActive: ' + action : ''}`;
-    }
-
-    updateWeatherIndicator() {
-        const ws = this.game?.weatherSystem;
-        if (!ws) return;
-        const icon = ws.getWeatherIcon?.() ?? '☀️';
-        const fx = ws.currentEffects;
-        let label = document.getElementById('weather-indicator');
-        if (!label) {
-            const resourceBar = document.getElementById('resource-bar');
-            if (!resourceBar) return;
-            label = document.createElement('div');
-            label.id = 'weather-indicator';
-            label.className = 'resource';
-            label.style.cssText = 'padding:2px 8px;font-size:18px;cursor:default;';
-            resourceBar.appendChild(label);
-        }
-        const tip = fx?.speedModifier < 1 ? ` (−${Math.round((1 - fx.speedModifier) * 100)}% food/wood)` : '';
-        label.textContent = icon;
-        label.title = `Weather: ${ws.state?.type ?? 'clear'}${tip}`;
-    }
-
+    /** Animate a resource counter from its current displayed value to `to`. */
     showMessage(message, type = 'normal') {
         const log = document.getElementById('message-log');
         if (!log) return;

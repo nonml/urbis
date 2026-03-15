@@ -7,6 +7,8 @@ import { loadQuestsFromDirectory } from './content/loader.js';
 import { loadStoryletsFromDirectory } from './content/loader.js';
 import { loadOutcomes } from './content/loader.js';
 import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
+import ResourceBar from './ui/components/ResourceBar.svelte';
+import SettingsPanel from './ui/components/SettingsPanel.svelte';
 
 // Display version
 document.addEventListener('DOMContentLoaded', () => {
@@ -137,6 +139,16 @@ window.showStartScreen = function() {
 
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', async () => {
+    // Mount Svelte components
+    const rbMount = document.getElementById('resource-bar-mount');
+    if (rbMount) new ResourceBar({ target: rbMount });
+
+    // Settings panel mounts into body; manager prop is injected after game init
+    const settingsMount = document.createElement('div');
+    settingsMount.id = 'settings-panel-mount';
+    document.body.appendChild(settingsMount);
+    window._settingsPanelComponent = new SettingsPanel({ target: settingsMount, props: { manager: null } });
+
     // Show main menu on load
     const menu = document.getElementById('main-menu-overlay');
     if (menu) menu.classList.remove('hidden');
