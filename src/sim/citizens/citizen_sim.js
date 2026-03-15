@@ -1,5 +1,4 @@
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
-import CitizenWorkerConstructor from '../../workers/citizen_worker.js?worker';
 
 export class CitizenSim {
     constructor(game) {
@@ -16,21 +15,27 @@ export class CitizenSim {
     }
 
     _initWorker() {
-        try {
-            this._worker = new CitizenWorkerConstructor();
-            this._worker.onmessage = (e) => {
-                if (e.data?.type === 'UPDATE_RESULT') {
-                    this._pendingWorkerResult = e.data.results;
-                }
-            };
-            this._worker.onerror = (err) => {
-                console.warn('[CitizenSim] Worker error, falling back to main thread:', err?.message);
-                this._worker = null;
-            };
-            this._workerReady = true;
-        } catch (err) {
-            console.info('[CitizenSim] WebWorker unavailable, running sync:', err.message);
-        }
+        // Dynamic import handles both Vite (?worker) and Node.js (graceful skip)
+        import('../../workers/citizen_worker.js?worker').then(mod => {
+            try {
+                const Ctor = mod.default;
+                this._worker = new Ctor();
+                this._worker.onmessage = (e) => {
+                    if (e.data?.type === 'UPDATE_RESULT') {
+                        this._pendingWorkerResult = e.data.results;
+                    }
+                };
+                this._worker.onerror = (err) => {
+                    console.warn('[CitizenSim] Worker error, falling back to main thread:', err?.message);
+                    this._worker = null;
+                };
+                this._workerReady = true;
+            } catch (err) {
+                console.info('[CitizenSim] WebWorker init failed:', err.message);
+            }
+        }).catch(() => {
+            // Node.js / environments without Vite worker support — fall back to main thread
+        });
     }
 
     enforceCitizenCap() {
