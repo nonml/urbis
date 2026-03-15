@@ -4,7 +4,7 @@ import { MapScreen } from './ui/map_screen.js';
 import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
 import { SettingsManager } from './ui/settings.js';
-import { createThemeManager } from './ui/theme.js';
+import { createThemeManager, ScreenReaderAnnouncer } from './ui/theme.js';
 import { BuildMenu } from './ui/build_menu.js';
 import { CaseFileUI } from './ui/case_file.js';
 import { FactionsPanel } from './ui/factions_panel.js';
@@ -12,8 +12,11 @@ import { CitizenProfileUI } from './ui/citizen_profile.js';
 import { PoliticsPanel } from './ui/politics_panel.js';
 import { CodexUI } from './ui/codex.js';
 import { FeedbackUI } from './ui/feedback.js';
+import { NewsFeedPanel } from './ui/news_feed.js';
 import { createAudioManager } from './audio/audio_manager.js';
+import { getProceduralMusic } from './audio/procedural_music.js';
 import { getInteractableTypeInfo, getInteractableStateName } from './sim/interactables.js';
+import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { createVictoryScreen, AchievementNotification } from './ui/victory_screen.js';
 import { updatePlayerMovement, createPlayerState } from './player/controller.js';
 import { validatePlacement } from './build/placement.js';
@@ -22,6 +25,7 @@ import { BreachMinigame } from './ui/breach_minigame.js';
 import { HackNetwork } from './ui/hack_network.js';
 import { createTutorialOverlay, TutorialOverlay } from './ui/tutorial_overlay.js';
 import { TooltipManager } from './ui/tooltips.js';
+import { PhotoMode } from './ui/photo_mode.js';
 
 function getFallbackCanvasId(mainCanvas) {
     return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
@@ -269,8 +273,22 @@ export class UIManager {
         this.themeManager = createThemeManager();
         window.themeManager = this.themeManager;
 
+        // Screen reader announcer (accessibility)
+        this.srAnnouncer = new ScreenReaderAnnouncer();
+        this._setupScreenReaderListeners();
+
         // Audio
         this.audioManager = createAudioManager(game);
+
+        // Procedural music (6D) — starts on first user gesture (browser audio policy)
+        this.proceduralMusic = getProceduralMusic(game);
+        const _startMusic = () => {
+            this.proceduralMusic?.start();
+            window.removeEventListener('click', _startMusic);
+            window.removeEventListener('keydown', _startMusic);
+        };
+        window.addEventListener('click', _startMusic, { once: true });
+        window.addEventListener('keydown', _startMusic, { once: true });
 
         // Victory screen
         this.victoryScreen = createVictoryScreen();
@@ -304,6 +322,7 @@ export class UIManager {
         this.hackList = new HackList(this.game);
         this.breachMinigame = new BreachMinigame(this.game);
         this.hackNetwork = new HackNetwork(this.game);
+        this.photoMode = new PhotoMode(this.game);
         this._breachWasPaused = false;
 
         // Player movement state (third-person controller)
@@ -321,6 +340,7 @@ export class UIManager {
         this.politicsPanel = new PoliticsPanel(this.game);
         this.codexUI = new CodexUI(this.game);
         this.feedbackUI = new FeedbackUI(this.game);
+        this.newsFeedPanel = new NewsFeedPanel(this.game);
         this.setupInfoTabs();
         this.setupSettingsButton();
         this.setupInput();
@@ -590,6 +610,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     this.handleEKey();
                 }
             }
+            if (e.key === 'F8') {
+                e.preventDefault();
+                this.photoMode?.toggle();
+            }
             if (e.key.toLowerCase() === 'h') {
                 e.preventDefault();
                 this.hackScanVisible = !this.hackScanVisible;
@@ -608,6 +632,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             }
             if (e.key.toLowerCase() === 'c') {
                 this.caseFileUI?.toggle();
+            }
+            // Tier 2B: News feed toggle (N key)
+            if (e.key.toLowerCase() === 'n') {
+                this.newsFeedPanel?.toggle();
             }
 
             // Citizen profile: V key
@@ -895,6 +923,11 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         if (this.audioManager) {
             this.audioManager.updateVolumes();
         }
+        // Sync procedural music volume to settings
+        if (this.proceduralMusic?.running) {
+            const vol = this.settings?.get('masterVolume') ?? 0.8;
+            this.proceduralMusic.setVolume(vol * 0.6);
+        }
         
         try {
             this.renderer3d.render();
@@ -938,9 +971,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     }
 
     updateResources(resources) {
-        document.getElementById('gold-amount').textContent = Math.floor(resources.gold);
-        document.getElementById('food-amount').textContent = Math.floor(resources.food);
-        document.getElementById('wood-amount').textContent = Math.floor(resources.wood);
+        const g = Math.floor(resources.gold), f = Math.floor(resources.food), w = Math.floor(resources.wood);
+        this._animateResourceCounter('gold-amount', g);
+        this._animateResourceCounter('food-amount', f);
+        this._animateResourceCounter('wood-amount', w);
         document.getElementById('population-amount').textContent = resources.population;
         document.getElementById('day-amount').textContent = `Day ${resources.day}`;
 
@@ -958,6 +992,49 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         const player = this.game.state.player || {};
         const heat = player.heat || 0;
         this.updateHeatMeter(heat);
+
+        // Weather indicator (6B)
+        this.updateWeatherIndicator();
+    }
+
+    /** Animate a resource counter from its current displayed value to `to`. */
+    _animateResourceCounter(id, to) {
+        const el = document.getElementById(id);
+        if (!el) return;
+        const from = parseInt(el.textContent, 10);
+        if (isNaN(from) || from === to) { el.textContent = to; return; }
+
+        // Flash class
+        const delta = to - from;
+        el.classList.remove('res-gain', 'res-loss');
+        // Force reflow so animation restarts if called rapidly
+        void el.offsetWidth;
+        el.classList.add(delta > 0 ? 'res-gain' : 'res-loss');
+
+        // Floating delta label
+        if (Math.abs(delta) >= 3) {
+            const parent = el.closest('.resource');
+            if (parent) {
+                parent.style.position = 'relative';
+                const lbl = document.createElement('span');
+                lbl.className = 'resource-delta';
+                lbl.textContent = (delta > 0 ? '+' : '') + delta;
+                lbl.style.color = delta > 0 ? '#00ff88' : '#ff4444';
+                parent.appendChild(lbl);
+                setTimeout(() => lbl.remove(), 1200);
+            }
+        }
+
+        // Tick number up/down
+        const duration = Math.min(500, Math.abs(delta) * 3 + 100);
+        const start = performance.now();
+        const tick = (now) => {
+            const t = Math.min(1, (now - start) / duration);
+            const ease = t * (2 - t);
+            el.textContent = Math.round(from + delta * ease);
+            if (t < 1) requestAnimationFrame(tick);
+        };
+        requestAnimationFrame(tick);
     }
 
     updateHeatMeter(heat) {
@@ -994,6 +1071,26 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             // Visual warning at high heat
             heatContainer.style.borderColor = heat >= 70 ? '#ff4444' : (heat >= 30 ? '#ffaa00' : '#44ff44');
         }
+    }
+
+    updateWeatherIndicator() {
+        const ws = this.game?.weatherSystem;
+        if (!ws) return;
+        const icon = ws.getWeatherIcon?.() ?? '☀️';
+        const fx = ws.currentEffects;
+        let label = document.getElementById('weather-indicator');
+        if (!label) {
+            const resourceBar = document.getElementById('resource-bar');
+            if (!resourceBar) return;
+            label = document.createElement('div');
+            label.id = 'weather-indicator';
+            label.className = 'resource';
+            label.style.cssText = 'padding:2px 8px;font-size:18px;cursor:default;';
+            resourceBar.appendChild(label);
+        }
+        const tip = fx?.speedModifier < 1 ? ` (−${Math.round((1 - fx.speedModifier) * 100)}% food/wood)` : '';
+        label.textContent = icon;
+        label.title = `Weather: ${ws.state?.type ?? 'clear'}${tip}`;
     }
 
     showMessage(message, type = 'normal') {
@@ -1705,6 +1802,42 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 this.audioManager[method]();
             }
         }
+    }
+
+    /**
+     * Wire screen reader announcements to key game events.
+     */
+    _setupScreenReaderListeners() {
+        const sr = this.srAnnouncer;
+
+        eventBus.on(EVENT_TYPES.PLAYER_BUILT_BUILDING, ({ buildingName }) => {
+            sr.announce(`${buildingName} built.`);
+        });
+
+        eventBus.on(EVENT_TYPES.CRISIS_STARTED, ({ name }) => {
+            sr.announceUrgent(`Alert: ${name} crisis has started.`);
+        });
+
+        eventBus.on(EVENT_TYPES.CRISIS_RESOLVED, ({ name }) => {
+            sr.announce(`${name} crisis resolved.`);
+        });
+
+        eventBus.on(EVENT_TYPES.QUEST_COMPLETED, ({ questName, caseTitle }) => {
+            const label = questName || caseTitle || 'Quest';
+            sr.announce(`${label} completed.`);
+        });
+
+        eventBus.on(EVENT_TYPES.QUEST_FAILED, ({ questName }) => {
+            sr.announceUrgent(`${questName || 'Quest'} failed.`);
+        });
+
+        eventBus.on(EVENT_TYPES.RIVAL_INFLUENCE_MILESTONE, ({ influence }) => {
+            sr.announceUrgent(`Warning: rival influence has reached ${influence}%.`);
+        });
+
+        eventBus.on(EVENT_TYPES.DAY_START, ({ day }) => {
+            sr.announce(`Day ${day} begins.`);
+        });
     }
 
     /**

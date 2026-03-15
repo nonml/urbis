@@ -83,10 +83,12 @@ export async function createRenderer3D(game, canvas) {
     return new Renderer3D(game, canvas);
 }
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
 import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_night.js';
 import { createFXSystem } from './render/fx/fx_system.js';
+import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
@@ -109,9 +111,10 @@ export class Renderer3D {
         // Scene
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0xb9d6ff);
+        this.scene.fog = new THREE.FogExp2(0xb9d6ff, 0.0001);
 
         // Camera rig (Ticket B-2: Orbit + Follow + Collision)
-        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 1000);
+        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
         this.yaw = 0;
         this.pitch = -0.4;
         this.followDist = 8;
@@ -125,6 +128,47 @@ export class Renderer3D {
         this.cameraCollisionRadius = 1.0;
         this.zoomSensitivity = 0.1;
         this.zoomDampening = 0.15;
+
+        // LOD thresholds (world units from camera to chunk center)
+        // Full detail below LOD_FULL_DIST; terrain-only between FULL and TERRAIN_ONLY; hidden beyond FAR.
+        this.LOD_FULL_DIST = 40;
+        this.LOD_TERRAIN_ONLY_DIST = 100;
+        
+        // Camera mode settings (God vs Street)
+        this.cameraMode = 'street'; // 'street' or 'god'
+        this.cameraModeTransition = 0; // 0 = street, 1 = god
+        this.cameraModeTarget = 0; // target for smooth transition
+        
+        // Mode-specific camera settings
+        this.streetCamera = {
+            pitch: -0.4,
+            followDist: 8,
+            followHeight: 4,
+            fov: 60,
+            yawSpeed: 0.005,
+            pitchSpeed: 0.005
+        };
+        this.godCamera = {
+            pitch: -0.8,
+            followDist: 15,
+            followHeight: 12,
+            fov: 70,
+            yawSpeed: 0.003,
+            pitchSpeed: 0.003
+        };
+        
+        // Camera shake
+        this.shakeIntensity = 0;
+        this.shakeDuration = 0;
+        this.shakeDecay = 1.0;
+        this.shakeOffset = new THREE.Vector3(0, 0, 0);
+
+        // Citizen animation
+        this._citizenAnimTimes = [];
+        
+        // Building hover feedback
+        this._hoveredTile = null;
+        this._hoverHighlight = null;
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
@@ -150,6 +194,17 @@ export class Renderer3D {
         this.fxSystem = createFXSystem(this.scene, this.renderer);
         window.fxSystem = this.fxSystem;
         
+        // Wire camera shake from FXSystem to renderer
+        this.fxSystem.onShakeCamera = (intensity, duration) => {
+            this.shakeCamera(intensity, duration);
+        };
+        
+        // VFX trigger manager - wires game events to visual effects
+        this.vfxTriggerManager = createVFXTriggerManager(this.fxSystem, this.game);
+        this.vfxTriggerManager.setupListeners();
+        window.vfxTriggerManager = this.vfxTriggerManager;
+        setVFXTriggerManager(this.vfxTriggerManager);
+        
         // Particle system
         this.particleSystem = createParticleSystem(this.scene, this.renderer);
         window.particleSystem = this.particleSystem;
@@ -170,6 +225,31 @@ export class Renderer3D {
 
         this._buildingsDirty = true;
         this._citizensDirty = true;
+
+        // Building spawn flash animations (1D: game feel)
+        this._spawnFlashes = [];
+        eventBus.on(EVENT_TYPES.PLAYER_BUILT_BUILDING, (data) => {
+            if (data.x != null && data.y != null) {
+                this._addSpawnFlash(data.x, data.y);
+            }
+        });
+
+        // Cinematic camera state (1B: crisis zoom)
+        this._cinematic = {
+            active: false,
+            startPos: new THREE.Vector3(),
+            targetPos: new THREE.Vector3(),
+            startLook: new THREE.Vector3(),
+            targetLook: new THREE.Vector3(),
+            duration: 0,
+            elapsed: 0,
+            returnDelay: 0,    // ms to hold at target before returning
+            returning: false,
+        };
+        this._setupCinematicListeners();
+
+        // Create hover highlight ring
+        this._createHoverHighlight();
 
         // VFX - Floating text and progress rings
         this._vfxGroup = new THREE.Group();
@@ -438,9 +518,27 @@ export class Renderer3D {
 
         this._projScreenMatrix.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse);
         this._frustum.setFromProjectionMatrix(this._projScreenMatrix);
+        const camPos = this.camera.position;
         for (const entry of this._chunkMeshes.values()) {
             const sphere = new THREE.Sphere(entry.center, entry.radius);
-            entry.group.visible = this._frustum.intersectsSphere(sphere);
+            const inFrustum = this._frustum.intersectsSphere(sphere);
+            if (!inFrustum) {
+                entry.group.visible = false;
+                continue;
+            }
+            // Distance-based LOD: hide buildings on distant chunks to reduce draw calls
+            const dist = camPos.distanceTo(entry.center);
+            if (dist > this.LOD_TERRAIN_ONLY_DIST) {
+                entry.group.visible = false;
+            } else {
+                entry.group.visible = true;
+                const terrainOnly = dist > this.LOD_FULL_DIST;
+                for (const child of entry.group.children) {
+                    if (child.userData?.kind === 'building') {
+                        child.visible = !terrainOnly;
+                    }
+                }
+            }
         }
     }
 
@@ -490,6 +588,16 @@ export class Renderer3D {
         const mat = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
         this._citizensMesh = new THREE.InstancedMesh(geom, mat, Math.max(1, n));
 
+        // Initialize animation timing for each citizen (random offset for variety)
+        this._citizenAnimTimes = [];
+        for (let i = 0; i < n; i++) {
+            this._citizenAnimTimes.push({
+                phase: Math.random() * Math.PI * 2, // Random start phase
+                speed: 2 + Math.random() * 2, // Random speed between 2-4 rad/s
+                amplitude: 0.03 + Math.random() * 0.02 // Random amplitude between 0.03-0.05
+            });
+        }
+
         const dummy = new THREE.Object3D();
         for (let i = 0; i < n; i++) {
             const c = this.game.citizens.citizens[i];
@@ -511,12 +619,25 @@ export class Renderer3D {
             this._citizensDirty = true;
             return;
         }
+        
         const dummy = new THREE.Object3D();
+        const currentTime = performance.now() / 1000; // Current time in seconds
+        
         for (let i = 0; i < n; i++) {
             const c = this.game.citizens.citizens[i];
             const wx = c.x - this._mapHalfW + 0.5;
             const wz = c.y - this._mapHalfH + 0.5;
-            dummy.position.set(wx, 0.18, wz);
+            
+            // Add subtle vertical bobbing animation to make citizens appear alive
+            let yPos = 0.18; // Base height
+            if (this._citizenAnimTimes[i]) {
+                const anim = this._citizenAnimTimes[i];
+                // Sine wave bobbing based on time, phase, and speed
+                const bobOffset = Math.sin(currentTime * anim.speed + anim.phase) * anim.amplitude;
+                yPos = 0.18 + bobOffset;
+            }
+            
+            dummy.position.set(wx, yPos, wz);
             dummy.updateMatrix();
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
         }
@@ -540,7 +661,16 @@ export class Renderer3D {
         return { x: mx, y: my };
     }
 
-    updateCamera() {
+    updateCamera(dt = 16.67) {
+        // Photo mode: camera position driven externally by PhotoMode._tick()
+        if (this._photoMode) return;
+
+        // Cinematic camera takeover (crisis zoom)
+        if (this._cinematic?.active) {
+            this._updateCinematic(dt);
+            if (this._cinematic.active && !this._cinematic.returning) return;
+        }
+
         // Temporary camera takeover from hacked nodes.
         if (this._cameraHack && this.game.state.time.tick < this._cameraHack.untilTick) {
             const wx = this._cameraHack.x - this._mapHalfW + 0.5;
@@ -558,21 +688,32 @@ export class Renderer3D {
 
         const p = this._player.position;
 
+        // Smooth camera mode transition
+        const transitionSpeed = 0.08;
+        this.cameraModeTransition += (this.cameraModeTarget - this.cameraModeTransition) * transitionSpeed;
+        const t = this.cameraModeTransition; // 0 = street, 1 = god
+
+        // Interpolate camera settings based on mode transition
+        const currentPitch = THREE.MathUtils.lerp(this.streetCamera.pitch, this.godCamera.pitch, t);
+        const currentFollowDist = THREE.MathUtils.lerp(this.streetCamera.followDist, this.godCamera.followDist, t);
+        const currentFollowHeight = THREE.MathUtils.lerp(this.streetCamera.followHeight, this.godCamera.followHeight, t);
+        const currentFOV = THREE.MathUtils.lerp(this.streetCamera.fov, this.godCamera.fov, t);
+
         // Calculate ideal camera position from orbit
         const cos = Math.cos(this.yaw);
         const sin = Math.sin(this.yaw);
 
         // Camera position relative to player (orbit)
-        const idealX = p.x - sin * this.followDist;
-        const idealZ = p.z - cos * this.followDist;
+        const idealX = p.x - sin * currentFollowDist;
+        const idealZ = p.z - cos * currentFollowDist;
 
         // Height based on pitch (more pitch = lower height)
         // Pitch range: -1.2 (look down) to -0.1 (look up)
-        const targetHeight = p.y + Math.sin(this.pitch) * this.followDist + this.followHeight;
+        const targetHeight = p.y + Math.sin(currentPitch) * currentFollowDist + currentFollowHeight;
 
         // Apply pitch smoothing (damped oscillation)
         const pitchDamp = 0.15;
-        this.pitch = this.pitch + (Math.max(-1.2, Math.min(-0.1, this.pitch)) - this.pitch) * pitchDamp;
+        this.pitch = this.pitch + (Math.max(-1.2, Math.min(-0.1, currentPitch)) - this.pitch) * pitchDamp;
 
         // Build ideal camera position
         let idealCamPos = new THREE.Vector3(idealX, targetHeight, idealZ);
@@ -642,14 +783,214 @@ export class Renderer3D {
             }
         }
 
+        // Update FOV smoothly
+        this.camera.fov = THREE.MathUtils.lerp(this.camera.fov, currentFOV, 0.1);
+        this.camera.updateProjectionMatrix();
+
         this.followDist += (this.targetFollowDist - this.followDist) * this.zoomDampening;
 
-        this.camera.position.lerp(idealCamPos, 0.15);
+        // Apply camera shake
+        if (this.shakeIntensity > 0 && this.shakeDuration > 0) {
+            this.shakeDuration -= 16.67; // Assume ~60fps
+            if (this.shakeDuration <= 0) {
+                this.shakeDuration = 0;
+                this.shakeIntensity = 0;
+            } else {
+                // Decay shake intensity
+                this.shakeDecay = Math.max(0, this.shakeDecay - 0.02);
+                const currentShake = this.shakeIntensity * this.shakeDecay;
+                
+                // Generate random shake offset
+                this.shakeOffset.x = (Math.random() - 0.5) * currentShake;
+                this.shakeOffset.y = (Math.random() - 0.5) * currentShake * 0.5; // Less vertical shake
+                this.shakeOffset.z = (Math.random() - 0.5) * currentShake;
+            }
+        } else {
+            this.shakeOffset.set(0, 0, 0);
+        }
+
+        // Apply camera position with shake
+        const finalCamPos = idealCamPos.clone().add(this.shakeOffset);
+        this.camera.position.lerp(finalCamPos, 0.15);
         this.camera.lookAt(p.x, p.y + 1.0, p.z);
+    }
+
+    // -----------------------------------------------------------------------
+    // Building spawn flash (1D: game feel)
+    // -----------------------------------------------------------------------
+
+    _addSpawnFlash(tileX, tileY) {
+        const wx = tileX - this._mapHalfW + 0.5;
+        const wz = tileY - this._mapHalfH + 0.5;
+        const geom = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffffff, transparent: true, opacity: 0.85, depthWrite: false
+        });
+        const mesh = new THREE.Mesh(geom, mat);
+        mesh.position.set(wx, 0.45, wz);
+        mesh.scale.set(0, 0, 0);
+        this.scene.add(mesh);
+        this._spawnFlashes.push({ mesh, elapsed: 0, duration: 450 });
+
+        // Add scaffolding: wireframe cage that lingers during construction (6B)
+        this._addScaffolding(wx, wz);
+    }
+
+    /** Construction scaffolding — yellow wireframe cage that fades over 2.5s (6B) */
+    _addScaffolding(wx, wz) {
+        if (!this._scaffolds) this._scaffolds = [];
+        const geom = new THREE.BoxGeometry(0.92, 0.92, 0.92);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffcc00, wireframe: true, transparent: true, opacity: 0.7
+        });
+        const cage = new THREE.Mesh(geom, mat);
+        cage.position.set(wx, 0.46, wz);
+        cage.scale.set(0.01, 0.01, 0.01);
+        this.scene.add(cage);
+        this._scaffolds.push({ mesh: cage, elapsed: 0, duration: 2500 });
+    }
+
+    _updateScaffolding(dt) {
+        if (!this._scaffolds) return;
+        for (let i = this._scaffolds.length - 1; i >= 0; i--) {
+            const s = this._scaffolds[i];
+            s.elapsed += dt;
+            const t = Math.min(1, s.elapsed / s.duration);
+            // Grow up quickly, then hold, then fade out
+            const scaleT = Math.min(1, t * 5); // reaches full scale in first 20% of duration
+            s.mesh.scale.setScalar(scaleT);
+            // Fade out in last 40%
+            const fadeT = Math.max(0, (t - 0.6) / 0.4);
+            s.mesh.material.opacity = 0.7 * (1 - fadeT);
+            if (t >= 1) {
+                this.scene.remove(s.mesh);
+                s.mesh.geometry.dispose();
+                s.mesh.material.dispose();
+                this._scaffolds.splice(i, 1);
+            }
+        }
+    }
+
+    _updateSpawnFlashes(dt) {
+        for (let i = this._spawnFlashes.length - 1; i >= 0; i--) {
+            const f = this._spawnFlashes[i];
+            f.elapsed += dt;
+            const t = Math.min(1, f.elapsed / f.duration);
+            // Scale up quickly then shrink (bounce)
+            const scale = t < 0.5
+                ? (t / 0.5) * 1.15
+                : 1.15 - ((t - 0.5) / 0.5) * 1.15;
+            f.mesh.scale.setScalar(scale);
+            f.mesh.material.opacity = 0.85 * (1 - t * t);
+            if (t >= 1) {
+                this.scene.remove(f.mesh);
+                f.mesh.geometry.dispose();
+                f.mesh.material.dispose();
+                this._spawnFlashes.splice(i, 1);
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Cinematic Camera (1B)
+    // -----------------------------------------------------------------------
+
+    _setupCinematicListeners() {
+        eventBus.on(EVENT_TYPES.CRISIS_STARTED, (data) => {
+            const wx = (data.x != null) ? (data.x - this._mapHalfW + 0.5) : 0;
+            const wz = (data.y != null) ? (data.y - this._mapHalfH + 0.5) : 0;
+            this.startCinematic(wx, wz, 3500, 1500);
+        });
+        eventBus.on(EVENT_TYPES.INCIDENT_CREATED, (data) => {
+            const wx = (data.x != null) ? (data.x - this._mapHalfW + 0.5) : null;
+            const wz = (data.y != null) ? (data.y - this._mapHalfH + 0.5) : null;
+            if (wx != null) this.startCinematic(wx, wz, 2500, 1000);
+        });
+    }
+
+    /**
+     * Smoothly pan+zoom camera to look at a world-space point.
+     * @param {number} wx - World X
+     * @param {number} wz - World Z
+     * @param {number} duration - Travel time in ms
+     * @param {number} holdMs - How long to hold at target before auto-returning
+     */
+    startCinematic(wx, wz, duration = 3000, holdMs = 1500) {
+        const cin = this._cinematic;
+        cin.active = true;
+        cin.returning = false;
+        cin.elapsed = 0;
+        cin.duration = duration;
+        cin.returnDelay = holdMs;
+        cin.startPos.copy(this.camera.position);
+        cin.startLook.set(
+            this.camera.position.x + Math.sin(this.yaw) * 5,
+            this.camera.position.y - 2,
+            this.camera.position.z + Math.cos(this.yaw) * 5
+        );
+        // Target: elevated position above the crisis point, angled down
+        cin.targetPos.set(wx - Math.sin(this.yaw) * 14, 18, wz - Math.cos(this.yaw) * 14);
+        cin.targetLook.set(wx, 0, wz);
+    }
+
+    _updateCinematic(dt) {
+        const cin = this._cinematic;
+        if (!cin.active) return false;
+        cin.elapsed += dt;
+
+        if (!cin.returning) {
+            const raw = Math.min(1, cin.elapsed / cin.duration);
+            const t = raw * raw * (3 - 2 * raw); // smoothstep
+            this.camera.position.lerpVectors(cin.startPos, cin.targetPos, t);
+            const lookAt = new THREE.Vector3().lerpVectors(cin.startLook, cin.targetLook, t);
+            this.camera.lookAt(lookAt);
+            if (raw >= 1) {
+                // Hold phase
+                if (cin.elapsed >= cin.duration + cin.returnDelay) {
+                    cin.returning = true;
+                    cin.elapsed = 0;
+                    cin.startPos.copy(this.camera.position);
+                    cin.startLook.copy(cin.targetLook);
+                }
+            }
+        } else {
+            // Return to player: just fade cinematic out over 1s
+            const t = Math.min(1, cin.elapsed / 1000);
+            if (t >= 1) {
+                cin.active = false;
+                cin.returning = false;
+            }
+            // Blend weight: lerp toward zero cinematic influence
+            // Actual position handled by normal updateCamera with extra lerp weight
+            this._cinematicReturnT = 1 - t;
+        }
+        return true;
+    }
+
+    // Set camera mode with smooth transition
+    setCameraMode(mode) {
+        if (mode === this.cameraMode) return;
+        
+        this.cameraMode = mode;
+        this.cameraModeTarget = (mode === 'god') ? 1 : 0;
+        
+        // Update mode indicator UI if available
+        if (this.game.ui && this.game.ui.modeIndicator) {
+            this.game.ui.modeIndicator.setMode(mode);
+        }
+    }
+
+    // Trigger camera shake
+    shakeCamera(intensity, duration) {
+        this.shakeIntensity = intensity;
+        this.shakeDuration = duration;
+        this.shakeDecay = 1.0;
     }
 
     render() {
         const now = performance.now();
+        const dt = this._lastRenderTime ? Math.min(50, now - this._lastRenderTime) : 16.67;
+        this._lastRenderTime = now;
         if (this.fpsElement && this.fpsTimes !== undefined) {
             this.fpsTimes.push(now);
             while (this.fpsTimes.length > 60) this.fpsTimes.shift();
@@ -666,7 +1007,7 @@ export class Renderer3D {
         else this.updateCitizens();
 
         this.syncPlayer();
-        this.updateCamera();
+        this.updateCamera(dt);
         this.syncChunkStreaming();
         if (this._debugMode === 'services') {
             this.updateDebugOverlay();
@@ -675,10 +1016,36 @@ export class Renderer3D {
             this.updateZoneOverlay();
         }
         
+        // Sync fog density from weather system (6B)
+        const wfx = this.game?.weatherSystem?.currentEffects;
+        if (this.scene.fog && wfx) {
+            this.scene.fog.density = wfx.fogDensity ?? 0.0001;
+            if (wfx.ambientColor != null) {
+                this.scene.background.setHex(wfx.ambientColor);
+                this.scene.fog.color.setHex(wfx.ambientColor);
+            }
+        }
+
         // Update VFX systems
         this.updateVFX();
         if (this.fxSystem) {
             this.fxSystem.update();
+        }
+        
+        // Update building spawn flashes (1D)
+        if (this._spawnFlashes?.length) this._updateSpawnFlashes(dt);
+
+        // Update construction scaffolding (6B)
+        if (this._scaffolds?.length) this._updateScaffolding(dt);
+
+        // Update build ghost animation
+        this._updateBuildGhostAnim();
+        
+        // Update hover highlight pulse animation
+        if (this._hoverHighlight && this._hoveredTile) {
+            const pulseTime = (performance.now() / 500) % (Math.PI * 2);
+            const pulseScale = 1 + Math.sin(pulseTime) * 0.15;
+            this._hoverHighlight.scale.set(pulseScale, pulseScale, pulseScale);
         }
         
         // Update particle system
@@ -702,6 +1069,15 @@ export class Renderer3D {
         
         // Apply lighting to scene lights
         this.lightingManager.applyToScene(this.ambientLight, this.sunLight);
+        
+        // Apply tint effect to ambient light for color grading
+        const grading = this.lightingManager.getColorGrading();
+        if (grading && this.ambientLight) {
+            // Blend tint color with ambient based on tint strength
+            const tintColor = new THREE.Color(grading.tint);
+            const blendFactor = grading.tintStrength;
+            this.ambientLight.color.lerp(tintColor, blendFactor * 0.3); // Subtle tint effect
+        }
         
         // Store current phase for debugging
         this.currentPhase = lighting.phase;
@@ -1022,18 +1398,115 @@ export class Renderer3D {
             this._buildGhost = new THREE.Mesh(geom, mat);
             this._buildGhostType = type;
             this.scene.add(this._buildGhost);
+            
+            // Initialize animation state
+            this._buildGhostAnim = {
+                targetPos: new THREE.Vector3(),
+                targetScale: new THREE.Vector3(1, 1, 1),
+                currentScale: new THREE.Vector3(0, 0, 0),
+                progress: 0,
+                active: false
+            };
         }
+        
         const wx = x - this._mapHalfW + 0.5;
         const wz = y - this._mapHalfH + 0.5;
+        
+        // Set target position
         this._buildGhost.position.set(wx, h / 2, wz);
+        this._buildGhostAnim.targetPos.set(wx, h / 2, wz);
+        
+        // Set rotation
         this._buildGhost.rotation.y = ((rotation % 4) + 4) % 4 * (Math.PI / 2);
+        
+        // Update color
         this._buildGhost.material.color.setHex(ok ? 0x3ecf8e : 0xe25555);
+        
+        // Trigger snap animation if ghost was not visible
+        if (!this._buildGhost.visible) {
+            this._buildGhostAnim.currentScale.set(0, 0, 0);
+            this._buildGhostAnim.targetScale.set(1, 1, 1);
+            this._buildGhostAnim.progress = 0;
+            this._buildGhostAnim.active = true;
+        }
+        
         this._buildGhost.visible = true;
     }
 
     clearBuildGhost() {
         if (!this._buildGhost) return;
         this._buildGhost.visible = false;
+        this._buildGhostAnim = null;
+    }
+    
+    // Create hover highlight ring mesh
+    _createHoverHighlight() {
+        const geom = new THREE.RingGeometry(0.45, 0.55, 16);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0xffff00,
+            transparent: true,
+            opacity: 0,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        this._hoverHighlight = new THREE.Mesh(geom, mat);
+        this._hoverHighlight.rotation.x = -Math.PI / 2;
+        this.scene.add(this._hoverHighlight);
+    }
+    
+    // Set hovered tile for building highlight feedback
+    setHoveredTile(tile) {
+        if (!tile) {
+            this._hoveredTile = null;
+            if (this._hoverHighlight) {
+                this._hoverHighlight.material.opacity = 0;
+            }
+            return;
+        }
+        
+        // Check if there's a building at this tile
+        const building = this.game.buildings.buildings.find(b => b.x === tile.x && b.y === tile.y);
+        if (!building) {
+            this._hoveredTile = null;
+            if (this._hoverHighlight) {
+                this._hoverHighlight.material.opacity = 0;
+            }
+            return;
+        }
+        
+        this._hoveredTile = tile;
+        if (this._hoverHighlight) {
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+            this._hoverHighlight.position.set(wx, 0.05, wz);
+            this._hoverHighlight.material.opacity = 0.8;
+        }
+    }
+    
+    // Update build ghost snap animation
+    _updateBuildGhostAnim() {
+        if (!this._buildGhost || !this._buildGhostAnim || !this._buildGhostAnim.active) return;
+        
+        const anim = this._buildGhostAnim;
+        
+        // Ease-in-out cubic function for smooth snap
+        const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
+        
+        // Update animation progress
+        anim.progress += 0.15; // Animation speed
+        if (anim.progress >= 1) {
+            anim.progress = 1;
+            anim.active = false;
+        }
+        
+        // Apply eased scale
+        const easedProgress = easeInOutCubic(anim.progress);
+        const targetScale = anim.targetScale;
+        this._buildGhost.scale.set(
+            targetScale.x * easedProgress,
+            targetScale.y * easedProgress,
+            targetScale.z * easedProgress
+        );
     }
 
     /**

@@ -48,6 +48,7 @@ import { CaseGeneratorV2 } from './sim/campaign/case_generator.js';
 import { DialogueManager } from './sim/campaign/dialogue.js';
 import { NewsFeed, BriefingSystem } from './sim/campaign/news_feed.js';
 import { CampaignPanel } from './ui/campaign_panel.js';
+import { NPCGenerator } from './sim/npc_generator.js';
 import { FactionSystem } from './sim/factions/faction_system.js';
 import { PoliceSystem } from './sim/police/police_system.js';
 import { PursuitAI } from './sim/police/pursuit_ai.js';
@@ -74,6 +75,8 @@ import { extractRoadGraph } from './sim/traffic/graph_extractor.js';
 import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
 import { TrafficManager } from './sim/agents/traffic_agent.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
+
+import { ModLoader } from './mod/mod_loader.js';
 
 // Weather and particle systems (new)
 import { WeatherSystem, createWeatherSystem } from './weather_system.js';
@@ -186,7 +189,13 @@ export class Game {
             this.minimap = new Minimap(this);
         }
 
-        this.difficulty = DIFFICULTY.NORMAL;
+        // Sandbox game-mode overrides difficulty to SANDBOX preset
+        const diffKey = (mode === 'sandbox' ? 'SANDBOX' : (options.difficulty || 'NORMAL')).toUpperCase();
+        this.difficulty = DIFFICULTY[diffKey] ?? DIFFICULTY.NORMAL;
+        this._dda = { struggleTicks: 0, reliefActive: 0 }; // dynamic difficulty adjuster state
+
+        // Modding support (Phase 8)
+        this.modLoader = new ModLoader(this);
 
         // Schedule system for citizen daily routines
         this.scheduleManager = new ScheduleManager(this.map.width, this.map.height, this.map, this.buildings);
@@ -239,7 +248,11 @@ export class Game {
         this.campaign = new CampaignModel(this);
         this.caseGenerator = new CaseGeneratorV2(this);
         this.dialogueManager = new DialogueManager(this);
-        this.newsFeed = new NewsFeed(this);
+        
+        // Tier 2B: NPC Generator for emergent narrative
+        this.npcGenerator = new NPCGenerator(this.rngStreams.narrative);
+        
+        this.newsFeed = new NewsFeed(this, this.npcGenerator);
         this.briefingSystem = new BriefingSystem(this);
         if (!this.isHeadless) {
             this.campaignPanel = new CampaignPanel(this);
@@ -364,6 +377,9 @@ export class Game {
 
         // Apply scenario and mutators
         this.scenarioSelector.applyToGameState(this.state);
+
+        // Apply difficulty preset (Tier 2D)
+        this.applyDifficulty(this.difficulty);
 
         // Start tutorial if enabled
         if (this.ui.settings.get('showTutorial')) {
@@ -491,9 +507,26 @@ export class Game {
         }
         const ledgerTick = this.economyLedger.beginTick(newTick);
 
-        // 1. Daily resource income from buildings
+        // 1. Daily resource income from buildings (Tier 2C: adjacency + decay)
         this.jobsManager.updateAssignments();
-        const incomeRaw = this.buildings.getIncome();
+        const incomeRaw = this.buildings.getDynamicIncome();
+        // Tier 2D: difficulty income bonus (+ dynamic difficulty relief bonus)
+        const diffBonus  = this.difficulty?.incomeBonus  ?? 0;
+        const reliefMult = this._dda?.reliefActive > 0 ? 0.2 : 0;
+        if (diffBonus !== 0 || reliefMult !== 0) {
+            const m = 1 + diffBonus + reliefMult;
+            incomeRaw.gold = Math.floor(incomeRaw.gold * m);
+            incomeRaw.food = Math.floor(incomeRaw.food * m);
+            incomeRaw.wood = Math.floor(incomeRaw.wood * m);
+        }
+        // 1b. Weather income modifier (6B): rain/storm/snow reduce food/wood output
+        const weatherFx = this.weatherSystem?.currentEffects;
+        if (weatherFx && weatherFx.speedModifier < 1) {
+            const wMod = weatherFx.speedModifier; // 0.7–0.9 for bad weather
+            incomeRaw.food = Math.floor(incomeRaw.food * wMod);
+            incomeRaw.wood = Math.floor(incomeRaw.wood * wMod);
+        }
+
         const income = this.jobsManager.scaleIncome(incomeRaw, this.buildings.buildings);
         this.resources.add('gold', income.gold);
         this.resources.add('food', income.food);
@@ -506,6 +539,41 @@ export class Game {
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
         this.economyLedger.addDelta(ledgerTick, 'gold', -(upkeep || 0), 'buildings_upkeep');
+
+        // 2b. Tier 2C: Building decay (degrades when city is running a deficit)
+        const inDebt = (this.state.resources.gold ?? 0) < 0;
+        const decayMult = this.difficulty?.decayMultiplier ?? 1;
+        this.buildings.updateDecay(inDebt, decayMult);
+        if (inDebt && newTick % 20 === 0) {
+            const { critical, degraded } = this.buildings.getConditionSummary();
+            if (critical > 0) {
+                this.ui?.showMessage?.(`${critical} building(s) in critical condition — repair by clearing debt.`, 'crisis');
+            } else if (degraded > 0) {
+                this.ui?.showMessage?.(`${degraded} building(s) degrading — income reduced.`, 'warning');
+            }
+        }
+
+        // 2c. Tier 2D: Dynamic difficulty adjustment
+        // Track "struggling" ticks; after 30 consecutive ticks of hardship, grant a 10-tick income relief
+        if (this._dda) {
+            if (this._dda.reliefActive > 0) {
+                this._dda.reliefActive--;
+            } else {
+                const avgHappy = this.citizens.getAverageHappiness?.() ?? 50;
+                const isStruggling = inDebt || (this.state.resources.food < 15 && this.state.resources.gold < 15) || avgHappy < 20;
+                if (isStruggling) {
+                    this._dda.struggleTicks = (this._dda.struggleTicks || 0) + 1;
+                    if (this._dda.struggleTicks >= 30 && !this.difficulty?.sandbox) {
+                        this._dda.struggleTicks = 0;
+                        this._dda.reliefActive = 10;
+                        this.ui?.showMessage?.('Emergency aid incoming — income boosted for 10 ticks.', 'normal');
+                        eventBus.emit('ui_notification', { message: 'Emergency Aid Active (+20% income)' });
+                    }
+                } else {
+                    this._dda.struggleTicks = Math.max(0, (this._dda.struggleTicks || 0) - 1);
+                }
+            }
+        }
         const wageMult = this.factionSystem.getPerkSnapshot().modifiers.wageMultiplier ?? 1;
         const wages = this.jobsManager.applyWages(this.resources, wageMult);
         this.economyLedger.addDelta(ledgerTick, 'gold', -wages, 'wages');
@@ -766,6 +834,13 @@ export class Game {
         } else if (progress.technological >= 100) {
             this.ui.showVictory('Technological', totalProgress);
             this.stop();
+        } else {
+            // Check custom mod scenarios
+            const customWin = this.modLoader?.checkCustomVictory();
+            if (customWin) {
+                this.ui.showVictory(customWin.name, totalProgress);
+                this.stop();
+            }
         }
     }
 
@@ -822,6 +897,35 @@ export class Game {
         }
     }
 
+    /**
+     * Apply a difficulty preset to all tunable systems.
+     * Safe to call mid-game (e.g. from settings or a debug menu).
+     * @param {Object} preset - One of the DIFFICULTY constants
+     */
+    applyDifficulty(preset) {
+        if (!preset) return;
+        this.difficulty = preset;
+
+        // Crisis chance
+        this.crisisManager?.setDifficulty(preset);
+        this.crisisDirector?.setDifficulty?.(preset);
+
+        // Sandbox mode: flip progress.mode so goalsManager.isSandbox() picks it up
+        if (preset.sandbox) {
+            this.state.progress = this.state.progress || {};
+            this.state.progress.mode = 'sandbox';
+        }
+
+        // Starting resources only apply on new-game (don't overwrite mid-game saves)
+        if (this.state.time?.tick === 0) {
+            const { startingGold, startingFood, startingWood } = preset;
+            if (startingGold !== undefined) this.state.resources.gold  = startingGold;
+            if (startingFood !== undefined) this.state.resources.food  = startingFood;
+            if (startingWood !== undefined) this.state.resources.wood  = startingWood;
+            this.resources?.syncFromState?.();
+        }
+    }
+
     applyEffect(effect) {
         for (const [resource, value] of Object.entries(effect)) {
             if (typeof value === 'number') {
@@ -830,6 +934,11 @@ export class Game {
                 } else {
                     if (resource in this.resources) {
                         this.resources.add(resource, value);
+                        // Emit VFX event for noticeable resource changes (|value| >= 5)
+                        if (Math.abs(value) >= 5) {
+                            const eventName = value > 0 ? 'ui_resource_gained' : 'ui_resource_lost';
+                            eventBus.emit(eventName, { type: resource, amount: Math.abs(value) });
+                        }
                     }
                 }
             }
@@ -992,6 +1101,7 @@ export class Game {
                     income: b.income,
                     upkeep: b.upkeep,
                     constructedAt: b.constructedAt,
+                    condition: b.condition ?? 100,
                 })),
                 nextId: this.buildings.nextId,
             },
@@ -1202,6 +1312,13 @@ export class Game {
             if (data.buildings?.list) {
                 for (const b of data.buildings.list) {
                     this.buildings.build(b.type, b.x, b.y, b.level, b.rotation ?? 0);
+                }
+                // Restore condition (build() always starts at 100; patch from save)
+                for (let i = 0; i < data.buildings.list.length; i++) {
+                    const saved = data.buildings.list[i];
+                    if (saved.condition !== undefined && this.buildings.buildings[i]) {
+                        this.buildings.buildings[i].condition = saved.condition;
+                    }
                 }
                 this.scheduleManager.syncNavBuildings(this.buildings);
             }
