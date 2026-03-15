@@ -35,7 +35,14 @@ export class PhotoMode {
                 <div id="photo-mode-actions">
                     <button id="photo-capture-btn">📸 Capture</button>
                     <button id="photo-timelapse-btn">⏩ Timelapse</button>
-                    <button id="photo-exit-btn">Exit (P)</button>
+                    <select id="photo-filter-select" title="Visual filter">
+                        <option value="none">Normal</option>
+                        <option value="cinematic">Cinematic</option>
+                        <option value="vintage">Vintage</option>
+                        <option value="bw">B&amp;W</option>
+                        <option value="vivid">Vivid</option>
+                    </select>
+                    <button id="photo-exit-btn">Exit (F8)</button>
                 </div>
                 <div id="photo-timelapse-status" style="display:none;color:#ffcc00;font-size:11px;">
                     ⏩ Recording… <span id="photo-timelapse-count">0</span> frames
@@ -65,6 +72,18 @@ export class PhotoMode {
                 color: '#fff', fontFamily: 'monospace',
             });
         }
+        // Vignette overlay for DoF/cinematic look
+        this._vignette = document.createElement('div');
+        Object.assign(this._vignette.style, {
+            position: 'fixed', inset: '0', zIndex: '8999', pointerEvents: 'none',
+            background: 'radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,0.55) 100%)',
+            opacity: '0', transition: 'opacity 0.4s',
+        });
+        document.body.appendChild(this._vignette);
+
+        // Filter canvas element reference
+        this._filterCanvas = null;
+
         captureBtn.addEventListener('click', () => this.capture());
         exitBtn.addEventListener('click', () => this.deactivate());
         const timelapseBtn = this._overlay.querySelector('#photo-timelapse-btn');
@@ -74,6 +93,15 @@ export class PhotoMode {
             color: '#fff', fontFamily: 'monospace',
         });
         timelapseBtn.addEventListener('click', () => this.toggleTimelapse());
+
+        const filterSelect = this._overlay.querySelector('#photo-filter-select');
+        Object.assign(filterSelect.style, {
+            padding: '6px 10px', borderRadius: '6px', border: 'none',
+            background: 'rgba(255,255,255,0.15)', color: '#fff',
+            fontFamily: 'monospace', cursor: 'pointer',
+        });
+        filterSelect.addEventListener('change', (e) => this._applyFilter(e.target.value));
+
         document.body.appendChild(this._overlay);
 
         this._timelapseActive = false;
@@ -82,9 +110,27 @@ export class PhotoMode {
         this._timelapseSpeedBefore = 1;
     }
 
+    /** Apply visual filter to game canvas (DoF vignette + CSS filter) */
+    _applyFilter(name) {
+        this._currentFilter = name;
+        const canvas = document.querySelector('#game-canvas');
+        const FILTERS = {
+            none:       'none',
+            cinematic:  'contrast(1.1) saturate(0.85) brightness(0.92)',
+            vintage:    'sepia(0.5) contrast(1.1) brightness(0.9) saturate(0.8)',
+            bw:         'grayscale(1) contrast(1.15)',
+            vivid:      'saturate(1.8) contrast(1.1)',
+        };
+        if (canvas) canvas.style.filter = FILTERS[name] ?? 'none';
+        if (this._vignette) {
+            this._vignette.style.opacity = (name !== 'none') ? '1' : '0';
+        }
+    }
+
     activate() {
         if (this.active) return;
         this.active = true;
+        this._currentFilter = 'none';
         this._wasPaused = !!this.game.state?.time?.paused;
         if (this.game.state?.time) this.game.state.time.paused = true;
 
@@ -99,9 +145,12 @@ export class PhotoMode {
         }
 
         this._overlay.classList.remove('hidden');
+        if (this._vignette) this._vignette.style.display = 'block';
+        const filterSel = this._overlay.querySelector('#photo-filter-select');
+        if (filterSel) filterSel.value = 'none';
         this._setupListeners();
         this._tick();
-        this.game.ui?.showMessage('📷 Photo Mode — P to exit', 'normal');
+        this.game.ui?.showMessage('📷 Photo Mode — F8 to exit', 'normal');
     }
 
     deactivate() {
@@ -110,6 +159,10 @@ export class PhotoMode {
         this.active = false;
         if (this.game.state?.time) this.game.state.time.paused = this._wasPaused;
         this._overlay.classList.add('hidden');
+        if (this._vignette) { this._vignette.style.display = 'none'; this._vignette.style.opacity = '0'; }
+        // Clear canvas filter
+        const canvas = document.querySelector('#game-canvas');
+        if (canvas) canvas.style.filter = 'none';
         this._removeListeners();
         if (this._raf) { cancelAnimationFrame(this._raf); this._raf = null; }
         // Restore normal camera
@@ -118,19 +171,28 @@ export class PhotoMode {
     }
 
     capture() {
-        // Render one frame then export canvas as PNG
         const r = this.game.ui?.renderer3d;
         const canvas = r?.renderer?.domElement ?? r?.canvas ?? document.querySelector('#game-canvas');
         if (!canvas) return;
-        // Force a render if possible
+        // Force a render
         if (r?.renderer && r?.scene && r?.camera) {
             r.renderer.render(r.scene, r.camera);
         }
-        const link = document.createElement('a');
-        link.download = `city_${Date.now()}.png`;
-        link.href = canvas.toDataURL('image/png');
-        link.click();
-        this.game.ui?.showMessage('📸 Screenshot saved!', 'success');
+        const dataUrl = canvas.toDataURL('image/png');
+        const defaultName = `city_${Date.now()}.png`;
+
+        // Use Electron native dialog if available, otherwise browser download
+        if (window.electronAPI?.saveScreenshot) {
+            window.electronAPI.saveScreenshot(dataUrl, defaultName).then((res) => {
+                if (res?.ok) this.game.ui?.showMessage(`📸 Saved: ${res.filePath}`, 'success');
+            });
+        } else {
+            const link = document.createElement('a');
+            link.download = defaultName;
+            link.href = dataUrl;
+            link.click();
+            this.game.ui?.showMessage('📸 Screenshot saved!', 'success');
+        }
     }
 
     _setupListeners() {

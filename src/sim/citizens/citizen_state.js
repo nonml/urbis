@@ -1,3 +1,5 @@
+// @ts-check
+/// <reference path="../../types/game.d.ts" />
 // Deterministic name pool — seeded by citizen ID so names are stable across saves
 const _FIRST = [
     'James','John','Robert','Michael','William','David','Richard','Joseph','Thomas','Charles',

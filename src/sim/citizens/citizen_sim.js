@@ -1,3 +1,5 @@
+// @ts-check
+/// <reference path="../../types/game.d.ts" />
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
 
 export class CitizenSim {

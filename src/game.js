@@ -74,6 +74,7 @@ import { createDataGridSystem } from './sim/networks/data_grid.js';
 import { extractRoadGraph } from './sim/traffic/graph_extractor.js';
 import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
 import { TrafficManager } from './sim/agents/traffic_agent.js';
+import { VehicleSystem } from './sim/traffic/vehicle_system.ts';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
 import { ModLoader } from './mod/mod_loader.js';
@@ -303,6 +304,7 @@ export class Game {
         this.trafficGraph = extractRoadGraph(this.map);
         this.trafficPathfinder = new TrafficPathfinder(this.trafficGraph, null);
         this.trafficManager = new TrafficManager(this, this.rngStreams.sim);
+        this.vehicleSystem = new VehicleSystem(this);
 
         // Weather and particle systems
         this.weatherSystem = new WeatherSystem(this);
@@ -476,6 +478,11 @@ export class Game {
                 this.tickOnce(simDt);
                 this.tickAccumulator -= this.tickRate;
             }
+        }
+
+        // Vehicle smooth movement (every frame, not fixed-tick)
+        if (!this.state.time.paused && this.vehicleSystem) {
+            this.vehicleSystem.update(frameDt / 1000);
         }
 
         // UI updates (every frame)
@@ -799,10 +806,21 @@ export class Game {
         if (buildings.length > 0) {
             const details = buildings.map((b) => {
                 const staffing = this.jobsManager?.getStaffingRatio?.(b.id);
-                if (staffing === undefined) return b.name;
-                return `${b.name} (staff ${Math.round(staffing * 100)}%)`;
+                const adj = b._adjacencyBonus;
+                let label = b.name;
+                if (staffing !== undefined) label += ` (staff ${Math.round(staffing * 100)}%)`;
+                if (adj) {
+                    const bonuses = [];
+                    if (adj.gold > 0) bonuses.push(`+${adj.gold}💰`);
+                    if (adj.food > 0) bonuses.push(`+${adj.food}🌾`);
+                    if (adj.wood > 0) bonuses.push(`+${adj.wood}🪵`);
+                    if (bonuses.length) label += ` [${bonuses.join(' ')}]`;
+                }
+                const adjLabels = this.buildings.getAdjacencyLabels(b);
+                if (adjLabels.length) label += ` ✦ ${adjLabels.join(', ')}`;
+                return label;
             });
-            info += ` - Buildings: ${details.join(', ')}`;
+            info += ` — ${details.join(' | ')}`;
         }
 
         this.ui.showMessage(info, 'normal');

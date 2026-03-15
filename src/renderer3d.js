@@ -264,6 +264,15 @@ export class Renderer3D {
         // GLTF model library: type -> THREE.Group (set after async _preloadModels)
         this._gltfModels = new Map();
 
+        // Vehicle GLTF model library: vehicleType -> THREE.Group
+        this._vehicleModels = new Map();
+        // Vehicle mesh group (updated every frame from vehicleSystem)
+        this._vehicleGroup = new THREE.Group();
+        this.scene.add(this._vehicleGroup);
+
+        // Terrain texture library: terrainType -> THREE.Texture (loaded async)
+        this._terrainTextures = new Map();
+
         // Debug overlays
         this._debugMode = 'none'; // 'none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services'
         this._debugOverlayMesh = null;
@@ -285,8 +294,8 @@ export class Renderer3D {
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('wheel', (e) => this.handleWheel(e));
 
-        // Async: load Kenney GLB models, then rebuild once ready
-        this._preloadModels();
+        // Async: load Kenney GLB models + terrain textures, then rebuild once ready
+        this._preloadAssets();
     }
 
     resize() {
@@ -357,6 +366,17 @@ export class Renderer3D {
     // Kenney GLB model loader
     // -----------------------------------------------------------------------
     /** Maps game building types → Kenney GLB asset paths (in public/) */
+    static VEHICLE_MODEL_MAP = {
+        'sedan':           'assets/models/kenney_vehicles/sedan.glb',
+        'taxi':            'assets/models/kenney_vehicles/taxi.glb',
+        'suv':             'assets/models/kenney_vehicles/suv.glb',
+        'van':             'assets/models/kenney_vehicles/van.glb',
+        'truck':           'assets/models/kenney_vehicles/truck.glb',
+        'police':          'assets/models/kenney_vehicles/police.glb',
+        'hatchback-sports':'assets/models/kenney_vehicles/hatchback-sports.glb',
+        'delivery':        'assets/models/kenney_vehicles/delivery.glb',
+    };
+
     static MODEL_MAP = {
         'house':             'assets/models/kenney_suburban/building-type-a.glb',
         'farm':              'assets/models/kenney_suburban/building-type-c.glb',
@@ -378,41 +398,80 @@ export class Renderer3D {
         default:     0.38,
     };
 
-    async _preloadModels() {
+    /** Map terrain type constant -> texture asset path */
+    static get TERRAIN_TEXTURE_MAP() {
+        return {
+            [TERRAIN_GRASS]:    'assets/textures/terrain/grass_color.jpg',
+            [TERRAIN_FOREST]:   'assets/textures/terrain/grass_color.jpg',
+            [TERRAIN_MOUNTAIN]: 'assets/textures/terrain/rock_color.jpg',
+            [TERRAIN_WATER]:    null, // water uses procedural color
+            0:                  'assets/textures/terrain/dirt_color.jpg', // default fallback
+        };
+    }
+
+    async _preloadAssets() {
+        const tl = new THREE.TextureLoader();
+        const loadTex = (terrainKey, url) => new Promise((resolve) => {
+            tl.load(url, (tex) => {
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, 1);
+                tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+                this._terrainTextures.set(terrainKey, tex);
+                resolve();
+            }, undefined, () => resolve());
+        });
+
         let GLTFLoader;
         try {
             const mod = await import('three/addons/loaders/GLTFLoader.js');
             GLTFLoader = mod.GLTFLoader;
         } catch {
-            // three/addons not available — keep box fallback forever
-            return;
+            // three/addons not available — keep box fallback
         }
 
-        const loader = new GLTFLoader();
-        const loadOne = (type, url) => new Promise((resolve) => {
-            loader.load(url, (gltf) => {
-                const root = gltf.scene;
-                const scale = Renderer3D.MODEL_SCALE[type] ?? Renderer3D.MODEL_SCALE.default;
-                root.scale.setScalar(scale);
-                // Sit flat on Y=0 and center on XZ
-                const box = new THREE.Box3().setFromObject(root);
-                const center = box.getCenter(new THREE.Vector3());
-                root.position.x -= center.x;
-                root.position.z -= center.z;
-                root.position.y -= box.min.y;
-                this._gltfModels.set(type, root);
-                resolve();
-            }, undefined, () => resolve()); // on error, skip silently
-        });
+        const jobs = Object.entries(Renderer3D.TERRAIN_TEXTURE_MAP)
+            .filter(([, url]) => url != null)
+            .map(([k, url]) => loadTex(Number(k), url));
 
-        await Promise.all(
-            Object.entries(Renderer3D.MODEL_MAP).map(([type, url]) => loadOne(type, url))
-        );
-
-        // Swap boxes → real models across all loaded chunks
-        if (this._gltfModels.size > 0) {
-            this.rebuildWorld();
+        if (GLTFLoader) {
+            const loader = new GLTFLoader();
+            const loadBuilding = (type, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    const scale = Renderer3D.MODEL_SCALE[type] ?? Renderer3D.MODEL_SCALE.default;
+                    root.scale.setScalar(scale);
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._gltfModels.set(type, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            const loadVehicle = (type, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    root.scale.setScalar(0.28); // cars fit in ~0.9 tiles
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._vehicleModels.set(type, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            for (const [type, url] of Object.entries(Renderer3D.MODEL_MAP)) {
+                jobs.push(loadBuilding(type, url));
+            }
+            for (const [type, url] of Object.entries(Renderer3D.VEHICLE_MODEL_MAP)) {
+                jobs.push(loadVehicle(type, url));
+            }
         }
+
+        await Promise.all(jobs);
+        this.rebuildWorld();
     }
 
     _disposeChunkEntry(entry) {
@@ -438,12 +497,23 @@ export class Renderer3D {
 
         const meshes = [];
         const dummy = new THREE.Object3D();
-        const color = new THREE.Color();
 
         for (const [terrain, tiles] of byTerrain.entries()) {
             if (tiles.length === 0) continue;
+            const isWater = terrain === TERRAIN_WATER;
             const geom = new THREE.BoxGeometry(1, 0.12, 1);
-            const mat = new THREE.MeshLambertMaterial({ vertexColors: true });
+
+            const tex = this._terrainTextures.get(terrain) ?? this._terrainTextures.get(0);
+            let mat;
+            if (isWater) {
+                mat = new THREE.MeshLambertMaterial({ color: 0x4da6ff, transparent: true, opacity: 0.82 });
+            } else if (tex) {
+                const tint = terrainTint(terrain);
+                mat = new THREE.MeshLambertMaterial({ map: tex, color: tint });
+            } else {
+                mat = new THREE.MeshLambertMaterial({ color: terrainHex(terrain) });
+            }
+
             const mesh = new THREE.InstancedMesh(geom, mat, tiles.length);
             mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
 
@@ -451,16 +521,13 @@ export class Renderer3D {
                 const tile = tiles[i];
                 const wx = tile.x - this._mapHalfW + 0.5;
                 const wz = tile.y - this._mapHalfH + 0.5;
-                const isWater = terrain === TERRAIN_WATER;
                 dummy.position.set(wx, isWater ? -0.06 : 0, wz);
                 dummy.scale.set(1, 1, 1);
                 dummy.updateMatrix();
                 mesh.setMatrixAt(i, dummy.matrix);
-                color.setHex(terrainHex(terrain));
-                mesh.setColorAt(i, color);
             }
 
-            mesh.instanceColor.needsUpdate = true;
+            mesh.instanceMatrix.needsUpdate = true;
             meshes.push(mesh);
         }
         return meshes;
@@ -728,6 +795,44 @@ export class Renderer3D {
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
         }
         this._citizensMesh.instanceMatrix.needsUpdate = true;
+    }
+
+    updateVehicles() {
+        const vs = this.game.vehicleSystem;
+        if (!vs) return;
+        const vehicles = vs.vehicles;
+
+        // Rebuild vehicle group when count changes
+        if (this._vehicleGroup.children.length !== vehicles.length) {
+            this._vehicleGroup.clear();
+            for (const v of vehicles) {
+                const model = this._vehicleModels.get(v.type);
+                if (model) {
+                    const clone = model.clone(true);
+                    clone.userData.vehicleId = v.id;
+                    this._vehicleGroup.add(clone);
+                } else {
+                    // Fallback: colored box
+                    const mesh = new THREE.Mesh(
+                        new THREE.BoxGeometry(0.45, 0.18, 0.22),
+                        new THREE.MeshLambertMaterial({ color: 0x607d8b })
+                    );
+                    mesh.userData.vehicleId = v.id;
+                    this._vehicleGroup.add(mesh);
+                }
+            }
+        }
+
+        // Update positions every frame
+        for (let i = 0; i < vehicles.length; i++) {
+            const v = vehicles[i];
+            const child = this._vehicleGroup.children[i];
+            if (!child) continue;
+            const wx = v.x - this._mapHalfW + 0.5;
+            const wz = v.y - this._mapHalfH + 0.5;
+            child.position.set(wx, 0.06, wz);
+            child.rotation.y = v.angle ?? 0;
+        }
     }
 
     // Convert mouse pixel coords to tile (or null)
@@ -1114,6 +1219,8 @@ export class Renderer3D {
 
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
+
+        this.updateVehicles();
 
         this.syncPlayer();
         this.updateCamera(dt);
@@ -1831,6 +1938,16 @@ function terrainHex(t) {
         case TERRAIN_FOREST: return 0x2d6a4f;
         case TERRAIN_MOUNTAIN: return 0x8b4513;
         default: return 0x444444;
+    }
+}
+
+/** Multiplicative tint applied on top of the texture map */
+function terrainTint(t) {
+    switch (t) {
+        case TERRAIN_GRASS:    return 0xb5ddb5; // light green tint
+        case TERRAIN_FOREST:   return 0x5a9e5a; // darker green tint
+        case TERRAIN_MOUNTAIN: return 0xc8b89a; // warm stone tint
+        default: return 0xd0c8b8;               // sandy/dirt tint
     }
 }
 
