@@ -3392,3 +3392,31 @@ body {
         scroll-behavior: auto !important;
     }
 }
+
+/* High-contrast mode (4C) — activated via settings toggle */
+:root[style*="--high-contrast: 1"] body,
+body:has(:root[style*="--high-contrast: 1"]) {
+    filter: contrast(1.4) saturate(1.2);
+}
+
+/* High-contrast mode (4C) — applies when settings toggle is on */
+body.high-contrast,
+body.high-contrast * {
+    outline-color: #ffff00 !important;
+}
+body.high-contrast button,
+body.high-contrast .btn,
+body.high-contrast [role="button"] {
+    border: 2px solid #ffffff !important;
+    font-weight: 700 !important;
+}
+body.high-contrast input,
+body.high-contrast select,
+body.high-contrast textarea {
+    border: 2px solid #ffffff !important;
+    background: #000000 !important;
+    color: #ffffff !important;
+}
+body.high-contrast .message { border-left: 4px solid #ffffff !important; }
+body.high-contrast .message.crisis { border-left-color: #ff4444 !important; }
+body.high-contrast .message.success { border-left-color: #00ff88 !important; }

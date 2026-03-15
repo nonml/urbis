@@ -114,7 +114,66 @@ export const THEMES = {
             '--glow-color': 'rgba(0, 0, 0, 0.05)',
             '--grid-color': 'rgba(0, 0, 0, 0.05)',
         }
-    }
+    },
+    // ---------------------------------------------------------------------------
+    // Colorblind-safe palettes (Okabe & Ito, 2008 — most cited CB-safe palette)
+    // Orange #E69F00, Sky Blue #56B4E9, Bluish Green #009E73, Yellow #F0E442,
+    // Blue #0072B2, Vermillion #D55E00, Reddish Purple #CC79A7
+    // ---------------------------------------------------------------------------
+    DEUTERANOPIA: {
+        name: 'Deuteranopia (CB)',
+        description: 'Colorblind-safe for red-green vision (deuteranopia/deuteranomaly)',
+        colors: {
+            '--primary-color': '#0a0f1e',
+            '--primary-light': '#141f38',
+            '--primary-dark': '#050a12',
+            '--accent-color': '#e69f00',       // orange — clearly distinct from blue bg
+            '--accent-light': '#f0b429',
+            '--accent-dark': '#c48600',
+            '--success-color': '#0072b2',       // blue, NOT green
+            '--warning-color': '#f0e442',       // yellow
+            '--danger-color': '#d55e00',        // vermillion — differs from warning by hue+brightness
+            '--text-primary': '#e8e8f0',
+            '--text-secondary': '#a8a8c0',
+            '--text-muted': '#686888',
+            '--bg-primary': '#0a0f1e',
+            '--bg-secondary': '#141f38',
+            '--bg-tertiary': '#1a2640',
+            '--border-color': '#2a3a58',
+            '--card-bg': '#141f38',
+            '--panel-bg': 'rgba(20, 31, 56, 0.95)',
+            '--shadow-color': 'rgba(0, 0, 0, 0.5)',
+            '--glow-color': 'rgba(230, 159, 0, 0.3)',
+            '--grid-color': 'rgba(230, 159, 0, 0.1)',
+        }
+    },
+    PROTANOPIA: {
+        name: 'Protanopia (CB)',
+        description: 'Colorblind-safe for red-blind vision (protanopia/protanomaly)',
+        colors: {
+            '--primary-color': '#0a1018',
+            '--primary-light': '#141c28',
+            '--primary-dark': '#050810',
+            '--accent-color': '#56b4e9',        // sky blue — primary identifier
+            '--accent-light': '#7ac4f0',
+            '--accent-dark': '#3a9fd8',
+            '--success-color': '#0072b2',       // blue (darker than accent)
+            '--warning-color': '#e69f00',       // orange
+            '--danger-color': '#f0e442',        // bright yellow — high luminance contrast vs bg
+            '--text-primary': '#e8e8f0',
+            '--text-secondary': '#a8a8c0',
+            '--text-muted': '#686888',
+            '--bg-primary': '#0a1018',
+            '--bg-secondary': '#141c28',
+            '--bg-tertiary': '#1a2030',
+            '--border-color': '#283848',
+            '--card-bg': '#141c28',
+            '--panel-bg': 'rgba(20, 28, 40, 0.95)',
+            '--shadow-color': 'rgba(0, 0, 0, 0.5)',
+            '--glow-color': 'rgba(86, 180, 233, 0.3)',
+            '--grid-color': 'rgba(86, 180, 233, 0.1)',
+        }
+    },
 };
 
 // Default theme
@@ -290,11 +349,20 @@ export class ThemeManager {
     setHighContrast(enabled) {
         const root = document.documentElement;
         root.style.setProperty('--high-contrast', enabled ? '1' : '0');
-        
+        document.body.classList.toggle('high-contrast', enabled);
+
         if (enabled) {
-            // Boost contrast
-            root.style.setProperty('--text-primary', enabled ? '#ffffff' : this.currentTheme.colors['--text-primary']);
-            root.style.setProperty('--border-color', enabled ? '#ffffff' : this.currentTheme.colors['--border-color']);
+            root.style.setProperty('--text-primary', '#ffffff');
+            root.style.setProperty('--text-secondary', '#dddddd');
+            root.style.setProperty('--text-muted', '#aaaaaa');
+            root.style.setProperty('--border-color', '#ffffff');
+            root.style.setProperty('--bg-secondary', '#000000');
+            root.style.setProperty('--accent-color', '#ffff00');
+        } else if (this.currentTheme?.colors) {
+            // Restore theme values
+            for (const [k, v] of Object.entries(this.currentTheme.colors)) {
+                root.style.setProperty(k, v);
+            }
         }
     }
 
@@ -363,6 +431,76 @@ export class ThemeManager {
      */
     isInitialized() {
         return this.initialized;
+    }
+}
+
+/**
+ * Screen Reader Announcer
+ * Creates a visually-hidden aria-live region for announcing key game events
+ * to assistive technologies without affecting visual layout.
+ */
+export class ScreenReaderAnnouncer {
+    constructor() {
+        this._polite = null;
+        this._assertive = null;
+        this._init();
+    }
+
+    _init() {
+        // Polite: non-urgent messages (resource updates, building built, etc.)
+        this._polite = document.createElement('div');
+        this._polite.setAttribute('aria-live', 'polite');
+        this._polite.setAttribute('aria-atomic', 'true');
+        this._polite.setAttribute('role', 'status');
+        Object.assign(this._polite.style, {
+            position: 'absolute', width: '1px', height: '1px',
+            padding: '0', margin: '-1px', overflow: 'hidden',
+            clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: '0',
+        });
+
+        // Assertive: urgent messages (crisis, attack, game over)
+        this._assertive = document.createElement('div');
+        this._assertive.setAttribute('aria-live', 'assertive');
+        this._assertive.setAttribute('aria-atomic', 'true');
+        this._assertive.setAttribute('role', 'alert');
+        Object.assign(this._assertive.style, {
+            position: 'absolute', width: '1px', height: '1px',
+            padding: '0', margin: '-1px', overflow: 'hidden',
+            clip: 'rect(0,0,0,0)', whiteSpace: 'nowrap', border: '0',
+        });
+
+        document.body.appendChild(this._polite);
+        document.body.appendChild(this._assertive);
+    }
+
+    /**
+     * Announce a polite (non-interrupting) message.
+     * Use for: building placed, resource milestone, quest complete.
+     * @param {string} message
+     */
+    announce(message) {
+        if (!this._polite) return;
+        // Reset then set — forces re-announcement even if text is same
+        this._polite.textContent = '';
+        requestAnimationFrame(() => { this._polite.textContent = message; });
+    }
+
+    /**
+     * Announce an urgent (interrupting) message.
+     * Use for: crisis started, city under attack, game over.
+     * @param {string} message
+     */
+    announceUrgent(message) {
+        if (!this._assertive) return;
+        this._assertive.textContent = '';
+        requestAnimationFrame(() => { this._assertive.textContent = message; });
+    }
+
+    destroy() {
+        this._polite?.remove();
+        this._assertive?.remove();
+        this._polite = null;
+        this._assertive = null;
     }
 }
 
