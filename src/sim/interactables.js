@@ -4,9 +4,13 @@ import { eventBus, EVENT_TYPES } from './events.js';
 
 // Interactable types
 export const INTERACTABLE_TYPES = {
-    POWER_SUBSTATION: { name: 'Power Substation', difficulty: 1, icon: '⚡', owners: ['city', 'corp'] },
-    CCTV_POLE: { name: 'CCTV Pole', difficulty: 2, icon: '📷', owners: ['city', 'police', 'corp'] },
-    TELECOM_BOX: { name: 'Telecom Box', difficulty: 3, icon: '📡', owners: ['corp', 'gang'] },
+    POWER_SUBSTATION: { name: 'Power Substation', difficulty: 1, icon: '⚡', owners: ['city', 'corp'], requiresStreetMode: false },
+    CCTV_POLE: { name: 'CCTV Pole', difficulty: 2, icon: '📷', owners: ['city', 'police', 'corp'], requiresStreetMode: false },
+    TELECOM_BOX: { name: 'Telecom Box', difficulty: 3, icon: '📡', owners: ['corp', 'gang'], requiresStreetMode: false },
+    // Physical nodes - require street mode and proximity
+    SERVER_RACK: { name: 'Server Rack', difficulty: 4, icon: '🖥️', owners: ['corp', 'gang'], requiresStreetMode: true, minSecurityLevel: 3, maxSecurityLevel: 5 },
+    SECURITY_HUB: { name: 'Security Hub', difficulty: 5, icon: '🔐', owners: ['corp', 'police'], requiresStreetMode: true, minSecurityLevel: 4, maxSecurityLevel: 5 },
+    DATA_VAULT: { name: 'Data Vault', difficulty: 5, icon: '💾', owners: ['corp'], requiresStreetMode: true, minSecurityLevel: 5, maxSecurityLevel: 5 },
 };
 
 // Interactable state
@@ -25,7 +29,21 @@ export function createInteractable(x, y, districtId, typeKey, seed) {
     const rng = new RNG(seed + x + y * 1000);
     const type = INTERACTABLE_TYPES[typeKey];
     const ownerFaction = type.owners[rng.int(0, type.owners.length - 1)];
-    const securityLevel = Math.max(1, Math.min(5, type.difficulty + rng.int(0, 2)));
+    
+    // Handle security level based on type
+    let securityLevel;
+    if (type.minSecurityLevel !== undefined && type.maxSecurityLevel !== undefined) {
+        // Physical nodes have fixed high security
+        securityLevel = rng.int(type.minSecurityLevel, type.maxSecurityLevel);
+    } else {
+        // Regular nodes have variable security
+        securityLevel = Math.max(1, Math.min(5, type.difficulty + rng.int(0, 2)));
+    }
+    
+    // Calculate rewards based on type and security
+    const baseGold = type.requiresStreetMode ? type.difficulty * 10 : type.difficulty * 5;
+    const goldVariance = type.requiresStreetMode ? 20 : 15;
+    
     return {
         id: `node-${x}-${y}-${rng.int(0, 9999)}`,
         type: typeKey,
@@ -43,11 +61,12 @@ export function createInteractable(x, y, districtId, typeKey, seed) {
         state: INTERACTABLE_STATES.AVAILABLE,
         progress: 0,
         discovered: false,
+        requiresStreetMode: type.requiresStreetMode || false,
         cameraActiveUntil: 0,
         trafficToggledUntil: 0,
         doorUnlockedUntil: 0,
         blackoutPingUntil: 0,
-        rewardGold: type.difficulty * 5 + rng.int(5, 15),
+        rewardGold: baseGold + rng.int(5, goldVariance),
         rewardInfo: type.difficulty > 2 ? `Intelligence from ${type.name}` : null,
     };
 }
@@ -76,6 +95,16 @@ export class InteractableManager {
         // Generate based on map size
         const baseCount = Math.floor((this.width * this.height) / 500); // ~1 node per 500 tiles
         const count = Math.max(5, Math.min(baseCount, 30)); // 5-30 nodes
+
+        // Split between regular and physical nodes (70% regular, 30% physical)
+        const physicalCount = Math.floor(count * 0.3);
+        const regularCount = count - physicalCount;
+        let physicalPlaced = 0;
+
+        // Get type keys separated by physical requirement
+        const allTypeKeys = Object.keys(INTERACTABLE_TYPES);
+        const physicalTypeKeys = allTypeKeys.filter(k => INTERACTABLE_TYPES[k].requiresStreetMode);
+        const regularTypeKeys = allTypeKeys.filter(k => !INTERACTABLE_TYPES[k].requiresStreetMode);
 
         // Try to place one per district as a minimum
         const districtCenters = map.districts.map(d => d.center);
@@ -109,8 +138,14 @@ export class InteractableManager {
             }
 
             if (bestTile) {
-                const typeKeys = Object.keys(INTERACTABLE_TYPES);
-                const typeKey = typeKeys[(this.rng.int(0, typeKeys.length - 1))];
+                // Decide if this should be a physical node
+                const usePhysical = physicalPlaced < physicalCount &&
+                                    placedFromDistricts.size < regularCount + physicalCount / 2 &&
+                                    this.rng.float(0, 1) < 0.3;
+                
+                const typeKeys = usePhysical ? physicalTypeKeys : regularTypeKeys;
+                const typeKey = typeKeys[this.rng.int(0, typeKeys.length - 1)];
+                
                 const interactable = createInteractable(
                     bestTile.x,
                     bestTile.y,
@@ -120,6 +155,10 @@ export class InteractableManager {
                 );
                 interactable.manager = this;
                 this.interactables.push(interactable);
+                
+                if (usePhysical) {
+                    physicalPlaced++;
+                }
                 placedFromDistricts.add(center.id);
                 nodeId++;
             }
@@ -141,7 +180,11 @@ export class InteractableManager {
             const existing = this.interactables.find(n => n.x === x && n.y === y);
             if (existing) continue;
 
-            const typeKeys = Object.keys(INTERACTABLE_TYPES);
+            // Decide if this should be a physical node
+            const usePhysical = physicalPlaced < physicalCount &&
+                                this.rng.float(0, 1) < 0.3;
+            
+            const typeKeys = usePhysical ? physicalTypeKeys : regularTypeKeys;
             const typeKey = typeKeys[this.rng.int(0, typeKeys.length - 1)];
 
             const interactable = createInteractable(
@@ -152,6 +195,10 @@ export class InteractableManager {
             );
             interactable.manager = this;
             this.interactables.push(interactable);
+            
+            if (usePhysical) {
+                physicalPlaced++;
+            }
             nodeId++;
         }
     }
@@ -165,11 +212,26 @@ export class InteractableManager {
         return list[0] || null;
     }
 
-    scanNearby(playerX, playerY, maxDistance = 25) {
+    scanNearby(playerX, playerY, maxDistance = 25, playerMode = 'god') {
         const scanned = [];
         for (const node of this.interactables) {
             const dist = Math.abs(playerX - node.x) + Math.abs(playerY - node.y);
+            
+            // Physical nodes require street mode and close proximity
+            if (node.requiresStreetMode) {
+                // Must be in street mode
+                if (playerMode !== 'street') {
+                    continue;
+                }
+                // Must be very close (within 5 tiles)
+                if (dist > 5) {
+                    continue;
+                }
+            }
+            
+            // Regular scan distance for non-physical nodes
             if (dist > maxDistance) continue;
+            
             node.discovered = true;
             node.distance = dist;
             scanned.push(node);

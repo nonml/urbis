@@ -19,6 +19,7 @@ import { updatePlayerMovement, createPlayerState } from './player/controller.js'
 import { validatePlacement } from './build/placement.js';
 import { HackList } from './ui/hack_list.js';
 import { BreachMinigame } from './ui/breach_minigame.js';
+import { HackNetwork } from './ui/hack_network.js';
 import { createTutorialOverlay, TutorialOverlay } from './ui/tutorial_overlay.js';
 import { TooltipManager } from './ui/tooltips.js';
 
@@ -255,6 +256,7 @@ function createRendererStub(game, canvas) {
 
 export class UIManager {
     constructor(game) {
+        console.log('[UIManager] Constructor called!');
         this.game = game;
         this.canvas = document.getElementById('game-canvas');
         this.selectedBuilding = null;
@@ -301,6 +303,7 @@ export class UIManager {
         this.scannedHackables = [];
         this.hackList = new HackList(this.game);
         this.breachMinigame = new BreachMinigame(this.game);
+        this.hackNetwork = new HackNetwork(this.game);
         this._breachWasPaused = false;
 
         // Player movement state (third-person controller)
@@ -319,6 +322,7 @@ export class UIManager {
         this.codexUI = new CodexUI(this.game);
         this.feedbackUI = new FeedbackUI(this.game);
         this.setupInfoTabs();
+        this.setupSettingsButton();
         this.setupInput();
         this.setupGlobalShortcuts();
 
@@ -467,6 +471,21 @@ export class UIManager {
         const debugBtn = document.getElementById('debug-info-btn');
         if (debugBtn) {
             debugBtn.addEventListener('click', () => this.copyDebugInfo());
+        }
+    }
+
+    setupSettingsButton() {
+        console.log('[UIManager] setupSettingsButton called');
+        const settingsBtn = document.getElementById('settings-btn');
+        console.log('[UIManager] settingsBtn element:', settingsBtn);
+        if (settingsBtn) {
+            console.log('[UIManager] Adding click listener to settings button');
+            settingsBtn.addEventListener('click', () => {
+                console.log('[UIManager] Settings button clicked!');
+                this.toggleSettings();
+            });
+        } else {
+            console.error('[UIManager] Settings button NOT found!');
         }
     }
 
@@ -795,6 +814,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             } else {
                 this.game.tooltipManager?.hide();
             }
+            
+            // Update building hover highlight
+            this.renderer3d.setHoveredTile(tile);
         });
 
         this.canvas.addEventListener('mouseleave', () => {
@@ -884,7 +906,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
     updateHackScan() {
         if (!this.game.interactables || !this.hackList) return;
-        const nodes = this.game.interactables.scanNearby(this.game.player.x, this.game.player.y, 25);
+        // Get current camera mode to determine if player is in street mode
+        const playerMode = this.renderer3d?.cameraMode || 'god';
+        const nodes = this.game.interactables.scanNearby(this.game.player.x, this.game.player.y, 25, playerMode);
         this.scannedHackables = nodes;
         const selectedId = this.currentInteractable?.id || null;
         this.hackList.setVisible(this.hackScanVisible);
@@ -1459,20 +1483,47 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 }
                 this._breachWasPaused = this.game.state.time.paused;
                 this.game.state.time.paused = true;
-                this.breachMinigame.start(node, (success, hackedNode) => {
+                
+                // Convert scanned hackables to network nodes format
+                const networkNodes = this.scannedHackables.map(hackable => ({
+                    id: hackable.id,
+                    name: hackable.name,
+                    securityLevel: hackable.securityLevel || 1,
+                    ownerFaction: hackable.ownerFaction || 'Unknown',
+                    distance: hackable.distance || 0,
+                    type: hackable.type || 'server',
+                    icon: hackable.icon || '🔒'
+                }));
+                
+                // Start the visual hacking network
+                this.hackNetwork.start(networkNodes, (hackedNodes) => {
                     this.game.state.time.paused = this._breachWasPaused;
-                    const result = this.game.executeHack(hackedNode, success);
-                    if (!result.ok) {
-                        this.showMessage(result.reason || 'Hack failed to execute.', 'crisis');
-                        return;
+                    
+                    // Execute hacks for all successfully hacked nodes
+                    let totalHeat = 0;
+                    let successCount = 0;
+                    let failCount = 0;
+                    
+                    for (const hackedNode of hackedNodes) {
+                        const result = this.game.executeHack(hackedNode, hackedNode.success);
+                        if (result.ok) {
+                            totalHeat += (result.heat || 0);
+                            if (hackedNode.success) {
+                                successCount++;
+                            } else {
+                                failCount++;
+                            }
+                        }
                     }
-                    if (!success) {
-                        this.showMessage(`Breach failed. Heat +5. Cooldown applied.`, 'crisis');
-                        return;
+                    
+                    // Show summary message
+                    if (successCount > 0) {
+                        const heatText = `Heat +${Math.round(totalHeat)}`;
+                        this.showMessage(`Hacked ${successCount} node(s). (${heatText})`, 'success');
                     }
-                    const actionMsg = result.actionResult?.msg || 'Hack success.';
-                    const heatText = `Heat ${Math.round(result.heat || 0)}`;
-                    this.showMessage(`${actionMsg} (${heatText})`, 'success');
+                    if (failCount > 0) {
+                        this.showMessage(`Failed to breach ${failCount} node(s).`, 'crisis');
+                    }
                 });
             } else if (node.state === 'success' || node.state === 'failed') {
                 // Reset and try again
@@ -1633,7 +1684,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
      * Toggle settings menu
      */
     toggleSettings() {
+        console.log('[UIManager] toggleSettings called, settings object:', this.settings);
         this.settings.toggle();
+        console.log('[UIManager] After toggle, settings.isOpen:', this.settings.isOpen);
     }
 
     /**

@@ -143,7 +143,12 @@ export function createNewGameState(options = {}) {
             points: 0,
             unlocked: [],
             completedCases: 0,
-            districtStability: {}
+            districtStability: {},
+            // Hacking skill progression
+            hackingSkill: 1, // Level 1-10
+            hackingXP: 0, // XP toward next level
+            totalNodesHacked: 0,
+            successfulBreaches: 0
         },
         progress: {
             mode: 'standard',
