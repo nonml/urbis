@@ -8,36 +8,35 @@ import { createAudioMixer, AUDIO_CHANNELS, MIXER_PRESETS } from './mixer.js';
 
 // Audio source configuration (paths can be placeholders for development)
 export const AUDIO_SOURCES = {
-    // Ambient loops
-    ambient_grass: 'assets/audio/ambient/grass_loop.mp3',
+    // Ambient loops (real MP3/OGG files downloaded from OpenGameArt CC0)
     ambient_urban: 'assets/audio/ambient/urban_loop.mp3',
-    ambient_night: 'assets/audio/ambient/night_loop.mp3',
+    ambient_night: 'assets/audio/ambient/night_loop.ogg',
 
-    // UI sounds
-    ui_click: 'assets/audio/ui/click.mp3',
-    ui_slider: 'assets/audio/ui/slider.mp3',
-    ui_success: 'assets/audio/ui/success.mp3',
-    ui_error: 'assets/audio/ui/error.mp3',
+    // UI sounds (procedurally generated WAV via scripts/gen_sfx.mjs)
+    ui_click: 'assets/audio/ui/click.wav',
+    ui_slider: 'assets/audio/ui/slider.wav',
+    ui_success: 'assets/audio/ui/success.wav',
+    ui_error: 'assets/audio/ui/error.wav',
 
     // Crisis sounds
-    crisis_stinger: 'assets/audio/crisis/stinger.mp3',
-    crisis_warning: 'assets/audio/crisis/warning.mp3',
+    crisis_stinger: 'assets/audio/crisis/stinger.wav',
+    crisis_warning: 'assets/audio/crisis/warning.wav',
 
     // Footsteps
-    footsteps_grass: 'assets/audio/footsteps/grass.mp3',
-    footsteps_urban: 'assets/audio/footsteps/urban.mp3',
+    footsteps_grass: 'assets/audio/footsteps/grass.wav',
+    footsteps_urban: 'assets/audio/footsteps/urban.wav',
 
     // Building sounds
-    build_success: 'assets/audio/build/build.mp3',
+    build_success: 'assets/audio/build/build.wav',
 };
 
 // District theme mappings
 export const DISTRICT_AMBIENT = {
-    residential: 'ambient_grass',
+    residential: 'ambient_night',
     commercial: 'ambient_urban',
     industrial: 'ambient_urban',
     mixed: 'ambient_urban',
-    default: 'ambient_grass',
+    default: 'ambient_night',
 };
 
 /**
@@ -167,15 +166,15 @@ export class AudioManager {
     }
 
     /**
-     * Check if audio asset exists (not strictly necessary but useful for detection)
+     * Check if audio asset exists via HEAD request
      */
-    checkAudioAsset(src) {
-        return new Promise(resolve => {
-            const img = new Image();
-            img.src = src;
-            img.onload = () => resolve(true);
-            img.onerror = () => resolve(false);
-        });
+    async checkAudioAsset(src) {
+        try {
+            const r = await fetch(src, { method: 'HEAD' });
+            return r.ok;
+        } catch {
+            return false;
+        }
     }
 
     /**

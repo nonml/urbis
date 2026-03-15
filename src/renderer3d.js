@@ -261,6 +261,9 @@ export class Renderer3D {
         this._vfxEntries = [];
         this._vfxRings = [];
 
+        // GLTF model library: type -> THREE.Group (set after async _preloadModels)
+        this._gltfModels = new Map();
+
         // Debug overlays
         this._debugMode = 'none'; // 'none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services'
         this._debugOverlayMesh = null;
@@ -281,6 +284,9 @@ export class Renderer3D {
         this.resize();
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('wheel', (e) => this.handleWheel(e));
+
+        // Async: load Kenney GLB models, then rebuild once ready
+        this._preloadModels();
     }
 
     resize() {
@@ -347,6 +353,68 @@ export class Renderer3D {
         this.updateDebugOverlay();
     }
 
+    // -----------------------------------------------------------------------
+    // Kenney GLB model loader
+    // -----------------------------------------------------------------------
+    /** Maps game building types → Kenney GLB asset paths (in public/) */
+    static MODEL_MAP = {
+        'house':             'assets/models/kenney_suburban/building-type-a.glb',
+        'farm':              'assets/models/kenney_suburban/building-type-c.glb',
+        'lumber-mill':       'assets/models/kenney_commercial/building-d.glb',
+        'market':            'assets/models/kenney_commercial/building-a.glb',
+        'town-hall':         'assets/models/kenney_commercial/building-skyscraper-a.glb',
+        'warehouse':         'assets/models/kenney_suburban/building-type-g.glb',
+        'barracks':          'assets/models/kenney_suburban/building-type-m.glb',
+        'school':            'assets/models/kenney_suburban/building-type-b.glb',
+        'police-station':    'assets/models/kenney_commercial/building-b.glb',
+        'cctv-network':      'assets/models/kenney_suburban/building-type-d.glb',
+        'counterintel':      'assets/models/kenney_commercial/building-c.glb',
+        'propaganda-office': 'assets/models/kenney_commercial/building-e.glb',
+    };
+
+    /** Uniform scale per type so models fit inside a 1-unit tile */
+    static MODEL_SCALE = {
+        'town-hall': 0.28,
+        default:     0.38,
+    };
+
+    async _preloadModels() {
+        let GLTFLoader;
+        try {
+            const mod = await import('three/addons/loaders/GLTFLoader.js');
+            GLTFLoader = mod.GLTFLoader;
+        } catch {
+            // three/addons not available — keep box fallback forever
+            return;
+        }
+
+        const loader = new GLTFLoader();
+        const loadOne = (type, url) => new Promise((resolve) => {
+            loader.load(url, (gltf) => {
+                const root = gltf.scene;
+                const scale = Renderer3D.MODEL_SCALE[type] ?? Renderer3D.MODEL_SCALE.default;
+                root.scale.setScalar(scale);
+                // Sit flat on Y=0 and center on XZ
+                const box = new THREE.Box3().setFromObject(root);
+                const center = box.getCenter(new THREE.Vector3());
+                root.position.x -= center.x;
+                root.position.z -= center.z;
+                root.position.y -= box.min.y;
+                this._gltfModels.set(type, root);
+                resolve();
+            }, undefined, () => resolve()); // on error, skip silently
+        });
+
+        await Promise.all(
+            Object.entries(Renderer3D.MODEL_MAP).map(([type, url]) => loadOne(type, url))
+        );
+
+        // Swap boxes → real models across all loaded chunks
+        if (this._gltfModels.size > 0) {
+            this.rebuildWorld();
+        }
+    }
+
     _disposeChunkEntry(entry) {
         if (!entry) return;
         this.scene.remove(entry.group);
@@ -399,16 +467,28 @@ export class Renderer3D {
     }
 
     _buildBuildingMeshesForChunk(bounds, buildings) {
-        const byType = new Map();
+        const objects = [];
+        const boxGroups = new Map(); // type -> building[]
+
         for (const b of buildings) {
             if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
-            if (!byType.has(b.type)) byType.set(b.type, []);
-            byType.get(b.type).push(b);
+            const model = this._gltfModels.get(b.type);
+            if (model) {
+                const clone = model.clone(true);
+                const wx = b.x - this._mapHalfW + 0.5;
+                const wz = b.y - this._mapHalfH + 0.5;
+                clone.position.set(wx, 0, wz);
+                clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
+                objects.push(clone);
+            } else {
+                if (!boxGroups.has(b.type)) boxGroups.set(b.type, []);
+                boxGroups.get(b.type).push(b);
+            }
         }
 
-        const meshes = [];
+        // Box instanced mesh fallback for types without a loaded model
         const dummy = new THREE.Object3D();
-        for (const [type, arr] of byType.entries()) {
+        for (const [type, arr] of boxGroups.entries()) {
             if (arr.length === 0) continue;
             const h = (BUILDING_3D[type]?.height ?? 0.6);
             const geom = new THREE.BoxGeometry(0.85, h, 0.85);
@@ -424,9 +504,9 @@ export class Renderer3D {
                 mesh.setMatrixAt(i, dummy.matrix);
             }
             mesh.instanceMatrix.needsUpdate = true;
-            meshes.push(mesh);
+            objects.push(mesh);
         }
-        return meshes;
+        return objects;
     }
 
     _createChunkEntry(chunkId) {
@@ -459,7 +539,7 @@ export class Renderer3D {
             center,
             radius,
             terrainCount: terrainMeshes.reduce((n, mesh) => n + mesh.count, 0),
-            buildingCount: buildingMeshes.reduce((n, mesh) => n + mesh.count, 0),
+            buildingCount: buildingMeshes.reduce((n, m) => n + (m.count ?? 1), 0),
         };
     }
 
@@ -474,15 +554,21 @@ export class Renderer3D {
         });
         for (const child of toRemove) {
             entry.group.remove(child);
-            child.geometry?.dispose?.();
-            child.material?.dispose?.();
+            // Traverse handles both InstancedMesh and cloned GLTF groups
+            child.traverse?.((obj) => {
+                if (obj.isMesh) {
+                    obj.geometry?.dispose?.();
+                    if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose?.());
+                    else obj.material?.dispose?.();
+                }
+            });
         }
         const meshes = this._buildBuildingMeshesForChunk(entry.bounds, this.game.buildings.buildings);
         for (const mesh of meshes) {
             mesh.userData.kind = 'building';
             entry.group.add(mesh);
         }
-        entry.buildingCount = meshes.reduce((n, mesh) => n + mesh.count, 0);
+        entry.buildingCount = meshes.reduce((n, m) => n + (m.count ?? 1), 0);
     }
 
     syncChunkStreaming(forceInitial = false) {

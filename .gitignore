@@ -1,3 +1,5 @@
 .noctune_cache
+playwright-report
 node_modules
 build/
+!public/assets/audio/build/
