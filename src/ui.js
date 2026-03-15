@@ -1006,6 +1006,17 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         // Flash class
         const delta = to - from;
+
+        // Emit VFX resource events so VFXTriggerManager can show floating text (Phase 6)
+        if (Math.abs(delta) >= 3) {
+            const resourceType = id.replace('-amount', '').replace(/-/g, ' ');
+            if (delta > 0) {
+                eventBus.emit('ui_resource_gained', { type: resourceType, amount: delta });
+            } else {
+                eventBus.emit('ui_resource_lost', { type: resourceType, amount: Math.abs(delta) });
+            }
+        }
+
         el.classList.remove('res-gain', 'res-loss');
         // Force reflow so animation restarts if called rapidly
         void el.offsetWidth;
