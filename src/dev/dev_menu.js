@@ -150,6 +150,11 @@ export class DevMenu {
                 label: 'Validate Content',
                 description: 'Run content validation check',
                 callback: () => this.validateContent()
+            },
+            exportBalanceCSV: {
+                label: 'Export Balance CSV',
+                description: 'Download building income/upkeep and difficulty constants as CSV',
+                callback: () => this.exportBalanceCSV()
             }
         };
     }
@@ -813,6 +818,55 @@ export class DevMenu {
                 this.grantResources({ gold: 1000, wood: 1000, food: 1000, data: 1000 });
             }
         });
+    }
+
+    /**
+     * Export game balance constants as a CSV file (2D: balance pass tool)
+     * Rows: building types + their income/upkeep per level
+     * Also includes difficulty presets and upgrade costs.
+     */
+    exportBalanceCSV() {
+        const rows = [];
+        rows.push(['type', 'field', 'level1', 'level2', 'level3', 'level4']);
+
+        const game = this.game;
+        // Dynamic import to avoid circular dep at module load
+        import('../constants.js').then(({ BUILDING_TYPES, BUILDING_SECURITY, BUILDING_LEVELS, UPGRADE_COSTS, DIFFICULTY_PRESETS }) => {
+            const allBuildings = { ...BUILDING_TYPES, ...BUILDING_SECURITY };
+            for (const [type, def] of Object.entries(allBuildings)) {
+                const baseGold = def.income?.gold ?? 0;
+                const baseFood = def.income?.food ?? 0;
+                const baseWood = def.income?.wood ?? 0;
+                const baseUpkeep = def.upkeep ?? 0;
+                const basePop = def.population ?? 0;
+                const mults = [1, 2, 3, 4].map(l => BUILDING_LEVELS[l]?.multiplier ?? 1);
+                rows.push([type, 'income_gold', ...mults.map(m => Math.floor(baseGold * m))]);
+                rows.push([type, 'income_food', ...mults.map(m => Math.floor(baseFood * m))]);
+                rows.push([type, 'income_wood', ...mults.map(m => Math.floor(baseWood * m))]);
+                rows.push([type, 'upkeep',      ...mults.map(m => Math.floor(baseUpkeep * m))]);
+                rows.push([type, 'population',  ...mults.map(m => Math.floor(basePop * m))]);
+            }
+            rows.push([]);
+            rows.push(['difficulty', 'resourceMult', 'enemyStrength', 'startGold', 'startFood', 'startWood', 'incomeBonus', 'decayMult']);
+            for (const [key, p] of Object.entries(DIFFICULTY_PRESETS)) {
+                rows.push([key, p.resourceMultiplier, p.enemyStrength, p.startingGold, p.startingFood, p.startingWood, p.incomeBonus, p.decayMultiplier]);
+            }
+            rows.push([]);
+            rows.push(['upgrade_level', 'gold', 'wood', 'food']);
+            for (const [level, cost] of Object.entries(UPGRADE_COSTS)) {
+                rows.push([level, cost.gold, cost.wood, cost.food]);
+            }
+
+            const csv = rows.map(r => r.join(',')).join('\n');
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'game_balance.csv';
+            a.click();
+            URL.revokeObjectURL(url);
+            this.showMessage('Balance CSV exported!', 'success');
+        }).catch(e => this.showMessage(`Export failed: ${e.message}`, 'error'));
     }
 
     /**
