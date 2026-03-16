@@ -1340,9 +1340,13 @@ export class Renderer3D {
                 // Skyscraper variants load at scale=1.0; apply type scale here
                 if (useSkyscraperScale) {
                     const baseScale = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
-                    // Per-building height variation ±30% for natural skyline stepped profile
+                    // Per-building height variation — CBD pyramid profile: taller downtown, shorter suburbs
                     const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
-                    const heightMult = 0.70 + heightHash * 0.60; // 0.70 to 1.30x base
+                    const distFromCenter = Math.sqrt(
+                        (b.x - this._mapHalfW) ** 2 + (b.y - this._mapHalfH) ** 2
+                    );
+                    const centerFactor = Math.max(0, 1.0 - distFromCenter / 18);
+                    const heightMult = 0.55 + heightHash * 0.55 + centerFactor * 0.55;
                     clone.scale.setScalar(baseScale * heightMult);
                 }
                 const wx = b.x - this._mapHalfW + 0.5;
