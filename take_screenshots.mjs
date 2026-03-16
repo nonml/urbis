@@ -189,33 +189,27 @@ async function render(setup) {
     const r = window.game.ui.renderer3d;
 
     r.dayNightCycle = false;
-    if (r._updateSkyForTime) r._updateSkyForTime(11);
+    if (r._updateSkyForTime) r._updateSkyForTime(10); // 10am for nice light angle
 
-    // Hide Sky shader, use clean solid sky color
+    // Sky shader renders white in headless — use solid gradient background instead
     if (r._sky) r._sky.visible = false;
+    r.scene.background.setHex(0x5ab4f0);
 
-    // Clear sky blue background
-    r.scene.background = new (r.scene.background.constructor)();
-    r.scene.background.setHex(0x6ab4f5);
-
-    // Soft atmospheric haze
+    // Subtle atmospheric haze
     if (r.scene.fog) {
-      r.scene.fog.color.setHex(0xb8d8f8);
-      r.scene.fog.density = 0.003;
-    } else {
-      // Add exponential fog if none exists
-      const THREE = r.scene.background.constructor;
+      r.scene.fog.color.setHex(0xaad4f0);
+      r.scene.fog.density = 0.0015;
     }
 
-    r.renderer.toneMappingExposure = 1.1;
+    r.renderer.toneMappingExposure = 1.05;
 
     // Disable SSAO (causes artifacts in headless)
     if (r._ssaoPass) r._ssaoPass.enabled = false;
 
-    // Subtle bloom
+    // Subtle bloom — slight glow on sun-bright surfaces
     if (r._bloomPass) {
-      r._bloomPass.strength = 0.08;
-      r._bloomPass.threshold = 0.95;
+      r._bloomPass.strength = 0.12;
+      r._bloomPass.threshold = 0.90;
     }
 
     r.camera.position.set(s.cx, s.cy, s.cz);
@@ -257,17 +251,20 @@ async function shot(name, setup) {
 // Camera angles — world (0,0,0) is map center
 // Roads at every 4 tiles: world x = ...-11.5, -7.5, -3.5, 0.5, 4.5, 8.5...
 
-// OVERVIEW — elevated isometric, see full city layout + surrounding terrain
+// Camera note: roads at dx%4==0 → world x = ...-11.5, -7.5, -3.5, 0.5, 4.5, 8.5, 12.5
+// Building blocks at dx = ±1,2,3 from each road
+
+// OVERVIEW — elevated isometric showing full city + road grid + terrain
 await shot('ss_overview',  { cx: 22, cy: 30, cz: 22, lx: 0, ly: 1, lz: 0, fov: 52 });
 
-// SKYLINE — dramatic low-angle from outside, full tower silhouette against sky
-await shot('ss_skyline',   { cx: -24, cy: 7, cz: 18, lx: 0, ly: 5, lz: 0, fov: 48 });
+// SKYLINE — dramatic low-angle from SW, full tower silhouette against sky
+await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46 });
 
-// STREET — camera on road at x=-7.5 looking down the corridor toward city center
-await shot('ss_street',    { cx: -7.5, cy: 3.5, cz: 16, lx: -7.5, ly: 3.5, lz: -14, fov: 72 });
+// STREET — camera on road corridor (x=0.5), eye-level, looking north into city
+await shot('ss_street',    { cx: 0.5, cy: 3.2, cz: 18, lx: 0.5, ly: 3.5, lz: -12, fov: 75 });
 
-// PANORAMA — wide elevated arc showing city + nature + water
-await shot('ss_panorama',  { cx: 26, cy: 24, cz: -20, lx: -2, ly: 1, lz: 2, fov: 62 });
+// PANORAMA — wide arc from NE, city + nature + water in frame
+await shot('ss_panorama',  { cx: 28, cy: 26, cz: -22, lx: -2, ly: 1, lz: 2, fov: 60 });
 
 console.log('\nLogs:', logs.filter(l=>l.startsWith('City')||l.startsWith('Total')||l.startsWith('Placed')));
 await browser.close();

@@ -1291,7 +1291,9 @@ export class Renderer3D {
                 clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
                 const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
                 // Slightly darker roof color for contrast
-                const roofColor = bldColor.clone().multiplyScalar(0.72);
+                const roofColor = bldColor.clone().multiplyScalar(0.65);
+                // Glass/steel buildings get more reflective material
+                const isGlassType = Renderer3D.SKYSCRAPER_TYPES.has(b.type);
                 clone.traverse((child) => {
                     if (child.isMesh) {
                         child.castShadow = true;
@@ -1308,19 +1310,24 @@ export class Renderer3D {
                                     const size = box.getSize(new THREE.Vector3());
                                     const isSmall = size.x < 0.15 && size.z < 0.15;
                                     if (isSmall) {
-                                        // Window: emissive yellow
+                                        // Window: emissive warm glow
                                         nm.color.set(0xffee88);
                                         nm.emissive = new THREE.Color(0xffcc44);
-                                        nm.emissiveIntensity = 0.6;
+                                        nm.emissiveIntensity = 0.8;
+                                        nm.roughness = 0.1;
+                                        nm.metalness = 0.0;
                                     } else if (size.y < 0.08) {
                                         // Flat/roof mesh
                                         nm.color.set(roofColor);
+                                        nm.roughness = 0.85;
+                                        nm.metalness = 0.0;
                                     } else {
                                         nm.color.set(bldColor);
+                                        // Glass/steel tower facades get a reflective sheen
+                                        nm.roughness = isGlassType ? 0.35 : 0.65;
+                                        nm.metalness = isGlassType ? 0.18 : 0.03;
                                     }
-                                    nm.roughness = 0.6;
-                                    nm.metalness = 0.05;
-                                    nm.envMapIntensity = 0.8;
+                                    nm.envMapIntensity = isGlassType ? 1.2 : 0.6;
                                 }
                                 return nm;
                             };
