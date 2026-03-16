@@ -304,6 +304,7 @@ export class Renderer3D {
 
         // GLTF model library: type -> THREE.Group (set after async _preloadModels)
         this._gltfModels = new Map();
+        this._windowTexture = null; // lazy-created canvas texture for window glow
 
         // Vegetation model library: modelName -> THREE.Group
         this._vegetationModels = new Map();
@@ -1343,6 +1344,37 @@ export class Renderer3D {
                     }
                 });
                 objects.push(clone);
+
+                // Add lit-window glow overlay to tall skyscraper buildings
+                if (useSkyscraperScale) {
+                    const bbox = new THREE.Box3().setFromObject(clone);
+                    const bs = bbox.getSize(new THREE.Vector3());
+                    if (bs.y > 1.2) {
+                        const bc = bbox.getCenter(new THREE.Vector3());
+                        const winTex = this._getWindowTexture();
+                        const winMat = new THREE.MeshBasicMaterial({
+                            map: winTex,
+                            transparent: true,
+                            depthWrite: false,
+                            blending: THREE.AdditiveBlending,
+                            opacity: 0.55,
+                        });
+                        // Four cardinal faces: +Z -Z +X -X
+                        const faces = [
+                            [bs.x * 0.88, bs.y * 0.90, bc.x, bc.y, bbox.max.z + 0.018, 0, 0],
+                            [bs.x * 0.88, bs.y * 0.90, bc.x, bc.y, bbox.min.z - 0.018, 0, Math.PI],
+                            [bs.z * 0.88, bs.y * 0.90, bbox.max.x + 0.018, bc.y, bc.z, 0, Math.PI / 2],
+                            [bs.z * 0.88, bs.y * 0.90, bbox.min.x - 0.018, bc.y, bc.z, 0, -Math.PI / 2],
+                        ];
+                        for (const [pw, ph, px, py, pz, rx, ry] of faces) {
+                            const g = new THREE.PlaneGeometry(pw, ph);
+                            const m = new THREE.Mesh(g, winMat.clone());
+                            m.position.set(px, py, pz);
+                            m.rotation.set(rx, ry, 0);
+                            objects.push(m);
+                        }
+                    }
+                }
             } else {
                 if (!boxGroups.has(b.type)) boxGroups.set(b.type, []);
                 boxGroups.get(b.type).push(b);
@@ -1373,6 +1405,39 @@ export class Renderer3D {
             objects.push(mesh);
         }
         return objects;
+    }
+
+    /**
+     * Returns a lazily-created CanvasTexture of a window grid for building glow overlays.
+     * Warm-yellow and cool-white window squares on a transparent background.
+     */
+    _getWindowTexture() {
+        if (this._windowTexture) return this._windowTexture;
+        const W = 128, H = 256;
+        const cv = document.createElement('canvas');
+        cv.width = W; cv.height = H;
+        const ctx = cv.getContext('2d');
+        ctx.clearRect(0, 0, W, H);
+        const cols = 5, rows = 14;
+        const pw = W / cols, ph = H / rows;
+        const sw = pw * 0.55, sh = ph * 0.48;
+        for (let r = 0; r < rows; r++) {
+            for (let c = 0; c < cols; c++) {
+                // Deterministic: ~78% of windows lit, varied warm/cool
+                const seed = ((r * cols + c) * 2654435761) >>> 0;
+                if ((seed & 0x7) > 1) {
+                    const warm = (seed & 0x3) > 0;
+                    ctx.fillStyle = warm ? 'rgba(255,228,110,0.88)' : 'rgba(210,230,255,0.75)';
+                    ctx.fillRect(
+                        c * pw + (pw - sw) / 2,
+                        r * ph + (ph - sh) / 2,
+                        sw, sh
+                    );
+                }
+            }
+        }
+        this._windowTexture = new THREE.CanvasTexture(cv);
+        return this._windowTexture;
     }
 
     /**

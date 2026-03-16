@@ -173,6 +173,23 @@ await page.evaluate(() => {
       addBuilding(cx+dx, cy+dy, OUTER[oi++ % OUTER.length]);
     }
 
+  // Tree-lined road edges: set empty grass tiles adjacent to roads → TERRAIN_PARK
+  const TERRAIN_PARK_T = 6;
+  for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
+    for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) continue;
+      if (game.map.getTileAt(x, y) !== TERRAIN_GRASS) continue;
+      if (game.buildings.getBuildingsAt(x, y).length > 0) continue;
+      // Check if any of the 4 cardinal neighbors is TERRAIN_ROAD
+      const isRoadAdj = [
+        game.map.getTileAt(x-1, y), game.map.getTileAt(x+1, y),
+        game.map.getTileAt(x, y-1), game.map.getTileAt(x, y+1),
+      ].some(t => t === TERRAIN_ROAD);
+      if (isRoadAdj) game.map.setTileAt(x, y, TERRAIN_PARK_T);
+    }
+  }
+
   // Extend LOD so everything is visible
   r.LOD_FULL_DIST = 9999;
   r.LOD_TERRAIN_ONLY_DIST = 9999;
