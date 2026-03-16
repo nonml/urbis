@@ -208,27 +208,48 @@ async function render(setup) {
     const r = window.game.ui.renderer3d;
 
     r.dayNightCycle = false;
-    if (r._updateSkyForTime) r._updateSkyForTime(8.5); // 8:30am — low sun angle, long dramatic shadows
-
-    // Sky shader renders white in headless — use solid gradient background instead
     if (r._sky) r._sky.visible = false;
-    r.scene.background.setHex(0x5ab4f0);
+    if (r._ssaoPass) r._ssaoPass.enabled = false; // causes white artifact in headless
 
-    // Light atmospheric haze — low density keeps distant terrain visible
-    if (r.scene.fog) {
-      r.scene.fog.color.setHex(0xaad4f0);
-      r.scene.fog.density = 0.0010;
-    }
-
-    r.renderer.toneMappingExposure = 1.05;
-
-    // Disable SSAO (causes white-sky artifact in headless)
-    if (r._ssaoPass) r._ssaoPass.enabled = false;
-
-    // Subtle bloom
-    if (r._bloomPass) {
-      r._bloomPass.strength = 0.10;
-      r._bloomPass.threshold = 0.92;
+    if (s.dusk) {
+      // Golden hour — warm orange sun just above horizon
+      if (r._updateSkyForTime) r._updateSkyForTime(18.5);
+      r.scene.background.setHex(0xf07830);
+      if (r.scene.fog) { r.scene.fog.color.setHex(0xe8602a); r.scene.fog.density = 0.0018; }
+      if (r.hemiLight)   { r.hemiLight.color.setHex(0xffb060); r.hemiLight.groundColor.setHex(0x8a5030); r.hemiLight.intensity = 0.55; }
+      if (r.ambientLight) { r.ambientLight.color.setHex(0xff9040); r.ambientLight.intensity = 0.35; }
+      if (r.sunLight)    { r.sunLight.color.setHex(0xff8030); r.sunLight.intensity = 1.8; }
+      if (r.sunLightFar) { r.sunLightFar.color.setHex(0xff8030); r.sunLightFar.intensity = 0.9; }
+      r.renderer.toneMappingExposure = 1.1;
+      if (r._bloomPass) { r._bloomPass.strength = 0.18; r._bloomPass.threshold = 0.80; }
+      // Window glow: moderate visibility at dusk
+      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.60; });
+    } else if (s.night) {
+      // Night — dark navy sky, city lit only by window glow + dim ambient
+      if (r._updateSkyForTime) r._updateSkyForTime(0);
+      r.scene.background.setHex(0x05101e);
+      if (r.scene.fog) { r.scene.fog.color.setHex(0x05101e); r.scene.fog.density = 0.0008; }
+      if (r.hemiLight)   { r.hemiLight.color.setHex(0x2040a0); r.hemiLight.groundColor.setHex(0x102030); r.hemiLight.intensity = 0.10; }
+      if (r.ambientLight) { r.ambientLight.color.setHex(0x203060); r.ambientLight.intensity = 0.08; }
+      if (r.sunLight)    { r.sunLight.intensity = 0.04; }
+      if (r.sunLightFar) { r.sunLightFar.intensity = 0.04; }
+      r.renderer.toneMappingExposure = 1.35;
+      if (r._bloomPass) { r._bloomPass.strength = 0.45; r._bloomPass.threshold = 0.72; }
+      // Boost window glow to full brightness at night
+      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 1.0; });
+    } else {
+      // Daytime — 8:30am, long dramatic shadows
+      if (r._updateSkyForTime) r._updateSkyForTime(8.5);
+      r.scene.background.setHex(0x5ab4f0);
+      if (r.scene.fog) { r.scene.fog.color.setHex(0xaad4f0); r.scene.fog.density = 0.0010; }
+      if (r.hemiLight)   { r.hemiLight.color.setHex(0x9fd8fb); r.hemiLight.groundColor.setHex(0x4a7a3a); r.hemiLight.intensity = 0.70; }
+      if (r.ambientLight) { r.ambientLight.color.setHex(0xfff8f0); r.ambientLight.intensity = 0.30; }
+      if (r.sunLight)    { r.sunLight.color.setHex(0xfffbe0); r.sunLight.intensity = 2.2; }
+      if (r.sunLightFar) { r.sunLightFar.color.setHex(0xfffbe0); r.sunLightFar.intensity = 1.2; }
+      r.renderer.toneMappingExposure = 1.05;
+      if (r._bloomPass) { r._bloomPass.strength = 0.10; r._bloomPass.threshold = 0.92; }
+      // Window glow: subtle in daylight
+      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.55; });
     }
 
     r.camera.position.set(s.cx, s.cy, s.cz);
@@ -294,6 +315,15 @@ await shot('ss_street',    { cx: 0.5, cy: 3.2, cz: 18, lx: 0.5, ly: 3.5, lz: -12
 
 // PANORAMA — wide arc from NE, city + nature + water in frame
 await shot('ss_panorama',  { cx: 28, cy: 26, cz: -22, lx: -2, ly: 1, lz: 2, fov: 60 });
+
+// DUSK — golden hour, warm orange sun from W, long shadows
+await shot('ss_dusk',      { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46, dusk: true });
+
+// NIGHT — city lit by window glow, dark sky
+await shot('ss_night',     { cx: -20, cy: 10, cz: 22, lx: 0, ly: 4, lz: 0, fov: 52, night: true });
+
+// NIGHT STREET — eye-level between towers, window glow dominant
+await shot('ss_night_street', { cx: 0.5, cy: 3.2, cz: 18, lx: 0.5, ly: 3.5, lz: -12, fov: 75, night: true });
 
 console.log('\nLogs:', logs.filter(l=>l.startsWith('City')||l.startsWith('Total')||l.startsWith('Placed')));
 await browser.close();
