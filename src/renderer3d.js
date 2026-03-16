@@ -3129,7 +3129,7 @@ const BUILDING_PALETTES = {
     'lumber-mill':     [0x906040, 0x7a4a28, 0xa87050],
     // Commercial — glass blue, steel, bronze, warm gray
     'market':          [0x4a6888, 0x5878a0, 0x385878, 0x6888a8, 0x607070, 0x486080],
-    'shopping-mall':   [0x607890, 0x6888a0, 0x7890a8, 0x9ab0c0, 0x506880, 0x8898b0],
+    'shopping-mall':   [0x3a5870, 0x486078, 0x507080, 0x607888, 0x3a5060, 0x5a7080],
     'restaurant':      [0xa05838, 0xb06848, 0x906030, 0xc87040],
     'nightclub':       [0x2a2848, 0x383660, 0x484870, 0x302850],
     // Hotel — warm earth tones, gold glass, stone
@@ -3146,9 +3146,9 @@ const BUILDING_PALETTES = {
     'theater':         [0x703848, 0x804858, 0x602838, 0x906858],
     'prison':          [0x585850, 0x686860, 0x484840, 0x707060],
     // Apartments — wide palette: blue glass, dark steel, warm concrete, teal, slate
-    'apartment':       [0x4a6070, 0x506878, 0x3a5060, 0x607888,
-                        0x5a7068, 0x486070, 0x708090, 0x586880,
-                        0x7888a0, 0x4a5870, 0x688098, 0x506070],
+    'apartment':       [0x384858, 0x3e5060, 0x2c3e4e, 0x485e6e,
+                        0x425650, 0x364858, 0x4e6070, 0x40505e,
+                        0x526076, 0x364054, 0x485e70, 0x384858],
     // Office/tech
     'university':      [0x5a5080, 0x6a6090, 0x4a4070, 0x7a70a0],
     'research-lab':    [0x485868, 0x586878, 0x384858, 0x607088],
@@ -3171,13 +3171,13 @@ const BUILDING_PALETTES = {
 function buildingPaletteColor(type, id) {
     const palette = BUILDING_PALETTES[type] || BUILDING_PALETTES['default'];
     const hex = palette[(id || 0) % palette.length];
-    // Cap luminance to ≤ 0.58 so no palette color blows out under 2.2 sun
+    // Cap luminance to ≤ 0.48 so no palette color blows out under 2.2 sun
     const r = ((hex >> 16) & 0xff) / 255;
     const g = ((hex >>  8) & 0xff) / 255;
     const b = ( hex        & 0xff) / 255;
     const lum = r * 0.299 + g * 0.587 + b * 0.114;
-    if (lum > 0.58) {
-        const s = 0.58 / lum;
+    if (lum > 0.48) {
+        const s = 0.48 / lum;
         return (Math.round(r * s * 255) << 16) | (Math.round(g * s * 255) << 8) | Math.round(b * s * 255);
     }
     return hex;

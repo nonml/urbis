@@ -373,8 +373,8 @@ async function shot(name, setup) {
 // Camera note: roads at dx%4==0 → world x = ...-11.5, -7.5, -3.5, 0.5, 4.5, 8.5, 12.5
 // Building blocks at dx = ±1,2,3 from each road
 
-// OVERVIEW — elevated isometric showing full city + road grid + terrain
-await shot('ss_overview',  { cx: 22, cy: 30, cz: 22, lx: 0, ly: 1, lz: 0, fov: 52 });
+// OVERVIEW — mid-elevation isometric, city fills the frame
+await shot('ss_overview',  { cx: 18, cy: 22, cz: 18, lx: 0, ly: 2, lz: 0, fov: 55 });
 
 // SKYLINE — dramatic low-angle from SW, full tower silhouette against sky
 await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46 });
@@ -382,8 +382,8 @@ await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 4
 // STREET — ground level, looking along E-W cross-street with buildings either side
 await shot('ss_street',    { cx: -18, cy: 1.2, cz: 0.5, lx: 4, ly: 4.5, lz: 0.5, fov: 68 });
 
-// PANORAMA — wide arc from NE, city + nature + water in frame
-await shot('ss_panorama',  { cx: 28, cy: 26, cz: -22, lx: -2, ly: 1, lz: 2, fov: 60 });
+// PANORAMA — wide arc from NE, city fills lower 2/3 of frame
+await shot('ss_panorama',  { cx: 22, cy: 18, cz: -18, lx: -1, ly: 2, lz: 1, fov: 62 });
 
 // DUSK — golden hour, warm orange sun from W, long shadows
 await shot('ss_dusk',      { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46, dusk: true });
