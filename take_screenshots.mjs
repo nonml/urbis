@@ -241,6 +241,13 @@ await page.evaluate(() => {
         clone.position.set(wx, 0.06, wz + lateral);
         clone.rotation.y = facing + Math.PI / 2;
       }
+      // Darken near-white car bodies (some Kenney models are cream/silver)
+      clone.traverse(c => {
+        if (c.isMesh && c.material?.color) {
+          const lum = c.material.color.r * 0.299 + c.material.color.g * 0.587 + c.material.color.b * 0.114;
+          if (lum > 0.70) c.material.color.multiplyScalar(0.52);
+        }
+      });
       r.scene.add(clone);
       carsPlaced++;
     }
@@ -355,8 +362,8 @@ await shot('ss_overview',  { cx: 22, cy: 30, cz: 22, lx: 0, ly: 1, lz: 0, fov: 5
 // SKYLINE — dramatic low-angle from SW, full tower silhouette against sky
 await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46 });
 
-// STREET — camera on road corridor (x=0.5), eye-level, looking north into city
-await shot('ss_street',    { cx: 0.5, cy: 3.2, cz: 18, lx: 0.5, ly: 3.5, lz: -12, fov: 75 });
+// STREET — ground level on road at city edge, looking north into canyon of towers
+await shot('ss_street',    { cx: 0.5, cy: 1.2, cz: 21, lx: 0.5, ly: 5.0, lz: -4, fov: 68 });
 
 // PANORAMA — wide arc from NE, city + nature + water in frame
 await shot('ss_panorama',  { cx: 28, cy: 26, cz: -22, lx: -2, ly: 1, lz: 2, fov: 60 });
