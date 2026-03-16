@@ -82,7 +82,7 @@ export async function createRenderer3D(game, canvas) {
     await loadThreeJS();
     return new Renderer3D(game, canvas);
 }
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
@@ -110,18 +110,18 @@ export class Renderer3D {
 
         // Scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0xb9d6ff);
-        this.scene.fog = new THREE.FogExp2(0xb9d6ff, 0.0001);
+        this.scene.background = new THREE.Color(0x87ceeb);
+        this.scene.fog = new THREE.FogExp2(0xa8d8ea, 0.0012);
 
         // Camera rig (Ticket B-2: Orbit + Follow + Collision)
-        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 300);
+        this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
         this.yaw = 0;
         this.pitch = -0.4;
         this.followDist = 8;
         this.targetFollowDist = 8;
         this.followHeight = 4;
         this.minFollowDist = 4;
-        this.maxFollowDist = 15;
+        this.maxFollowDist = 50;
         this.mouseSensitivity = 0.005;
         this.invertY = false;
         this.cameraCollision = true;
@@ -131,8 +131,8 @@ export class Renderer3D {
 
         // LOD thresholds (world units from camera to chunk center)
         // Full detail below LOD_FULL_DIST; terrain-only between FULL and TERRAIN_ONLY; hidden beyond FAR.
-        this.LOD_FULL_DIST = 40;
-        this.LOD_TERRAIN_ONLY_DIST = 100;
+        this.LOD_FULL_DIST = 60;
+        this.LOD_TERRAIN_ONLY_DIST = 150;
         
         // Camera mode settings (God vs Street)
         this.cameraMode = 'street'; // 'street' or 'god'
@@ -149,10 +149,10 @@ export class Renderer3D {
             pitchSpeed: 0.005
         };
         this.godCamera = {
-            pitch: -0.8,
-            followDist: 15,
-            followHeight: 12,
-            fov: 70,
+            pitch: -1.0,
+            followDist: 25,
+            followHeight: 20,
+            fov: 45,
             yawSpeed: 0.003,
             pitchSpeed: 0.003
         };
@@ -173,16 +173,52 @@ export class Renderer3D {
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
         this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
-        this.renderer.shadowMap.enabled = false;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.3;
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderScale = 1.0;
         this.setRenderScale(1.0);
 
-        // Lighting
-        this.ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+        // Lighting — hemisphere light for natural sky/ground fill
+        this.hemiLight = new THREE.HemisphereLight(0x9fd8fb, 0x4a7a3a, 0.9);
+        this.scene.add(this.hemiLight);
+
+        this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.4);
         this.scene.add(this.ambientLight);
-        this.sunLight = new THREE.DirectionalLight(0xffffff, 0.8);
-        this.sunLight.position.set(12, 20, 8);
+
+        // Primary sun light — tighter frustum for sharper nearby shadows
+        this.sunLight = new THREE.DirectionalLight(0xfffbe8, 1.8);
+        this.sunLight.position.set(30, 50, 20);
+        this.sunLight.castShadow = true;
+        this.sunLight.shadow.mapSize.width = 4096;
+        this.sunLight.shadow.mapSize.height = 4096;
+        this.sunLight.shadow.camera.near = 1;
+        this.sunLight.shadow.camera.far = 150;
+        this.sunLight.shadow.camera.left = -50;
+        this.sunLight.shadow.camera.right = 50;
+        this.sunLight.shadow.camera.top = 50;
+        this.sunLight.shadow.camera.bottom = -50;
+        this.sunLight.shadow.bias = -0.0005;
+        this.sunLight.shadow.normalBias = 0.03;
         this.scene.add(this.sunLight);
+
+        // Secondary distant sun — wider, softer shadows for distant objects
+        this.sunLightFar = new THREE.DirectionalLight(0xfff4e0, 0.4);
+        this.sunLightFar.position.set(30, 40, 20);
+        this.sunLightFar.castShadow = true;
+        this.sunLightFar.shadow.mapSize.width = 1024;
+        this.sunLightFar.shadow.mapSize.height = 1024;
+        this.sunLightFar.shadow.camera.near = 1;
+        this.sunLightFar.shadow.camera.far = 200;
+        this.sunLightFar.shadow.camera.left = -80;
+        this.sunLightFar.shadow.camera.right = 80;
+        this.sunLightFar.shadow.camera.top = 80;
+        this.sunLightFar.shadow.camera.bottom = -80;
+        this.sunLightFar.shadow.bias = -0.003;
+        this.sunLightFar.shadow.normalBias = 0.08;
+        this.scene.add(this.sunLightFar);
         
         // Day/Night cycle
         this.dayNightCycle = createDayNightCycle();
@@ -208,7 +244,12 @@ export class Renderer3D {
         // Particle system
         this.particleSystem = createParticleSystem(this.scene, this.renderer);
         window.particleSystem = this.particleSystem;
-        
+
+        // Post-processing composer (initialized async in _initPostProcessing)
+        this.composer = null;
+        this._sky = null;
+        this._sunPosition = new THREE.Vector3();
+
         // Internal
         this._mapHalfW = 0;
         this._mapHalfH = 0;
@@ -264,6 +305,13 @@ export class Renderer3D {
         // GLTF model library: type -> THREE.Group (set after async _preloadModels)
         this._gltfModels = new Map();
 
+        // Vegetation model library: modelName -> THREE.Group
+        this._vegetationModels = new Map();
+        // Road model library: modelName -> THREE.Group
+        this._roadModels = new Map();
+        // Street prop model library: propName -> THREE.Group
+        this._propModels = new Map();
+
         // Vehicle GLTF model library: vehicleType -> THREE.Group
         this._vehicleModels = new Map();
         // Vehicle mesh group (updated every frame from vehicleSystem)
@@ -287,7 +335,18 @@ export class Renderer3D {
             new THREE.MeshBasicMaterial({ visible: false })
         );
         this._groundPlane.rotation.x = -Math.PI / 2;
+        this._groundPlane.position.y = 0.12; // Match terrain surface for raycasting
         this.scene.add(this._groundPlane);
+
+        // Visible ground beneath terrain — prevents seeing black void
+        const visibleGround = new THREE.Mesh(
+            new THREE.PlaneGeometry(2000, 2000),
+            new THREE.MeshStandardMaterial({ color: 0x3d5c3a, roughness: 1.0 })
+        );
+        visibleGround.rotation.x = -Math.PI / 2;
+        visibleGround.position.y = -0.3;
+        visibleGround.receiveShadow = true;
+        this.scene.add(visibleGround);
 
         this.rebuildWorld();
         this.resize();
@@ -303,6 +362,10 @@ export class Renderer3D {
         this.renderer.setSize(rect.width, rect.height, false);
         this.camera.aspect = rect.width / rect.height;
         this.camera.updateProjectionMatrix();
+        // Resize post-processing composer
+        if (this.composer) {
+            this.composer.setSize(rect.width, rect.height);
+        }
     }
 
     handleWheel(e) {
@@ -365,6 +428,28 @@ export class Renderer3D {
     // -----------------------------------------------------------------------
     // Kenney GLB model loader
     // -----------------------------------------------------------------------
+    /** Road model paths — keyed by connectivity bitmask (N=1,E=2,S=4,W=8) */
+    static ROAD_MODEL_MAP = {
+        'road-straight':    'assets/models/kenney_roads/road-straight.glb',
+        'road-bend':        'assets/models/kenney_roads/road-bend.glb',
+        'road-intersection':'assets/models/kenney_roads/road-intersection.glb',
+        'road-crossroad':   'assets/models/kenney_roads/road-crossroad.glb',
+        'road-end':         'assets/models/kenney_roads/road-end.glb',
+    };
+
+    /** Street prop model paths */
+    static PROP_MODEL_MAP = {
+        'light-square':       'assets/models/kenney_roads/light-square.glb',
+        'construction-cone':  'assets/models/kenney_roads/construction-cone.glb',
+    };
+
+    /** Vegetation model paths */
+    static VEGETATION_MODEL_MAP = {
+        'tree-large':  'assets/models/kenney_suburban/tree-large.glb',
+        'tree-small':  'assets/models/kenney_suburban/tree-small.glb',
+        'planter':     'assets/models/kenney_suburban/planter.glb',
+    };
+
     /** Maps game building types → Kenney GLB asset paths (in public/) */
     static VEHICLE_MODEL_MAP = {
         'sedan':           'assets/models/kenney_vehicles/sedan.glb',
@@ -390,33 +475,120 @@ export class Renderer3D {
         'cctv-network':      'assets/models/kenney_suburban/building-type-d.glb',
         'counterintel':      'assets/models/kenney_commercial/building-c.glb',
         'propaganda-office': 'assets/models/kenney_commercial/building-e.glb',
+        // Extended building types
+        'hospital':          'assets/models/kenney_commercial/building-f.glb',
+        'fire-station':      'assets/models/kenney_commercial/building-g.glb',
+        'stadium':           'assets/models/kenney_commercial/building-skyscraper-d.glb',
+        'university':        'assets/models/kenney_commercial/building-h.glb',
+        'research-lab':      'assets/models/kenney_commercial/building-i.glb',
+        'airport':           'assets/models/kenney_commercial/building-skyscraper-b.glb',
+        'port':              'assets/models/kenney_commercial/building-j.glb',
+        'library':           'assets/models/kenney_commercial/building-k.glb',
+        'shopping-mall':     'assets/models/kenney_commercial/building-skyscraper-c.glb',
+        'apartment':         'assets/models/kenney_commercial/building-l.glb',
+        'factory':           'assets/models/kenney_commercial/building-m.glb',
+        'water-treatment':   'assets/models/kenney_commercial/building-n.glb',
+        'nuclear-plant':     'assets/models/kenney_commercial/building-skyscraper-e.glb',
+        'power-plant':       'assets/models/kenney_suburban/building-type-h.glb',
+        'substation':        'assets/models/kenney_suburban/building-type-e.glb',
+        // Extended types mapped to available commercial models (reuse existing)
+        'hotel':             'assets/models/kenney_commercial/building-skyscraper-a.glb',
+        'theater':           'assets/models/kenney_commercial/building-a.glb',
+        'museum':            'assets/models/kenney_commercial/building-b.glb',
+        'courthouse':        'assets/models/kenney_commercial/building-c.glb',
+        'prison':            'assets/models/kenney_commercial/building-d.glb',
+        'restaurant':        'assets/models/kenney_suburban/building-type-f.glb',
+        'nightclub':         'assets/models/kenney_suburban/building-type-i.glb',
+        'recycling-plant':   'assets/models/kenney_commercial/building-e.glb',
+        'solar-farm':        'assets/models/kenney_commercial/low-detail-building-a.glb',
+        'wind-farm':         'assets/models/kenney_commercial/low-detail-building-b.glb',
     };
+
+    /** Variant models for 'house' type — all 21 kenney_suburban building types */
+    static HOUSE_VARIANTS = [
+        'assets/models/kenney_suburban/building-type-a.glb',
+        'assets/models/kenney_suburban/building-type-b.glb',
+        'assets/models/kenney_suburban/building-type-c.glb',
+        'assets/models/kenney_suburban/building-type-d.glb',
+        'assets/models/kenney_suburban/building-type-e.glb',
+        'assets/models/kenney_suburban/building-type-f.glb',
+        'assets/models/kenney_suburban/building-type-g.glb',
+        'assets/models/kenney_suburban/building-type-h.glb',
+        'assets/models/kenney_suburban/building-type-i.glb',
+        'assets/models/kenney_suburban/building-type-j.glb',
+        'assets/models/kenney_suburban/building-type-k.glb',
+        'assets/models/kenney_suburban/building-type-l.glb',
+        'assets/models/kenney_suburban/building-type-m.glb',
+        'assets/models/kenney_suburban/building-type-n.glb',
+        'assets/models/kenney_suburban/building-type-o.glb',
+        'assets/models/kenney_suburban/building-type-p.glb',
+        'assets/models/kenney_suburban/building-type-q.glb',
+        'assets/models/kenney_suburban/building-type-r.glb',
+        'assets/models/kenney_suburban/building-type-s.glb',
+        'assets/models/kenney_suburban/building-type-t.glb',
+        'assets/models/kenney_suburban/building-type-u.glb',
+    ];
 
     /** Uniform scale per type so models fit inside a 1-unit tile */
     static MODEL_SCALE = {
-        'town-hall': 0.28,
-        default:     0.38,
+        // Skyscrapers — tall iconic downtown buildings
+        'town-hall':        1.5,
+        'apartment':        1.45,
+        'shopping-mall':    1.7,
+        'hotel':            1.5,
+        'stadium':          1.4,
+        'university':       1.3,
+        'airport':          1.5,
+        'nuclear-plant':    1.3,
+        // Mid-rise commercial
+        'hospital':         1.0,
+        'school':           0.9,
+        'market':           0.95,
+        'police-station':   0.9,
+        'fire-station':     0.9,
+        'research-lab':     1.05,
+        'library':          0.9,
+        'theater':          1.0,
+        'museum':           1.05,
+        'courthouse':       1.0,
+        'prison':           0.95,
+        // Industrial
+        'warehouse':        0.85,
+        'factory':          0.95,
+        'lumber-mill':      0.8,
+        // Default residential
+        default:            0.72,
     };
 
     /** Map terrain type constant -> texture asset path */
     static get TERRAIN_TEXTURE_MAP() {
-        return {
-            [TERRAIN_GRASS]:    'assets/textures/terrain/grass_color.jpg',
-            [TERRAIN_FOREST]:   'assets/textures/terrain/grass_color.jpg',
-            [TERRAIN_MOUNTAIN]: 'assets/textures/terrain/rock_color.jpg',
-            [TERRAIN_WATER]:    null, // water uses procedural color
-            0:                  'assets/textures/terrain/dirt_color.jpg', // default fallback
-        };
+        // Returning null for all types — pure vertex colors give cleaner city-sim look
+        return {};
+    }
+
+    /** Normal maps for terrain textures */
+    static get TERRAIN_NORMAL_MAP() {
+        return {};
     }
 
     async _preloadAssets() {
         const tl = new THREE.TextureLoader();
+        this._terrainNormals = new Map();
         const loadTex = (terrainKey, url) => new Promise((resolve) => {
             tl.load(url, (tex) => {
                 tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
                 tex.repeat.set(1, 1);
                 tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
                 this._terrainTextures.set(terrainKey, tex);
+                resolve();
+            }, undefined, () => resolve());
+        });
+        const loadNormal = (terrainKey, url) => new Promise((resolve) => {
+            tl.load(url, (tex) => {
+                tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+                tex.repeat.set(1, 1);
+                tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+                this._terrainNormals.set(terrainKey, tex);
                 resolve();
             }, undefined, () => resolve());
         });
@@ -429,9 +601,13 @@ export class Renderer3D {
             // three/addons not available — keep box fallback
         }
 
-        const jobs = Object.entries(Renderer3D.TERRAIN_TEXTURE_MAP)
-            .filter(([, url]) => url != null)
-            .map(([k, url]) => loadTex(Number(k), url));
+        const jobs = [
+            ...Object.entries(Renderer3D.TERRAIN_TEXTURE_MAP)
+                .filter(([, url]) => url != null)
+                .map(([k, url]) => loadTex(Number(k), url)),
+            ...Object.entries(Renderer3D.TERRAIN_NORMAL_MAP)
+                .map(([k, url]) => loadNormal(Number(k), url)),
+        ];
 
         if (GLTFLoader) {
             const silentManager = new THREE.LoadingManager();
@@ -467,13 +643,206 @@ export class Renderer3D {
             for (const [type, url] of Object.entries(Renderer3D.MODEL_MAP)) {
                 jobs.push(loadBuilding(type, url));
             }
+            // Load house variants for visual diversity
+            for (let i = 0; i < Renderer3D.HOUSE_VARIANTS.length; i++) {
+                const url = Renderer3D.HOUSE_VARIANTS[i];
+                const variantKey = `house-variant-${i}`;
+                jobs.push(loadBuilding(variantKey, url));
+            }
             for (const [type, url] of Object.entries(Renderer3D.VEHICLE_MODEL_MAP)) {
                 jobs.push(loadVehicle(type, url));
+            }
+            // Load road models
+            const loadRoad = (name, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    root.scale.setScalar(0.5);
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._roadModels.set(name, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            for (const [name, url] of Object.entries(Renderer3D.ROAD_MODEL_MAP)) {
+                jobs.push(loadRoad(name, url));
+            }
+            // Load street prop models
+            const loadProp = (name, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    root.scale.setScalar(0.35);
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._propModels.set(name, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            for (const [name, url] of Object.entries(Renderer3D.PROP_MODEL_MAP)) {
+                jobs.push(loadProp(name, url));
+            }
+            // Load vegetation models
+            const loadVegetation = (name, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    root.scale.setScalar(1.4);
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._vegetationModels.set(name, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            for (const [name, url] of Object.entries(Renderer3D.VEGETATION_MODEL_MAP)) {
+                jobs.push(loadVegetation(name, url));
             }
         }
 
         await Promise.all(jobs);
+
+        // Initialize post-processing and sky (async addon imports)
+        await this._initPostProcessing();
+        this._initEnvMap(); // non-blocking HDR env map
+
         this.rebuildWorld();
+    }
+
+    /**
+     * Initialize post-processing pipeline (EffectComposer + Bloom) and procedural Sky.
+     * Imports Three.js addons lazily to match the lazy-load pattern used elsewhere.
+     */
+    async _initPostProcessing() {
+        try {
+            const imports = await Promise.allSettled([
+                import('three/addons/postprocessing/EffectComposer.js'),
+                import('three/addons/postprocessing/RenderPass.js'),
+                import('three/addons/postprocessing/UnrealBloomPass.js'),
+                import('three/addons/objects/Sky.js'),
+                import('three/addons/postprocessing/SSAOPass.js'),
+            ]);
+            const [EffectComposerMod, RenderPassMod, BloomMod, SkyMod, SSAOMod] = imports.map(r => r.status === 'fulfilled' ? r.value : null);
+            if (!EffectComposerMod || !RenderPassMod || !BloomMod || !SkyMod) throw new Error('core addons missing');
+            const { EffectComposer } = EffectComposerMod;
+            const { RenderPass } = RenderPassMod;
+            const { UnrealBloomPass } = BloomMod;
+            const { Sky } = SkyMod;
+
+            // --- Effect Composer ---
+            const rect = this.canvas.getBoundingClientRect();
+            this.composer = new EffectComposer(this.renderer);
+            this.composer.setSize(rect.width, rect.height);
+
+            const renderPass = new RenderPass(this.scene, this.camera);
+            this.composer.addPass(renderPass);
+
+            // SSAO — ambient occlusion for contact shadows and depth (optional)
+            if (SSAOMod) {
+                const { SSAOPass } = SSAOMod;
+                const ssaoPass = new SSAOPass(this.scene, this.camera, rect.width, rect.height);
+                ssaoPass.kernelRadius = 8;
+                ssaoPass.minDistance = 0.005;
+                ssaoPass.maxDistance = 0.3;
+                this.composer.addPass(ssaoPass);
+                this._ssaoPass = ssaoPass;
+            }
+
+            // Bloom — subtle glow on bright surfaces (sun, water glints)
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(rect.width, rect.height),
+                0.25,   // strength (a bit more visible)
+                0.5,    // radius
+                0.80    // threshold
+            );
+            this.composer.addPass(bloomPass);
+            this._bloomPass = bloomPass;
+
+            // --- Procedural Sky ---
+            const sky = new Sky();
+            sky.scale.setScalar(400);
+            sky.frustumCulled = false;
+            sky.renderOrder = -1; // Render before everything else
+            this.scene.add(sky);
+            this._sky = sky;
+
+            const skyUniforms = sky.material.uniforms;
+            skyUniforms['turbidity'].value = 4;        // clearer, bluer sky
+            skyUniforms['rayleigh'].value = 3;          // more scattering = deeper blue
+            skyUniforms['mieCoefficient'].value = 0.003;
+            skyUniforms['mieDirectionalG'].value = 0.85;
+
+            // Initial sun position (will be updated by day/night cycle)
+            this._updateSkyForTime(12); // noon
+
+            // Keep scene.background as fallback color — sky mesh renders on top
+
+        } catch (e) {
+            // Addons not available — fall back to direct rendering (no post-processing)
+            console.warn('Post-processing addons not available, using direct rendering:', e.message);
+        }
+    }
+
+    /**
+     * Load HDR environment map from Poly Haven and apply to scene.
+     * Improves reflections on water, glass buildings, and provides IBL lighting.
+     */
+    async _initEnvMap() {
+        try {
+            const { RGBELoader } = await import('three/addons/loaders/RGBELoader.js');
+            const loader = new RGBELoader();
+            loader.load('assets/env.hdr', (hdr) => {
+                const pmrem = new THREE.PMREMGenerator(this.renderer);
+                pmrem.compileEquirectangularShader();
+                const envMap = pmrem.fromEquirectangular(hdr).texture;
+                this.scene.environment = envMap;  // IBL for all materials
+                pmrem.dispose();
+                hdr.dispose();
+            }, undefined, () => {}); // silent fail if not found
+        } catch { /* addon not available */ }
+    }
+
+    /**
+     * Update procedural sky sun position based on time of day (0-24).
+     */
+    _updateSkyForTime(timeOfDay) {
+        if (!this._sky) return;
+
+        // Map time (0-24h) to sun elevation angle
+        // Sun rises at 6h, peaks at 12h, sets at 18h
+        const sunPhase = ((timeOfDay - 6) / 12) * Math.PI; // 0 at 6h, PI at 18h
+        const elevation = Math.sin(sunPhase); // -1..1, peaks at noon
+        const azimuth = 0.25; // fixed azimuth for consistent shadow direction
+
+        // Below horizon at night
+        const phi = THREE.MathUtils.degToRad(90 - elevation * 60); // 30° to 150° range
+        const theta = THREE.MathUtils.degToRad(180 * azimuth);
+
+        this._sunPosition.setFromSphericalCoords(1, phi, theta);
+        this._sky.material.uniforms['sunPosition'].value.copy(this._sunPosition);
+
+        // Also move the directional lights to match sky sun position
+        if (this.sunLight) {
+            const lightDist = 40;
+            this.sunLight.position.set(
+                this._sunPosition.x * lightDist,
+                Math.max(5, this._sunPosition.y * lightDist),
+                this._sunPosition.z * lightDist
+            );
+        }
+        if (this.sunLightFar) {
+            const lightDist = 40;
+            this.sunLightFar.position.set(
+                this._sunPosition.x * lightDist,
+                Math.max(5, this._sunPosition.y * lightDist),
+                this._sunPosition.z * lightDist
+            );
+        }
     }
 
     _disposeChunkEntry(entry) {
@@ -487,52 +856,374 @@ export class Renderer3D {
         });
     }
 
+    /**
+     * Build animated water plane(s) for a set of water tiles.
+     * Creates a single flat plane per contiguous row of water tiles, with a
+     * custom vertex shader for gentle wave animation.
+     */
+    _buildWaterMeshForTiles(tiles) {
+        const meshes = [];
+        // Create one plane per water tile — cheap with shared geometry + material
+        const geom = new THREE.PlaneGeometry(1, 1, 8, 8);
+        geom.rotateX(-Math.PI / 2);
+
+        // Shared animated water material
+        if (!this._waterMaterial) {
+            this._waterMaterial = new THREE.MeshPhysicalMaterial({
+                color: 0x1565c0,       // deep ocean blue
+                transparent: true,
+                opacity: 0.82,
+                roughness: 0.05,       // very reflective
+                metalness: 0.1,
+                transmission: 0.4,
+                thickness: 1.2,
+                clearcoat: 1.0,
+                clearcoatRoughness: 0.05,
+                envMapIntensity: 1.5,
+                side: THREE.FrontSide,
+            });
+            // Inject vertex displacement for waves
+            this._waterMaterial.onBeforeCompile = (shader) => {
+                shader.uniforms.uTime = { value: 0 };
+                this._waterShaderRef = shader;
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <common>',
+                    `#include <common>
+                    uniform float uTime;`
+                );
+                shader.vertexShader = shader.vertexShader.replace(
+                    '#include <begin_vertex>',
+                    `#include <begin_vertex>
+                    float wave1 = sin(position.x * 3.0 + uTime * 1.2) * 0.06;
+                    float wave2 = sin(position.z * 2.5 + uTime * 0.9) * 0.05;
+                    float wave3 = cos((position.x + position.z) * 2.0 + uTime * 0.7) * 0.03;
+                    float wave4 = sin(position.x * 6.0 - position.z * 3.0 + uTime * 2.0) * 0.015;
+                    transformed.y += wave1 + wave2 + wave3 + wave4;`
+                );
+            };
+        }
+
+        const dummy = new THREE.Object3D();
+        const instancedMesh = new THREE.InstancedMesh(geom, this._waterMaterial, tiles.length);
+        instancedMesh.receiveShadow = true;
+        instancedMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+
+        for (let i = 0; i < tiles.length; i++) {
+            const tile = tiles[i];
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+            dummy.position.set(wx, -0.35, wz);
+            dummy.updateMatrix();
+            instancedMesh.setMatrixAt(i, dummy.matrix);
+        }
+        instancedMesh.instanceMatrix.needsUpdate = true;
+        meshes.push(instancedMesh);
+
+        // Track water meshes for time uniform updates
+        if (!this._waterMeshes) this._waterMeshes = [];
+        this._waterMeshes.push(instancedMesh);
+
+        return meshes;
+    }
+
+    /**
+     * Build 3D road models for road tiles based on neighbor connectivity.
+     * Neighbor bitmask: N=1, E=2, S=4, W=8
+     */
+    _buildRoadMeshesForTiles(tiles, bounds) {
+        const objects = [];
+        const hash = (x, y, salt) => {
+            let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
+            h = ((h ^ (h >> 13)) * 1274126177) | 0;
+            return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+        };
+
+        for (const tile of tiles) {
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+
+            // Calculate connectivity bitmask from neighbors
+            const n = this.game.map.getTileAt(tile.x, tile.y - 1) === TERRAIN_ROAD ? 1 : 0;
+            const e = this.game.map.getTileAt(tile.x + 1, tile.y) === TERRAIN_ROAD ? 2 : 0;
+            const s = this.game.map.getTileAt(tile.x, tile.y + 1) === TERRAIN_ROAD ? 4 : 0;
+            const w = this.game.map.getTileAt(tile.x - 1, tile.y) === TERRAIN_ROAD ? 8 : 0;
+            const mask = n | e | s | w;
+            const count = ((mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1));
+
+            let modelName = 'road-straight';
+            let rotation = 0;
+
+            if (count === 4) {
+                modelName = 'road-crossroad';
+                rotation = 0;
+            } else if (count === 3) {
+                modelName = 'road-intersection';
+                // T-junction: rotate so the missing direction is at the back
+                if (!(mask & 1)) rotation = Math.PI;       // missing N -> face S
+                else if (!(mask & 2)) rotation = -Math.PI / 2; // missing E -> face W
+                else if (!(mask & 4)) rotation = 0;         // missing S -> face N
+                else rotation = Math.PI / 2;                  // missing W -> face E
+            } else if (count === 2) {
+                // Two neighbors: straight or bend
+                if ((mask & 5) === 5 || (mask & 10) === 10) {
+                    // Opposite sides: straight
+                    modelName = 'road-straight';
+                    rotation = (mask & 5) === 5 ? 0 : Math.PI / 2; // N-S or E-W
+                } else {
+                    // Adjacent: bend
+                    modelName = 'road-bend';
+                    if ((mask & 3) === 3) rotation = 0;           // N+E
+                    else if ((mask & 6) === 6) rotation = Math.PI / 2;  // E+S
+                    else if ((mask & 12) === 12) rotation = Math.PI;     // S+W
+                    else rotation = -Math.PI / 2;                         // W+N
+                }
+            } else if (count === 1) {
+                modelName = 'road-end';
+                if (mask & 1) rotation = 0;            // N
+                else if (mask & 2) rotation = Math.PI / 2;  // E
+                else if (mask & 4) rotation = Math.PI;      // S
+                else rotation = -Math.PI / 2;                // W
+            } else {
+                // Isolated road: just use straight
+                modelName = 'road-straight';
+            }
+
+            const model = this._roadModels.get(modelName);
+            if (model) {
+                const clone = model.clone(true);
+                clone.position.set(wx, 0.09, wz);
+                clone.rotation.y = rotation;
+                clone.traverse((child) => {
+                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+                });
+                objects.push(clone);
+            } else {
+                // Fallback: flat gray box
+                const geom = new THREE.BoxGeometry(1, 0.18, 1);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0 });
+                const mesh = new THREE.Mesh(geom, mat);
+                mesh.position.set(wx, 0.09, wz);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                objects.push(mesh);
+            }
+
+            // Street props: place a light every ~5 tiles (deterministic)
+            if (hash(tile.x, tile.y, 200) < 0.18) {
+                const lightModel = this._propModels.get('light-square');
+                if (lightModel) {
+                    const lightClone = lightModel.clone(true);
+                    const side = hash(tile.x, tile.y, 210) > 0.5 ? 0.45 : -0.45;
+                    lightClone.position.set(wx + side, 0.1, wz + side * 0.3);
+                    lightClone.rotation.y = hash(tile.x, tile.y, 220) * Math.PI * 2;
+                    lightClone.traverse((child) => {
+                        if (child.isMesh) { child.castShadow = true; }
+                    });
+                    objects.push(lightClone);
+                }
+            }
+        }
+        return objects;
+    }
+
+    /** Height per terrain type for the smooth heightmap */
+    static TERRAIN_HEIGHT = {
+        [TERRAIN_WATER]: -0.3,
+        [TERRAIN_GRASS]: 0.05,
+        [TERRAIN_FOREST]: 0.18,
+        [TERRAIN_MOUNTAIN]: 1.4,
+        [TERRAIN_ROAD]: 0.04,
+        [TERRAIN_SIDEWALK]: 0.06,
+        [TERRAIN_PARK]: 0.07,
+    };
+
     _buildTerrainMeshesForChunk(bounds) {
-        const byTerrain = new Map();
+        const meshes = [];
+        const waterTiles = [];
+        const roadTiles = [];
+
+        const width = bounds.maxX - bounds.minX + 1;
+        const height = bounds.maxY - bounds.minY + 1;
+
+        // Collect water/road tiles separately; build a smooth heightmap for the rest
+        const tileGrid = [];
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            const row = [];
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const terrain = this.game.map.getTileAt(x, y);
-                if (!byTerrain.has(terrain)) byTerrain.set(terrain, []);
-                byTerrain.get(terrain).push({ x, y });
+                row.push(terrain);
+                if (terrain === TERRAIN_WATER) waterTiles.push({ x, y });
+                if (terrain === TERRAIN_ROAD) roadTiles.push({ x, y });
+            }
+            tileGrid.push(row);
+        }
+
+        // Water: animated plane
+        if (waterTiles.length > 0) {
+            meshes.push(...this._buildWaterMeshForTiles(waterTiles));
+        }
+
+        // Roads: 3D road models
+        if (roadTiles.length > 0 && this._roadModels.size > 0) {
+            meshes.push(...this._buildRoadMeshesForTiles(roadTiles, bounds));
+        }
+
+        // --- Smooth heightmap terrain ---
+        // One extra vertex per edge for smooth interpolation (segs = tiles)
+        const segsX = width;
+        const segsZ = height;
+        const geom = new THREE.PlaneGeometry(width, height, segsX, segsZ);
+        geom.rotateX(-Math.PI / 2);
+
+        const pos = geom.getAttribute('position');
+        const colors = new Float32Array(pos.count * 3);
+        const terrainHeights = Renderer3D.TERRAIN_HEIGHT;
+        const tmpColor = new THREE.Color();
+
+        // Helper: get terrain height with bounds clamping
+        const getH = (gx, gy) => {
+            const t = this.game.map.getTileAt(
+                Math.max(0, Math.min(this.game.map.width - 1, gx)),
+                Math.max(0, Math.min(this.game.map.height - 1, gy))
+            );
+            return terrainHeights[t] ?? 0.05;
+        };
+
+        const getColor = (gx, gy) => {
+            const t = this.game.map.getTileAt(
+                Math.max(0, Math.min(this.game.map.width - 1, gx)),
+                Math.max(0, Math.min(this.game.map.height - 1, gy))
+            );
+            return terrainTint(t);
+        };
+
+        // Offset: position the plane so its tiles align with world coordinates
+        const originX = bounds.minX - this._mapHalfW;
+        const originZ = bounds.minY - this._mapHalfH;
+
+        for (let iz = 0; iz <= segsZ; iz++) {
+            for (let ix = 0; ix <= segsX; ix++) {
+                const vi = iz * (segsX + 1) + ix;
+
+                // World position
+                const wx = originX + ix;
+                const wz = originZ + iz;
+
+                // Grid position (tile coords)
+                const gx = bounds.minX + ix;
+                const gy = bounds.minY + iz;
+
+                // Smooth height: average with neighbors for interpolation
+                const h0 = getH(gx, gy);
+                const hN = getH(gx, gy - 1);
+                const hS = getH(gx, gy + 1);
+                const hE = getH(gx + 1, gy);
+                const hW = getH(gx - 1, gy);
+                const smoothH = h0 * 0.5 + (hN + hS + hE + hW) * 0.125;
+
+                // Water tiles should be flat and low (water plane handles visuals)
+                const t = this.game.map.getTileAt(
+                    Math.min(gx, this.game.map.width - 1),
+                    Math.min(gy, this.game.map.height - 1)
+                );
+                const finalH = t === TERRAIN_WATER ? -0.2 : smoothH;
+
+                pos.setXYZ(vi, wx, finalH, wz);
+
+                // Vertex color based on terrain type
+                tmpColor.setHex(getColor(gx, gy));
+                colors[vi * 3] = tmpColor.r;
+                colors[vi * 3 + 1] = tmpColor.g;
+                colors[vi * 3 + 2] = tmpColor.b;
             }
         }
 
-        const meshes = [];
-        const dummy = new THREE.Object3D();
+        pos.needsUpdate = true;
+        geom.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+        geom.computeVertexNormals();
 
-        for (const [terrain, tiles] of byTerrain.entries()) {
-            if (tiles.length === 0) continue;
-            const isWater = terrain === TERRAIN_WATER;
-            const geom = new THREE.BoxGeometry(1, 0.12, 1);
+        // Material: vertex colors blended with tiling PBR terrain texture (1 repeat per tile)
+        // Determine terrain texture: prefer grass/forest unless heavily mountainous
+        const typeCount = new Map();
+        for (const row of tileGrid) for (const t of row) typeCount.set(t, (typeCount.get(t) || 0) + 1);
+        const totalNonWater = [...typeCount.entries()].filter(([t]) => t !== TERRAIN_WATER).reduce((s, [, c]) => s + c, 0);
+        const mountainFrac = (typeCount.get(TERRAIN_MOUNTAIN) || 0) / Math.max(1, totalNonWater);
+        // Only use rock texture if chunk is >60% mountain
+        const dominantTerrain = mountainFrac > 0.6 ? TERRAIN_MOUNTAIN : TERRAIN_GRASS;
 
-            const tex = this._terrainTextures.get(terrain) ?? this._terrainTextures.get(0);
-            let mat;
-            if (isWater) {
-                mat = new THREE.MeshLambertMaterial({ color: 0x4da6ff, transparent: true, opacity: 0.82 });
-            } else if (tex) {
-                const tint = terrainTint(terrain);
-                mat = new THREE.MeshLambertMaterial({ map: tex, color: tint });
-            } else {
-                mat = new THREE.MeshLambertMaterial({ color: terrainHex(terrain) });
-            }
+        const cloneTex = (src) => {
+            if (!src) return null;
+            const t = src.clone();
+            t.wrapS = t.wrapT = THREE.RepeatWrapping;
+            t.repeat.set(width, height);
+            t.needsUpdate = true;
+            return t;
+        };
+        const baseTex = this._terrainTextures.get(dominantTerrain) ?? this._terrainTextures.get(TERRAIN_GRASS) ?? this._terrainTextures.get(0);
+        const baseNorm = this._terrainNormals?.get(dominantTerrain) ?? this._terrainNormals?.get(TERRAIN_GRASS);
+        const tex = cloneTex(baseTex);
+        const normTex = cloneTex(baseNorm);
 
-            const mesh = new THREE.InstancedMesh(geom, mat, tiles.length);
-            mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        const mat = new THREE.MeshStandardMaterial({
+            vertexColors: true,
+            map: tex || null,
+            normalMap: normTex || null,
+            normalScale: new THREE.Vector2(0.6, 0.6),
+            roughness: 0.88,
+            metalness: 0.0,
+            envMapIntensity: 0.4,
+        });
 
-            for (let i = 0; i < tiles.length; i++) {
-                const tile = tiles[i];
+        const terrainMesh = new THREE.Mesh(geom, mat);
+        terrainMesh.castShadow = false;
+        terrainMesh.receiveShadow = true;
+        meshes.push(terrainMesh);
+
+        // Road fallback: flat asphalt slabs for roads when no GLTF models loaded
+        if (roadTiles.length > 0 && this._roadModels.size === 0) {
+            // Asphalt base — dark gray with slight roughness variation
+            const roadGeom = new THREE.PlaneGeometry(1, 1);
+            roadGeom.rotateX(-Math.PI / 2);
+            const roadMat = new THREE.MeshStandardMaterial({
+                color: 0x323232,  // dark asphalt
+                roughness: 0.95,
+                metalness: 0.0,
+            });
+            const roadMesh = new THREE.InstancedMesh(roadGeom, roadMat, roadTiles.length);
+            roadMesh.receiveShadow = true;
+            roadMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < roadTiles.length; i++) {
+                const tile = roadTiles[i];
                 const wx = tile.x - this._mapHalfW + 0.5;
                 const wz = tile.y - this._mapHalfH + 0.5;
-                dummy.position.set(wx, isWater ? -0.06 : 0, wz);
-                dummy.scale.set(1, 1, 1);
+                dummy.position.set(wx, 0.09, wz);
                 dummy.updateMatrix();
-                mesh.setMatrixAt(i, dummy.matrix);
+                roadMesh.setMatrixAt(i, dummy.matrix);
             }
-
-            mesh.instanceMatrix.needsUpdate = true;
-            meshes.push(mesh);
+            roadMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(roadMesh);
         }
+
         return meshes;
+    }
+
+    /** Returns the smoothed terrain Y for a given tile (matches heightmap vertex logic) */
+    _smoothTerrainY(tx, ty) {
+        const th = Renderer3D.TERRAIN_HEIGHT;
+        const getH = (x, y) => {
+            const t = this.game.map.getTileAt(
+                Math.max(0, Math.min(this.game.map.width - 1, x)),
+                Math.max(0, Math.min(this.game.map.height - 1, y))
+            );
+            return th[t] ?? 0.1;
+        };
+        const h0 = getH(tx, ty);
+        const hN = getH(tx, ty - 1);
+        const hS = getH(tx, ty + 1);
+        const hE = getH(tx + 1, ty);
+        const hW = getH(tx - 1, ty);
+        return h0 * 0.5 + (hN + hS + hE + hW) * 0.125;
     }
 
     _buildBuildingMeshesForChunk(bounds, buildings) {
@@ -541,13 +1232,63 @@ export class Renderer3D {
 
         for (const b of buildings) {
             if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
-            const model = this._gltfModels.get(b.type);
+            // For houses, select a variant model based on building id for visual diversity
+            let model = this._gltfModels.get(b.type);
+            if (b.type === 'house' && Renderer3D.HOUSE_VARIANTS.length > 0) {
+                const variantIdx = (b.id || 0) % Renderer3D.HOUSE_VARIANTS.length;
+                const variantModel = this._gltfModels.get(`house-variant-${variantIdx}`);
+                if (variantModel) model = variantModel;
+            }
             if (model) {
                 const clone = model.clone(true);
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
-                clone.position.set(wx, 0, wz);
+                const terrainY = this._smoothTerrainY(b.x, b.y);
+                clone.position.set(wx, terrainY, wz);
                 clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
+                const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
+                // Slightly darker roof color for contrast
+                const roofColor = bldColor.clone().multiplyScalar(0.72);
+                clone.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if (child.material) {
+                            const applyMat = (m) => {
+                                if (!m.color) return m;
+                                const nm = m.clone();
+                                // Recolor all light-colored (non-dark) meshes
+                                const brightness = nm.color.r * 0.299 + nm.color.g * 0.587 + nm.color.b * 0.114;
+                                if (brightness > 0.25) {
+                                    // Assign palette color based on mesh role
+                                    const box = new THREE.Box3().setFromObject(child);
+                                    const size = box.getSize(new THREE.Vector3());
+                                    const isSmall = size.x < 0.15 && size.z < 0.15;
+                                    if (isSmall) {
+                                        // Window: emissive yellow
+                                        nm.color.set(0xffee88);
+                                        nm.emissive = new THREE.Color(0xffcc44);
+                                        nm.emissiveIntensity = 0.6;
+                                    } else if (size.y < 0.08) {
+                                        // Flat/roof mesh
+                                        nm.color.set(roofColor);
+                                    } else {
+                                        nm.color.set(bldColor);
+                                    }
+                                    nm.roughness = 0.6;
+                                    nm.metalness = 0.05;
+                                    nm.envMapIntensity = 0.8;
+                                }
+                                return nm;
+                            };
+                            if (Array.isArray(child.material)) {
+                                child.material = child.material.map(applyMat);
+                            } else {
+                                child.material = applyMat(child.material);
+                            }
+                        }
+                    }
+                });
                 objects.push(clone);
             } else {
                 if (!boxGroups.has(b.type)) boxGroups.set(b.type, []);
@@ -559,15 +1300,18 @@ export class Renderer3D {
         const dummy = new THREE.Object3D();
         for (const [type, arr] of boxGroups.entries()) {
             if (arr.length === 0) continue;
-            const h = (BUILDING_3D[type]?.height ?? 0.6);
+            const h = (BUILDING_3D[type]?.height ?? 0.6) * 3.5;
             const geom = new THREE.BoxGeometry(0.85, h, 0.85);
-            const mat = new THREE.MeshLambertMaterial({ color: buildingHex(type) });
+            const mat = new THREE.MeshStandardMaterial({ color: buildingHex(type), roughness: 0.7, metalness: 0.05 });
             const mesh = new THREE.InstancedMesh(geom, mat, arr.length);
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
             for (let i = 0; i < arr.length; i++) {
                 const b = arr[i];
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
-                dummy.position.set(wx, h / 2, wz);
+                const terrainY = this._smoothTerrainY(b.x, b.y);
+                dummy.position.set(wx, h / 2 + terrainY, wz);
                 dummy.rotation.y = ((b.rotation ?? ((b.id || i) % 4)) % 4) * (Math.PI / 2);
                 dummy.updateMatrix();
                 mesh.setMatrixAt(i, dummy.matrix);
@@ -575,6 +1319,129 @@ export class Renderer3D {
             mesh.instanceMatrix.needsUpdate = true;
             objects.push(mesh);
         }
+        return objects;
+    }
+
+    /**
+     * Build instanced vegetation (trees) for forest and park tiles in a chunk.
+     * Uses a deterministic seeded RNG based on tile coordinates for consistency.
+     */
+    _buildVegetationForChunk(bounds) {
+        const objects = [];
+        const treeLarge = this._vegetationModels.get('tree-large');
+        const treeSmall = this._vegetationModels.get('tree-small');
+        if (!treeLarge && !treeSmall) return objects;
+
+        // Collect forest/park tile positions
+        const forestTiles = [];
+        const parkTiles = [];
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                const terrain = this.game.map.getTileAt(x, y);
+                if (terrain === TERRAIN_FOREST) forestTiles.push({ x, y });
+                else if (terrain === TERRAIN_PARK) parkTiles.push({ x, y });
+            }
+        }
+
+        // Simple deterministic hash for seeded pseudo-random per tile
+        const hash = (x, y, salt) => {
+            let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
+            h = ((h ^ (h >> 13)) * 1274126177) | 0;
+            return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+        };
+
+        // Place trees on forest tiles (1-3 per tile)
+        for (const tile of forestTiles) {
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+            const treeCount = 1 + Math.floor(hash(tile.x, tile.y, 0) * 3); // 1-3 trees
+
+            for (let t = 0; t < treeCount; t++) {
+                const model = hash(tile.x, tile.y, t + 10) > 0.4 ? treeLarge : treeSmall;
+                if (!model) continue;
+                const clone = model.clone(true);
+                const offsetX = (hash(tile.x, tile.y, t + 20) - 0.5) * 0.6;
+                const offsetZ = (hash(tile.x, tile.y, t + 30) - 0.5) * 0.6;
+                const rotY = hash(tile.x, tile.y, t + 40) * Math.PI * 2;
+                const scale = 0.7 + hash(tile.x, tile.y, t + 50) * 0.8; // 0.7-1.5x
+                const treeY = this._smoothTerrainY(tile.x, tile.y);
+                clone.position.set(wx + offsetX, treeY, wz + offsetZ);
+                clone.rotation.y = rotY;
+                clone.scale.multiplyScalar(scale);
+                // Color the tree: foliage green, trunk brown
+                const foliageColors = [0x2d8a2d, 0x1e7a1e, 0x3a9a3a, 0x2e7d32, 0x388e3c];
+                const trunkColor = 0x6d4c3a;
+                const foliageHex = foliageColors[(tile.x * 7 + tile.y * 13 + t * 3) % foliageColors.length];
+                clone.traverse((child) => {
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        if (child.material) {
+                            const applyTreeColor = (m) => {
+                                if (!m.color) return m;
+                                const nm = m.clone();
+                                const box = new THREE.Box3().setFromObject(child);
+                                const size = box.getSize(new THREE.Vector3());
+                                // Trunk: narrow cylinder, Foliage: wider cone/sphere
+                                if (size.x < 0.25 && size.z < 0.25) {
+                                    nm.color.setHex(trunkColor); // trunk
+                                } else {
+                                    nm.color.setHex(foliageHex); // foliage
+                                }
+                                nm.roughness = 0.9;
+                                nm.metalness = 0.0;
+                                return nm;
+                            };
+                            if (Array.isArray(child.material)) {
+                                child.material = child.material.map(applyTreeColor);
+                            } else {
+                                child.material = applyTreeColor(child.material);
+                            }
+                        }
+                    }
+                });
+                objects.push(clone);
+            }
+        }
+
+        // Place trees on park tiles (0-1 per tile + some open space)
+        for (const tile of parkTiles) {
+            if (hash(tile.x, tile.y, 100) > 0.6) continue; // 60% of park tiles get a tree
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+            const model = hash(tile.x, tile.y, 110) > 0.5 ? treeLarge : treeSmall;
+            if (!model) continue;
+            const clone = model.clone(true);
+            const offsetX = (hash(tile.x, tile.y, 120) - 0.5) * 0.4;
+            const offsetZ = (hash(tile.x, tile.y, 130) - 0.5) * 0.4;
+            const parkY = Renderer3D.TERRAIN_HEIGHT[TERRAIN_PARK] ?? 0.06;
+            clone.position.set(wx + offsetX, parkY, wz + offsetZ);
+            clone.rotation.y = hash(tile.x, tile.y, 140) * Math.PI * 2;
+            clone.traverse((child) => {
+                if (child.isMesh) {
+                    child.castShadow = true;
+                    child.receiveShadow = true;
+                    if (child.material) {
+                        const applyParkTreeColor = (m) => {
+                            if (!m.color) return m;
+                            const nm = m.clone();
+                            const box = new THREE.Box3().setFromObject(child);
+                            const size = box.getSize(new THREE.Vector3());
+                            nm.color.setHex(size.x < 0.25 && size.z < 0.25 ? 0x6d4c3a : 0x4caf50);
+                            nm.roughness = 0.9; nm.metalness = 0.0;
+                            return nm;
+                        };
+                        if (Array.isArray(child.material)) {
+                            child.material = child.material.map(applyParkTreeColor);
+                        } else {
+                            child.material = applyParkTreeColor(child.material);
+                        }
+                    }
+                }
+            });
+            objects.push(clone);
+        }
+
         return objects;
     }
 
@@ -589,6 +1456,12 @@ export class Renderer3D {
         const buildingMeshes = this._buildBuildingMeshesForChunk(bounds, this.game.buildings.buildings);
         for (const mesh of buildingMeshes) {
             mesh.userData.kind = 'building';
+            group.add(mesh);
+        }
+        // Vegetation (trees on forest/park tiles)
+        const vegMeshes = this._buildVegetationForChunk(bounds);
+        for (const mesh of vegMeshes) {
+            mesh.userData.kind = 'vegetation';
             group.add(mesh);
         }
 
@@ -689,7 +1562,7 @@ export class Renderer3D {
                 entry.group.visible = true;
                 const terrainOnly = dist > this.LOD_FULL_DIST;
                 for (const child of entry.group.children) {
-                    if (child.userData?.kind === 'building') {
+                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') {
                         child.visible = !terrainOnly;
                     }
                 }
@@ -699,14 +1572,16 @@ export class Renderer3D {
 
     buildPlayer() {
         const group = new THREE.Group();
-        const mat = new THREE.MeshLambertMaterial({ color: 0x333333 });
+        const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
 
         const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 10), mat);
-        body.position.y = 0.55;
+        body.castShadow = true;
+        body.position.y = 0.55 + 0.12;
         group.add(body);
 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshLambertMaterial({ color: 0xf2c7a3 }));
-        head.position.y = 1.1;
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf2c7a3, roughness: 0.5 }));
+        head.castShadow = true;
+        head.position.y = 1.1 + 0.12;
         group.add(head);
 
         return group;
@@ -717,7 +1592,19 @@ export class Renderer3D {
         // player.wx/wz are in tile-space coordinates (0..width) continuous.
         const wx = (p.wx ?? (p.x + 0.5)) - this._mapHalfW;
         const wz = (p.wz ?? (p.y + 0.5)) - this._mapHalfH;
-        if (this._player) this._player.position.set(wx, 0, wz);
+        if (this._player) this._player.position.set(wx, 0.12, wz);
+
+        // Move shadow cameras to follow player so shadows stay sharp nearby
+        if (this.sunLight?.shadow) {
+            this.sunLight.target.position.set(wx, 0, wz);
+            this.sunLight.target.updateMatrixWorld();
+            this.sunLight.position.set(wx + 30, 40, wz + 20);
+        }
+        if (this.sunLightFar?.shadow) {
+            this.sunLightFar.target.position.set(wx, 0, wz);
+            this.sunLightFar.target.updateMatrixWorld();
+            this.sunLightFar.position.set(wx + 30, 40, wz + 20);
+        }
     }
 
     markBuildingsDirty() {
@@ -732,24 +1619,59 @@ export class Renderer3D {
         this._buildingsDirty = true;
     }
 
+    /** Citizen clothing/appearance color palette */
+    static CITIZEN_COLORS = [
+        0x2196f3, 0xe91e63, 0x4caf50, 0xff9800, 0x9c27b0,
+        0x00bcd4, 0xff5722, 0x607d8b, 0x795548, 0x3f51b5,
+        0xcddc39, 0xf44336, 0x009688, 0xffc107, 0x673ab7,
+    ];
+
     rebuildCitizens() {
         if (this._citizensMesh) {
             this.scene.remove(this._citizensMesh);
             this._citizensMesh.geometry.dispose();
         }
+        if (!this.game.citizens?.citizens) { this._citizensDirty = false; return; }
 
         const n = this.game.citizens.citizens.length;
-        const geom = new THREE.SphereGeometry(0.15, 10, 10);
-        const mat = new THREE.MeshLambertMaterial({ color: 0x4caf50 });
-        this._citizensMesh = new THREE.InstancedMesh(geom, mat, Math.max(1, n));
+
+        // Capsule-like geometry: cylinder body + sphere head (merged)
+        const bodyGeom = new THREE.CylinderGeometry(0.06, 0.08, 0.22, 8);
+        bodyGeom.translate(0, 0.11, 0);
+        const headGeom = new THREE.SphereGeometry(0.065, 8, 6);
+        headGeom.translate(0, 0.26, 0);
+
+        // Merge into one BufferGeometry for instancing
+        const mergedGeom = this._mergeBufferGeometries([bodyGeom, headGeom]);
+        bodyGeom.dispose();
+        headGeom.dispose();
+
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xffffff, roughness: 0.6, metalness: 0.05,
+            vertexColors: false,
+        });
+        this._citizensMesh = new THREE.InstancedMesh(mergedGeom, mat, Math.max(1, n));
+        this._citizensMesh.castShadow = true;
+        this._citizensMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+        // Per-citizen colors for variety
+        const colors = Renderer3D.CITIZEN_COLORS;
+        for (let i = 0; i < n; i++) {
+            const color = new THREE.Color(colors[i % colors.length]);
+            this._citizensMesh.setColorAt(i, color);
+        }
+        if (this._citizensMesh.instanceColor) {
+            this._citizensMesh.instanceColor.needsUpdate = true;
+        }
 
         // Initialize animation timing for each citizen (random offset for variety)
         this._citizenAnimTimes = [];
         for (let i = 0; i < n; i++) {
             this._citizenAnimTimes.push({
-                phase: Math.random() * Math.PI * 2, // Random start phase
-                speed: 2 + Math.random() * 2, // Random speed between 2-4 rad/s
-                amplitude: 0.03 + Math.random() * 0.02 // Random amplitude between 0.03-0.05
+                phase: Math.random() * Math.PI * 2,
+                speed: 2 + Math.random() * 2,
+                amplitude: 0.03 + Math.random() * 0.02,
+                wobblePhase: Math.random() * Math.PI * 2,
             });
         }
 
@@ -758,7 +1680,7 @@ export class Renderer3D {
             const c = this.game.citizens.citizens[i];
             const wx = c.x - this._mapHalfW + 0.5;
             const wz = c.y - this._mapHalfH + 0.5;
-            dummy.position.set(wx, 0.18, wz);
+            dummy.position.set(wx, 0.12, wz);
             dummy.updateMatrix();
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
         }
@@ -767,31 +1689,72 @@ export class Renderer3D {
         this._citizensDirty = false;
     }
 
+    /** Merge multiple BufferGeometry objects into one (simple position+normal merge) */
+    _mergeBufferGeometries(geometries) {
+        let totalVerts = 0;
+        let totalIndex = 0;
+        for (const g of geometries) {
+            totalVerts += g.getAttribute('position').count;
+            totalIndex += g.index ? g.index.count : g.getAttribute('position').count;
+        }
+        const positions = new Float32Array(totalVerts * 3);
+        const normals = new Float32Array(totalVerts * 3);
+        const indices = new Uint32Array(totalIndex);
+        let vertOffset = 0, idxOffset = 0, vertCountOffset = 0;
+        for (const g of geometries) {
+            const pos = g.getAttribute('position');
+            const norm = g.getAttribute('normal');
+            for (let i = 0; i < pos.count * 3; i++) {
+                positions[vertOffset * 3 + i] = pos.array[i];
+                if (norm) normals[vertOffset * 3 + i] = norm.array[i];
+            }
+            if (g.index) {
+                for (let i = 0; i < g.index.count; i++) {
+                    indices[idxOffset + i] = g.index.array[i] + vertCountOffset;
+                }
+                idxOffset += g.index.count;
+            } else {
+                for (let i = 0; i < pos.count; i++) {
+                    indices[idxOffset + i] = i + vertCountOffset;
+                }
+                idxOffset += pos.count;
+            }
+            vertCountOffset += pos.count;
+            vertOffset += pos.count;
+        }
+        const merged = new THREE.BufferGeometry();
+        merged.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+        merged.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+        merged.setIndex(new THREE.BufferAttribute(indices, 1));
+        return merged;
+    }
+
     updateCitizens() {
-        if (!this._citizensMesh) return;
+        if (!this._citizensMesh || !this.game.citizens?.citizens) return;
         const n = this.game.citizens.citizens.length;
         if (this._citizensMesh.count !== Math.max(1, n)) {
             this._citizensDirty = true;
             return;
         }
-        
+
         const dummy = new THREE.Object3D();
-        const currentTime = performance.now() / 1000; // Current time in seconds
-        
+        const currentTime = performance.now() / 1000;
+
         for (let i = 0; i < n; i++) {
             const c = this.game.citizens.citizens[i];
             const wx = c.x - this._mapHalfW + 0.5;
             const wz = c.y - this._mapHalfH + 0.5;
-            
-            // Add subtle vertical bobbing animation to make citizens appear alive
-            let yPos = 0.18; // Base height
+
+            let yPos = 0.12;
             if (this._citizenAnimTimes[i]) {
                 const anim = this._citizenAnimTimes[i];
-                // Sine wave bobbing based on time, phase, and speed
+                // Vertical bobbing
                 const bobOffset = Math.sin(currentTime * anim.speed + anim.phase) * anim.amplitude;
-                yPos = 0.18 + bobOffset;
+                yPos = 0.12 + bobOffset;
+                // Slight tilt/wobble for walking feel
+                dummy.rotation.z = Math.sin(currentTime * anim.speed * 1.5 + (anim.wobblePhase || 0)) * 0.08;
             }
-            
+
             dummy.position.set(wx, yPos, wz);
             dummy.updateMatrix();
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
@@ -817,8 +1780,9 @@ export class Renderer3D {
                     // Fallback: colored box
                     const mesh = new THREE.Mesh(
                         new THREE.BoxGeometry(0.45, 0.18, 0.22),
-                        new THREE.MeshLambertMaterial({ color: 0x607d8b })
+                        new THREE.MeshStandardMaterial({ color: 0x607d8b, roughness: 0.4, metalness: 0.3 })
                     );
+                    mesh.castShadow = true;
                     mesh.userData.vehicleId = v.id;
                     this._vehicleGroup.add(mesh);
                 }
@@ -1022,7 +1986,9 @@ export class Renderer3D {
     _applySeasonalColors(season) {
         const p = Renderer3D.SEASON_PALETTES[season] ?? Renderer3D.SEASON_PALETTES.spring;
         this._seasonFogDensity = p.fogDensity;
-        this.scene.background.setHex(p.sky);
+        if (this.scene.background) {
+            this.scene.background.setHex(p.sky);
+        }
         if (this.scene.fog) {
             this.scene.fog.color.setHex(p.fog);
             this.scene.fog.density = p.fogDensity;
@@ -1246,7 +2212,9 @@ export class Renderer3D {
         if (this.scene.fog && wfx) {
             this.scene.fog.density = wfx.fogDensity ?? (this._seasonFogDensity ?? 0.0001);
             if (wfx.ambientColor != null) {
-                this.scene.background.setHex(wfx.ambientColor);
+                if (this.scene.background) {
+                    this.scene.background.setHex(wfx.ambientColor);
+                }
                 this.scene.fog.color.setHex(wfx.ambientColor);
             }
         }
@@ -1278,7 +2246,17 @@ export class Renderer3D {
             this.particleSystem.update();
         }
         
-        this.renderer.render(this.scene, this.camera);
+        // Update water shader animation
+        if (this._waterShaderRef) {
+            this._waterShaderRef.uniforms.uTime.value = performance.now() / 1000;
+        }
+
+        // Render via post-processing composer if available, else direct
+        if (this.composer) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
     }
 
     /**
@@ -1304,6 +2282,9 @@ export class Renderer3D {
             this.ambientLight.color.lerp(tintColor, blendFactor * 0.3); // Subtle tint effect
         }
         
+        // Update procedural sky sun position to match time of day
+        this._updateSkyForTime(timeOfDay);
+
         // Store current phase for debugging
         this.currentPhase = lighting.phase;
     }
@@ -1316,6 +2297,9 @@ export class Renderer3D {
         const width = this.canvas.clientWidth;
         const height = this.canvas.clientHeight;
         this.renderer.setSize(width * scale, height * scale, false);
+        if (this.composer) {
+            this.composer.setSize(width * scale, height * scale);
+        }
     }
 
     /**
@@ -1946,24 +2930,67 @@ function terrainHex(t) {
 /** Multiplicative tint applied on top of the texture map */
 function terrainTint(t) {
     switch (t) {
-        case TERRAIN_GRASS:    return 0xb5ddb5; // light green tint
-        case TERRAIN_FOREST:   return 0x5a9e5a; // darker green tint
-        case TERRAIN_MOUNTAIN: return 0xc8b89a; // warm stone tint
-        default: return 0xd0c8b8;               // sandy/dirt tint
+        case TERRAIN_GRASS:    return 0x7acc6e; // bright grass green
+        case TERRAIN_FOREST:   return 0x4a8c42; // rich forest green
+        case TERRAIN_MOUNTAIN: return 0xa09080; // warm gray rock
+        case TERRAIN_ROAD:     return 0x606060; // asphalt gray
+        case TERRAIN_SIDEWALK: return 0xc0b8a8; // light concrete
+        case TERRAIN_PARK:     return 0x5abf50; // vivid park green
+        case TERRAIN_WATER:    return 0x2080b8; // clear ocean blue
+        default: return 0xc8b080;               // sandy dirt
     }
 }
 
+/** Per-type color palettes — muted/realistic architectural tones like Cities: Skylines */
+const BUILDING_PALETTES = {
+    // Residential — warm brick, terracotta, slate, cream
+    'house':           [0xb87050, 0xc4886a, 0x9a7860, 0x8898b0, 0xc09870, 0xa07868, 0x788898, 0xb0a080],
+    'farm':            [0xc8944a, 0xd4a860, 0xb88038, 0xe0b860],
+    'lumber-mill':     [0x906040, 0x7a4a28, 0xa87050],
+    // Commercial — glass blue-gray, steel
+    'market':          [0x4a6888, 0x5878a0, 0x385878, 0x6888a8],
+    'shopping-mall':   [0x607890, 0x708898, 0x506880, 0x8098a8],
+    'restaurant':      [0xa05838, 0xb06848, 0x906030],
+    'nightclub':       [0x2a2848, 0x383660, 0x484870],
+    'hotel':           [0x8a7060, 0x9a8070, 0x786050, 0xa89080],
+    // Civic — institutional gray, tan, warm white
+    'town-hall':       [0xd4c090, 0xe8d4a0, 0xc4b080, 0xf0e0b0],  // warm gov marble/stone
+    'school':          [0x7098b8, 0x8090a0, 0x6088a8],
+    'hospital':        [0xd8e0e8, 0xc8d8e0, 0xe0e8f0],
+    'police-station':  [0x384870, 0x485880, 0x283860],
+    'fire-station':    [0xb83028, 0xa82020, 0xc84040],
+    'library':         [0x8a6840, 0x7a5830, 0x9a7850],
+    'courthouse':      [0xb0a888, 0xa09878, 0xc0b898],
+    'museum':          [0x806888, 0x907898, 0x705878],
+    'theater':         [0x703848, 0x804858, 0x602838],
+    'prison':          [0x585850, 0x686860, 0x484840],
+    // Office/tech — dark glass, blue steel
+    'apartment':       [0x4a6070, 0x506878, 0x3a5060, 0x607888],
+    'university':      [0x5a5080, 0x6a6090, 0x4a4070],
+    'research-lab':    [0x485868, 0x586878, 0x384858],
+    // Infrastructure
+    'warehouse':       [0x8090a0, 0x90a0b0, 0x7080908],
+    'barracks':        [0x607050, 0x506040, 0x708060],
+    'airport':         [0xa8b0b8, 0xb8c0c8, 0x989fa8],
+    'factory':         [0x7a7060, 0x8a8070, 0x6a6050],
+    'nuclear-plant':   [0xc0c0c0, 0xd0d0d0, 0xb0b0b0],
+    'power-plant':     [0x707880, 0x808890, 0x606070],
+    'water-treatment': [0x5878a8, 0x6888b8, 0x486898],
+    'solar-farm':      [0x203858, 0x2a4868, 0x183048],
+    'wind-farm':       [0xd0d8e0, 0xc0c8d0, 0xe0e8f0],
+    'port':            [0x8a7a5a, 0x9a8a6a, 0x7a6a4a],
+    'stadium':         [0x406880, 0x507890, 0x305870],
+    'recycling-plant': [0x406840, 0x507850, 0x305830],
+    'default':         [0xa09880, 0xb0a890, 0x908870, 0xc0b8a0],
+};
+
+function buildingPaletteColor(type, id) {
+    const palette = BUILDING_PALETTES[type] || BUILDING_PALETTES['default'];
+    return palette[(id || 0) % palette.length];
+}
+
 function buildingHex(type) {
-    // Stable per building type
-    switch (type) {
-        case 'house': return 0xe8d5b0;
-        case 'farm': return 0xf0c808;
-        case 'lumber-mill': return 0x8b5a2b;
-        case 'market': return 0x4a90e2;
-        case 'town-hall': return 0x3b7a57;
-        case 'warehouse': return 0x9e9e9e;
-        case 'barracks': return 0x7e4d1a;
-        case 'school': return 0x6ab0de;
-        default: return 0xffffff;
-    }
+    // Use first palette color for consistent box fallback colors
+    const palette = BUILDING_PALETTES[type] || BUILDING_PALETTES['default'];
+    return palette[0];
 }

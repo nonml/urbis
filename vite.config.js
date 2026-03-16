@@ -15,7 +15,7 @@ export default defineConfig({
     },
     server: {
         port: 5173,
-        open: true
+        open: false
     },
     define: {
         'import.meta.env.VITE_BUILD_TIMESTAMP': JSON.stringify(new Date().toISOString()),
