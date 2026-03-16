@@ -110,12 +110,14 @@ await page.evaluate(() => {
     return t === TERRAIN_GRASS; // only on grass — not road, park, water, mountain
   };
 
-  // Downtown core: tall landmark buildings, varied colors
+  // Downtown core: landmark tall buildings, deliberately varied colors
+  // town-hall=gold, shopping-mall=steel-blue, hotel=warm-tan, stadium=dark-teal,
+  // museum=purple, courthouse=stone, hospital=white — break any color clusters
   const DOWNTOWN = [
-    'town-hall','shopping-mall','hotel','stadium','university',
-    'town-hall','museum','courthouse','theater','hotel',
-    'shopping-mall','library','museum','police-station','stadium',
-    'university','town-hall','theater','hospital','shopping-mall',
+    'town-hall','shopping-mall','hotel','courthouse','shopping-mall',
+    'hotel','museum','town-hall','stadium','hotel',
+    'shopping-mall','town-hall','hospital','courthouse','shopping-mall',
+    'hotel','town-hall','museum','stadium','shopping-mall',
   ];
 
   // Mid-ring: mixed use — apartments, civic, commercial
@@ -189,27 +191,27 @@ async function render(setup) {
     const r = window.game.ui.renderer3d;
 
     r.dayNightCycle = false;
-    if (r._updateSkyForTime) r._updateSkyForTime(10); // 10am for nice light angle
+    if (r._updateSkyForTime) r._updateSkyForTime(8.5); // 8:30am — low sun angle, long dramatic shadows
 
     // Sky shader renders white in headless — use solid gradient background instead
     if (r._sky) r._sky.visible = false;
     r.scene.background.setHex(0x5ab4f0);
 
-    // Subtle atmospheric haze
+    // Light atmospheric haze — low density keeps distant terrain visible
     if (r.scene.fog) {
       r.scene.fog.color.setHex(0xaad4f0);
-      r.scene.fog.density = 0.0015;
+      r.scene.fog.density = 0.0010;
     }
 
     r.renderer.toneMappingExposure = 1.05;
 
-    // Disable SSAO (causes artifacts in headless)
+    // Disable SSAO (causes white-sky artifact in headless)
     if (r._ssaoPass) r._ssaoPass.enabled = false;
 
-    // Subtle bloom — slight glow on sun-bright surfaces
+    // Subtle bloom
     if (r._bloomPass) {
-      r._bloomPass.strength = 0.12;
-      r._bloomPass.threshold = 0.90;
+      r._bloomPass.strength = 0.10;
+      r._bloomPass.threshold = 0.92;
     }
 
     r.camera.position.set(s.cx, s.cy, s.cz);
@@ -218,14 +220,24 @@ async function render(setup) {
     r.camera.aspect = 1920 / 1080;
     r.camera.updateProjectionMatrix();
 
+    // Point shadow camera at city center so building shadows fall on terrain
+    if (r.sunLight) {
+      r.sunLight.target.position.set(0, 0, 0);
+      r.sunLight.target.updateMatrixWorld();
+    }
+    if (r.sunLightFar) {
+      r.sunLightFar.target.position.set(0, 0, 0);
+      r.sunLightFar.target.updateMatrixWorld();
+    }
+
     // Force all chunks visible
     r._chunkMeshes.forEach(entry => {
       entry.group.visible = true;
       entry.group.children.forEach(child => child.visible = true);
     });
 
-    // Render 5 frames to stabilize
-    for (let i = 0; i < 5; i++) {
+    // Render 8 frames — shadow maps need extra passes to stabilize
+    for (let i = 0; i < 8; i++) {
       if (r.composer) r.composer.render();
       else r.renderer.render(r.scene, r.camera);
     }

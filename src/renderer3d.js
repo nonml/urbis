@@ -182,14 +182,14 @@ export class Renderer3D {
         this.setRenderScale(1.0);
 
         // Lighting — hemisphere light for natural sky/ground fill
-        this.hemiLight = new THREE.HemisphereLight(0x9fd8fb, 0x4a7a3a, 0.9);
+        this.hemiLight = new THREE.HemisphereLight(0x9fd8fb, 0x4a7a3a, 0.7);
         this.scene.add(this.hemiLight);
 
-        this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.4);
+        this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.3);
         this.scene.add(this.ambientLight);
 
         // Primary sun light — tighter frustum for sharper nearby shadows
-        this.sunLight = new THREE.DirectionalLight(0xfffbe8, 1.8);
+        this.sunLight = new THREE.DirectionalLight(0xfffbe0, 2.2);
         this.sunLight.position.set(30, 50, 20);
         this.sunLight.castShadow = true;
         this.sunLight.shadow.mapSize.width = 4096;
@@ -2985,7 +2985,7 @@ function terrainTint(t) {
     switch (t) {
         case TERRAIN_GRASS:    return 0x88c870; // fresh grass green
         case TERRAIN_FOREST:   return 0x3a7a32; // deep forest green
-        case TERRAIN_MOUNTAIN: return 0x8a8878; // muted gray-green rock (less brown)
+        case TERRAIN_MOUNTAIN: return 0x909888; // olive-gray alpine (less brown, hint of green)
         case TERRAIN_ROAD:     return 0x686868; // asphalt
         case TERRAIN_SIDEWALK: return 0xc8c0b0; // light concrete
         case TERRAIN_PARK:     return 0x60c850; // vivid park green
