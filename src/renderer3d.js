@@ -701,9 +701,11 @@ export class Renderer3D {
                             const m = child.material;
                             if (m.color) {
                                 const lum = m.color.r * 0.299 + m.color.g * 0.587 + m.color.b * 0.114;
-                                if (lum > 0.75) m.color.multiplyScalar(0.55); // dim white markings
+                                if (lum > 0.60) m.color.multiplyScalar(0.38); // aggressively dim road markings
+                                else if (lum > 0.35) m.color.multiplyScalar(0.72); // moderate dim for mid tones
                             }
-                            if (m.roughness !== undefined) m.roughness = Math.min(0.98, m.roughness + 0.1);
+                            if (m.roughness !== undefined) m.roughness = Math.min(0.99, m.roughness + 0.15);
+                            if (m.metalness !== undefined) m.metalness = 0;
                         }
                     });
                     this._roadModels.set(name, root);
@@ -3131,7 +3133,7 @@ const BUILDING_PALETTES = {
     // Civic — warm gold stone, marble, classical
     'town-hall':       [0xd4c090, 0xe8d4a0, 0xc4b080, 0xf0e0b0, 0xd8c8a0, 0xe0d0b0],
     'school':          [0x7098b8, 0x8090a0, 0x6088a8, 0x90a8c0],
-    'hospital':        [0xd8e0e8, 0xc8d8e0, 0xe0e8f0, 0xd0e0f0],
+    'hospital':        [0x90b8d0, 0x80a8c0, 0xa0c0d8, 0x78a0c0],
     'police-station':  [0x384870, 0x485880, 0x283860, 0x506888],
     'fire-station':    [0xb83028, 0xa82020, 0xc84040, 0xd04030],
     'library':         [0x8a6840, 0x7a5830, 0x9a7850, 0xb08858],
@@ -3149,13 +3151,13 @@ const BUILDING_PALETTES = {
     // Infrastructure
     'warehouse':       [0x8090a0, 0x90a0b0, 0x708090, 0xa0b0c0],
     'barracks':        [0x607050, 0x506040, 0x708060],
-    'airport':         [0xa8b0b8, 0xb8c0c8, 0x989fa8, 0xc0c8d0],
+    'airport':         [0x7888a0, 0x8898b0, 0x687890, 0x9aaabb],
     'factory':         [0x7a7060, 0x8a8070, 0x6a6050],
-    'nuclear-plant':   [0xb8c0c8, 0xc8d0d8, 0xa8b0b8],
+    'nuclear-plant':   [0x8898a8, 0x98a8b8, 0x788898],
     'power-plant':     [0x707880, 0x808890, 0x606070],
     'water-treatment': [0x5878a8, 0x6888b8, 0x486898],
     'solar-farm':      [0x203858, 0x2a4868, 0x183048],
-    'wind-farm':       [0xd0d8e0, 0xc0c8d0, 0xe0e8f0],
+    'wind-farm':       [0xa0b0c0, 0x90a0b0, 0xb0c0d0],
     'port':            [0x8a7a5a, 0x9a8a6a, 0x7a6a4a],
     'stadium':         [0x406880, 0x507890, 0x305870, 0x6080a0],
     'recycling-plant': [0x406840, 0x507850, 0x305830],

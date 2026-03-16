@@ -196,6 +196,9 @@ await page.evaluate(() => {
   r.LOD_FULL_DIST = 9999;
   r.LOD_TERRAIN_ONLY_DIST = 9999;
 
+  // Use flat dark-asphalt road tiles instead of GLTF road models (no white crosswalk glare)
+  r._roadModels.clear();
+
   // Full world rebuild
   r.rebuildWorld();
 
