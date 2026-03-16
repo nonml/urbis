@@ -695,6 +695,17 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    // Tone down road markings: very bright/white surfaces → muted gray
+                    root.traverse((child) => {
+                        if (child.isMesh && child.material) {
+                            const m = child.material;
+                            if (m.color) {
+                                const lum = m.color.r * 0.299 + m.color.g * 0.587 + m.color.b * 0.114;
+                                if (lum > 0.75) m.color.multiplyScalar(0.55); // dim white markings
+                            }
+                            if (m.roughness !== undefined) m.roughness = Math.min(0.98, m.roughness + 0.1);
+                        }
+                    });
                     this._roadModels.set(name, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -706,12 +717,21 @@ export class Renderer3D {
             const loadProp = (name, url) => new Promise((resolve) => {
                 loader.load(url, (gltf) => {
                     const root = gltf.scene;
-                    root.scale.setScalar(0.60);
+                    root.scale.setScalar(0.45);
                     const box = new THREE.Box3().setFromObject(root);
                     const center = box.getCenter(new THREE.Vector3());
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    // Tone down bright white/chrome surfaces on props
+                    root.traverse((child) => {
+                        if (child.isMesh && child.material?.color) {
+                            const m = child.material;
+                            const lum = m.color.r * 0.299 + m.color.g * 0.587 + m.color.b * 0.114;
+                            if (lum > 0.70) m.color.multiplyScalar(0.60);
+                            if (m.roughness !== undefined) m.roughness = Math.max(0.55, m.roughness);
+                        }
+                    });
                     this._propModels.set(name, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -1041,8 +1061,10 @@ export class Renderer3D {
                 objects.push(mesh);
             }
 
-            // Street props: place a lamp every ~4 tiles (deterministic)
-            if (hash(tile.x, tile.y, 200) < 0.28) {
+            // Street props: only in urban core (radius ≤ 14 from map center)
+            const dcx = tile.x - this._mapHalfW, dcz = tile.y - this._mapHalfH;
+            const distFromCenter = Math.sqrt(dcx * dcx + dcz * dcz);
+            if (distFromCenter <= 14 && hash(tile.x, tile.y, 200) < 0.18) {
                 const lightModel = this._propModels.get('light-square');
                 const side = hash(tile.x, tile.y, 210) > 0.5 ? 1 : -1;
                 const terrainYL = this._smoothTerrainY(tile.x, tile.y);
@@ -1061,9 +1083,9 @@ export class Renderer3D {
                     const bbox = new THREE.Box3();
                     bbox.setFromObject(lightModel);
                     const lampTopY = terrainYL + bbox.max.y * 0.60;
-                    const glowGeom = new THREE.SphereGeometry(0.055, 6, 4);
+                    const glowGeom = new THREE.SphereGeometry(0.042, 6, 4);
                     const glowMat = new THREE.MeshStandardMaterial({
-                        color: 0xffee88, emissive: 0xffcc44, emissiveIntensity: 1.8,
+                        color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
                         roughness: 0.4, metalness: 0.0,
                     });
                     const glowSphere = new THREE.Mesh(glowGeom, glowMat);
@@ -1079,9 +1101,9 @@ export class Renderer3D {
                     const pole = new THREE.Mesh(poleGeom, poleMat);
                     pole.position.set(px, terrainYL2 + 0.375, pz);
                     objects.push(pole);
-                    const glowGeom = new THREE.SphereGeometry(0.055, 6, 4);
+                    const glowGeom = new THREE.SphereGeometry(0.042, 6, 4);
                     const glowMat = new THREE.MeshStandardMaterial({
-                        color: 0xffee88, emissive: 0xffcc44, emissiveIntensity: 1.8,
+                        color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
                     });
                     const glowSphere = new THREE.Mesh(glowGeom, glowMat);
                     glowSphere.position.set(px, terrainYL2 + 0.78, pz);

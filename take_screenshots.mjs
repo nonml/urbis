@@ -205,6 +205,46 @@ await page.evaluate(() => {
 
 await page.waitForTimeout(5000); // wait for rebuild + GLTF loading
 
+// Add parked cars along road corridors
+await page.evaluate(() => {
+  const r = window.game.ui.renderer3d;
+  const game = window.game;
+  const TERRAIN_ROAD = 4;
+  const carTypes = ['sedan', 'taxi', 'suv', 'van', 'truck', 'hatchback-sports', 'delivery'];
+  const rng = (x, y, s) => {
+    let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
+    h = ((h ^ (h >> 13)) * 2654435761) | 0;
+    return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+  };
+  let carsPlaced = 0;
+  const hw = r._mapHalfW, hh = r._mapHalfH;
+  for (let y = 0; y < game.map.height; y++) {
+    for (let x = 0; x < game.map.width; x++) {
+      if (game.map.getTileAt(x, y) !== TERRAIN_ROAD) continue;
+      if (rng(x, y, 0) > 0.30) continue; // ~30% of road tiles get a parked car
+      const carType = carTypes[Math.floor(rng(x, y, 1) * carTypes.length)];
+      const model = r._vehicleModels.get(carType);
+      if (!model) continue;
+      const isNS = game.map.getTileAt(x, y - 1) === TERRAIN_ROAD || game.map.getTileAt(x, y + 1) === TERRAIN_ROAD;
+      const clone = model.clone(true);
+      const wx = x - hw + 0.5;
+      const wz = y - hh + 0.5;
+      const lateral = (rng(x, y, 2) > 0.5 ? 1 : -1) * (0.25 + rng(x, y, 3) * 0.08);
+      const facing = rng(x, y, 4) > 0.5 ? 0 : Math.PI;
+      if (isNS) {
+        clone.position.set(wx + lateral, 0.06, wz);
+        clone.rotation.y = facing;
+      } else {
+        clone.position.set(wx, 0.06, wz + lateral);
+        clone.rotation.y = facing + Math.PI / 2;
+      }
+      r.scene.add(clone);
+      carsPlaced++;
+    }
+  }
+  console.log('Cars placed:', carsPlaced);
+});
+
 async function render(setup) {
   await page.evaluate((s) => {
     const r = window.game.ui.renderer3d;
