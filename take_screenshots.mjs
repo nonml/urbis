@@ -31,6 +31,8 @@ const info = await page.evaluate(() => {
   const r = window.game.ui.renderer3d;
   return {
     gltfs: [...r._gltfModels.keys()],
+    roadModels: r._roadModels.size,
+    propModels: r._propModels.size,
     mapSize: `${window.game.map.width}x${window.game.map.height}`,
   };
 });

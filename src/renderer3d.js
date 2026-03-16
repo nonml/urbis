@@ -706,7 +706,7 @@ export class Renderer3D {
             const loadProp = (name, url) => new Promise((resolve) => {
                 loader.load(url, (gltf) => {
                     const root = gltf.scene;
-                    root.scale.setScalar(0.35);
+                    root.scale.setScalar(0.60);
                     const box = new THREE.Box3().setFromObject(root);
                     const center = box.getCenter(new THREE.Vector3());
                     root.position.x -= center.x;
@@ -1041,18 +1041,51 @@ export class Renderer3D {
                 objects.push(mesh);
             }
 
-            // Street props: place a light every ~5 tiles (deterministic)
-            if (hash(tile.x, tile.y, 200) < 0.18) {
+            // Street props: place a lamp every ~4 tiles (deterministic)
+            if (hash(tile.x, tile.y, 200) < 0.28) {
                 const lightModel = this._propModels.get('light-square');
+                const side = hash(tile.x, tile.y, 210) > 0.5 ? 1 : -1;
+                const terrainYL = this._smoothTerrainY(tile.x, tile.y);
                 if (lightModel) {
                     const lightClone = lightModel.clone(true);
-                    const side = hash(tile.x, tile.y, 210) > 0.5 ? 0.45 : -0.45;
-                    lightClone.position.set(wx + side, 0.1, wz + side * 0.3);
-                    lightClone.rotation.y = hash(tile.x, tile.y, 220) * Math.PI * 2;
+                    const px = wx + side * 0.42;
+                    const pz = wz;
+                    lightClone.position.set(px, terrainYL, pz);
+                    // Orient arm toward road center
+                    lightClone.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
                     lightClone.traverse((child) => {
                         if (child.isMesh) { child.castShadow = true; }
                     });
                     objects.push(lightClone);
+                    // Glowing lamp-head sphere
+                    const bbox = new THREE.Box3();
+                    bbox.setFromObject(lightModel);
+                    const lampTopY = terrainYL + bbox.max.y * 0.60;
+                    const glowGeom = new THREE.SphereGeometry(0.055, 6, 4);
+                    const glowMat = new THREE.MeshStandardMaterial({
+                        color: 0xffee88, emissive: 0xffcc44, emissiveIntensity: 1.8,
+                        roughness: 0.4, metalness: 0.0,
+                    });
+                    const glowSphere = new THREE.Mesh(glowGeom, glowMat);
+                    glowSphere.position.set(px, lampTopY, pz);
+                    objects.push(glowSphere);
+                } else {
+                    // Fallback: pole + glow sphere
+                    const terrainYL2 = this._smoothTerrainY(tile.x, tile.y);
+                    const px = wx + side * 0.42;
+                    const pz = wz;
+                    const poleGeom = new THREE.CylinderGeometry(0.022, 0.022, 0.75, 5);
+                    const poleMat = new THREE.MeshStandardMaterial({ color: 0x303030, roughness: 0.7 });
+                    const pole = new THREE.Mesh(poleGeom, poleMat);
+                    pole.position.set(px, terrainYL2 + 0.375, pz);
+                    objects.push(pole);
+                    const glowGeom = new THREE.SphereGeometry(0.055, 6, 4);
+                    const glowMat = new THREE.MeshStandardMaterial({
+                        color: 0xffee88, emissive: 0xffcc44, emissiveIntensity: 1.8,
+                    });
+                    const glowSphere = new THREE.Mesh(glowGeom, glowMat);
+                    glowSphere.position.set(px, terrainYL2 + 0.78, pz);
+                    objects.push(glowSphere);
                 }
             }
         }
