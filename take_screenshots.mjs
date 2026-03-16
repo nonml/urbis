@@ -387,8 +387,8 @@ await shot('ss_overview',  { cx: 18, cy: 22, cz: 18, lx: 0, ly: 2, lz: 0, fov: 5
 // SKYLINE — dramatic low-angle from SW, full tower silhouette against sky
 await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46 });
 
-// STREET — ground level, looking along E-W cross-street with buildings either side
-await shot('ss_street',    { cx: -18, cy: 1.2, cz: 0.5, lx: 4, ly: 4.5, lz: 0.5, fov: 68 });
+// STREET — south approach on center road, looking north into tower canyon
+await shot('ss_street',    { cx: 0.5, cy: 1.4, cz: 22, lx: 0.5, ly: 6, lz: 2, fov: 62 });
 
 // PANORAMA — wide arc from NE, city fills lower 2/3 of frame
 await shot('ss_panorama',  { cx: 22, cy: 18, cz: -18, lx: -1, ly: 2, lz: 1, fov: 62 });
@@ -399,8 +399,8 @@ await shot('ss_dusk',      { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 4
 // NIGHT — city lit by window glow, dark sky
 await shot('ss_night',     { cx: -20, cy: 10, cz: 22, lx: 0, ly: 4, lz: 0, fov: 52, night: true });
 
-// NIGHT STREET — ground level along E-W cross-street into glowing tower canyon
-await shot('ss_night_street', { cx: -18, cy: 1.2, cz: 0.5, lx: 4, ly: 4.5, lz: 0.5, fov: 68, night: true });
+// NIGHT STREET — south approach looking north into glowing tower canyon
+await shot('ss_night_street', { cx: 0.5, cy: 1.4, cz: 22, lx: 0.5, ly: 6, lz: 2, fov: 62, night: true });
 
 console.log('\nLogs:', logs.filter(l=>l.startsWith('City')||l.startsWith('Total')||l.startsWith('Placed')));
 await browser.close();
