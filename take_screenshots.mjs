@@ -241,11 +241,22 @@ await page.evaluate(() => {
         clone.position.set(wx, 0.06, wz + lateral);
         clone.rotation.y = facing + Math.PI / 2;
       }
-      // Darken near-white car bodies (some Kenney models are cream/silver)
+      // Assign realistic dark car colors and strip diffuse textures so color takes effect
+      const carPalette = [0x2a3a4a, 0x3a2a2a, 0x2a3a2a, 0x4a4038, 0x1a2a3a,
+                          0x383030, 0x303838, 0x4a3820, 0x202838, 0x3a3a3a];
+      const bodyColor = carPalette[Math.floor(rng(x, y, 5) * carPalette.length)];
       clone.traverse(c => {
-        if (c.isMesh && c.material?.color) {
-          const lum = c.material.color.r * 0.299 + c.material.color.g * 0.587 + c.material.color.b * 0.114;
-          if (lum > 0.70) c.material.color.multiplyScalar(0.52);
+        if (!c.isMesh) return;
+        const mats = Array.isArray(c.material) ? c.material : [c.material];
+        for (const m of mats) {
+          if (!m) continue;
+          const lum = m.color ? m.color.r * 0.299 + m.color.g * 0.587 + m.color.b * 0.114 : 1;
+          if (lum > 0.35) {
+            m.color?.setHex(bodyColor);
+            if (m.map) { m.map = null; } // remove diffuse texture so color is authoritative
+            if (m.roughness !== undefined) m.roughness = 0.55;
+            if (m.metalness !== undefined) m.metalness = 0.15;
+          }
         }
       });
       r.scene.add(clone);
@@ -285,10 +296,10 @@ async function render(setup) {
       if (r.ambientLight) { r.ambientLight.color.setHex(0x203060); r.ambientLight.intensity = 0.08; }
       if (r.sunLight)    { r.sunLight.intensity = 0.04; }
       if (r.sunLightFar) { r.sunLightFar.intensity = 0.04; }
-      r.renderer.toneMappingExposure = 1.35;
-      if (r._bloomPass) { r._bloomPass.strength = 0.45; r._bloomPass.threshold = 0.72; }
-      // Boost window glow to full brightness at night
-      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 1.0; });
+      r.renderer.toneMappingExposure = 1.25;
+      if (r._bloomPass) { r._bloomPass.strength = 0.30; r._bloomPass.threshold = 0.80; }
+      // Boost window glow at night — 0.80 keeps windows visible without over-blooming
+      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.80; });
     } else {
       // Daytime — 8:30am, long dramatic shadows
       if (r._updateSkyForTime) r._updateSkyForTime(8.5);
@@ -362,8 +373,8 @@ await shot('ss_overview',  { cx: 22, cy: 30, cz: 22, lx: 0, ly: 1, lz: 0, fov: 5
 // SKYLINE — dramatic low-angle from SW, full tower silhouette against sky
 await shot('ss_skyline',   { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 46 });
 
-// STREET — ground level on road at city edge, looking north into canyon of towers
-await shot('ss_street',    { cx: 0.5, cy: 1.2, cz: 21, lx: 0.5, ly: 5.0, lz: -4, fov: 68 });
+// STREET — ground level, looking along E-W cross-street with buildings either side
+await shot('ss_street',    { cx: -18, cy: 1.2, cz: 0.5, lx: 4, ly: 4.5, lz: 0.5, fov: 68 });
 
 // PANORAMA — wide arc from NE, city + nature + water in frame
 await shot('ss_panorama',  { cx: 28, cy: 26, cz: -22, lx: -2, ly: 1, lz: 2, fov: 60 });
@@ -374,8 +385,8 @@ await shot('ss_dusk',      { cx: -26, cy: 6, cz: 20, lx: 0, ly: 6, lz: 0, fov: 4
 // NIGHT — city lit by window glow, dark sky
 await shot('ss_night',     { cx: -20, cy: 10, cz: 22, lx: 0, ly: 4, lz: 0, fov: 52, night: true });
 
-// NIGHT STREET — ground level looking up into glowing tower canyon
-await shot('ss_night_street', { cx: 0.5, cy: 1.2, cz: 21, lx: 0.5, ly: 5.0, lz: -4, fov: 68, night: true });
+// NIGHT STREET — ground level along E-W cross-street into glowing tower canyon
+await shot('ss_night_street', { cx: -18, cy: 1.2, cz: 0.5, lx: 4, ly: 4.5, lz: 0.5, fov: 68, night: true });
 
 console.log('\nLogs:', logs.filter(l=>l.startsWith('City')||l.startsWith('Total')||l.startsWith('Placed')));
 await browser.close();

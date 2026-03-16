@@ -1355,8 +1355,8 @@ export class Renderer3D {
                 clone.position.set(wx, terrainY, wz);
                 clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
                 const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
-                // Slightly darker roof color for contrast
-                const roofColor = bldColor.clone().multiplyScalar(0.65);
+                // Darker roof — avoids washout under bright sun
+                const roofColor = bldColor.clone().multiplyScalar(0.42);
                 // Glass/steel buildings get more reflective material
                 const isGlassType = Renderer3D.SKYSCRAPER_TYPES.has(b.type);
                 clone.traverse((child) => {
@@ -3112,8 +3112,8 @@ function terrainTint(t) {
         case TERRAIN_GRASS:    return 0x88c870; // fresh grass green
         case TERRAIN_FOREST:   return 0x3a7a32; // deep forest green
         case TERRAIN_MOUNTAIN: return 0x909888; // olive-gray alpine (less brown, hint of green)
-        case TERRAIN_ROAD:     return 0x686868; // asphalt
-        case TERRAIN_SIDEWALK: return 0xc8c0b0; // light concrete
+        case TERRAIN_ROAD:     return 0x484848; // dark asphalt
+        case TERRAIN_SIDEWALK: return 0x626058; // dark warm concrete — avoid glare under bright sun
         case TERRAIN_PARK:     return 0x60c850; // vivid park green
         case TERRAIN_WATER:    return 0x1878b8; // deep ocean blue
         default: return 0x90a070;               // olive-green fill
@@ -3133,15 +3133,15 @@ const BUILDING_PALETTES = {
     'restaurant':      [0xa05838, 0xb06848, 0x906030, 0xc87040],
     'nightclub':       [0x2a2848, 0x383660, 0x484870, 0x302850],
     // Hotel — warm earth tones, gold glass, stone
-    'hotel':           [0xc8a870, 0xd4b880, 0xb89860, 0xe0c890, 0xa8906a, 0xb8a080],
+    'hotel':           [0x907050, 0x9c8060, 0x806040, 0xa08060, 0x785040, 0x886050],
     // Civic — warm gold stone, marble, classical
-    'town-hall':       [0xd4c090, 0xe8d4a0, 0xc4b080, 0xf0e0b0, 0xd8c8a0, 0xe0d0b0],
+    'town-hall':       [0x8a7848, 0x9a8858, 0x7a6838, 0xa89060, 0x90804a, 0x988858],
     'school':          [0x7098b8, 0x8090a0, 0x6088a8, 0x90a8c0],
     'hospital':        [0x90b8d0, 0x80a8c0, 0xa0c0d8, 0x78a0c0],
     'police-station':  [0x384870, 0x485880, 0x283860, 0x506888],
     'fire-station':    [0xb83028, 0xa82020, 0xc84040, 0xd04030],
     'library':         [0x8a6840, 0x7a5830, 0x9a7850, 0xb08858],
-    'courthouse':      [0xb0a888, 0xa09878, 0xc0b898, 0xd0c8a8],
+    'courthouse':      [0x786850, 0x685840, 0x887860, 0x907858],
     'museum':          [0x806888, 0x907898, 0x705878, 0xa08898],
     'theater':         [0x703848, 0x804858, 0x602838, 0x906858],
     'prison':          [0x585850, 0x686860, 0x484840, 0x707060],
@@ -3170,7 +3170,17 @@ const BUILDING_PALETTES = {
 
 function buildingPaletteColor(type, id) {
     const palette = BUILDING_PALETTES[type] || BUILDING_PALETTES['default'];
-    return palette[(id || 0) % palette.length];
+    const hex = palette[(id || 0) % palette.length];
+    // Cap luminance to ≤ 0.58 so no palette color blows out under 2.2 sun
+    const r = ((hex >> 16) & 0xff) / 255;
+    const g = ((hex >>  8) & 0xff) / 255;
+    const b = ( hex        & 0xff) / 255;
+    const lum = r * 0.299 + g * 0.587 + b * 0.114;
+    if (lum > 0.58) {
+        const s = 0.58 / lum;
+        return (Math.round(r * s * 255) << 16) | (Math.round(g * s * 255) << 8) | Math.round(b * s * 255);
+    }
+    return hex;
 }
 
 function buildingHex(type) {
