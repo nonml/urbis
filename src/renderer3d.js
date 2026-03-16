@@ -3111,7 +3111,7 @@ function terrainTint(t) {
     switch (t) {
         case TERRAIN_GRASS:    return 0x88c870; // fresh grass green
         case TERRAIN_FOREST:   return 0x3a7a32; // deep forest green
-        case TERRAIN_MOUNTAIN: return 0x909888; // olive-gray alpine (less brown, hint of green)
+        case TERRAIN_MOUNTAIN: return 0x686e62; // darker olive-grey alpine rock
         case TERRAIN_ROAD:     return 0x484848; // dark asphalt
         case TERRAIN_SIDEWALK: return 0x626058; // dark warm concrete — avoid glare under bright sun
         case TERRAIN_PARK:     return 0x60c850; // vivid park green

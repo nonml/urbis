@@ -298,8 +298,16 @@ async function render(setup) {
       if (r.sunLightFar) { r.sunLightFar.intensity = 0.01; }
       // Dim IBL env map so sky doesn't dominate — keep at 4% for faint silhouette
       r.scene.traverse(o => {
-        if (o.isMesh && o.material && !Array.isArray(o.material) && o.material.envMapIntensity !== undefined) {
-          o.material.envMapIntensity = 0.04;
+        if (!o.isMesh || !o.material || Array.isArray(o.material)) return;
+        if (o.material.envMapIntensity !== undefined) o.material.envMapIntensity = 0.04;
+        // Desaturate and darken vegetation so trees don't glow bright green at night
+        if (o.material.color) {
+          const c = o.material.color;
+          const lum = c.r * 0.299 + c.g * 0.587 + c.b * 0.114;
+          // Identify green-dominant vegetation materials
+          if (c.g > c.r * 1.3 && c.g > c.b * 1.3) {
+            c.r = lum * 0.25; c.g = lum * 0.30; c.b = lum * 0.20;
+          }
         }
       });
       r.renderer.toneMappingExposure = 1.45;
