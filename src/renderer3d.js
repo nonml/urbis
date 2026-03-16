@@ -3137,7 +3137,7 @@ const BUILDING_PALETTES = {
     // Civic — warm gold stone, marble, classical
     'town-hall':       [0x8a7848, 0x9a8858, 0x7a6838, 0xa89060, 0x90804a, 0x988858],
     'school':          [0x7098b8, 0x8090a0, 0x6088a8, 0x90a8c0],
-    'hospital':        [0x90b8d0, 0x80a8c0, 0xa0c0d8, 0x78a0c0],
+    'hospital':        [0x4a6878, 0x3e5c6c, 0x547080, 0x3a5468],
     'police-station':  [0x384870, 0x485880, 0x283860, 0x506888],
     'fire-station':    [0xb83028, 0xa82020, 0xc84040, 0xd04030],
     'library':         [0x8a6840, 0x7a5830, 0x9a7850, 0xb08858],
@@ -3147,8 +3147,8 @@ const BUILDING_PALETTES = {
     'prison':          [0x585850, 0x686860, 0x484840, 0x707060],
     // Apartments — wide palette: blue glass, dark steel, warm concrete, teal, slate
     'apartment':       [0x384858, 0x3e5060, 0x2c3e4e, 0x485e6e,
-                        0x425650, 0x364858, 0x4e6070, 0x40505e,
-                        0x526076, 0x364054, 0x485e70, 0x384858],
+                        0x584840, 0x4a4038, 0x4e6070, 0x5a5040,
+                        0x526076, 0x3e4830, 0x485e70, 0x604838],
     // Office/tech
     'university':      [0x5a5080, 0x6a6090, 0x4a4070, 0x7a70a0],
     'research-lab':    [0x485868, 0x586878, 0x384858, 0x607088],
