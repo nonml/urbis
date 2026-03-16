@@ -150,6 +150,11 @@ window.showStartScreen = function() {
     document.getElementById('main-menu-overlay').classList.remove('hidden');
 };
 
+// One-time migration: disable tutorial that was on by default
+if (localStorage.getItem('game_settings_show_tutorial') === 'true') {
+    localStorage.setItem('game_settings_show_tutorial', 'false');
+}
+
 // Wait for DOM to load
 document.addEventListener('DOMContentLoaded', async () => {
     // Mount Svelte components

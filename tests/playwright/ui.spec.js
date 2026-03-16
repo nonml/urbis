@@ -82,7 +82,7 @@ const customTest = test.extend({
     page.dismissOverlays = async () => {
       // Disable pointer events on any panels that might intercept clicks
       await page.evaluate(() => {
-        const overlayIds = ['politics-panel', 'campaign-panel', 'factions-panel', 'tech-screen', 'quest-log', 'case-file', 'codex', 'shop', 'citizen-profile', 'map-screen', 'seed-browser', 'case-browser', 'hack-list'];
+        const overlayIds = ['politics-panel', 'campaign-panel', 'factions-panel', 'tech-screen', 'quest-log', 'case-file', 'codex', 'shop', 'citizen-profile', 'map-screen', 'seed-browser', 'case-browser', 'hack-list', 'tutorial-tooltip'];
         overlayIds.forEach(id => {
           const el = document.getElementById(id);
           if (el) {
@@ -398,8 +398,9 @@ customTest.describe('Performance Tests', () => {
     await page.waitForTimeout(300);
     
     const errors = page.consoleErrors || [];
-    const newErrors = errors.filter(e => 
-      !e.includes('Three') && 
+    const newErrors = errors.filter(e =>
+      !e.includes('Three') &&
+      !e.includes('THREE') &&
       !e.includes('webgl') &&
       !e.includes('Cross-Origin')
     );

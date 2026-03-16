@@ -574,6 +574,8 @@ export class TutorialOverlay {
      * Check if tutorial should be shown
      */
     static shouldShowTutorial() {
+        const showSetting = localStorage.getItem('game_settings_show_tutorial');
+        if (showSetting !== 'true') return false;
         const completed = localStorage.getItem('tutorial_completed');
         return completed !== 'true';
     }

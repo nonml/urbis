@@ -112,6 +112,10 @@ export class BudgetManager {
     /**
      * Get debt payment amount (simplified: 5% of total debt per tick)
      */
+    getBalance() {
+        return this.game.resources?.gold ?? this.game.state?.resources?.gold ?? 0;
+    }
+
     getDebtPayment() {
         const debt = this.game.state.economy.debt || 0;
         const payment = Math.max(0, Math.floor(debt * 0.05));

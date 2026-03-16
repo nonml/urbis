@@ -160,7 +160,7 @@ const customTest = test.extend({
           'politics-panel', 'campaign-panel', 'factions-panel', 'tech-screen',
           'quest-log', 'case-file', 'codex', 'shop', 'citizen-profile',
           'map-screen', 'seed-browser', 'case-browser', 'hack-list',
-          'breach-minigame', 'run-summary'
+          'breach-minigame', 'run-summary', 'tutorial-tooltip'
         ];
         overlayIds.forEach(id => {
           const el = document.getElementById(id);
@@ -260,7 +260,7 @@ customTest.describe('Settings Panel Buttons', () => {
     const closeBtn = page.locator('#settings-overlay .btn-close[data-action="close"]');
     await expect(closeBtn).toBeVisible();
     await closeBtn.click();
-    await expect(settingsOverlay).toHaveClass(/hidden/);
+    await expect(settingsOverlay).not.toBeAttached({ timeout: 5000 });
   });
 
   customTest('settings tab buttons should switch tabs', async ({ page }) => {

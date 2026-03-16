@@ -2,7 +2,7 @@
 // Supports: ambient loops, footsteps, UI sounds, crisis stinger
 // Audio assets are loaded from assets/audio/ directory
 
-import { SETTINGS_KEYS, DEFAULT_SETTINGS } from '../ui/settings.js';
+import { SETTINGS_KEYS, DEFAULT_SETTINGS } from '../stores/settings.js';
 import { createSoundscape } from './soundscape.js';
 import { createAudioMixer, AUDIO_CHANNELS, MIXER_PRESETS } from './mixer.js';
 

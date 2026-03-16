@@ -2,45 +2,9 @@
 // Settings persist in localStorage (not in save file)
 // UI is rendered by SettingsPanel.svelte; this class manages persistence + apply logic.
 
-import { THEMES, DEFAULT_THEME, DEFAULT_THEME_SETTINGS } from './theme.js';
-import { settingsStore, settingsPanelOpen } from '../stores/settings.js';
+import { settingsStore, settingsPanelOpen, DEFAULT_SETTINGS, SETTINGS_KEYS } from '../stores/settings.js';
 
-// Default settings
-export const DEFAULT_SETTINGS = {
-    mouseSensitivity: 0.005,
-    invertY: false,
-    masterVolume: 0.8,
-    uiVolume: 1.0,
-    audioVolume: 1.0,
-    renderScale: 1.0,
-    showFPS: false,
-    showTutorial: true,
-    autoSave: true,
-    // Theme and accessibility settings
-    theme: DEFAULT_THEME,
-    fontScale: 1.0,
-    reducedMotion: false,
-    highContrast: false,
-    colorblindMode: 'none'
-};
-
-// Settings keys for localStorage
-export const SETTINGS_KEYS = {
-    mouseSensitivity: 'game_settings_mouse_sensitivity',
-    invertY: 'game_settings_invert_y',
-    masterVolume: 'game_settings_master_volume',
-    uiVolume: 'game_settings_ui_volume',
-    audioVolume: 'game_settings_audio_volume',
-    renderScale: 'game_settings_render_scale',
-    showFPS: 'game_settings_show_fps',
-    showTutorial: 'game_settings_show_tutorial',
-    autoSave: 'game_settings_auto_save',
-    theme: 'game_settings_theme',
-    fontScale: 'game_settings_font_scale',
-    reducedMotion: 'game_settings_reduced_motion',
-    highContrast: 'game_settings_high_contrast',
-    colorblindMode: 'game_settings_colorblind_mode'
-};
+export { DEFAULT_SETTINGS, SETTINGS_KEYS };
 
 /**
  * Settings Manager - Handles settings persistence and apply-side-effects.

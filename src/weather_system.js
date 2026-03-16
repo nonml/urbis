@@ -121,7 +121,7 @@ export class WeatherSystem {
         // Update temperature range
         const tempRange = this.seasonalTemp[this.state.season];
         if (this.rng) {
-            this.state.temperature = tempRange.min + this.rng.range(0, tempRange.max - tempRange.min);
+            this.state.temperature = tempRange.min + this.rng.float(0, tempRange.max - tempRange.min);
         } else {
             this.state.temperature = (tempRange.min + tempRange.max) / 2;
         }
@@ -139,7 +139,7 @@ export class WeatherSystem {
             return;
         }
         
-        const roll = this.rng.range(0, 1);
+        const roll = this.rng.next();
         let newWeather = WEATHER_CLEAR;
         let duration = 60; // Default duration in ticks
         

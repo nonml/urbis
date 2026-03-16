@@ -259,24 +259,23 @@ export class LightingManager {
             const t = this.transitionProgress;
             const smoothT = t * t * (3 - 2 * t); // Smoothstep
 
+            // Inline lerp helpers to avoid method availability issues
+            const lerpN = (a, b, t) => a + (b - a) * t;
+            const lerpHex = (color, fromHex, toHex, t) => {
+                const fr = ((fromHex >> 16) & 255) / 255, fg = ((fromHex >> 8) & 255) / 255, fb = (fromHex & 255) / 255;
+                const tr = ((toHex >> 16) & 255) / 255, tg = ((toHex >> 8) & 255) / 255, tb = (toHex & 255) / 255;
+                color.r = lerpN(fr, tr, t); color.g = lerpN(fg, tg, t); color.b = lerpN(fb, tb, t);
+            };
+
             // Interpolate colors
-            this._skyColor.lerpColors(
-                new (typeof THREE !== 'undefined' ? THREE.Color : ColorProxy)(this.currentPreset.skyColor),
-                new (typeof THREE !== 'undefined' ? THREE.Color : ColorProxy)(this.targetPreset.skyColor),
-                smoothT
-            );
-            this._fogColor.lerpColors(
-                new (typeof THREE !== 'undefined' ? THREE.Color : ColorProxy)(this.currentPreset.fogColor),
-                new (typeof THREE !== 'undefined' ? THREE.Color : ColorProxy)(this.targetPreset.fogColor),
-                smoothT
-            );
+            lerpHex(this._skyColor, this.currentPreset.skyColor, this.targetPreset.skyColor, smoothT);
+            lerpHex(this._fogColor, this.currentPreset.fogColor, this.targetPreset.fogColor, smoothT);
+            lerpHex(this._currentTint, this.currentPreset.tint, this.targetPreset.tint, smoothT);
 
             // Interpolate color grading parameters
-            const targetTint = new (typeof THREE !== 'undefined' ? THREE.Color : ColorProxy)(this.targetPreset.tint);
-            this._currentTint.lerpColors(this._currentTint.clone(), targetTint, smoothT);
-            this._currentTintStrength = THREE.MathUtils.lerp(this._currentTintStrength, this.targetPreset.tintStrength, smoothT);
-            this._currentSaturation = THREE.MathUtils.lerp(this._currentSaturation, this.targetPreset.saturation, smoothT);
-            this._currentBrightness = THREE.MathUtils.lerp(this._currentBrightness, this.targetPreset.brightness, smoothT);
+            this._currentTintStrength = lerpN(this._currentTintStrength, this.targetPreset.tintStrength, smoothT);
+            this._currentSaturation = lerpN(this._currentSaturation, this.targetPreset.saturation, smoothT);
+            this._currentBrightness = lerpN(this._currentBrightness, this.targetPreset.brightness, smoothT);
         }
         
         // Update star/moon visibility
@@ -426,6 +425,10 @@ class ColorProxy {
         this.g = this.g + (target.g - this.g) * t;
         this.b = this.b + (target.b - this.b) * t;
         return this;
+    }
+
+    lerp(color, alpha) {
+        return this.lerpColors(color, alpha);
     }
     
     copy(other) {

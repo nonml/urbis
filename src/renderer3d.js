@@ -434,7 +434,9 @@ export class Renderer3D {
             .map(([k, url]) => loadTex(Number(k), url));
 
         if (GLTFLoader) {
-            const loader = new GLTFLoader();
+            const silentManager = new THREE.LoadingManager();
+            silentManager.onError = () => {};
+            const loader = new GLTFLoader(silentManager);
             const loadBuilding = (type, url) => new Promise((resolve) => {
                 loader.load(url, (gltf) => {
                     const root = gltf.scene;

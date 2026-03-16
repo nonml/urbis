@@ -72,13 +72,14 @@
     <div class="overlay-content settings-content">
         <div class="overlay-header">
             <h2>Settings</h2>
-            <button class="btn-close" aria-label="Close settings" on:click={close}>✕</button>
+            <button class="btn-close" data-action="close" aria-label="Close settings" on:click={close}>✕</button>
         </div>
 
         <!-- Tabs -->
         <div class="settings-tabs" role="tablist" aria-label="Settings categories">
             {#each tabs as tab, idx}
             <button class="tab" class:active={activeTab === tab.id}
+                    data-tab={tab.id}
                     role="tab" aria-selected={activeTab === tab.id}
                     on:click={() => activeTab = tab.id}
                     on:keydown={(e) => onKeydownTab(e, idx)}>
@@ -91,7 +92,7 @@
 
             <!-- Controls -->
             {#if activeTab === 'controls'}
-            <div class="settings-tab-content active" role="tabpanel" tabindex="0">
+            <div class="settings-tab-content active" data-content="controls" role="tabpanel" tabindex="0">
                 <div class="setting-row">
                     <label for="mouse-sensitivity">Mouse Sensitivity</label>
                     <div class="slider-container">
@@ -114,7 +115,7 @@
 
             <!-- Graphics -->
             {#if activeTab === 'graphics'}
-            <div class="settings-tab-content active" role="tabpanel" tabindex="0">
+            <div class="settings-tab-content active" data-content="graphics" role="tabpanel" tabindex="0">
                 <div class="setting-row">
                     <label for="render-scale">Render Scale</label>
                     <div class="slider-container">
@@ -184,7 +185,7 @@
 
             <!-- Audio -->
             {#if activeTab === 'audio'}
-            <div class="settings-tab-content active" role="tabpanel" tabindex="0">
+            <div class="settings-tab-content active" data-content="audio" role="tabpanel" tabindex="0">
                 <div class="setting-row">
                     <label for="master-volume">Master Volume</label>
                     <div class="slider-container">
@@ -217,7 +218,7 @@
 
             <!-- System -->
             {#if activeTab === 'system'}
-            <div class="settings-tab-content active" role="tabpanel" tabindex="0">
+            <div class="settings-tab-content active" data-content="system" role="tabpanel" tabindex="0">
                 <div class="setting-row">
                     <label class="checkbox-label">
                         <input type="checkbox" id="show-tutorial" checked={s.showTutorial}
@@ -233,10 +234,10 @@
                     </label>
                 </div>
                 <div class="setting-row">
-                    <button class="btn" on:click={resetDefaults}>Reset to Defaults</button>
+                    <button id="reset-settings" class="btn" on:click={resetDefaults}>Reset to Defaults</button>
                 </div>
                 <div class="setting-row">
-                    <button class="btn btn-secondary" on:click={knownIssues}>
+                    <button id="known-issues-btn" class="btn btn-secondary" on:click={knownIssues}>
                         <svg width="16" height="16" viewBox="0 0 24 24" style="margin-right:8px;vertical-align:middle">
                             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
                         </svg>
