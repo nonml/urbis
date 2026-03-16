@@ -1281,8 +1281,11 @@ export class Renderer3D {
                 const clone = model.clone(true);
                 // Skyscraper variants load at scale=1.0; apply type scale here
                 if (useSkyscraperScale) {
-                    const s = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
-                    clone.scale.setScalar(s);
+                    const baseScale = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
+                    // Per-building height variation ±30% for natural skyline stepped profile
+                    const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                    const heightMult = 0.70 + heightHash * 0.60; // 0.70 to 1.30x base
+                    clone.scale.setScalar(baseScale * heightMult);
                 }
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
@@ -2980,14 +2983,14 @@ function terrainHex(t) {
 /** Multiplicative tint applied on top of the texture map */
 function terrainTint(t) {
     switch (t) {
-        case TERRAIN_GRASS:    return 0x7acc6e; // bright grass green
-        case TERRAIN_FOREST:   return 0x4a8c42; // rich forest green
-        case TERRAIN_MOUNTAIN: return 0xa09080; // warm gray rock
-        case TERRAIN_ROAD:     return 0x606060; // asphalt gray
-        case TERRAIN_SIDEWALK: return 0xc0b8a8; // light concrete
-        case TERRAIN_PARK:     return 0x5abf50; // vivid park green
-        case TERRAIN_WATER:    return 0x2080b8; // clear ocean blue
-        default: return 0xc8b080;               // sandy dirt
+        case TERRAIN_GRASS:    return 0x88c870; // fresh grass green
+        case TERRAIN_FOREST:   return 0x3a7a32; // deep forest green
+        case TERRAIN_MOUNTAIN: return 0x8a8878; // muted gray-green rock (less brown)
+        case TERRAIN_ROAD:     return 0x686868; // asphalt
+        case TERRAIN_SIDEWALK: return 0xc8c0b0; // light concrete
+        case TERRAIN_PARK:     return 0x60c850; // vivid park green
+        case TERRAIN_WATER:    return 0x1878b8; // deep ocean blue
+        default: return 0x90a070;               // olive-green fill
     }
 }
 
