@@ -288,18 +288,24 @@ async function render(setup) {
       // Window glow: moderate visibility at dusk
       r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.60; });
     } else if (s.night) {
-      // Night — dark navy sky, city lit only by window glow + dim ambient
+      // Night — dark sky, buildings barely lit, window glow is primary light source
       if (r._updateSkyForTime) r._updateSkyForTime(0);
-      r.scene.background.setHex(0x05101e);
-      if (r.scene.fog) { r.scene.fog.color.setHex(0x05101e); r.scene.fog.density = 0.0008; }
-      if (r.hemiLight)   { r.hemiLight.color.setHex(0x2040a0); r.hemiLight.groundColor.setHex(0x102030); r.hemiLight.intensity = 0.10; }
-      if (r.ambientLight) { r.ambientLight.color.setHex(0x203060); r.ambientLight.intensity = 0.08; }
-      if (r.sunLight)    { r.sunLight.intensity = 0.04; }
-      if (r.sunLightFar) { r.sunLightFar.intensity = 0.04; }
-      r.renderer.toneMappingExposure = 1.25;
-      if (r._bloomPass) { r._bloomPass.strength = 0.30; r._bloomPass.threshold = 0.80; }
-      // Boost window glow at night — 0.80 keeps windows visible without over-blooming
-      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.80; });
+      r.scene.background.setHex(0x04091a);
+      if (r.scene.fog) { r.scene.fog.color.setHex(0x04091a); r.scene.fog.density = 0.0006; }
+      if (r.hemiLight)   { r.hemiLight.color.setHex(0x1a2d68); r.hemiLight.groundColor.setHex(0x0a0e22); r.hemiLight.intensity = 0.22; }
+      if (r.ambientLight) { r.ambientLight.color.setHex(0x0e1530); r.ambientLight.intensity = 0.12; }
+      if (r.sunLight)    { r.sunLight.intensity = 0.015; }
+      if (r.sunLightFar) { r.sunLightFar.intensity = 0.01; }
+      // Dim IBL env map so sky doesn't dominate — keep at 4% for faint silhouette
+      r.scene.traverse(o => {
+        if (o.isMesh && o.material && !Array.isArray(o.material) && o.material.envMapIntensity !== undefined) {
+          o.material.envMapIntensity = 0.04;
+        }
+      });
+      r.renderer.toneMappingExposure = 1.45;
+      if (r._bloomPass) { r._bloomPass.strength = 0.32; r._bloomPass.threshold = 0.78; }
+      // Full window glow brightness at night
+      r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.90; });
     } else {
       // Daytime — 8:30am, long dramatic shadows
       if (r._updateSkyForTime) r._updateSkyForTime(8.5);
