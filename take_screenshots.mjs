@@ -321,9 +321,9 @@ async function render(setup) {
       if (r.scene.fog) { r.scene.fog.color.setHex(0xaad4f0); r.scene.fog.density = 0.0010; }
       if (r.hemiLight)   { r.hemiLight.color.setHex(0x9fd8fb); r.hemiLight.groundColor.setHex(0x4a7a3a); r.hemiLight.intensity = 0.70; }
       if (r.ambientLight) { r.ambientLight.color.setHex(0xfff8f0); r.ambientLight.intensity = 0.30; }
-      if (r.sunLight)    { r.sunLight.color.setHex(0xfffbe0); r.sunLight.intensity = 2.2; }
-      if (r.sunLightFar) { r.sunLightFar.color.setHex(0xfffbe0); r.sunLightFar.intensity = 1.2; }
-      r.renderer.toneMappingExposure = 1.05;
+      if (r.sunLight)    { r.sunLight.color.setHex(0xfffbe0); r.sunLight.intensity = 1.75; }
+      if (r.sunLightFar) { r.sunLightFar.color.setHex(0xfffbe0); r.sunLightFar.intensity = 0.95; }
+      r.renderer.toneMappingExposure = 1.10;
       if (r._bloomPass) { r._bloomPass.strength = 0.10; r._bloomPass.threshold = 0.92; }
       // Window glow: subtle in daylight
       r.scene.traverse(o => { if (o.isMesh && o.material?.blending === 2) o.material.opacity = 0.55; });
