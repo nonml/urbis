@@ -504,6 +504,21 @@ export class Renderer3D {
         'wind-farm':         'assets/models/kenney_commercial/low-detail-building-b.glb',
     };
 
+    /** All 5 kenney_commercial skyscraper models — rotated through tall building types */
+    static SKYSCRAPER_VARIANTS = [
+        'assets/models/kenney_commercial/building-skyscraper-a.glb',
+        'assets/models/kenney_commercial/building-skyscraper-b.glb',
+        'assets/models/kenney_commercial/building-skyscraper-c.glb',
+        'assets/models/kenney_commercial/building-skyscraper-d.glb',
+        'assets/models/kenney_commercial/building-skyscraper-e.glb',
+    ];
+
+    /** Building types that cycle through all skyscraper variants */
+    static SKYSCRAPER_TYPES = new Set([
+        'apartment', 'hotel', 'town-hall', 'shopping-mall', 'stadium',
+        'university', 'airport', 'nuclear-plant',
+    ]);
+
     /** Variant models for 'house' type — all 21 kenney_suburban building types */
     static HOUSE_VARIANTS = [
         'assets/models/kenney_suburban/building-type-a.glb',
@@ -648,6 +663,23 @@ export class Renderer3D {
                 const url = Renderer3D.HOUSE_VARIANTS[i];
                 const variantKey = `house-variant-${i}`;
                 jobs.push(loadBuilding(variantKey, url));
+            }
+            // Load skyscraper variants at scale=1.0; scale applied per-type at placement
+            for (let i = 0; i < Renderer3D.SKYSCRAPER_VARIANTS.length; i++) {
+                const url = Renderer3D.SKYSCRAPER_VARIANTS[i];
+                jobs.push(new Promise((resolve) => {
+                    loader.load(url, (gltf) => {
+                        const root = gltf.scene;
+                        root.scale.setScalar(1.0);
+                        const box = new THREE.Box3().setFromObject(root);
+                        const center = box.getCenter(new THREE.Vector3());
+                        root.position.x -= center.x;
+                        root.position.z -= center.z;
+                        root.position.y -= box.min.y;
+                        this._gltfModels.set(`skyscraper-variant-${i}`, root);
+                        resolve();
+                    }, undefined, () => resolve());
+                }));
             }
             for (const [type, url] of Object.entries(Renderer3D.VEHICLE_MODEL_MAP)) {
                 jobs.push(loadVehicle(type, url));
@@ -1232,15 +1264,26 @@ export class Renderer3D {
 
         for (const b of buildings) {
             if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
-            // For houses, select a variant model based on building id for visual diversity
+            // Select model variant for visual diversity
             let model = this._gltfModels.get(b.type);
+            let useSkyscraperScale = false;
             if (b.type === 'house' && Renderer3D.HOUSE_VARIANTS.length > 0) {
                 const variantIdx = (b.id || 0) % Renderer3D.HOUSE_VARIANTS.length;
                 const variantModel = this._gltfModels.get(`house-variant-${variantIdx}`);
                 if (variantModel) model = variantModel;
+            } else if (Renderer3D.SKYSCRAPER_TYPES.has(b.type)) {
+                // Pick skyscraper variant by position hash for spatial variety
+                const h = (((b.x * 374761393 + b.y * 668265263) >>> 0) % Renderer3D.SKYSCRAPER_VARIANTS.length);
+                const variantModel = this._gltfModels.get(`skyscraper-variant-${h}`);
+                if (variantModel) { model = variantModel; useSkyscraperScale = true; }
             }
             if (model) {
                 const clone = model.clone(true);
+                // Skyscraper variants load at scale=1.0; apply type scale here
+                if (useSkyscraperScale) {
+                    const s = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
+                    clone.scale.setScalar(s);
+                }
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
                 const terrainY = this._smoothTerrainY(b.x, b.y);
@@ -2943,43 +2986,48 @@ function terrainTint(t) {
 
 /** Per-type color palettes — muted/realistic architectural tones like Cities: Skylines */
 const BUILDING_PALETTES = {
-    // Residential — warm brick, terracotta, slate, cream
-    'house':           [0xb87050, 0xc4886a, 0x9a7860, 0x8898b0, 0xc09870, 0xa07868, 0x788898, 0xb0a080],
+    // Residential — warm brick, terracotta, slate, cream, sage
+    'house':           [0xb87050, 0xc4886a, 0x9a7860, 0x8898b0, 0xc09870, 0xa07868, 0x788898, 0xb0a080,
+                        0xc8a888, 0x7890a0, 0xd4b090, 0x9880a0],
     'farm':            [0xc8944a, 0xd4a860, 0xb88038, 0xe0b860],
     'lumber-mill':     [0x906040, 0x7a4a28, 0xa87050],
-    // Commercial — glass blue-gray, steel
-    'market':          [0x4a6888, 0x5878a0, 0x385878, 0x6888a8],
-    'shopping-mall':   [0x607890, 0x708898, 0x506880, 0x8098a8],
-    'restaurant':      [0xa05838, 0xb06848, 0x906030],
-    'nightclub':       [0x2a2848, 0x383660, 0x484870],
-    'hotel':           [0x8a7060, 0x9a8070, 0x786050, 0xa89080],
-    // Civic — institutional gray, tan, warm white
-    'town-hall':       [0xd4c090, 0xe8d4a0, 0xc4b080, 0xf0e0b0],  // warm gov marble/stone
-    'school':          [0x7098b8, 0x8090a0, 0x6088a8],
-    'hospital':        [0xd8e0e8, 0xc8d8e0, 0xe0e8f0],
-    'police-station':  [0x384870, 0x485880, 0x283860],
-    'fire-station':    [0xb83028, 0xa82020, 0xc84040],
-    'library':         [0x8a6840, 0x7a5830, 0x9a7850],
-    'courthouse':      [0xb0a888, 0xa09878, 0xc0b898],
-    'museum':          [0x806888, 0x907898, 0x705878],
-    'theater':         [0x703848, 0x804858, 0x602838],
-    'prison':          [0x585850, 0x686860, 0x484840],
-    // Office/tech — dark glass, blue steel
-    'apartment':       [0x4a6070, 0x506878, 0x3a5060, 0x607888],
-    'university':      [0x5a5080, 0x6a6090, 0x4a4070],
-    'research-lab':    [0x485868, 0x586878, 0x384858],
+    // Commercial — glass blue, steel, bronze, warm gray
+    'market':          [0x4a6888, 0x5878a0, 0x385878, 0x6888a8, 0x607070, 0x486080],
+    'shopping-mall':   [0x607890, 0x6888a0, 0x7890a8, 0x9ab0c0, 0x506880, 0x8898b0],
+    'restaurant':      [0xa05838, 0xb06848, 0x906030, 0xc87040],
+    'nightclub':       [0x2a2848, 0x383660, 0x484870, 0x302850],
+    // Hotel — warm earth tones, gold glass, stone
+    'hotel':           [0xc8a870, 0xd4b880, 0xb89860, 0xe0c890, 0xa8906a, 0xb8a080],
+    // Civic — warm gold stone, marble, classical
+    'town-hall':       [0xd4c090, 0xe8d4a0, 0xc4b080, 0xf0e0b0, 0xd8c8a0, 0xe0d0b0],
+    'school':          [0x7098b8, 0x8090a0, 0x6088a8, 0x90a8c0],
+    'hospital':        [0xd8e0e8, 0xc8d8e0, 0xe0e8f0, 0xd0e0f0],
+    'police-station':  [0x384870, 0x485880, 0x283860, 0x506888],
+    'fire-station':    [0xb83028, 0xa82020, 0xc84040, 0xd04030],
+    'library':         [0x8a6840, 0x7a5830, 0x9a7850, 0xb08858],
+    'courthouse':      [0xb0a888, 0xa09878, 0xc0b898, 0xd0c8a8],
+    'museum':          [0x806888, 0x907898, 0x705878, 0xa08898],
+    'theater':         [0x703848, 0x804858, 0x602838, 0x906858],
+    'prison':          [0x585850, 0x686860, 0x484840, 0x707060],
+    // Apartments — wide palette: blue glass, dark steel, warm concrete, teal, slate
+    'apartment':       [0x4a6070, 0x506878, 0x3a5060, 0x607888,
+                        0x5a7068, 0x486070, 0x708090, 0x586880,
+                        0x7888a0, 0x4a5870, 0x688098, 0x506070],
+    // Office/tech
+    'university':      [0x5a5080, 0x6a6090, 0x4a4070, 0x7a70a0],
+    'research-lab':    [0x485868, 0x586878, 0x384858, 0x607088],
     // Infrastructure
-    'warehouse':       [0x8090a0, 0x90a0b0, 0x7080908],
+    'warehouse':       [0x8090a0, 0x90a0b0, 0x708090, 0xa0b0c0],
     'barracks':        [0x607050, 0x506040, 0x708060],
-    'airport':         [0xa8b0b8, 0xb8c0c8, 0x989fa8],
+    'airport':         [0xa8b0b8, 0xb8c0c8, 0x989fa8, 0xc0c8d0],
     'factory':         [0x7a7060, 0x8a8070, 0x6a6050],
-    'nuclear-plant':   [0xc0c0c0, 0xd0d0d0, 0xb0b0b0],
+    'nuclear-plant':   [0xb8c0c8, 0xc8d0d8, 0xa8b0b8],
     'power-plant':     [0x707880, 0x808890, 0x606070],
     'water-treatment': [0x5878a8, 0x6888b8, 0x486898],
     'solar-farm':      [0x203858, 0x2a4868, 0x183048],
     'wind-farm':       [0xd0d8e0, 0xc0c8d0, 0xe0e8f0],
     'port':            [0x8a7a5a, 0x9a8a6a, 0x7a6a4a],
-    'stadium':         [0x406880, 0x507890, 0x305870],
+    'stadium':         [0x406880, 0x507890, 0x305870, 0x6080a0],
     'recycling-plant': [0x406840, 0x507850, 0x305830],
     'default':         [0xa09880, 0xb0a890, 0x908870, 0xc0b8a0],
 };

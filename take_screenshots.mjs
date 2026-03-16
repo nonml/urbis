@@ -92,13 +92,12 @@ await page.evaluate(() => {
   // --- Flatten city area to grass and add road grid ---
   const TERRAIN_GRASS = 1;
   const TERRAIN_ROAD = 4;
-  const FLATTEN_R = 18;
+  const FLATTEN_R = 20;
   for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
     for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
       const x = cx + dx, y = cy + dy;
       if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) continue;
       if (dx*dx + dy*dy > FLATTEN_R*FLATTEN_R) continue;
-      // Roads every 4 tiles as a city grid
       const isRoadX = (Math.abs(dx) % 4 === 0);
       const isRoadY = (Math.abs(dy) % 4 === 0);
       game.map.setTileAt(x, y, (isRoadX || isRoadY) ? TERRAIN_ROAD : TERRAIN_GRASS);
@@ -108,7 +107,7 @@ await page.evaluate(() => {
   const canBuild = (x, y) => {
     if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) return false;
     const t = game.map.getTileAt(x, y);
-    return t === TERRAIN_GRASS; // only on grass, not on roads/water/mountain
+    return t === TERRAIN_GRASS; // only on grass — not road, park, water, mountain
   };
 
   // Downtown core: tall landmark buildings, varied colors
