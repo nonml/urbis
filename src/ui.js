@@ -1,5 +1,6 @@
 // UI manager for DOM + third-person 3D rendering
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
+import { BUILDING_EXTENDED, isBuildingUnlocked, getBuildingRequirements } from './buildings_extended.js';
 import { resourceStore } from './stores/resources.js';
 import { MapScreen } from './ui/map_screen.js';
 import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
@@ -434,7 +435,6 @@ export class UIManager {
 
         // Add security buildings (only if unlocked via progression)
         for (const [key, security] of Object.entries(BUILDING_SECURITY)) {
-            // Check if player has unlocked security buildings
             const securityUnlocked = this.game.state.progression?.unlocked?.includes('security_buildings');
             const rewardUnlock = this.game.state.progress?.unlocks?.buildings?.includes(key) ||
                 this.game.state.progress?.unlocks?.buildings?.includes('security_buildings');
@@ -442,12 +442,63 @@ export class UIManager {
                 this.createBuildingCard(grid, key, security, true);
             }
         }
+
+        // Populate City tab and set up tab switching
+        this.refreshCityBuildingTab();
+        this._setupBuildTabs();
     }
 
-    createBuildingCard(grid, key, building, isSecurity = false) {
+    _setupBuildTabs() {
+        const tabs = document.querySelectorAll('.build-tab');
+        if (!tabs.length) return;
+        tabs.forEach(tab => {
+            tab.addEventListener('click', () => {
+                tabs.forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+                const which = tab.dataset.tab;
+                document.getElementById('building-grid').style.display = which === 'core' ? '' : 'none';
+                document.getElementById('building-grid-city').style.display = which === 'city' ? '' : 'none';
+            });
+        });
+    }
+
+    refreshCityBuildingTab() {
+        const grid = document.getElementById('building-grid-city');
+        if (!grid) return;
+        grid.innerHTML = '';
+        const pop = this.game.resources?.population ?? 0;
+        const techLevel = this.game.state?.tech?.level ?? 0;
+        const cityState = { population: pop, techLevel };
+
+        // Group extended buildings by category
+        const CATEGORIES = [
+            { label: 'Services',   keys: ['hospital','fire-station','school','library','university','research-lab','courthouse','prison'] },
+            { label: 'Commerce',   keys: ['theater','museum','shopping-mall','hotel','restaurant','nightclub','apartment'] },
+            { label: 'Industry',   keys: ['factory','water-treatment','power-plant','substation','nuclear-plant','recycling-plant','solar-farm','wind-farm'] },
+            { label: 'Civic',      keys: ['airport','port','stadium'] },
+            { label: 'Transit',    keys: ['bus-stop','bus-depot','metro-station','tollway-gate','highway-ramp','subway-shaft'] },
+        ];
+
+        for (const { label, keys } of CATEGORIES) {
+            const validKeys = keys.filter(k => BUILDING_EXTENDED[k]);
+            if (!validKeys.length) continue;
+            const header = document.createElement('div');
+            header.className = 'building-category-header';
+            header.textContent = label;
+            grid.appendChild(header);
+            for (const key of validKeys) {
+                const building = BUILDING_EXTENDED[key];
+                const unlocked = isBuildingUnlocked(key, cityState);
+                this.createBuildingCard(grid, key, building, false, !unlocked);
+            }
+        }
+    }
+
+    createBuildingCard(grid, key, building, isSecurity = false, isLocked = false) {
         const card = document.createElement('div');
-        card.className = `building-card ${isSecurity ? 'security-building' : ''}`;
+        card.className = `building-card${isSecurity ? ' security-building' : ''}${isLocked ? ' locked' : ''}`;
         card.dataset.type = key;
+        const reqText = isLocked ? getBuildingRequirements(key) : '';
         card.innerHTML = `
             <div class="building-icon">${building.icon}</div>
             <div class="building-info">
@@ -459,16 +510,19 @@ export class UIManager {
                     ${building.cost.food ? `<span class="cost-item food">🌾${building.cost.food}</span>` : ''}
                 </div>
                 ${isSecurity ? `<div class="building-security-note">Reduces heat & rival effectiveness</div>` : ''}
+                ${isLocked ? `<div class="building-unlock-req">🔒 Requires: ${reqText}</div>` : ''}
             </div>
         `;
-        card.addEventListener('click', () => {
-            document.querySelectorAll('.building-card').forEach(o => o.classList.remove('selected'));
-            card.classList.add('selected');
-            this.selectedBuilding = key;
-            this.buildMenu.selectType(key);
-            this.showMessage(`Selected: ${building.name}`, 'success');
-            this.playUISound('click');
-        });
+        if (!isLocked) {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.building-card').forEach(o => o.classList.remove('selected'));
+                card.classList.add('selected');
+                this.selectedBuilding = key;
+                this.buildMenu.selectType(key);
+                this.showMessage(`Selected: ${building.name}`, 'success');
+                this.playUISound('click');
+            });
+        }
         grid.appendChild(card);
     }
 
@@ -982,6 +1036,15 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     updateResources(resources = this.game?.resources) {
         if (!resources) return;
         const g = Math.floor(resources.gold), f = Math.floor(resources.food), w = Math.floor(resources.wood);
+
+        // Refresh City tab unlock states at population milestones
+        const pop = resources.population ?? 0;
+        const prevPop = this._lastTabRefreshPop ?? -1;
+        const MILESTONES = [20, 30, 50, 60, 80, 100, 150, 200];
+        if (MILESTONES.some(m => prevPop < m && pop >= m)) {
+            this.refreshCityBuildingTab();
+        }
+        this._lastTabRefreshPop = pop;
 
         // Emit VFX events for floating text (unchanged logic, just use local vars)
         this._emitResourceVFX('gold-amount', g);
