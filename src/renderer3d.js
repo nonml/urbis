@@ -82,7 +82,7 @@ export async function createRenderer3D(game, canvas) {
     await loadThreeJS();
     return new Renderer3D(game, canvas);
 }
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK, TERRAIN_HIGHWAY, TERRAIN_BRIDGE, TERRAIN_TUNNEL, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
@@ -312,6 +312,8 @@ export class Renderer3D {
         this._roadModels = new Map();
         // Street prop model library: propName -> THREE.Group
         this._propModels = new Map();
+        this._bridgeModels = new Map();  // road-bridge, bridge-pillar
+        this._transitModels = new Map(); // bus, metro entrance geometry
 
         // Vehicle GLTF model library: vehicleType -> THREE.Group
         this._vehicleModels = new Map();
@@ -442,6 +444,8 @@ export class Renderer3D {
     static PROP_MODEL_MAP = {
         'light-square':       'assets/models/kenney_roads/light-square.glb',
         'construction-cone':  'assets/models/kenney_roads/construction-cone.glb',
+        'sign-highway':       'assets/models/kenney_roads/sign-highway.glb',
+        'bridge-pillar':      'assets/models/kenney_roads/bridge-pillar.glb',
     };
 
     /** Vegetation model paths */
@@ -461,6 +465,8 @@ export class Renderer3D {
         'police':          'assets/models/kenney_vehicles/police.glb',
         'hatchback-sports':'assets/models/kenney_vehicles/hatchback-sports.glb',
         'delivery':        'assets/models/kenney_vehicles/delivery.glb',
+        'firetruck':       'assets/models/kenney_vehicles/firetruck.glb',
+        'garbage-truck':   'assets/models/kenney_vehicles/garbage-truck.glb',
     };
 
     static MODEL_MAP = {
@@ -503,6 +509,13 @@ export class Renderer3D {
         'recycling-plant':   'assets/models/kenney_commercial/building-e.glb',
         'solar-farm':        'assets/models/kenney_commercial/low-detail-building-a.glb',
         'wind-farm':         'assets/models/kenney_commercial/low-detail-building-b.glb',
+        // Transit / infrastructure (reuse suitable existing models)
+        'bus-stop':          'assets/models/kenney_suburban/building-type-f.glb',
+        'bus-depot':         'assets/models/kenney_commercial/building-d.glb',
+        'metro-station':     'assets/models/kenney_commercial/building-b.glb',
+        'tollway-gate':      'assets/models/kenney_suburban/building-type-d.glb',
+        'highway-ramp':      'assets/models/kenney_commercial/low-detail-building-a.glb',
+        'subway-shaft':      'assets/models/kenney_suburban/building-type-e.glb',
     };
 
     /** All 5 kenney_commercial skyscraper models — rotated through tall building types */
@@ -572,6 +585,13 @@ export class Renderer3D {
         'warehouse':        0.85,
         'factory':          0.95,
         'lumber-mill':      0.8,
+        // Transit / infrastructure
+        'bus-stop':         0.60,
+        'bus-depot':        0.88,
+        'metro-station':    0.92,
+        'tollway-gate':     0.58,
+        'highway-ramp':     0.72,
+        'subway-shaft':     0.68,
         // Default residential
         default:            0.72,
     };
@@ -761,6 +781,9 @@ export class Renderer3D {
         }
 
         await Promise.all(jobs);
+
+        // Procedural bus (no bus.glb in asset pack)
+        this._vehicleModels.set('bus', this._createProceduralBus());
 
         // Initialize post-processing and sky (async addon imports)
         await this._initPostProcessing();
@@ -1112,7 +1135,135 @@ export class Renderer3D {
                     objects.push(glowSphere);
                 }
             }
+
+            // Traffic lights at 4-way road intersections
+            {
+                const n  = this.game.map.getTileAt(tile.x,     tile.y - 1);
+                const s  = this.game.map.getTileAt(tile.x,     tile.y + 1);
+                const e  = this.game.map.getTileAt(tile.x + 1, tile.y    );
+                const w  = this.game.map.getTileAt(tile.x - 1, tile.y    );
+                const isIntersection = [n, s, e, w].every(t =>
+                    t === TERRAIN_ROAD || t === TERRAIN_HIGHWAY
+                );
+                if (isIntersection && hash(tile.x, tile.y, 300) < 0.5) {
+                    const terrainY = this._smoothTerrainY(tile.x, tile.y);
+                    const tl = this._buildTrafficLight(wx + 0.45, terrainY, wz + 0.45);
+                    objects.push(...tl);
+                }
+            }
         }
+        return objects;
+    }
+
+    /** Procedural city bus model built from THREE primitives */
+    _createProceduralBus() {
+        const group = new THREE.Group();
+        // Main body — elongated box
+        const bodyGeom = new THREE.BoxGeometry(0.38, 0.22, 0.88);
+        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a4a8a, roughness: 0.6, metalness: 0.05 });
+        const body = new THREE.Mesh(bodyGeom, bodyMat);
+        body.position.set(0, 0.14, 0);
+        body.castShadow = true;
+        group.add(body);
+        // Roof
+        const roofGeom = new THREE.BoxGeometry(0.36, 0.04, 0.86);
+        const roofMat = new THREE.MeshStandardMaterial({ color: 0x143a70, roughness: 0.7 });
+        const roof = new THREE.Mesh(roofGeom, roofMat);
+        roof.position.set(0, 0.27, 0);
+        group.add(roof);
+        // Windows — side strips
+        const winGeom = new THREE.BoxGeometry(0.01, 0.08, 0.72);
+        const winMat = new THREE.MeshStandardMaterial({ color: 0xaaccee, roughness: 0.2, metalness: 0.1, emissive: 0x334455, emissiveIntensity: 0.2 });
+        for (const side of [-0.195, 0.195]) {
+            const win = new THREE.Mesh(winGeom, winMat);
+            win.position.set(side, 0.17, 0);
+            group.add(win);
+        }
+        // Wheels (4)
+        const wheelGeom = new THREE.CylinderGeometry(0.06, 0.06, 0.05, 8);
+        const wheelMat = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.9 });
+        for (const [zOff, xOff] of [[-0.30, -0.20], [-0.30, 0.20], [0.30, -0.20], [0.30, 0.20]]) {
+            const w = new THREE.Mesh(wheelGeom, wheelMat);
+            w.rotation.z = Math.PI / 2;
+            w.position.set(xOff, 0.06, zOff);
+            group.add(w);
+        }
+        // Front destination sign (yellow strip)
+        const signGeom = new THREE.BoxGeometry(0.28, 0.05, 0.01);
+        const signMat = new THREE.MeshStandardMaterial({ color: 0xffdd00, emissive: 0xddaa00, emissiveIntensity: 0.4, roughness: 0.4 });
+        const sign = new THREE.Mesh(signGeom, signMat);
+        sign.position.set(0, 0.22, -0.445);
+        group.add(sign);
+        return group;
+    }
+
+    /** Procedural traffic light: pole + housing + 3 signal lenses */
+    _buildTrafficLight(px, py, pz) {
+        const objects = [];
+        // Pole
+        const poleGeom = new THREE.CylinderGeometry(0.018, 0.018, 0.60, 5);
+        const poleMat  = new THREE.MeshStandardMaterial({ color: 0x252525, roughness: 0.7 });
+        const pole = new THREE.Mesh(poleGeom, poleMat);
+        pole.position.set(px, py + 0.30, pz);
+        pole.castShadow = true;
+        objects.push(pole);
+        // Housing box
+        const boxGeom = new THREE.BoxGeometry(0.06, 0.16, 0.06);
+        const boxMat  = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.8 });
+        const box = new THREE.Mesh(boxGeom, boxMat);
+        box.position.set(px, py + 0.60 + 0.08, pz);
+        box.castShadow = true;
+        objects.push(box);
+        // Red light
+        const redGeom = new THREE.SphereGeometry(0.020, 6, 4);
+        const redMat  = new THREE.MeshStandardMaterial({ color: 0xdd2222, emissive: 0xcc1111, emissiveIntensity: 0.5, roughness: 0.3 });
+        const red = new THREE.Mesh(redGeom, redMat);
+        red.position.set(px, py + 0.60 + 0.14, pz + 0.032);
+        objects.push(red);
+        // Amber light
+        const amberGeom = new THREE.SphereGeometry(0.020, 6, 4);
+        const amberMat  = new THREE.MeshStandardMaterial({ color: 0x666600, emissive: 0x442200, emissiveIntensity: 0.2, roughness: 0.3 });
+        const amber = new THREE.Mesh(amberGeom, amberMat);
+        amber.position.set(px, py + 0.60 + 0.08, pz + 0.032);
+        objects.push(amber);
+        // Green light (active)
+        const greenGeom = new THREE.SphereGeometry(0.020, 6, 4);
+        const greenMat  = new THREE.MeshStandardMaterial({ color: 0x22bb22, emissive: 0x118811, emissiveIntensity: 0.5, roughness: 0.3 });
+        const green = new THREE.Mesh(greenGeom, greenMat);
+        green.position.set(px, py + 0.60 + 0.02, pz + 0.032);
+        objects.push(green);
+        return objects;
+    }
+
+    /** Procedural tunnel portal arch placed at tunnel entry/exit points */
+    _buildTunnelPortal(px, py, pz, rotY) {
+        const objects = [];
+        // Arch frame
+        const archMat = new THREE.MeshStandardMaterial({ color: 0x484038, roughness: 0.88 });
+        // Left pillar
+        const pilGeom = new THREE.BoxGeometry(0.12, 0.55, 0.14);
+        const leftPil = new THREE.Mesh(pilGeom, archMat);
+        leftPil.position.set(-0.38, py + 0.28, 0);
+        leftPil.castShadow = true;
+        // Right pillar
+        const rightPil = new THREE.Mesh(pilGeom, archMat);
+        rightPil.position.set(0.38, py + 0.28, 0);
+        rightPil.castShadow = true;
+        // Top beam
+        const beamGeom = new THREE.BoxGeometry(0.90, 0.12, 0.14);
+        const beam = new THREE.Mesh(beamGeom, archMat);
+        beam.position.set(0, py + 0.50, 0);
+        beam.castShadow = true;
+        // Dark interior
+        const intGeom = new THREE.BoxGeometry(0.68, 0.36, 0.05);
+        const intMat = new THREE.MeshStandardMaterial({ color: 0x080808, roughness: 1.0 });
+        const interior = new THREE.Mesh(intGeom, intMat);
+        interior.position.set(0, py + 0.23, 0.025);
+        const group = new THREE.Group();
+        group.add(leftPil, rightPil, beam, interior);
+        group.position.set(px, 0, pz);
+        group.rotation.y = rotY;
+        objects.push(group);
         return objects;
     }
 
@@ -1125,12 +1276,18 @@ export class Renderer3D {
         [TERRAIN_ROAD]: 0.04,
         [TERRAIN_SIDEWALK]: 0.06,
         [TERRAIN_PARK]: 0.07,
+        [TERRAIN_HIGHWAY]: 0.12,   // slightly elevated above road
+        [TERRAIN_BRIDGE]:  0.35,   // raised for bridge
+        [TERRAIN_TUNNEL]:  0.04,   // same as road (goes underground)
     };
 
     _buildTerrainMeshesForChunk(bounds) {
         const meshes = [];
         const waterTiles = [];
         const roadTiles = [];
+        const highwayTiles = [];
+        const bridgeTiles = [];
+        const tunnelTiles = [];
 
         const width = bounds.maxX - bounds.minX + 1;
         const height = bounds.maxY - bounds.minY + 1;
@@ -1144,6 +1301,9 @@ export class Renderer3D {
                 row.push(terrain);
                 if (terrain === TERRAIN_WATER) waterTiles.push({ x, y });
                 if (terrain === TERRAIN_ROAD) roadTiles.push({ x, y });
+                if (terrain === TERRAIN_HIGHWAY) highwayTiles.push({ x: x, y: y });
+                if (terrain === TERRAIN_BRIDGE) bridgeTiles.push({ x: x, y: y });
+                if (terrain === TERRAIN_TUNNEL) tunnelTiles.push({ x: x, y: y });
             }
             tileGrid.push(row);
         }
@@ -1293,6 +1453,141 @@ export class Renderer3D {
             }
             roadMesh.instanceMatrix.needsUpdate = true;
             meshes.push(roadMesh);
+        }
+
+        // Highway: elevated dark slab + optional center barrier
+        if (highwayTiles.length > 0) {
+            const hwGeom = new THREE.BoxGeometry(1.0, 0.06, 1.0);
+            const hwMat = new THREE.MeshStandardMaterial({ color: 0x484050, roughness: 0.95, metalness: 0.0 });
+            const hwMesh = new THREE.InstancedMesh(hwGeom, hwMat, highwayTiles.length);
+            hwMesh.receiveShadow = true;
+            const dummy = new THREE.Object3D();
+            for (let i = 0; i < highwayTiles.length; i++) {
+                const tile = highwayTiles[i];
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                dummy.position.set(wx, 0.12, wz);
+                dummy.updateMatrix();
+                hwMesh.setMatrixAt(i, dummy.matrix);
+            }
+            hwMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(hwMesh);
+            // White lane markings on highway
+            const markGeom = new THREE.PlaneGeometry(0.08, 0.40);
+            markGeom.rotateX(-Math.PI / 2);
+            const markMat = new THREE.MeshStandardMaterial({ color: 0xe8e4d0, roughness: 0.9 });
+            const markMesh = new THREE.InstancedMesh(markGeom, markMat, highwayTiles.length * 2);
+            markMesh.receiveShadow = false;
+            let mi = 0;
+            for (const tile of highwayTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                for (const side of [-0.25, 0.25]) {
+                    dummy.position.set(wx + side, 0.125, wz);
+                    dummy.updateMatrix();
+                    markMesh.setMatrixAt(mi++, dummy.matrix);
+                }
+            }
+            markMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(markMesh);
+        }
+
+        // Bridge tiles — raised concrete slab with side railings
+        if (bridgeTiles.length > 0) {
+            const brGeom = new THREE.BoxGeometry(1.0, 0.10, 1.0);
+            const brMat = new THREE.MeshStandardMaterial({ color: 0x8a7a60, roughness: 0.88, metalness: 0.05 });
+            const brMesh = new THREE.InstancedMesh(brGeom, brMat, bridgeTiles.length);
+            brMesh.receiveShadow = true;
+            brMesh.castShadow = true;
+            const dummy2 = new THREE.Object3D();
+            for (let i = 0; i < bridgeTiles.length; i++) {
+                const tile = bridgeTiles[i];
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                dummy2.position.set(wx, 0.35, wz);
+                dummy2.updateMatrix();
+                brMesh.setMatrixAt(i, dummy2.matrix);
+            }
+            brMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(brMesh);
+            // Bridge railings (low wall on each side)
+            const railGeom = new THREE.BoxGeometry(1.0, 0.12, 0.05);
+            const railMat = new THREE.MeshStandardMaterial({ color: 0x707060, roughness: 0.85 });
+            const railMesh = new THREE.InstancedMesh(railGeom, railMat, bridgeTiles.length * 2);
+            let ri = 0;
+            for (const tile of bridgeTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                for (const side of [-0.48, 0.48]) {
+                    dummy2.position.set(wx, 0.44, wz + side);
+                    dummy2.rotation.set(0, 0, 0);
+                    dummy2.updateMatrix();
+                    railMesh.setMatrixAt(ri++, dummy2.matrix);
+                }
+            }
+            railMesh.instanceMatrix.needsUpdate = true;
+            railMesh.castShadow = true;
+            meshes.push(railMesh);
+            // Bridge support pillars (vertical box below bridge deck)
+            const pilGeom = new THREE.BoxGeometry(0.18, 0.35, 0.18);
+            const pilMat = new THREE.MeshStandardMaterial({ color: 0x706858, roughness: 0.90 });
+            const pilMesh = new THREE.InstancedMesh(pilGeom, pilMat, bridgeTiles.length * 2);
+            let pi = 0;
+            for (const tile of bridgeTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                for (const offset of [-0.28, 0.28]) {
+                    dummy2.position.set(wx + offset, 0.175, wz);
+                    dummy2.rotation.set(0, 0, 0);
+                    dummy2.updateMatrix();
+                    pilMesh.setMatrixAt(pi++, dummy2.matrix);
+                }
+            }
+            pilMesh.instanceMatrix.needsUpdate = true;
+            pilMesh.castShadow = true;
+            meshes.push(pilMesh);
+        }
+
+        // Tunnel tiles — dark slab flush with terrain + archway portals at open edges
+        if (tunnelTiles.length > 0) {
+            const tunGeom = new THREE.PlaneGeometry(1, 1);
+            tunGeom.rotateX(-Math.PI / 2);
+            const tunMat = new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.98, metalness: 0 });
+            const tunMesh = new THREE.InstancedMesh(tunGeom, tunMat, tunnelTiles.length);
+            tunMesh.receiveShadow = true;
+            const dummy3 = new THREE.Object3D();
+            for (let i = 0; i < tunnelTiles.length; i++) {
+                const tile = tunnelTiles[i];
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                dummy3.position.set(wx, 0.05, wz);
+                dummy3.updateMatrix();
+                tunMesh.setMatrixAt(i, dummy3.matrix);
+            }
+            tunMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(tunMesh);
+
+            // Archway portals at each tunnel edge that borders a non-tunnel tile
+            const PORTAL_DIRS = [
+                { dx:  0, dy: -1, rotY: 0            },  // N edge → face north
+                { dx:  0, dy:  1, rotY: Math.PI       },  // S edge → face south
+                { dx:  1, dy:  0, rotY: -Math.PI / 2  },  // E edge → face east
+                { dx: -1, dy:  0, rotY:  Math.PI / 2  },  // W edge → face west
+            ];
+            for (const tile of tunnelTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                const terrainY = this._smoothTerrainY(tile.x, tile.y);
+                for (const { dx, dy, rotY } of PORTAL_DIRS) {
+                    const nb = this.game.map.getTileAt(tile.x + dx, tile.y + dy);
+                    if (nb !== TERRAIN_TUNNEL) {
+                        const portals = this._buildTunnelPortal(
+                            wx + dx * 0.5, terrainY, wz + dy * 0.5, rotY
+                        );
+                        meshes.push(...portals);
+                    }
+                }
+            }
         }
 
         return meshes;
@@ -3116,6 +3411,9 @@ function terrainTint(t) {
         case TERRAIN_SIDEWALK: return 0x626058; // dark warm concrete — avoid glare under bright sun
         case TERRAIN_PARK:     return 0x60c850; // vivid park green
         case TERRAIN_WATER:    return 0x1878b8; // deep ocean blue
+        case TERRAIN_HIGHWAY:  return 0x484050; // dark grey-purple highway asphalt
+        case TERRAIN_BRIDGE:   return 0x8a7a60; // concrete tan
+        case TERRAIN_TUNNEL:   return 0x282828; // near-black tunnel
         default: return 0x90a070;               // olive-green fill
     }
 }
@@ -3165,6 +3463,12 @@ const BUILDING_PALETTES = {
     'port':            [0x8a7a5a, 0x9a8a6a, 0x7a6a4a],
     'stadium':         [0x406880, 0x507890, 0x305870, 0x6080a0],
     'recycling-plant': [0x406840, 0x507850, 0x305830],
+    'bus-stop':        [0x3a6080, 0x486888, 0x304e70, 0x5878a0],
+    'bus-depot':       [0x5a6840, 0x4a5830, 0x6a7850, 0x3a4820],
+    'metro-station':   [0x203040, 0x283848, 0x182838, 0x304058],
+    'tollway-gate':    [0x484838, 0x585848, 0x383828, 0x686858],
+    'highway-ramp':    [0x404040, 0x505050, 0x303030, 0x606060],
+    'subway-shaft':    [0x303838, 0x404848, 0x202828, 0x505858],
     'default':         [0xa09880, 0xb0a890, 0x908870, 0xc0b8a0],
 };
 

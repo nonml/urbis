@@ -11,6 +11,7 @@ import {
 } from './constants.js';
 
 // Extended building type constants
+export const BUILDING_APARTMENT = 'apartment';
 export const BUILDING_HOSPITAL = 'hospital';
 export const BUILDING_FIRE_STATION = 'fire-station';
 export const BUILDING_PARK = 'park';
@@ -32,9 +33,26 @@ export const BUILDING_SHOPPING_MALL = 'shopping-mall';
 export const BUILDING_HOTEL = 'hotel';
 export const BUILDING_RESTAURANT = 'restaurant';
 export const BUILDING_NIGHTCLUB = 'nightclub';
+export const BUILDING_BUS_STOP      = 'bus-stop';
+export const BUILDING_BUS_DEPOT     = 'bus-depot';
+export const BUILDING_METRO_STATION = 'metro-station';
+export const BUILDING_TOLLWAY_GATE  = 'tollway-gate';
+export const BUILDING_HIGHWAY_RAMP  = 'highway-ramp';
+export const BUILDING_SUBWAY_SHAFT  = 'subway-shaft';
 
 // Extended building definitions
 export const BUILDING_EXTENDED = {
+    [BUILDING_APARTMENT]: {
+        name: 'Apartment',
+        icon: '🏢',
+        description: 'High-density housing for 20 citizens',
+        cost: { gold: 150, wood: 100 },
+        income: { gold: 8, food: 0, wood: 0 },
+        upkeep: 8,
+        population: 20,
+        effects: { housingDensity: 0.4 },
+        unlockRequirement: { population: 30 }
+    },
     // Infrastructure buildings
     [BUILDING_HOSPITAL]: {
         name: 'Hospital',
@@ -337,7 +355,73 @@ export const BUILDING_EXTENDED = {
             nightlifeRating: 0.25
         },
         unlockRequirement: { population: 80 }
-    }
+    },
+    [BUILDING_BUS_STOP]: {
+        name: 'Bus Stop',
+        icon: '🚌',
+        description: 'Public bus stop, increases citizen mobility',
+        cost: { gold: 40, wood: 20, food: 0 },
+        income: { gold: 3, food: 0, wood: 0 },
+        upkeep: 3,
+        population: 0,
+        effects: { mobilityBonus: 0.10, transitCoverage: 0.05 },
+        unlockRequirement: { population: 20 }
+    },
+    [BUILDING_BUS_DEPOT]: {
+        name: 'Bus Depot',
+        icon: '🚌',
+        description: 'Maintains bus fleet, required for bus routes',
+        cost: { gold: 200, wood: 150, food: 50 },
+        income: { gold: -8, food: 0, wood: 0 },
+        upkeep: 15,
+        population: 0,
+        effects: { busRoutes: 3, mobilityBonus: 0.20 },
+        unlockRequirement: { population: 60 }
+    },
+    [BUILDING_METRO_STATION]: {
+        name: 'Metro Station',
+        icon: '🚇',
+        description: 'Underground metro stop, high-capacity urban transit',
+        cost: { gold: 500, wood: 200, food: 100 },
+        income: { gold: 15, food: 0, wood: 0 },
+        upkeep: 25,
+        population: 0,
+        effects: { mobilityBonus: 0.35, transitCoverage: 0.20, congestionReduction: 0.15 },
+        unlockRequirement: { population: 150, techLevel: 2 }
+    },
+    [BUILDING_TOLLWAY_GATE]: {
+        name: 'Tollway Gate',
+        icon: '🚧',
+        description: 'Toll collection booth on highway, generates revenue',
+        cost: { gold: 150, wood: 80, food: 0 },
+        income: { gold: 20, food: 0, wood: 0 },
+        upkeep: 5,
+        population: 0,
+        effects: { tollRevenue: 20, trafficControl: 0.10 },
+        unlockRequirement: { population: 100 }
+    },
+    [BUILDING_HIGHWAY_RAMP]: {
+        name: 'Highway Ramp',
+        icon: '🛣️',
+        description: 'On/off ramp connecting local roads to highway',
+        cost: { gold: 120, wood: 60, food: 0 },
+        income: { gold: 0, food: 0, wood: 0 },
+        upkeep: 4,
+        population: 0,
+        effects: { connectivityBonus: 0.15 },
+        unlockRequirement: { population: 80 }
+    },
+    [BUILDING_SUBWAY_SHAFT]: {
+        name: 'Subway Shaft',
+        icon: '🚇',
+        description: 'Ventilation/access shaft for underground subway line',
+        cost: { gold: 80, wood: 40, food: 0 },
+        income: { gold: 0, food: 0, wood: 0 },
+        upkeep: 3,
+        population: 0,
+        effects: { subwayAccess: true },
+        unlockRequirement: { population: 120, techLevel: 2 }
+    },
 };
 
 /**

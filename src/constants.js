@@ -19,6 +19,9 @@ export const TERRAIN_MOUNTAIN = 3;
 export const TERRAIN_ROAD = 4;
 export const TERRAIN_SIDEWALK = 5;
 export const TERRAIN_PARK = 6;
+export const TERRAIN_HIGHWAY = 7;   // Wide elevated road
+export const TERRAIN_BRIDGE  = 8;   // Road bridge over water
+export const TERRAIN_TUNNEL  = 9;   // Underground road through mountain
 
 // Interactable node types (stored as tile modifiers)
 export const INTERACTABLE_POWER_SUBSTATION = 'power_substation';
@@ -32,7 +35,10 @@ export const TERRAIN_COLORS = {
     [TERRAIN_MOUNTAIN]: '#8b4513',
     [TERRAIN_ROAD]: '#888888',
     [TERRAIN_SIDEWALK]: '#dddddd',
-    [TERRAIN_PARK]: '#90ee90'
+    [TERRAIN_PARK]: '#90ee90',
+    [TERRAIN_HIGHWAY]: '#555566',  // dark grey-blue asphalt
+    [TERRAIN_BRIDGE]:  '#8a7a60',  // concrete tan
+    [TERRAIN_TUNNEL]:  '#2a2a2a',  // near-black
 };
 
 export const TERRAIN_ICONS = {
@@ -42,7 +48,10 @@ export const TERRAIN_ICONS = {
     [TERRAIN_MOUNTAIN]: '⛰️',
     [TERRAIN_ROAD]: '🛣️',
     [TERRAIN_SIDEWALK]: '🚶',
-    [TERRAIN_PARK]: '🌳'
+    [TERRAIN_PARK]: '🌳',
+    [TERRAIN_HIGHWAY]: '🛣️',
+    [TERRAIN_BRIDGE]:  '🌉',
+    [TERRAIN_TUNNEL]:  '🚇',
 };
 
 // Building types
@@ -148,7 +157,14 @@ export const BUILDING_3D = {
     [BUILDING_TOWN_HALL]: { height: 1.2 },
     [BUILDING_WAREHOUSE]: { height: 0.7 },
     [BUILDING_BARRACKS]: { height: 0.85 },
-    [BUILDING_SCHOOL]: { height: 0.8 }
+    [BUILDING_SCHOOL]: { height: 0.8 },
+    // Transit / infrastructure buildings
+    'bus-stop':      { height: 0.30 },
+    'bus-depot':     { height: 0.70 },
+    'metro-station': { height: 0.90 },
+    'tollway-gate':  { height: 0.40 },
+    'highway-ramp':  { height: 0.30 },
+    'subway-shaft':  { height: 0.50 },
 };
 
 // Crisis events

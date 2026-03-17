@@ -10,6 +10,7 @@ import {
     UPGRADE_COSTS,
     BUILDING_LEVELS
 } from './constants.js';
+import { BUILDING_EXTENDED } from './buildings_extended.js';
 
 // ---------------------------------------------------------------------------
 // Tier 2C: Adjacency bonus rules
@@ -107,7 +108,7 @@ export class BuildingManager {
     }
 
     build(type, x, y, level = 1, rotation = 0) {
-        const buildingData = BUILDING_TYPES[type] || BUILDING_SECURITY[type];
+        const buildingData = BUILDING_TYPES[type] || BUILDING_SECURITY[type] || BUILDING_EXTENDED[type];
         if (!buildingData) return null;
 
         const levelData = BUILDING_LEVELS[level] || BUILDING_LEVELS[1];
@@ -167,7 +168,7 @@ export class BuildingManager {
 
         building.level = nextLevel;
         building.levelName = levelData.name;
-        const base = BUILDING_TYPES[building.type] || BUILDING_SECURITY[building.type];
+        const base = BUILDING_TYPES[building.type] || BUILDING_SECURITY[building.type] || BUILDING_EXTENDED[building.type];
         building.population = Math.floor((base.population || 0) * multiplier);
         building.income = {
             gold: Math.floor((base.income.gold || 0) * multiplier),

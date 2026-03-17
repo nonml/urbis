@@ -94,6 +94,9 @@ await page.evaluate(() => {
   // --- Flatten city area to grass and add road grid ---
   const TERRAIN_GRASS = 1;
   const TERRAIN_ROAD = 4;
+  const TERRAIN_HIGHWAY = 7;
+  const TERRAIN_BRIDGE  = 8;
+  const TERRAIN_TUNNEL  = 9;
   const FLATTEN_R = 20;
   for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
     for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
@@ -104,6 +107,30 @@ await page.evaluate(() => {
       const isRoadY = (Math.abs(dy) % 4 === 0);
       game.map.setTileAt(x, y, (isRoadX || isRoadY) ? TERRAIN_ROAD : TERRAIN_GRASS);
     }
+  }
+
+  // Highway ring: a box of highway tiles at radius 14-15
+  for (let side = -14; side <= 14; side++) {
+    [
+      // North side
+      [cx + side, cy - 14], [cx + side, cy - 15],
+      // South side
+      [cx + side, cy + 14], [cx + side, cy + 15],
+      // East side
+      [cx + 14, cy + side], [cx + 15, cy + side],
+      // West side
+      [cx - 14, cy + side], [cx - 15, cy + side],
+    ].forEach(([hx, hy]) => {
+      if (hx < 1 || hy < 1 || hx >= game.map.width-1 || hy >= game.map.height-1) return;
+      const t = game.map.getTileAt(hx, hy);
+      if (t === 0 /* water */) {
+        game.map.setTileAt(hx, hy, TERRAIN_BRIDGE);
+      } else if (t === 3 /* mountain */) {
+        game.map.setTileAt(hx, hy, TERRAIN_TUNNEL);
+      } else {
+        game.map.setTileAt(hx, hy, TERRAIN_HIGHWAY);
+      }
+    });
   }
 
   const canBuild = (x, y) => {
@@ -127,8 +154,8 @@ await page.evaluate(() => {
     'apartment','market','hospital','police-station','apartment',
     'fire-station','school','apartment','market','library',
     'theater','apartment','museum','restaurant','apartment',
-    'market','hotel','nightclub','courthouse','apartment',
-    'warehouse','market','apartment','hospital','apartment',
+    'market','hotel','nightclub','metro-station','apartment',
+    'bus-stop','market','bus-depot','hospital','apartment',
   ];
 
   // Outer suburbs: houses, farms
@@ -213,7 +240,7 @@ await page.evaluate(() => {
   const r = window.game.ui.renderer3d;
   const game = window.game;
   const TERRAIN_ROAD = 4;
-  const carTypes = ['sedan', 'taxi', 'suv', 'van', 'truck', 'hatchback-sports', 'delivery'];
+  const carTypes = ['sedan', 'taxi', 'suv', 'van', 'truck', 'hatchback-sports', 'delivery', 'police', 'firetruck', 'garbage-truck', 'bus'];
   const rng = (x, y, s) => {
     let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
     h = ((h ^ (h >> 13)) * 2654435761) | 0;
