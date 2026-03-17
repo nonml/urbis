@@ -365,7 +365,8 @@ customTest.describe('Screenshot Tests', () => {
 
   customTest('capture resource bar screenshot', async ({ page }) => {
     await page.goto('/');
-    await page.click(SELECTORS.START_BTN);
+    await page.waitForLoadState('networkidle');
+    await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.START_BTN);
     await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
 
     // Stop all animations to stabilize the page for screenshot
