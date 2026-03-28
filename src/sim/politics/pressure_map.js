@@ -438,6 +438,8 @@ export class PressureMapManager {
      * @param {number} tick - Current tick
      */
     update(tick) {
+        if (!this.pressureGrid || !this.factionInfluenceGrid) return;
+
         const width = this.gridWidth;
         const height = this.gridHeight;
         const dt = tick - this.lastUpdateTick;
