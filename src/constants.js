@@ -63,6 +63,7 @@ export const BUILDING_TOWN_HALL = 'town-hall';
 export const BUILDING_WAREHOUSE = 'warehouse';
 export const BUILDING_BARRACKS = 'barracks';
 export const BUILDING_SCHOOL = 'school';
+export const BUILDING_ROAD = 'road';
 
 export const BUILDING_TYPES = {
     [BUILDING_HOUSE]: {
@@ -137,6 +138,15 @@ export const BUILDING_TYPES = {
         population: 0,
         income: { gold: 5, food: 0, wood: 0 },
         upkeep: 5
+    },
+    [BUILDING_ROAD]: {
+        name: 'Road',
+        icon: '🛣️',
+        description: 'Connects buildings and enables transportation',
+        cost: { gold: 5 },
+        population: 0,
+        income: { gold: 0, food: 0, wood: 0 },
+        upkeep: 0
     }
 };
 
@@ -485,4 +495,169 @@ export const JOB_TYPES = {
         baseSalary: 4,
         requiredBuilding: 'school'
     }
+};
+
+// Sound Effect identifiers
+export const SFX = {
+    // Building interactions
+    BUILD_PLACE: 'build_place',
+    BUILD_DEMOLISH: 'build_demolish',
+    BUILD_INVALID: 'build_invalid',
+    
+    // UI interactions
+    UI_CLICK: 'ui_click',
+    UI_HOVER: 'ui_hover',
+    UI_SLIDER: 'ui_slider',
+    UI_ERROR: 'ui_error',
+    UI_SUCCESS: 'ui_success',
+    
+    // Crisis events
+    CRISIS_ALERT: 'crisis_alert',
+    CRISIS_WARNING: 'crisis_warning',
+    CRISIS_RESOLVED: 'crisis_resolved',
+    
+    // Hack minigame
+    HACK_SUCCESS: 'hack_success',
+    HACK_FAIL: 'hack_fail',
+    HACK_PROGRESS: 'hack_progress',
+    
+    // Resources
+    RESOURCE_GAIN: 'resource_gain',
+    RESOURCE_LOSS: 'resource_loss',
+    RESOURCE_LOW: 'resource_low',
+};
+
+// SFX parameters for procedural generation
+export const SFX_PARAMS = {
+    [SFX.BUILD_PLACE]: {
+        type: 'synth',
+        frequency: 220,
+        duration: 0.15,
+        envelope: { attack: 0.01, decay: 0.1, sustain: 0.3, release: 0.05 },
+        oscillator: 'sine'
+    },
+    [SFX.BUILD_DEMOLISH]: {
+        type: 'noise',
+        duration: 0.2,
+        volume: 0.8
+    },
+    [SFX.UI_CLICK]: {
+        type: 'synth',
+        frequency: 880,
+        duration: 0.05,
+        envelope: { attack: 0.005, decay: 0.04, sustain: 0.2, release: 0.01 },
+        oscillator: 'triangle'
+    },
+    [SFX.UI_HOVER]: {
+        type: 'synth',
+        frequency: 1200,
+        duration: 0.03,
+        envelope: { attack: 0.002, decay: 0.02, sustain: 0.1, release: 0.01 },
+        oscillator: 'sine'
+    },
+    [SFX.CRISIS_ALERT]: {
+        type: 'synth',
+        frequency: 150,
+        duration: 1.0,
+        envelope: { attack: 0.1, decay: 0.3, sustain: 0.6, release: 0.5 },
+        oscillator: 'sawtooth',
+        modulate: true
+    },
+    [SFX.HACK_SUCCESS]: {
+        type: 'synth',
+        frequency: 1046,
+        duration: 0.3,
+        envelope: { attack: 0.02, decay: 0.15, sustain: 0.4, release: 0.1 },
+        oscillator: 'sine',
+        arpeggio: [1046, 1244, 1468, 1760]
+    },
+    [SFX.HACK_FAIL]: {
+        type: 'synth',
+        frequency: 150,
+        duration: 0.4,
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.3, release: 0.15 },
+        oscillator: 'sawtooth'
+    },
+    [SFX.BUILD_INVALID]: {
+        type: 'synth',
+        frequency: 120,
+        duration: 0.2,
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.2, release: 0.08 },
+        oscillator: 'sawtooth',
+        frequencyEnd: 80
+    },
+    [SFX.UI_SLIDER]: {
+        type: 'synth',
+        frequency: 600,
+        duration: 0.08,
+        envelope: { attack: 0.005, decay: 0.06, sustain: 0.15, release: 0.02 },
+        oscillator: 'triangle'
+    },
+    [SFX.UI_ERROR]: {
+        type: 'synth',
+        frequency: 180,
+        duration: 0.25,
+        envelope: { attack: 0.03, decay: 0.12, sustain: 0.25, release: 0.1 },
+        oscillator: 'sawtooth',
+        frequencyEnd: 120
+    },
+    [SFX.UI_SUCCESS]: {
+        type: 'arpeggio',
+        duration: 0.35,
+        volume: 0.12,
+        oscillator: 'sine',
+        arpeggio: [523, 659, 784, 1046],
+        envelope: { attack: 0.02, decay: 0.08, sustain: 0.3, release: 0.05 }
+    },
+    [SFX.CRISIS_WARNING]: {
+        type: 'synth',
+        frequency: 200,
+        duration: 0.8,
+        envelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 0.35 },
+        oscillator: 'square',
+        modulate: true,
+        modulateRate: 4,
+        modulateDepth: 30
+    },
+    [SFX.CRISIS_RESOLVED]: {
+        type: 'arpeggio',
+        duration: 0.5,
+        volume: 0.15,
+        oscillator: 'sine',
+        arpeggio: [392, 493, 587, 659, 784],
+        envelope: { attack: 0.03, decay: 0.1, sustain: 0.4, release: 0.1 }
+    },
+    [SFX.HACK_PROGRESS]: {
+        type: 'synth',
+        frequency: 800,
+        duration: 0.08,
+        envelope: { attack: 0.005, decay: 0.06, sustain: 0.2, release: 0.02 },
+        oscillator: 'sine'
+    },
+    [SFX.RESOURCE_GAIN]: {
+        type: 'synth',
+        frequency: 660,
+        duration: 0.15,
+        envelope: { attack: 0.01, decay: 0.08, sustain: 0.3, release: 0.06 },
+        oscillator: 'sine',
+        frequencyEnd: 880
+    },
+    [SFX.RESOURCE_LOSS]: {
+        type: 'synth',
+        frequency: 300,
+        duration: 0.2,
+        envelope: { attack: 0.02, decay: 0.1, sustain: 0.25, release: 0.08 },
+        oscillator: 'triangle',
+        frequencyEnd: 200
+    },
+    [SFX.RESOURCE_LOW]: {
+        type: 'synth',
+        frequency: 180,
+        duration: 0.4,
+        envelope: { attack: 0.05, decay: 0.15, sustain: 0.4, release: 0.2 },
+        oscillator: 'sawtooth',
+        modulate: true,
+        modulateRate: 3,
+        modulateDepth: 20
+    },
 };

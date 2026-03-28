@@ -109,7 +109,7 @@ customTest.describe('Game Loading & Initialization', () => {
   customTest.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('should load the main menu overlay', async ({ page }) => {
@@ -137,7 +137,7 @@ customTest.describe('Game Loading & Initialization', () => {
   });
 
   customTest('should not have critical console errors on load', async ({ page }) => {
-    await page.waitForTimeout(RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CANVAS)).toBeVisible({ timeout: RENDER_STABILIZE_DELAY });
     const errors = page.consoleErrors || [];
     const criticalErrors = errors.filter(e => 
       !e.includes('Three') && 
@@ -153,7 +153,7 @@ customTest.describe('Game Start & UI Rendering', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('should show game container after starting', async ({ page }) => {
@@ -244,18 +244,18 @@ customTest.describe('UI Interaction Tests', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('should allow clicking reset camera button', async ({ page }) => {
     await page.dismissOverlays();
-    await page.waitForTimeout(200);
+    await expect(page.locator(SELECTORS.RESET_CAMERA)).toBeVisible();
     await page.evaluate((sel) => {
       const btn = document.querySelector(sel);
       if (!btn) throw new Error('Reset camera button not found');
       btn.click();
     }, SELECTORS.RESET_CAMERA);
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     // Button should still exist after click
     const exists = await page.evaluate((sel) => !!document.querySelector(sel), SELECTORS.RESET_CAMERA);
     expect(exists).toBe(true);
@@ -272,8 +272,7 @@ customTest.describe('UI Interaction Tests', () => {
     await page.evaluate(() => {
       if (window.showStartScreen) window.showStartScreen();
     });
-    await page.waitForTimeout(1000);
-    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible();
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('should switch between log and stats tabs', async ({ page }) => {
@@ -289,9 +288,6 @@ customTest.describe('UI Interaction Tests', () => {
       const el = document.querySelector(sel);
       if (el) el.click();
     }, SELECTORS.STATS_TAB);
-    await page.waitForTimeout(300);
-
-    // Stats tab should now be active
     await expect(statsTab).toHaveClass(/active/);
   });
 });
@@ -302,15 +298,13 @@ customTest.describe('Button Navigation Tests', () => {
     await page.waitForLoadState('networkidle');
     
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
-    
-    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible();
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('restart button should be visible after game start', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     // The restart button is in the main menu overlay (check via selector, not visibility)
     await expect(page.locator(SELECTORS.RESTART_BTN)).toBeAttached();
@@ -319,15 +313,13 @@ customTest.describe('Button Navigation Tests', () => {
   customTest('main menu button should return to menu', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     // Use evaluate to call the window function directly
     await page.evaluate(() => {
       if (window.showStartScreen) window.showStartScreen();
     });
-    await page.waitForTimeout(1000);
-    
-    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible();
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 });
 
@@ -335,26 +327,25 @@ customTest.describe('Screenshot Tests', () => {
   customTest('capture main menu screenshot', async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     // Take screenshot without baseline comparison (first run)
-    await page.screenshot({ 
+    await page.screenshot({
       path: 'test-results/main-menu-screenshot.png',
-      fullPage: false 
+      fullPage: false
     });
   });
 
   customTest('capture game UI screenshot', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY * 2);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
 
     // Stop all animations to stabilize page for screenshot
     await page.evaluate(() => {
       document.querySelectorAll('canvas').forEach(c => c.remove());
       window.requestAnimationFrame = () => 0;
     });
-    await page.waitForTimeout(500);
     await page.screenshot({
       path: 'test-results/game-ui-screenshot.png',
       fullPage: false,
@@ -367,7 +358,7 @@ customTest.describe('Screenshot Tests', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
 
     // Stop all animations to stabilize the page for screenshot
     await page.evaluate(() => {
@@ -376,7 +367,6 @@ customTest.describe('Screenshot Tests', () => {
       // Stop requestAnimationFrame
       window.requestAnimationFrame = () => 0;
     });
-    await page.waitForTimeout(500);
 
     const box = await page.evaluate((sel) => {
       const el = document.querySelector(sel);
@@ -410,9 +400,7 @@ customTest.describe('Performance Tests', () => {
     const startTime = Date.now();
     
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
-    
-    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible();
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     const gameTime = Date.now() - startTime;
     expect(gameTime).toBeLessThan(15000);
@@ -429,12 +417,12 @@ customTest.describe('Performance Tests', () => {
   customTest('should not have excessive console errors during interaction', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
 
     // Dismiss overlays then click reset camera
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.RESET_CAMERA);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
 
     const errors = page.consoleErrors || [];
     const newErrors = errors.filter(e =>
@@ -455,7 +443,7 @@ customTest.describe('Game State Verification', () => {
   customTest('should initialize with expected starting resources', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     const goldAmount = await page.locator(SELECTORS.GOLD_AMOUNT).textContent();
     const foodAmount = await page.locator(SELECTORS.FOOD_AMOUNT).textContent();
@@ -470,7 +458,7 @@ customTest.describe('Game State Verification', () => {
   customTest('should show initial welcome message', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     const messageLog = page.locator(SELECTORS.MESSAGE_LOG);
     await expect(messageLog).toBeVisible();
@@ -484,7 +472,7 @@ customTest.describe('Game State Verification', () => {
   customTest('should have all UI elements properly positioned', async ({ page }) => {
     await page.goto('/');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     // Verify key UI elements are visible and have layout
     const elements = [

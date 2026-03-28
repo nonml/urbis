@@ -15,6 +15,7 @@
     let prevGold = 100, prevFood = 100, prevWood = 100;
     let goldDelta = 0, foodDelta = 0, woodDelta = 0;
     let goldFlash = '', foodFlash = '', woodFlash = '';
+    let showUnaffordableFlash = false;
 
     function flashClass(delta) {
         return delta > 0 ? 'res-gain' : delta < 0 ? 'res-loss' : '';
@@ -44,6 +45,12 @@
         weather    = r.weather ?? { icon: '☀️', type: 'clear', speedModifier: 1 };
         rival      = r.rival ?? { influence: 0, currentAction: null };
 
+        // Handle unaffordable flash
+        if (r.unaffordable) {
+            showUnaffordableFlash = true;
+            setTimeout(() => { showUnaffordableFlash = false; }, 400);
+        }
+
         // Clear flash after animation
         setTimeout(() => { goldFlash = ''; foodFlash = ''; woodFlash = ''; }, 600);
     });
@@ -59,7 +66,7 @@
 <div id="resource-bar">
     <div class="resource" id="gold-display">
         <span class="icon">💰</span>
-        <span class="amount {goldFlash}" id="gold-amount">{Math.round($gold)}</span>
+        <span class="amount {goldFlash} {showUnaffordableFlash ? 'res-unaffordable' : ''}" id="gold-amount">{Math.round($gold)}</span>
     </div>
     <div class="resource" id="food-display">
         <span class="icon">🌾</span>

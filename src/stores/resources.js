@@ -9,6 +9,7 @@ export const resourceStore = writable({
     housing: 10,
     day: 1,
     heat: 0,
+    unaffordable: false, // Flash trigger for insufficient funds
     weather: { icon: '☀️', type: 'clear', speedModifier: 1 },
     rival: { influence: 0, currentAction: null },
 });

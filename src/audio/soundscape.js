@@ -14,6 +14,7 @@ export class Soundscape {
         this.currentTimeOfDay = 0; // 0-1 (0 = midnight, 0.5 = noon)
         this.currentCityState = 'normal'; // normal, busy, quiet, crisis
         this.currentDistrict = 'residential';
+        this.currentDistrictId = 0;
         this.populationLevel = 0;
         this.crisisLevel = 0;
         
@@ -81,6 +82,23 @@ export class Soundscape {
         if (Math.abs(newCrisisLevel - this.crisisLevel) > 0.1) {
             this.crisisLevel = newCrisisLevel;
             this.updateCrisisLayer();
+        }
+        
+        // Update current district based on player position
+        const playerX = this.game.state.player.x;
+        const playerY = this.game.state.player.y;
+        const newDistrictId = this.game.map?.getDistrictAt?.(playerX, playerY);
+        
+        if (newDistrictId !== undefined && newDistrictId !== this.currentDistrictId) {
+            const oldDistrict = this.currentDistrict;
+            const newDistrict = this.game.map.districts?.find(d => d.id === newDistrictId);
+            const newDistrictName = newDistrict?.theme || 'residential';
+            
+            if (newDistrictName !== oldDistrict) {
+                this.currentDistrictId = newDistrictId;
+                this.currentDistrict = newDistrictName;
+                this.updateDistrictAmbient(newDistrictName);
+            }
         }
         
         // Handle transitions
@@ -152,6 +170,36 @@ export class Soundscape {
         
         if (crisis || incidents.length > 0) {
             this.playCrisisStinger();
+        }
+    }
+    
+    /**
+     * Update district-based ambient layer
+     */
+    updateDistrictAmbient(districtTheme) {
+        console.log(`[Soundscape] District changed to: ${districtTheme}`);
+        
+        // District themes map to ambient characteristics
+        const districtAudioConfig = {
+            residential: { volume: 0.8, pitch: 1.0, activity: 'low' },
+            commercial: { volume: 1.0, pitch: 1.1, activity: 'high' },
+            industrial: { volume: 0.9, pitch: 0.9, activity: 'medium' },
+            waterfront: { volume: 0.7, pitch: 1.0, activity: 'low' },
+            elite: { volume: 0.6, pitch: 1.2, activity: 'low' }
+        };
+        
+        const config = districtAudioConfig[districtTheme] || districtAudioConfig.residential;
+        
+        // Adjust ambient volume based on district activity
+        if (this.audioManager?.ambientGain) {
+            const baseVol = this.audioManager.settings?.get('audioVolume') || 0.5;
+            const targetVol = baseVol * config.volume;
+            
+            this.audioManager.ambientGain.gain.setTargetAtTime(
+                targetVol,
+                this.audioManager.context.currentTime,
+                1.5 // Smooth crossfade
+            );
         }
     }
     

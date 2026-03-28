@@ -102,6 +102,11 @@ export class CrisisManager {
         this.activeCrisis = crisis;
         this.eventHistory.push({ type: 'crisis', crisis, day: this.game.getDay() });
 
+        // Play crisis alert sound
+        if (this.game.audioManager) {
+            this.game.audioManager.playCrisisAlert();
+        }
+
         const options = this.buildOptions(crisis);
         this.game.ui.showCrisis(crisis, options, (choice) => this.resolveCrisis(choice));
         this.game.showMessage(`🚨 CRISIS: ${crisis.name}`, 'crisis');
@@ -119,6 +124,12 @@ export class CrisisManager {
 
         this.game.resources.pay(choice.cost || {});
         this.game.applyEffect(choice.effect || {});
+        
+        // Play crisis resolved sound
+        if (this.game.audioManager) {
+            this.game.audioManager.playCrisisResolved();
+        }
+        
         this.game.showMessage(`✅ Crisis resolved: ${this.activeCrisis.name} → ${choice.label}`, 'success');
 
         this.activeCrisis = null;

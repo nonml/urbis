@@ -1,7 +1,7 @@
 .noctune_cache
 playwright-report
 node_modules
-build/
+/build/
 !public/assets/audio/build/
 src-tauri/target/
 dist-electron/

@@ -1,10 +1,12 @@
 // Audio Manager - Handles game audio with Web Audio API
-// Supports: ambient loops, footsteps, UI sounds, crisis stinger
+// Supports: ambient loops, footsteps, UI sounds, crisis stinger, procedural SFX
 // Audio assets are loaded from assets/audio/ directory
 
 import { SETTINGS_KEYS, DEFAULT_SETTINGS } from '../stores/settings.js';
 import { createSoundscape } from './soundscape.js';
 import { createAudioMixer, AUDIO_CHANNELS, MIXER_PRESETS } from './mixer.js';
+import { createSFXGenerator } from './sfx_generator.js';
+import { SFX } from '../constants.js';
 
 // Audio source configuration (paths can be placeholders for development)
 export const AUDIO_SOURCES = {
@@ -77,6 +79,9 @@ export class AudioManager {
         
         // Audio mixer for channel management
         this.mixer = null;
+        
+        // Procedural SFX generator
+        this.sfxGenerator = null;
     }
 
     /**
@@ -125,6 +130,9 @@ export class AudioManager {
 
             // Initialize audio mixer
             this.mixer = createAudioMixer(this.context, this.masterGain);
+
+            // Initialize procedural SFX generator
+            this.sfxGenerator = createSFXGenerator(this.context, this.uiGain);
 
         } catch (e) {
             console.warn('Audio initialization failed:', e);
@@ -329,8 +337,145 @@ export class AudioManager {
         this.playSynthSound('footstep');
     }
 
+    // ============================================
+    // Procedural SFX Methods (using SFX Generator)
+    // ============================================
+
     /**
-     * Play synthesized sound effect
+     * Play any SFX by name using the procedural generator
+     * @param {string} sfxName - SFX identifier from SFX constant
+     * @param {object} options - Optional parameter overrides
+     */
+    playSFX(sfxName, options = {}) {
+        if (!this.canPlay || !this.sfxGenerator) return;
+        this.sfxGenerator.play(sfxName, options);
+    }
+
+    /**
+     * Play building placement sound with pitch based on building type
+     * @param {string} buildingType - Type of building being placed
+     */
+    playBuildingPlace(buildingType) {
+        if (!this.canPlay || !this.sfxGenerator) return;
+        this.sfxGenerator.playBuildingPlace(buildingType);
+    }
+
+    /**
+     * Play building demolish sound
+     */
+    playBuildingDemolish() {
+        this.playSFX(SFX.BUILD_DEMOLISH);
+    }
+
+    /**
+     * Play invalid building placement sound
+     */
+    playBuildingInvalid() {
+        this.playSFX(SFX.BUILD_INVALID);
+    }
+
+    /**
+     * Play UI click sound (procedural)
+     */
+    playUIClick() {
+        this.playSFX(SFX.UI_CLICK);
+    }
+
+    /**
+     * Play UI hover sound
+     */
+    playUIHover() {
+        if (!this.canPlay || !this.sfxGenerator) return;
+        this.sfxGenerator.playUIHover();
+    }
+
+    /**
+     * Play UI slider sound (procedural)
+     */
+    playUISlider() {
+        this.playSFX(SFX.UI_SLIDER);
+    }
+
+    /**
+     * Play UI error sound (procedural)
+     */
+    playUIError() {
+        this.playSFX(SFX.UI_ERROR);
+    }
+
+    /**
+     * Play UI success sound (procedural)
+     */
+    playUISuccess() {
+        this.playSFX(SFX.UI_SUCCESS);
+    }
+
+    /**
+     * Play crisis alert sound (procedural)
+     */
+    playCrisisAlert() {
+        if (!this.canPlay || !this.sfxGenerator) return;
+        this.sfxGenerator.play(SFX.CRISIS_ALERT);
+    }
+
+    /**
+     * Play crisis warning sound (procedural)
+     */
+    playCrisisWarning() {
+        this.playSFX(SFX.CRISIS_WARNING);
+    }
+
+    /**
+     * Play crisis resolved sound (procedural)
+     */
+    playCrisisResolved() {
+        this.playSFX(SFX.CRISIS_RESOLVED);
+    }
+
+    /**
+     * Play hack success sound (procedural)
+     */
+    playHackSuccess() {
+        this.playSFX(SFX.HACK_SUCCESS);
+    }
+
+    /**
+     * Play hack fail sound (procedural)
+     */
+    playHackFail() {
+        this.playSFX(SFX.HACK_FAIL);
+    }
+
+    /**
+     * Play hack progress sound (procedural)
+     */
+    playHackProgress() {
+        this.playSFX(SFX.HACK_PROGRESS);
+    }
+
+    /**
+     * Play resource gain sound (procedural)
+     */
+    playResourceGain() {
+        this.playSFX(SFX.RESOURCE_GAIN);
+    }
+
+    /**
+     * Play resource loss sound (procedural)
+     */
+    playResourceLoss() {
+        this.playSFX(SFX.RESOURCE_LOSS);
+    }
+
+    /**
+     * Play resource low warning sound (procedural)
+     */
+    playResourceLow() {
+        this.playSFX(SFX.RESOURCE_LOW);
+    }
+
+    /**
+     * Play synthesized sound effect (legacy method)
      */
     playSynthSound(type) {
         if (!this.context) return;

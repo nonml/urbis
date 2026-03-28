@@ -123,6 +123,18 @@ export class DevMenu {
                 callback: () => this.setFactionRep('police', -60)
             },
 
+            // Audio debugging
+            toggleAudioDebug: {
+                label: 'Toggle Audio Debug',
+                description: 'Show audio system status overlay',
+                callback: () => this.toggleAudioDebug()
+            },
+            testAllSFX: {
+                label: 'Test All SFX',
+                description: 'Play all SFX types for testing',
+                callback: () => this.testAllSFX()
+            },
+
             // UI overlays
             toggleZoneOverlay: {
                 label: 'Toggle Zone Overlay',
@@ -867,6 +879,146 @@ export class DevMenu {
             URL.revokeObjectURL(url);
             this.showMessage('Balance CSV exported!', 'success');
         }).catch(e => this.showMessage(`Export failed: ${e.message}`, 'error'));
+    }
+
+    /**
+     * Toggle audio debug overlay
+     */
+    toggleAudioDebug() {
+        const audioManager = this.game.ui?.audioManager;
+        if (!audioManager) {
+            this.showMessage('Audio manager not available', 'error');
+            return;
+        }
+
+        // Check if overlay already exists
+        let overlay = document.getElementById('audio-debug-overlay');
+        if (overlay) {
+            overlay.remove();
+            this.showMessage('Audio debug overlay closed', 'normal');
+            return;
+        }
+
+        // Create overlay
+        overlay = document.createElement('div');
+        overlay.id = 'audio-debug-overlay';
+        overlay.className = 'dev-overlay';
+        overlay.style.cssText = `
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.85);
+            color: #fff;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: monospace;
+            font-size: 12px;
+            z-index: 10000;
+            min-width: 250px;
+            max-height: 400px;
+            overflow-y: auto;
+        `;
+
+        const updateOverlay = () => {
+            const soundscape = audioManager.soundscape;
+            const mixer = audioManager.mixer;
+            const playerX = this.game.state?.player?.x ?? 0;
+            const playerY = this.game.state?.player?.y ?? 0;
+            const districtId = this.game.map?.getDistrictAt?.(playerX, playerY) ?? -1;
+            const district = this.game.map?.districts?.find(d => d.id === districtId);
+
+            overlay.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                    <h4 style="margin: 0; color: #4CAF50;">Audio Debug</h4>
+                    <button id="audio-debug-close" style="background: none; border: none; color: #fff; font-size: 18px; cursor: pointer;">&times;</button>
+                </div>
+                <div style="margin-bottom: 8px;">
+                    <div><strong>Status:</strong> ${audioManager.isInitialized ? '<span style="color: #4CAF50;">Ready</span>' : '<span style="color: #f44336;">Not Init</span>'}</div>
+                    <div><strong>Context:</strong> ${audioManager.context?.state || 'N/A'}</div>
+                    <div><strong>Mute:</strong> ${audioManager.isMuted ? '<span style="color: #f44336;">Yes</span>' : '<span style="color: #4CAF50;">No</span>'}</div>
+                </div>
+                <div style="margin-bottom: 8px; border-top: 1px solid #444; padding-top: 8px;">
+                    <div><strong>Player District:</strong> ${district?.theme || 'Unknown'}</div>
+                    <div><strong>Position:</strong> (${playerX}, ${playerY})</div>
+                    <div><strong>Current Ambient:</strong> ${soundscape?.currentDistrict || 'N/A'}</div>
+                    <div><strong>Time of Day:</strong> ${(this.game.state?.time?.timeOfDay ?? 0).toFixed(2)}</div>
+                    <div><strong>City State:</strong> ${soundscape?.currentCityState || 'N/A'}</div>
+                </div>
+                <div style="margin-bottom: 8px; border-top: 1px solid #444; padding-top: 8px;">
+                    <div><strong>Master Vol:</strong> ${(audioManager.masterGain?.gain?.value ?? 0).toFixed(2)}</div>
+                    <div><strong>SFX Vol:</strong> ${(mixer?.channels?.get('sfx')?.gain?.gain?.value ?? 0).toFixed(2)}</div>
+                    <div><strong>Ambient Vol:</strong> ${(audioManager.ambientGain?.gain?.value ?? 0).toFixed(2)}</div>
+                    <div><strong>Music Vol:</strong> ${(mixer?.channels?.get('music')?.gain?.gain?.value ?? 0).toFixed(2)}</div>
+                </div>
+                <div style="border-top: 1px solid #444; padding-top: 8px;">
+                    <button id="audio-test-btn" style="background: #4CAF50; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer; margin-right: 5px;">Test SFX</button>
+                    <button id="audio-mute-btn" style="background: #2196F3; border: none; color: white; padding: 5px 10px; border-radius: 4px; cursor: pointer;">${audioManager.isMuted ? 'Unmute' : 'Mute'}</button>
+                </div>
+            `;
+
+            // Close button
+            overlay.querySelector('#audio-debug-close').addEventListener('click', () => {
+                overlay.remove();
+            });
+
+            // Test SFX button
+            overlay.querySelector('#audio-test-btn').addEventListener('click', () => {
+                this.testAllSFX();
+            });
+
+            // Mute button
+            overlay.querySelector('#audio-mute-btn').addEventListener('click', () => {
+                if (audioManager.isMuted) {
+                    audioManager.unmute();
+                } else {
+                    audioManager.mute();
+                }
+                updateOverlay();
+            });
+        };
+
+        updateOverlay();
+        document.body.appendChild(overlay);
+
+        // Auto-update every second
+        const interval = setInterval(() => {
+            if (!document.body.contains(overlay)) {
+                clearInterval(interval);
+                return;
+            }
+            updateOverlay();
+        }, 1000);
+
+        this.showMessage('Audio debug overlay opened', 'normal');
+    }
+
+    /**
+     * Test all SFX types
+     */
+    testAllSFX() {
+        const audioManager = this.game.ui?.audioManager;
+        if (!audioManager) {
+            this.showMessage('Audio manager not available', 'error');
+            return;
+        }
+
+        const sfxTypes = [
+            'build_place', 'build_demolish', 'build_invalid',
+            'ui_click', 'ui_hover', 'ui_slider', 'ui_success', 'ui_error',
+            'crisis_alert', 'crisis_warning', 'crisis_resolved',
+            'hack_success', 'hack_fail', 'hack_progress',
+            'resource_gain', 'resource_loss', 'resource_low'
+        ];
+
+        console.log('[Dev] Testing all SFX types...');
+        sfxTypes.forEach((sfx, index) => {
+            setTimeout(() => {
+                audioManager.playSFX(sfx);
+                console.log(`  Played: ${sfx}`);
+            }, index * 200);
+        });
+
+        this.showMessage(`Testing ${sfxTypes.length} SFX types (see console)`, 'normal');
     }
 
     /**

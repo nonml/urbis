@@ -364,8 +364,7 @@ export const BUILDING_EXTENDED = {
         income: { gold: 3, food: 0, wood: 0 },
         upkeep: 3,
         population: 0,
-        effects: { mobilityBonus: 0.10, transitCoverage: 0.05 },
-        unlockRequirement: { population: 20 }
+        effects: { mobilityBonus: 0.10, transitCoverage: 0.05 }
     },
     [BUILDING_BUS_DEPOT]: {
         name: 'Bus Depot',
@@ -375,8 +374,7 @@ export const BUILDING_EXTENDED = {
         income: { gold: -8, food: 0, wood: 0 },
         upkeep: 15,
         population: 0,
-        effects: { busRoutes: 3, mobilityBonus: 0.20 },
-        unlockRequirement: { population: 60 }
+        effects: { busRoutes: 3, mobilityBonus: 0.20 }
     },
     [BUILDING_METRO_STATION]: {
         name: 'Metro Station',
@@ -386,8 +384,7 @@ export const BUILDING_EXTENDED = {
         income: { gold: 15, food: 0, wood: 0 },
         upkeep: 25,
         population: 0,
-        effects: { mobilityBonus: 0.35, transitCoverage: 0.20, congestionReduction: 0.15 },
-        unlockRequirement: { population: 150, techLevel: 2 }
+        effects: { mobilityBonus: 0.35, transitCoverage: 0.20, congestionReduction: 0.15 }
     },
     [BUILDING_TOLLWAY_GATE]: {
         name: 'Tollway Gate',
@@ -397,8 +394,7 @@ export const BUILDING_EXTENDED = {
         income: { gold: 20, food: 0, wood: 0 },
         upkeep: 5,
         population: 0,
-        effects: { tollRevenue: 20, trafficControl: 0.10 },
-        unlockRequirement: { population: 100 }
+        effects: { tollRevenue: 20, trafficControl: 0.10 }
     },
     [BUILDING_HIGHWAY_RAMP]: {
         name: 'Highway Ramp',
@@ -408,8 +404,7 @@ export const BUILDING_EXTENDED = {
         income: { gold: 0, food: 0, wood: 0 },
         upkeep: 4,
         population: 0,
-        effects: { connectivityBonus: 0.15 },
-        unlockRequirement: { population: 80 }
+        effects: { connectivityBonus: 0.15 }
     },
     [BUILDING_SUBWAY_SHAFT]: {
         name: 'Subway Shaft',

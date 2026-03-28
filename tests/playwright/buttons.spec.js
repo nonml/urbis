@@ -192,7 +192,7 @@ customTest.describe('Main Menu Buttons', () => {
   customTest.beforeEach(async ({ page }) => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('start button should be visible and enabled', async ({ page }) => {
@@ -203,19 +203,18 @@ customTest.describe('Main Menu Buttons', () => {
 
   customTest('start button should transition to game', async ({ page }) => {
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
-    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible();
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('restart button should be available in main menu', async ({ page }) => {
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     // Show main menu to see restart button
     await page.evaluate(() => {
       if (window.showStartScreen) window.showStartScreen();
     });
-    await page.waitForTimeout(500);
+    await expect(page.locator(SELECTORS.MAIN_MENU_OVERLAY)).toBeVisible({ timeout: ACTION_TIMEOUT });
     
     await expect(page.locator(SELECTORS.RESTART_BTN)).toBeAttached();
   });
@@ -233,7 +232,7 @@ customTest.describe('Settings Panel Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('settings button should open settings panel', async ({ page }) => {
@@ -256,7 +255,7 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings close button should close panel', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached();
     const isOpen = await page.evaluate(() => !!document.querySelector('#settings-overlay:not(.hidden)'));
     expect(isOpen).toBe(true);
 
@@ -264,7 +263,8 @@ customTest.describe('Settings Panel Buttons', () => {
       const btn = document.querySelector('#settings-overlay .btn-close[data-action="close"]');
       if (btn) btn.click();
     });
-    await page.waitForTimeout(500);
+    // Wait for overlay to be hidden instead of using timeout
+    await expect(page.locator('#settings-overlay')).not.toBeAttached({ timeout: 1000 });
     const isClosed = await page.evaluate(() => {
       const el = document.querySelector('#settings-overlay');
       return !el || el.classList.contains('hidden') || !document.body.contains(el);
@@ -275,7 +275,7 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings tab buttons should switch tabs', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached();
 
     const firstActive = await page.evaluate(() => {
       const tabs = document.querySelectorAll('#settings-overlay .settings-tabs .tab');
@@ -287,7 +287,6 @@ customTest.describe('Settings Panel Buttons', () => {
       const tabs = document.querySelectorAll('#settings-overlay .settings-tabs .tab');
       if (tabs[1]) tabs[1].click();
     });
-    await page.waitForTimeout(300);
     const secondActive = await page.evaluate(() => {
       const tabs = document.querySelectorAll('#settings-overlay .settings-tabs .tab');
       return tabs[1]?.classList.contains('active') ?? false;
@@ -298,7 +297,7 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings sliders should be interactive', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached();
 
     const value = await page.evaluate(() => {
       const slider = document.querySelector('#settings-overlay #mouse-sensitivity');
@@ -310,7 +309,7 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings checkboxes should be toggleable', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached({ timeout: ACTION_TIMEOUT });
 
     const isChecked = await page.evaluate(() => {
       const cb = document.querySelector('#settings-overlay #invert-y');
@@ -324,11 +323,10 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings theme select should be changeable', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached({ timeout: ACTION_TIMEOUT });
     await page.evaluate(() => {
       document.querySelector('#settings-overlay .settings-tabs .tab[data-tab="graphics"]')?.click();
     });
-    await page.waitForTimeout(300);
     const exists = await page.evaluate(() => !!document.querySelector('#settings-overlay #theme-select'));
     expect(exists).toBe(true);
   });
@@ -336,11 +334,10 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings reset button should be visible', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached({ timeout: ACTION_TIMEOUT });
     await page.evaluate(() => {
       document.querySelector('#settings-overlay .settings-tabs .tab[data-tab="system"]')?.click();
     });
-    await page.waitForTimeout(300);
     const exists = await page.evaluate(() => !!document.querySelector('#settings-overlay #reset-settings'));
     expect(exists).toBe(true);
   });
@@ -348,11 +345,10 @@ customTest.describe('Settings Panel Buttons', () => {
   customTest('settings known issues button should be visible', async ({ page }) => {
     await page.dismissOverlays();
     await page.evaluate((sel) => document.querySelector(sel)?.click(), SELECTORS.SETTINGS_BTN);
-    await page.waitForTimeout(500);
+    await expect(page.locator('#settings-overlay')).toBeAttached();
     await page.evaluate(() => {
       document.querySelector('#settings-overlay .settings-tabs .tab[data-tab="system"]')?.click();
     });
-    await page.waitForTimeout(300);
     const exists = await page.evaluate(() => !!document.querySelector('#settings-overlay #known-issues-btn'));
     expect(exists).toBe(true);
   });
@@ -366,7 +362,7 @@ customTest.describe('Build Menu Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('building grid should be visible', async ({ page }) => {
@@ -400,13 +396,12 @@ customTest.describe('Politics Panel Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('politics toggle button should open panel', async ({ page }) => {
     // Politics panel is toggled with 'P' key
     await page.keyboard.press('KeyP');
-    await page.waitForTimeout(500);
     
     // Panel should be created (may not be visible if no policies)
     const panel = page.locator(SELECTORS.POLITICS_PANEL);
@@ -422,7 +417,6 @@ customTest.describe('Politics Panel Buttons', () => {
       const event = new KeyboardEvent('keydown', { key: 'p', code: 'KeyP' });
       document.dispatchEvent(event);
     });
-    await page.waitForTimeout(1000);
 
     // Check if tabs exist via evaluate
     const tabCount = await page.evaluate(() => {
@@ -434,7 +428,6 @@ customTest.describe('Politics Panel Buttons', () => {
         const tabs = document.querySelectorAll('#politics-panel .tab-btn');
         if (tabs[1]) tabs[1].click();
       });
-      await page.waitForTimeout(300);
       const isActive = await page.evaluate(() => {
         const tabs = document.querySelectorAll('#politics-panel .tab-btn');
         return tabs[1]?.classList.contains('active') ?? false;
@@ -452,13 +445,12 @@ customTest.describe('Campaign Panel Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('campaign toggle button should open panel', async ({ page }) => {
     // Campaign panel is toggled with 'C' key
     await page.keyboard.press('KeyC');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.CAMPAIGN_PANEL);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -468,7 +460,6 @@ customTest.describe('Campaign Panel Buttons', () => {
 
   customTest('campaign tab buttons should be present', async ({ page }) => {
     await page.keyboard.press('KeyC');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.CAMPAIGN_PANEL);
     const tabs = panel.locator('.campaign-tabs .tab-btn');
@@ -488,13 +479,12 @@ customTest.describe('Factions Panel Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('factions toggle button should open panel', async ({ page }) => {
     // Factions panel is toggled with 'F' key
     await page.keyboard.press('KeyF');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.FACTIONS_PANEL);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -511,13 +501,12 @@ customTest.describe('Quest Log Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('quest log toggle should open panel', async ({ page }) => {
     // Quest log is toggled with 'J' key
     await page.keyboard.press('KeyJ');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.QUEST_LOG);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -527,7 +516,6 @@ customTest.describe('Quest Log Buttons', () => {
 
   customTest('quest log close button should close panel', async ({ page }) => {
     await page.keyboard.press('KeyJ');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.QUEST_LOG);
     // Quest log close button has id #quest-log-close
@@ -537,15 +525,13 @@ customTest.describe('Quest Log Buttons', () => {
     if (closeCount > 0) {
       await expect(closeBtn).toBeVisible();
       await closeBtn.click();
-      await page.waitForTimeout(300);
-      
-      await expect(panel).toHaveCSS('display', 'none');
+      // Wait for panel to be hidden instead of using timeout
+      await expect(panel).toHaveCSS('display', 'none', { timeout: 1000 });
     }
   });
 
   customTest('quest mark complete button should be present', async ({ page }) => {
     await page.keyboard.press('KeyJ');
-    await page.waitForTimeout(500);
     
     // Quest log buttons have IDs #quest-mark-complete and #quest-cancel
     const markCompleteBtn = page.locator('#quest-mark-complete');
@@ -560,7 +546,6 @@ customTest.describe('Quest Log Buttons', () => {
 
   customTest('quest cancel button should be present', async ({ page }) => {
     await page.keyboard.press('KeyJ');
-    await page.waitForTimeout(500);
     
     const cancelBtn = page.locator('#quest-cancel');
     
@@ -581,13 +566,12 @@ customTest.describe('Map Screen Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('map screen toggle should open panel', async ({ page }) => {
     // Map screen is toggled with 'M' key
     await page.keyboard.press('KeyM');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.MAP_SCREEN);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -597,7 +581,6 @@ customTest.describe('Map Screen Buttons', () => {
 
   customTest('map screen close button should close panel', async ({ page }) => {
     await page.keyboard.press('KeyM');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.MAP_SCREEN);
     const closeBtn = panel.locator(SELECTORS.MAP_SCREEN_CLOSE);
@@ -606,7 +589,7 @@ customTest.describe('Map Screen Buttons', () => {
     if (closeCount > 0) {
       await expect(closeBtn).toBeVisible();
       await closeBtn.click();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(100);
       
       await expect(panel).toHaveCSS('display', 'none');
     }
@@ -621,7 +604,7 @@ customTest.describe('Seed Browser Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('seed browser should have close button', async ({ page }) => {
@@ -631,7 +614,7 @@ customTest.describe('Seed Browser Buttons', () => {
         window.seedBrowserUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SEED_BROWSER);
     const closeBtn = panel.locator(SELECTORS.SEED_BROWSER_CLOSE);
@@ -648,7 +631,7 @@ customTest.describe('Seed Browser Buttons', () => {
         window.seedBrowserUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SEED_BROWSER);
     const generateBtn = panel.locator(SELECTORS.SEED_GENERATE_BTN);
@@ -665,7 +648,7 @@ customTest.describe('Seed Browser Buttons', () => {
         window.seedBrowserUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SEED_BROWSER);
     const filterBtns = panel.locator(SELECTORS.SEED_FILTER_BTN);
@@ -685,7 +668,7 @@ customTest.describe('Shop Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('shop should have close button', async ({ page }) => {
@@ -694,7 +677,7 @@ customTest.describe('Shop Buttons', () => {
         window.shopUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SHOP_PANEL);
     const closeBtn = panel.locator(SELECTORS.SHOP_CLOSE_BTN);
@@ -711,7 +694,7 @@ customTest.describe('Shop Buttons', () => {
         window.shopUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SHOP_PANEL);
     const tabs = panel.locator(SELECTORS.SHOP_TABS);
@@ -730,7 +713,7 @@ customTest.describe('Shop Buttons', () => {
         window.shopUI.show();
       }
     });
-    await page.waitForTimeout(500);
+    await page.waitForTimeout(100);
     
     const panel = page.locator(SELECTORS.SHOP_PANEL);
     const tabs = panel.locator(SELECTORS.SHOP_TABS);
@@ -739,7 +722,6 @@ customTest.describe('Shop Buttons', () => {
     if (tabCount > 1) {
       // Click second tab
       await tabs.nth(1).click();
-      await page.waitForTimeout(300);
       
       await expect(tabs.nth(1)).toHaveClass(/active/);
     }
@@ -754,13 +736,12 @@ customTest.describe('Tech Screen Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('tech screen toggle should open panel', async ({ page }) => {
     // Tech screen is toggled with 'T' key
     await page.keyboard.press('KeyT');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.TECH_SCREEN);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -770,7 +751,6 @@ customTest.describe('Tech Screen Buttons', () => {
 
   customTest('tech screen should have close button', async ({ page }) => {
     await page.keyboard.press('KeyT');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.TECH_SCREEN);
     // Tech screen close button uses onclick handler with class .btn.btn-primary
@@ -798,7 +778,7 @@ customTest.describe('Victory Screen Buttons', () => {
         victoryScreen.classList.remove('hidden');
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const continueBtn = page.locator(SELECTORS.VICTORY_CONTINUE);
     const continueCount = await continueBtn.count();
@@ -818,7 +798,7 @@ customTest.describe('Victory Screen Buttons', () => {
         victoryScreen.classList.remove('hidden');
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const restartBtn = page.locator(SELECTORS.VICTORY_RESTART);
     const restartCount = await restartBtn.count();
@@ -838,7 +818,7 @@ customTest.describe('Victory Screen Buttons', () => {
         victoryScreen.classList.remove('hidden');
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const menuBtn = page.locator(SELECTORS.VICTORY_MENU);
     const menuCount = await menuBtn.count();
@@ -864,7 +844,7 @@ customTest.describe('Run Summary Buttons', () => {
         summary.style.display = 'block';
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const replayBtn = page.locator(SELECTORS.RUN_SUMMARY_REPLAY);
     const replayCount = await replayBtn.count();
@@ -884,7 +864,7 @@ customTest.describe('Run Summary Buttons', () => {
         summary.style.display = 'block';
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const newRunBtn = page.locator(SELECTORS.RUN_SUMMARY_NEW_RUN);
     const newRunCount = await newRunBtn.count();
@@ -904,7 +884,7 @@ customTest.describe('Run Summary Buttons', () => {
         summary.style.display = 'block';
       }
     });
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
     
     const statsBtn = page.locator(SELECTORS.RUN_SUMMARY_STATS);
     const statsCount = await statsBtn.count();
@@ -923,7 +903,7 @@ customTest.describe('Game Controls Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('reset camera button should be visible and clickable', async ({ page }) => {
@@ -933,7 +913,7 @@ customTest.describe('Game Controls Buttons', () => {
       if (!btn) throw new Error('Reset camera button not found');
       btn.click();
     }, SELECTORS.RESET_CAMERA);
-    await page.waitForTimeout(300);
+    await page.waitForTimeout(100);
 
     // Verify button still exists after click
     const exists = await page.evaluate((sel) => !!document.querySelector(sel), SELECTORS.RESET_CAMERA);
@@ -962,12 +942,11 @@ customTest.describe('Keyboard Toggle Buttons', () => {
     await page.goto('/');
     await page.waitForLoadState('networkidle');
     await page.click(SELECTORS.START_BTN);
-    await page.waitForTimeout(GAME_LOAD_DELAY + RENDER_STABILIZE_DELAY);
+    await expect(page.locator(SELECTORS.GAME_CONTAINER)).toBeVisible({ timeout: ACTION_TIMEOUT });
   });
 
   customTest('P key should toggle politics panel', async ({ page }) => {
     await page.keyboard.press('KeyP');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.POLITICS_PANEL);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -977,7 +956,6 @@ customTest.describe('Keyboard Toggle Buttons', () => {
 
   customTest('C key should toggle campaign panel', async ({ page }) => {
     await page.keyboard.press('KeyC');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.CAMPAIGN_PANEL);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -987,7 +965,6 @@ customTest.describe('Keyboard Toggle Buttons', () => {
 
   customTest('F key should toggle factions panel', async ({ page }) => {
     await page.keyboard.press('KeyF');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.FACTIONS_PANEL);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -997,7 +974,6 @@ customTest.describe('Keyboard Toggle Buttons', () => {
 
   customTest('J key should toggle quest log', async ({ page }) => {
     await page.keyboard.press('KeyJ');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.QUEST_LOG);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -1007,7 +983,6 @@ customTest.describe('Keyboard Toggle Buttons', () => {
 
   customTest('M key should toggle map screen', async ({ page }) => {
     await page.keyboard.press('KeyM');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.MAP_SCREEN);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
@@ -1017,7 +992,6 @@ customTest.describe('Keyboard Toggle Buttons', () => {
 
   customTest('T key should toggle tech screen', async ({ page }) => {
     await page.keyboard.press('KeyT');
-    await page.waitForTimeout(500);
     
     const panel = page.locator(SELECTORS.TECH_SCREEN);
     await panel.waitFor({ state: 'attached', timeout: 3000 }).catch(() => {
