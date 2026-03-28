@@ -286,6 +286,9 @@ export class UIManager {
         this.themeManager = createThemeManager();
         window.themeManager = this.themeManager;
 
+        // ─── NEW HUD SYSTEM ───
+        this._initNewHUD();
+
         // Screen reader announcer (accessibility)
         this.srAnnouncer = new ScreenReaderAnnouncer();
         this._setupScreenReaderListeners();
@@ -385,6 +388,326 @@ export class UIManager {
 
         // Auto-init 3D renderer on boot (City Skylines-style). If it fails, we fall back gracefully.
         this.loadRenderer3D();
+    }
+
+    // ═══════════════════════════════════════
+    // NEW HUD SYSTEM — Init & Update Methods
+    // ═══════════════════════════════════════
+
+    _initNewHUD() {
+        // Cache HUD element references
+        this._wantedStars = document.querySelectorAll('#wanted-stars .star');
+        this._heatLabel = document.getElementById('heat-label');
+        this._tickerPopVal = document.getElementById('ticker-pop-val');
+        this._tickerFundsVal = document.getElementById('ticker-funds-val');
+        this._tickerTimeVal = document.getElementById('ticker-time-val');
+        this._tickerWeatherIcon = document.getElementById('ticker-weather-icon');
+        this._healthFill = document.getElementById('health-fill');
+        this._healthVal = document.getElementById('health-val');
+        this._staminaFill = document.getElementById('stamina-fill');
+        this._staminaVal = document.getElementById('stamina-val');
+        this._hudStreetLayer = document.getElementById('hud-street-layer');
+        this._hudGodLayer = document.getElementById('hud-god-layer');
+        this._toggleLabel = document.getElementById('toggle-label');
+        this._toggleIcon = document.getElementById('toggle-icon');
+        this._minimapModeLabel = document.getElementById('minimap-mode-label');
+        this._profilerTooltip = document.getElementById('profiler-tooltip');
+        this._networkVision = document.getElementById('network-vision');
+        this._smartphoneOverlay = document.getElementById('smartphone-overlay');
+        this._pauseOverlay = document.getElementById('pause-overlay');
+        this._breachWindow = document.getElementById('breach-window');
+        this._lastWantedLevel = 0;
+
+        // Mode toggle button
+        const modeToggleBtn = document.getElementById('mode-toggle-btn');
+        if (modeToggleBtn) {
+            modeToggleBtn.addEventListener('click', () => {
+                this.toggleGameMode();
+                this.playUISound('click');
+            });
+        }
+
+        // Pause menu buttons
+        this._setupPauseMenu();
+
+        // Smartphone menu
+        this._setupSmartphoneMenu();
+
+        // Panel close buttons
+        document.querySelectorAll('.panel-close[data-close]').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const panelId = btn.dataset.close;
+                const panel = document.getElementById(panelId);
+                if (panel) panel.classList.add('hidden');
+                this.playUISound('click');
+            });
+        });
+
+        // Budget sliders
+        this._setupBudgetSliders();
+
+        // Network Vision toggle (already on 'h' key for hack scan, add 'g' for network vision)
+        // Build ribbon category clicks
+        document.querySelectorAll('.ribbon-category').forEach(cat => {
+            cat.addEventListener('click', () => {
+                document.querySelectorAll('.ribbon-category').forEach(c => c.classList.remove('active'));
+                cat.classList.add('active');
+                this.playUISound('click');
+            });
+        });
+    }
+
+    _setupPauseMenu() {
+        const resumeBtn = document.getElementById('pause-resume');
+        const saveBtn = document.getElementById('pause-save');
+        const loadBtn = document.getElementById('pause-load');
+        const settingsBtn = document.getElementById('pause-settings');
+        const exitBtn = document.getElementById('pause-exit');
+
+        if (resumeBtn) resumeBtn.addEventListener('click', () => {
+            this._pauseOverlay?.classList.add('hidden');
+            this.game.paused = false;
+            this.playUISound('click');
+        });
+        if (saveBtn) saveBtn.addEventListener('click', () => {
+            this.game.saveGame();
+            this.showMessage('City saved.', 'success');
+            this.playUISound('success');
+        });
+        if (loadBtn) loadBtn.addEventListener('click', () => {
+            this.game.loadGame();
+            this._pauseOverlay?.classList.add('hidden');
+            this.playUISound('click');
+        });
+        if (settingsBtn) settingsBtn.addEventListener('click', () => {
+            this.toggleSettings();
+            this.playUISound('click');
+        });
+        if (exitBtn) exitBtn.addEventListener('click', () => {
+            this._pauseOverlay?.classList.add('hidden');
+            this.game.stop?.();
+            window.showStartScreen?.();
+            this.playUISound('click');
+        });
+    }
+
+    _setupSmartphoneMenu() {
+        document.querySelectorAll('.phone-app').forEach(app => {
+            app.addEventListener('click', () => {
+                const appName = app.dataset.app;
+                this._openPhoneApp(appName);
+                this.playUISound('click');
+            });
+        });
+    }
+
+    _openPhoneApp(appName) {
+        const phonePanel = document.getElementById('phone-panel');
+        if (!phonePanel) return;
+
+        switch (appName) {
+            case 'missions':
+                this._smartphoneOverlay?.classList.add('hidden');
+                this.caseFileUI?.toggle();
+                break;
+            case 'upgrades':
+                this._smartphoneOverlay?.classList.add('hidden');
+                this.toggleTechScreen();
+                break;
+            case 'vehicles': {
+                const vc = this.game.vehicleController;
+                if (vc) {
+                    vc.summonVehicle?.(this.game.player.wx ?? this.game.player.x, this.game.player.wz ?? this.game.player.y);
+                    this.showMessage('Vehicle summoned nearby.', 'success');
+                }
+                this._smartphoneOverlay?.classList.add('hidden');
+                break;
+            }
+            case 'inventory':
+                phonePanel.classList.remove('hidden');
+                phonePanel.innerHTML = `<div class="phone-panel-title">INVENTORY</div><p style="color:var(--text-dim);font-size:11px;">No items collected yet.</p>`;
+                break;
+            case 'economy':
+                this._smartphoneOverlay?.classList.add('hidden');
+                document.getElementById('economy-panel')?.classList.remove('hidden');
+                break;
+            case 'factions':
+                this._smartphoneOverlay?.classList.add('hidden');
+                document.getElementById('factions-politics-panel')?.classList.remove('hidden');
+                break;
+            case 'transit':
+                this._smartphoneOverlay?.classList.add('hidden');
+                document.getElementById('transit-panel')?.classList.remove('hidden');
+                break;
+            case 'codex':
+                this._smartphoneOverlay?.classList.add('hidden');
+                this.codexUI?.open();
+                break;
+            default:
+                phonePanel.classList.remove('hidden');
+                phonePanel.innerHTML = `<div class="phone-panel-title">${appName.toUpperCase()}</div><p style="color:var(--text-dim);font-size:11px;">Coming soon...</p>`;
+        }
+    }
+
+    _setupBudgetSliders() {
+        const sliders = [
+            { id: 'tax-residential', valId: 'tax-res-val', suffix: '%' },
+            { id: 'tax-commercial', valId: 'tax-com-val', suffix: '%' },
+            { id: 'fund-police', valId: 'fund-police-val', suffix: '%' },
+            { id: 'fund-transit', valId: 'fund-transit-val', suffix: '%' },
+        ];
+        for (const { id, valId, suffix } of sliders) {
+            const slider = document.getElementById(id);
+            const valEl = document.getElementById(valId);
+            if (slider && valEl) {
+                slider.addEventListener('input', () => {
+                    valEl.textContent = slider.value + suffix;
+                });
+            }
+        }
+    }
+
+    toggleSmartphone() {
+        if (this._smartphoneOverlay) {
+            const isOpen = !this._smartphoneOverlay.classList.contains('hidden');
+            if (isOpen) {
+                this._smartphoneOverlay.classList.add('hidden');
+            } else {
+                this._smartphoneOverlay.classList.remove('hidden');
+                // Hide phone sub-panel when opening
+                const phonePanel = document.getElementById('phone-panel');
+                if (phonePanel) phonePanel.classList.add('hidden');
+            }
+        }
+    }
+
+    togglePauseMenu() {
+        if (this._pauseOverlay) {
+            const isOpen = !this._pauseOverlay.classList.contains('hidden');
+            if (isOpen) {
+                this._pauseOverlay.classList.add('hidden');
+                this.game.paused = false;
+            } else {
+                this._pauseOverlay.classList.remove('hidden');
+                this.game.paused = true;
+            }
+        }
+    }
+
+    toggleNetworkVision() {
+        if (this._networkVision) {
+            const active = !this._networkVision.classList.contains('hidden');
+            if (active) {
+                this._networkVision.classList.add('hidden');
+                document.body.classList.remove('network-vision-active');
+                this.showMessage('Network Vision: OFF', 'normal');
+            } else {
+                this._networkVision.classList.remove('hidden');
+                document.body.classList.add('network-vision-active');
+                this.showMessage('Network Vision: ON', 'success');
+            }
+        }
+    }
+
+    /** Update wanted stars based on heat level */
+    updateWantedStars(heat) {
+        // Heat is 0-100, map to 0-5 stars
+        const level = Math.min(5, Math.floor(heat / 20));
+        if (level === this._lastWantedLevel) return;
+        this._lastWantedLevel = level;
+
+        this._wantedStars?.forEach(star => {
+            const starLevel = parseInt(star.dataset.level);
+            if (starLevel <= level) {
+                star.classList.add('active');
+            } else {
+                star.classList.remove('active');
+            }
+        });
+
+        const labels = ['CLEAN', 'NOTICED', 'WANTED', 'HUNTED', 'MANHUNT', 'WARGAME'];
+        if (this._heatLabel) this._heatLabel.textContent = labels[level] || 'CLEAN';
+    }
+
+    /** Update top-right city ticker */
+    updateCityTicker() {
+        const res = this.game?.resources;
+        if (!res) return;
+        if (this._tickerPopVal) this._tickerPopVal.textContent = res.population || 0;
+        if (this._tickerFundsVal) this._tickerFundsVal.textContent = '$' + Math.floor(res.gold || 0);
+        if (this._tickerTimeVal) this._tickerTimeVal.textContent = 'Day ' + (res.day || 1);
+
+        const ws = this.game?.weatherSystem;
+        if (this._tickerWeatherIcon && ws?.getWeatherIcon) {
+            this._tickerWeatherIcon.textContent = ws.getWeatherIcon();
+        }
+    }
+
+    /** Update health/stamina bars */
+    updateHealthBars() {
+        const ph = this.game?.playerHealth;
+        if (!ph) return;
+        const hp = Math.max(0, Math.min(100, ph.hp ?? 100));
+        const maxHp = ph.maxHp ?? 100;
+        const pct = Math.round((hp / maxHp) * 100);
+        if (this._healthFill) this._healthFill.style.width = pct + '%';
+        if (this._healthVal) this._healthVal.textContent = hp;
+
+        // Stamina (from player state)
+        const stamina = Math.round((this.playerState?.stamina ?? 1) * 100);
+        if (this._staminaFill) this._staminaFill.style.width = stamina + '%';
+        if (this._staminaVal) this._staminaVal.textContent = stamina;
+    }
+
+    /** Switch HUD layers between Street and God view */
+    updateHUDLayers() {
+        const mode = this.game?.mode;
+        if (mode === MODE_GOD) {
+            this._hudStreetLayer?.classList.add('hidden');
+            this._hudGodLayer?.classList.remove('hidden');
+            if (this._toggleLabel) this._toggleLabel.textContent = 'GOD VIEW';
+            if (this._toggleIcon) this._toggleIcon.innerHTML = '&#127961;';
+            if (this._minimapModeLabel) this._minimapModeLabel.textContent = 'GOD';
+        } else {
+            this._hudStreetLayer?.classList.remove('hidden');
+            this._hudGodLayer?.classList.add('hidden');
+            if (this._toggleLabel) this._toggleLabel.textContent = 'STREET VIEW';
+            if (this._toggleIcon) this._toggleIcon.innerHTML = '&#128694;';
+            if (this._minimapModeLabel) this._minimapModeLabel.textContent = 'STREET';
+        }
+    }
+
+    /** Update NPC profiler tooltip position (world-to-screen) */
+    updateProfilerTooltip(npc, screenX, screenY) {
+        if (!this._profilerTooltip || !npc) {
+            this._profilerTooltip?.classList.add('hidden');
+            return;
+        }
+        this._profilerTooltip.classList.remove('hidden');
+        this._profilerTooltip.style.left = screenX + 'px';
+        this._profilerTooltip.style.top = screenY + 'px';
+
+        const nameEl = document.getElementById('profiler-name');
+        const occEl = document.getElementById('profiler-occupation');
+        const incEl = document.getElementById('profiler-income');
+        const facEl = document.getElementById('profiler-faction');
+        const secEl = document.getElementById('profiler-secret');
+
+        if (nameEl) nameEl.textContent = npc.name || 'Unknown';
+        if (occEl) occEl.textContent = 'Occupation: ' + (npc.job || 'Unemployed');
+        if (incEl) incEl.textContent = 'Income: $' + (npc.income ?? 0);
+        if (facEl) facEl.textContent = 'Faction: ' + (npc.faction || 'Neutral');
+        if (secEl) secEl.textContent = 'Secret: ' + (npc.secret || '???');
+    }
+
+    /** Update transit stats panel */
+    updateTransitPanel() {
+        const tm = this.game?.transitMetrics || {};
+        const el = (id, val) => { const e = document.getElementById(id); if (e) e.textContent = val; };
+        el('ts-mobility', Math.round((tm.mobilityBonus || 0) * 100) + '%');
+        el('ts-coverage', Math.round((tm.transitCoverage || 0) * 100) + '%');
+        el('ts-congestion', Math.round((tm.congestionReduction || 0) * 100) + '%');
+        el('ts-routes', tm.busRoutes || 0);
     }
 
     async loadRenderer3D() {
@@ -692,12 +1015,13 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 e.preventDefault();
                 this.game.saveGame();
             }
-            if (e.key.toLowerCase() === 'p') {
-                this.game.paused = !this.game.paused;
-                this.showMessage(this.game.paused ? '⏸️ Paused' : '▶️ Resumed', 'normal');
+            if (e.key.toLowerCase() === 'p' && !e.ctrlKey) {
+                // P key: toggle pause menu overlay
+                this.togglePauseMenu();
             }
             if (e.key.toLowerCase() === 'm') {
-                this.toggleMapScreen();
+                // M key: toggle smartphone menu (DedSec phone)
+                this.toggleSmartphone();
             }
             if (e.key.toLowerCase() === 'e') {
                 if (this.selectedBuilding) {
@@ -799,11 +1123,26 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 const open = this.buildMenu.toggleOpen();
                 this.showMessage(open ? 'Build menu opened.' : 'Build menu closed.', 'normal');
             }
-            if (e.key === 'Escape' && this.selectedBuilding) {
-                this.buildMenu.cancelBuildMode();
-                this.showMessage('Build mode canceled.', 'normal');
-            } else if (e.key === 'Escape' && this.breachMinigame.active) {
-                this.breachMinigame.finish(false);
+            // G key: toggle network vision overlay
+            if (e.key.toLowerCase() === 'g') {
+                this.toggleNetworkVision();
+            }
+            if (e.key === 'Escape') {
+                // Close various panels in priority order
+                if (this._smartphoneOverlay && !this._smartphoneOverlay.classList.contains('hidden')) {
+                    this._smartphoneOverlay.classList.add('hidden');
+                } else if (this._pauseOverlay && !this._pauseOverlay.classList.contains('hidden')) {
+                    this._pauseOverlay.classList.add('hidden');
+                    this.game.paused = false;
+                } else if (this.selectedBuilding) {
+                    this.buildMenu.cancelBuildMode();
+                    this.showMessage('Build mode canceled.', 'normal');
+                } else if (this.breachMinigame.active) {
+                    this.breachMinigame.finish(false);
+                } else {
+                    // Default: open pause menu
+                    this.togglePauseMenu();
+                }
             }
             if (e.key === 'F2') {
                 e.preventDefault();
@@ -1187,6 +1526,13 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         
         // Update action HUD (health, wanted, weapon, speed)
         this.actionHUD?.update();
+
+        // Update new HUD elements
+        const heat = this.game.state?.player?.heat ?? 0;
+        this.updateWantedStars(heat);
+        this.updateCityTicker();
+        this.updateHealthBars();
+        this.updateHUDLayers();
 
         try {
             this.renderer3d.render();

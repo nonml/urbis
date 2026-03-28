@@ -41,21 +41,21 @@ function ensureLoadingOverlay() {
     overlay.style.cssText = `
         position: fixed;
         inset: 0;
-        background: rgba(6, 16, 26, 0.85);
+        background: rgba(3, 5, 8, 0.92);
         display: none;
         align-items: center;
         justify-content: center;
         z-index: 12000;
-        color: #e6f2ff;
-        font-family: 'Courier New', monospace;
+        color: #e0e8f0;
+        font-family: 'Share Tech Mono', 'Consolas', monospace;
     `;
     overlay.innerHTML = `
-        <div style="width:min(420px, 92vw); padding:20px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.35)">
-            <div id="loading-label" style="margin-bottom:8px;">Preparing city...</div>
-            <div style="height:10px; background:rgba(255,255,255,0.15); border-radius:99px; overflow:hidden;">
-                <div id="loading-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#2fbf71,#54d3ff); transition: width 120ms ease;"></div>
+        <div style="width:min(420px, 92vw); padding:24px; border:1px solid rgba(0,240,255,0.15); background:rgba(8,12,22,0.9); border-radius:6px;">
+            <div id="loading-label" style="margin-bottom:10px; color:#00f0ff; letter-spacing:0.1em; font-size:13px;">INITIALIZING CITY...</div>
+            <div style="height:4px; background:rgba(255,255,255,0.08); border-radius:2px; overflow:hidden;">
+                <div id="loading-fill" style="height:100%; width:0%; background:linear-gradient(90deg,#00f0ff,#00ff88); transition: width 120ms ease;"></div>
             </div>
-            <div id="loading-percent" style="margin-top:8px; font-size:12px; opacity:0.9;">0%</div>
+            <div id="loading-percent" style="margin-top:8px; font-size:11px; opacity:0.6;">0%</div>
         </div>
     `;
     document.body.appendChild(overlay);
@@ -86,7 +86,7 @@ function nextFrame() {
 window.startGame = async function() {
     const menu = document.getElementById('main-menu-overlay');
     try {
-        updateLoading(5, 'Preparing session...');
+        updateLoading(5, 'PREPARING SESSION...');
         if (menu) menu.classList.add('hidden');
 
         const preset = document.getElementById('map-size')?.value || 'CITY';
@@ -96,7 +96,7 @@ window.startGame = async function() {
         const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
-        updateLoading(35, 'Generating world...');
+        updateLoading(35, 'GENERATING WORLD...');
 
         // Clean up previous game instance if any
         if (window.game) {
@@ -107,11 +107,11 @@ window.startGame = async function() {
         document.querySelectorAll('#mode-indicator').forEach(el => el.remove());
 
         window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
-        updateLoading(60, 'Booting systems...');
+        updateLoading(60, 'BOOTING SYSTEMS...');
         window.perfOverlay = new PerfOverlay(window.game);
         window.devMenu = new DevMenu(window.game);
         window.devMenu.enable();
-        updateLoading(85, 'Streaming initial chunks...');
+        updateLoading(85, 'STREAMING CHUNKS...');
         window.game.init();
         updateLoading(100, 'Ready');
         setTimeout(() => hideLoading(), 150);
@@ -127,7 +127,7 @@ window.restartGame = async function() {
     const menu = document.getElementById('main-menu-overlay');
     try {
         document.getElementById('victory-overlay').classList.add('hidden');
-        updateLoading(5, 'Restarting...');
+        updateLoading(5, 'RESTARTING...');
 
         const preset = document.getElementById('map-size')?.value || 'CITY';
         const seedStr = document.getElementById('world-seed')?.value?.trim();
@@ -136,7 +136,7 @@ window.restartGame = async function() {
         const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
-        updateLoading(35, 'Generating world...');
+        updateLoading(35, 'GENERATING WORLD...');
 
         // Clean up previous game instance
         if (window.game) {
@@ -148,11 +148,11 @@ window.restartGame = async function() {
 
         window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
 
-        updateLoading(60, 'Booting systems...');
+        updateLoading(60, 'BOOTING SYSTEMS...');
         window.perfOverlay = new PerfOverlay(window.game);
         window.devMenu = new DevMenu(window.game);
         window.devMenu.enable();
-        updateLoading(85, 'Streaming initial chunks...');
+        updateLoading(85, 'STREAMING CHUNKS...');
         window.game.init();
         updateLoading(100, 'Ready');
         setTimeout(() => hideLoading(), 150);

@@ -1,23 +1,56 @@
-/* Stardew Valley-inspired Game UI Styles */
+/* ═══════════════════════════════════════════════════════════
+   NEON CITY — Cyberpunk Browser Game UI
+   Theme: Low-Poly Flat-Shaded + Holographic Post-Processing
+   All UI is HTML/CSS overlays on the Three.js <canvas>
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── ROOT VARIABLES ─── */
 :root {
-    --stardew-green: #3b7a57;
-    --stardew-green-light: #5cb875;
-    --stardew-green-dark: #2c5d42;
-    --stardew-blue: #4a90e2;
-    --stardew-blue-light: #6ab0de;
-    --stardew-gold: #e6b800;
-    --stardew-gold-light: #f0c808;
-    --stardew-wood: #8b5a2b;
-    --stardew-wood-light: #a06b3a;
-    --stardew-heat: #ff4444;
-    --stardew-heat-light: #ffcccc;
-    --stardew-text: #3d3d3d;
-    --stardew-bg: #f4e4bc;
-    --stardew-card-bg: #e8d5b0;
-    --border-radius: 16px;
+    /* Neon palette */
+    --neon-cyan: #00f0ff;
+    --neon-magenta: #ff00aa;
+    --neon-amber: #ffaa00;
+    --neon-green: #00ff88;
+    --neon-red: #ff2244;
+    --neon-blue: #4488ff;
+    --neon-purple: #aa44ff;
+
+    /* Surface colors */
+    --bg-void: #030508;
+    --bg-panel: rgba(8, 12, 22, 0.92);
+    --bg-panel-solid: #080c16;
+    --bg-panel-hover: rgba(14, 22, 40, 0.95);
+    --bg-glass: rgba(0, 240, 255, 0.04);
+    --bg-glass-hover: rgba(0, 240, 255, 0.08);
+
+    /* Borders & accents */
+    --border: rgba(0, 240, 255, 0.12);
+    --border-bright: rgba(0, 240, 255, 0.3);
+    --border-glow: 0 0 8px rgba(0, 240, 255, 0.15);
+    --glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(0, 240, 255, 0.1);
+    --glow-magenta: 0 0 20px rgba(255, 0, 170, 0.3);
+    --glow-amber: 0 0 20px rgba(255, 170, 0, 0.3);
+
+    /* Text */
+    --text: #e0e8f0;
+    --text-dim: #7a8899;
+    --text-faint: #4a5568;
+    --text-bright: #ffffff;
+    --text-neon: #00f0ff;
+
+    /* Typography */
+    --font-display: 'Orbitron', 'Segoe UI', sans-serif;
+    --font-mono: 'Share Tech Mono', 'Consolas', monospace;
+    --font-body: 'Rajdhani', 'Segoe UI', sans-serif;
+
+    /* Sizing */
+    --radius: 3px;
+    --radius-lg: 6px;
+    --panel-blur: blur(16px);
 }
 
-* {
+/* ─── RESET ─── */
+*, *::before, *::after {
     box-sizing: border-box;
     margin: 0;
     padding: 0;
@@ -28,3463 +61,1919 @@
 }
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(180deg, #a3c497 0%, #f4e4bc 100%);
-    color: var(--stardew-text);
+    font-family: var(--font-body);
+    font-weight: 500;
+    background: var(--bg-void);
+    color: var(--text);
     overflow: hidden;
     height: 100vh;
+    width: 100vw;
+    cursor: crosshair;
 }
 
-/* Game Container */
-#game-container {
+/* ═══════════════════════════════════════
+   CRT SCANLINES & EFFECTS
+   ═══════════════════════════════════════ */
+.crt-scanlines {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 9999;
+    background: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 2px,
+        rgba(0, 0, 0, 0.08) 2px,
+        rgba(0, 0, 0, 0.08) 4px
+    );
+    mix-blend-mode: multiply;
+}
+
+/* ─── GLITCH TEXT ─── */
+.glitch-text {
+    position: relative;
+    font-family: var(--font-display);
+    font-weight: 900;
+    font-size: clamp(2.5rem, 8vw, 5rem);
+    color: var(--text-bright);
+    text-shadow:
+        0 0 10px var(--neon-cyan),
+        0 0 40px rgba(0, 240, 255, 0.4),
+        0 0 80px rgba(0, 240, 255, 0.2);
+    letter-spacing: 0.15em;
+}
+.glitch-text::before,
+.glitch-text::after {
+    content: attr(data-text);
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+}
+.glitch-text:hover::before {
+    animation: glitch-1 0.3s infinite;
+    color: var(--neon-magenta);
+    opacity: 0.8;
+    clip-path: polygon(0 0, 100% 0, 100% 45%, 0 45%);
+    transform: translate(-3px, 0);
+}
+.glitch-text:hover::after {
+    animation: glitch-2 0.3s infinite;
+    color: var(--neon-cyan);
+    opacity: 0.8;
+    clip-path: polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+    transform: translate(3px, 0);
+}
+
+@keyframes glitch-1 {
+    0%   { transform: translate(0); }
+    20%  { transform: translate(-3px, 2px); }
+    40%  { transform: translate(3px, -1px); }
+    60%  { transform: translate(-2px, 1px); }
+    80%  { transform: translate(2px, -2px); }
+    100% { transform: translate(0); }
+}
+@keyframes glitch-2 {
+    0%   { transform: translate(0); }
+    20%  { transform: translate(2px, -1px); }
+    40%  { transform: translate(-3px, 2px); }
+    60%  { transform: translate(1px, -2px); }
+    80%  { transform: translate(-2px, 1px); }
+    100% { transform: translate(0); }
+}
+
+/* ═══════════════════════════════════════
+   MAIN MENU (Title Screen)
+   ═══════════════════════════════════════ */
+#main-menu-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: var(--bg-void);
+}
+#main-menu-overlay.hidden {
+    display: none !important;
+}
+
+.menu-backdrop {
+    position: absolute;
+    inset: 0;
+    background:
+        radial-gradient(ellipse at 30% 80%, rgba(0, 240, 255, 0.08) 0%, transparent 60%),
+        radial-gradient(ellipse at 70% 20%, rgba(255, 0, 170, 0.06) 0%, transparent 50%),
+        linear-gradient(180deg, #030508 0%, #0a0e1a 50%, #050810 100%);
+    animation: menu-pan 30s ease-in-out infinite alternate;
+}
+@keyframes menu-pan {
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 100% 50%; }
+}
+
+.menu-content {
+    position: relative;
+    z-index: 2;
+    max-width: 500px;
+    width: 92%;
+    padding: 40px 32px;
     display: flex;
     flex-direction: column;
-    height: 100vh;
+    align-items: center;
+    gap: 24px;
 }
 
-/* Resource Bar - Wood and Green Theme */
-#resource-bar {
+.menu-logo {
+    text-align: center;
+    margin-bottom: 8px;
+}
+.menu-tagline {
+    font-family: var(--font-mono);
+    color: var(--neon-cyan);
+    font-size: 14px;
+    letter-spacing: 0.5em;
+    margin-top: 8px;
+    opacity: 0.7;
+}
+.menu-version {
+    font-family: var(--font-mono);
+    color: var(--text-faint);
+    font-size: 11px;
+    margin-top: 4px;
+}
+
+/* Menu Buttons */
+.menu-buttons, .menu-buttons-bottom {
     display: flex;
-    justify-content: center;
-    gap: 25px;
-    padding: 12px 20px;
-    background: repeating-linear-gradient(
-        45deg,
-        var(--stardew-green-dark),
-        var(--stardew-green-dark) 10px,
-        var(--stardew-green) 10px,
-        var(--stardew-green) 20px
-    );
-    border-bottom: 4px solid var(--stardew-green-dark);
-    flex-shrink: 0;
-    box-shadow: inset 0 -8px 16px rgba(0, 0, 0, 0.1);
+    flex-direction: column;
+    gap: 8px;
+    width: 100%;
+}
+.menu-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 14px 20px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    position: relative;
+    overflow: hidden;
+}
+.menu-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0, 240, 255, 0.05), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
+}
+.menu-btn:hover::before {
+    transform: translateX(100%);
+}
+.menu-btn:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: var(--border-glow);
+    color: var(--text-bright);
+}
+.menu-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+}
+.menu-btn .btn-icon {
+    font-size: 16px;
+}
+.menu-btn .btn-sub {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+}
+.menu-btn-primary {
+    background: rgba(0, 240, 255, 0.08);
+    border-color: rgba(0, 240, 255, 0.3);
+    color: var(--neon-cyan);
+}
+.menu-btn-primary:hover {
+    background: rgba(0, 240, 255, 0.15);
+    box-shadow: var(--glow-cyan);
+}
+.menu-btn-secondary {
+    background: rgba(255, 170, 0, 0.06);
+    border-color: rgba(255, 170, 0, 0.2);
+    color: var(--neon-amber);
+}
+.menu-btn-ghost {
+    background: transparent;
+    border-color: var(--border);
+    color: var(--text-dim);
+    font-size: 11px;
 }
 
-.resource {
+/* Menu Sections */
+.menu-section {
+    width: 100%;
+}
+.section-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.2em;
+    margin-bottom: 8px;
+    padding-left: 2px;
+}
+
+/* Save Slots */
+.save-slots {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.save-slot {
+    padding: 8px 12px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+.save-slot:hover {
+    border-color: var(--neon-cyan);
+    color: var(--text);
+}
+.save-slot.empty {
+    opacity: 0.5;
+}
+
+/* Menu Options (selects, inputs) */
+.menu-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.option-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+.option-row label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    flex-shrink: 0;
+}
+.option-row select,
+.option-row input {
+    flex: 1;
+    max-width: 220px;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    outline: none;
+}
+.option-row select:focus,
+.option-row input:focus {
+    border-color: var(--neon-cyan);
+    box-shadow: 0 0 6px rgba(0, 240, 255, 0.15);
+}
+.option-row select option {
+    background: var(--bg-panel-solid);
+    color: var(--text);
+}
+
+/* ═══════════════════════════════════════
+   GAME CONTAINER
+   ═══════════════════════════════════════ */
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: block;
+    overflow: hidden;
+}
+
+#main-area {
+    position: absolute;
+    inset: 0;
+    background: var(--bg-void);
+}
+
+#game-canvas {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
+}
+
+/* ═══════════════════════════════════════
+   HUD: GLOBAL ELEMENTS
+   ═══════════════════════════════════════ */
+
+/* Top Center: Heat / Wanted Stars */
+.hud-top-center {
+    position: fixed;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 16px;
-    background: #fff;
-    border-radius: var(--border-radius);
-    font-weight: 700;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.15);
-    border: 3px solid #fff;
-    transition: transform 0.1s ease;
+    padding: 6px 16px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
 }
-
-.resource:hover {
-    transform: translateY(-2px);
+.wanted-stars {
+    display: flex;
+    gap: 4px;
 }
-
-.resource .icon {
-    font-size: 26px;
-}
-
-.resource .amount {
+.wanted-stars .star {
     font-size: 18px;
-    color: var(--stardew-text);
-    font-variant-numeric: tabular-nums;
-    transition: color 0.3s ease;
+    color: var(--text-faint);
+    transition: all 0.3s ease;
+    filter: grayscale(1);
+}
+.wanted-stars .star.active {
+    color: var(--neon-amber);
+    filter: grayscale(0) drop-shadow(0 0 6px rgba(255, 170, 0, 0.6));
+    animation: star-pulse 1.5s ease-in-out infinite;
+}
+@keyframes star-pulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.15); }
+}
+.heat-label {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
 }
 
-/* Resource counter flash animations (1D: game feel) */
+/* Top Right: City Ticker */
+.hud-top-right {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 30;
+    display: flex;
+    gap: 2px;
+}
+.ticker-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+.ticker-item:first-child { border-radius: var(--radius-lg) 0 0 var(--radius-lg); }
+.ticker-item:last-child { border-radius: 0 var(--radius-lg) var(--radius-lg) 0; }
+.ticker-icon {
+    font-size: 14px;
+    opacity: 0.7;
+}
+.ticker-val {
+    color: var(--text);
+    font-weight: 600;
+}
+
+/* Top Left: Co-op Roster */
+.hud-top-left {
+    position: fixed;
+    top: 10px;
+    left: 10px;
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.roster-player {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.roster-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--text-faint);
+}
+.roster-dot.online {
+    background: var(--neon-green);
+    box-shadow: 0 0 6px var(--neon-green);
+}
+.roster-name { color: var(--text); }
+.roster-ping { color: var(--text-faint); font-size: 9px; }
+
+/* Resource Bar Mount */
+#resource-bar-mount {
+    position: fixed;
+    top: 42px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 29;
+}
+#resource-bar-mount > div,
+#resource-bar, #resource-bar-mount > div > div {
+    display: flex !important;
+    gap: 4px !important;
+    background: transparent !important;
+    border: none !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+}
+
+/* Resource items */
+.resource {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    transition: border-color 0.2s;
+}
+.resource:hover { border-color: var(--border-bright); }
+.resource .icon { font-size: 14px; opacity: 0.7; }
+.resource .amount { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
+.resource + .resource { border-left-color: var(--border); }
+.resource#day-display { border-color: rgba(255, 170, 0, 0.2); }
+.resource.heat-meter { border-color: rgba(255, 34, 68, 0.2); }
+.resource.heat-meter .heat-bar { width: 60px; height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; }
+.resource.heat-meter .heat-fill { height: 100%; background: linear-gradient(90deg, var(--neon-amber), var(--neon-red)); transition: width 0.3s; }
+.resource#happiness-display { border-color: rgba(0, 255, 136, 0.15); }
+
+/* Resource flash animations */
 @keyframes res-gain-flash {
-    0%   { color: #00ff88; transform: scale(1.25); }
-    60%  { color: #00dd77; transform: scale(1.05); }
-    100% { color: inherit;  transform: scale(1); }
+    0%   { color: var(--neon-green); transform: scale(1.2); }
+    100% { color: inherit; transform: scale(1); }
 }
 @keyframes res-loss-flash {
-    0%   { color: #ff4444; transform: scale(0.85); }
-    60%  { color: #ff6666; transform: scale(0.95); }
-    100% { color: inherit;  transform: scale(1); }
+    0%   { color: var(--neon-red); transform: scale(0.85); }
+    100% { color: inherit; transform: scale(1); }
 }
 @keyframes res-unaffordable-flash {
-    0%, 100%  { color: inherit; transform: scale(1); }
-    50%  { color: #ff4444; transform: scale(1.15); }
+    0%, 100% { color: inherit; }
+    50%      { color: var(--neon-red); transform: scale(1.1); }
 }
-.resource .amount.res-gain {
-    animation: res-gain-flash 0.6s ease-out forwards;
-}
-.resource .amount.res-loss {
-    animation: res-loss-flash 0.6s ease-out forwards;
-}
-.resource .amount.res-unaffordable {
-    animation: res-unaffordable-flash 0.4s ease-out forwards;
-}
+.resource .amount.res-gain { animation: res-gain-flash 0.5s ease-out forwards; }
+.resource .amount.res-loss { animation: res-loss-flash 0.5s ease-out forwards; }
+.resource .amount.res-unaffordable { animation: res-unaffordable-flash 0.4s ease-out forwards; }
 
-/* Floating delta labels (+12, -5) shown briefly above resource display */
+/* Floating delta labels */
 .resource-delta {
     position: absolute;
     top: -14px;
     right: 4px;
-    font-size: 13px;
+    font-size: 11px;
     font-weight: bold;
+    font-family: var(--font-mono);
     pointer-events: none;
-    animation: delta-float 1.2s ease-out forwards;
+    animation: delta-float 1s ease-out forwards;
 }
 @keyframes delta-float {
     0%   { opacity: 1; transform: translateY(0); }
-    70%  { opacity: 0.9; transform: translateY(-18px); }
-    100% { opacity: 0; transform: translateY(-28px); }
+    100% { opacity: 0; transform: translateY(-20px); }
 }
 
-.resource#day-display {
-    background: var(--stardew-gold-light);
-    border-color: var(--stardew-gold);
+/* Mode Toggle */
+.hud-mode-toggle {
+    position: fixed;
+    bottom: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 35;
 }
-
-/* Heat Meter */
-.resource.heat-meter {
-    background: var(--stardew-heat-light);
-    border-color: var(--stardew-heat);
-}
-
-.resource.heat-meter .icon {
-    font-size: 22px;
-}
-
-.resource.heat-meter .heat-bar-container {
+.mode-toggle-btn {
     display: flex;
-    flex-direction: column;
-    width: 80px;
-}
-
-.resource.heat-meter .heat-bar {
-    width: 100%;
-    height: 12px;
-    background: #333;
-    border-radius: 6px;
-    overflow: hidden;
-}
-
-.resource.heat-meter .heat-fill {
-    height: 100%;
-    background: linear-gradient(90deg, #ffaa00, #ff4444);
-    transition: width 0.3s ease;
-}
-
-.resource.heat-meter .heat-label {
-    font-size: 14px;
-    color: var(--stardew-text);
-    text-align: center;
-    margin-top: 4px;
-}
-
-/* Security Buildings in Panel */
-.building-card.security-building {
-    border: 2px solid #4488ff;
-    box-shadow: 0 0 8px rgba(68, 136, 255, 0.3);
-}
-
-.building-card.security-building .building-security-note {
-    font-size: 12px;
-    color: #4488ff;
-    margin-top: 6px;
-    font-style: italic;
-}
-
-/* Build panel tabs */
-.build-tabs {
-    display: flex;
-    gap: 4px;
-    margin-top: 4px;
-}
-
-.build-tab {
-    flex: 1;
-    padding: 4px 0;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: rgba(0, 240, 255, 0.08);
+    border: 1px solid rgba(0, 240, 255, 0.25);
+    border-radius: 24px;
+    color: var(--neon-cyan);
+    font-family: var(--font-display);
     font-size: 12px;
     font-weight: 700;
-    background: #d4c598;
-    border: 2px solid #b8a870;
-    border-radius: 6px;
+    letter-spacing: 0.15em;
     cursor: pointer;
-    color: var(--stardew-text);
-    transition: background 0.15s;
+    transition: all 0.25s ease;
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.1);
 }
-
-.build-tab:hover { background: #e8d8a8; }
-
-.build-tab.active {
-    background: var(--stardew-green-light);
-    border-color: var(--stardew-green-dark);
-    color: #fff;
+.mode-toggle-btn:hover {
+    background: rgba(0, 240, 255, 0.15);
+    box-shadow: var(--glow-cyan);
 }
+.toggle-icon { font-size: 16px; }
 
-/* Locked extended buildings */
-.building-card.locked {
-    opacity: 0.55;
-    cursor: not-allowed;
-    filter: grayscale(0.4);
-}
-
-.building-card.locked:hover {
-    transform: none;
-    background: var(--stardew-card-bg);
-    border-color: #d4c598;
-}
-
-.building-unlock-req {
-    font-size: 11px;
-    color: #886644;
-    margin-top: 4px;
-    font-style: italic;
-}
-
-/* Category header inside building grid */
-.building-category-header {
-    grid-column: 1 / -1;
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.08em;
-    color: #887750;
-    padding: 6px 2px 2px;
-    border-bottom: 1px solid #d4c598;
-    margin-top: 4px;
-}
-
-/* Main Game Area */
-#main-area {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-    position: relative;
-    background: repeating-linear-gradient(
-        45deg,
-        var(--stardew-bg),
-        var(--stardew-bg) 20px,
-        #ecd9a4 20px,
-        #ecd9a4 40px
-    );
-}
-
-#game-canvas {
-    flex: 1;
-    background: transparent;
-    cursor: crosshair;
-    touch-action: none;
-    width: 100%;
-    height: 100%;
-    display: block;
-}
-
-/* Sidebar Controls - Wood Panel Style */
-.sidebar {
-    width: 220px;
-    background: repeating-linear-gradient(
-        90deg,
-        var(--stardew-wood-light),
-        var(--stardew-wood-light) 3px,
-        var(--stardew-wood) 3px,
-        var(--stardew-wood) 6px
-    );
-    border-left: 5px solid var(--stardew-green-dark);
-    display: flex;
-    flex-direction: column;
+/* ═══════════════════════════════════════
+   HUD: MINIMAP (Bottom Left)
+   ═══════════════════════════════════════ */
+.hud-bottom-left {
+    position: fixed;
+    bottom: 10px;
+    left: 10px;
+    width: 180px;
+    z-index: 30;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     overflow: hidden;
 }
-
-.sidebar-header {
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.1);
-    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
-}
-
-.sidebar-header h3 {
-    font-size: 20px;
-    color: #fff;
-    text-transform: uppercase;
-    letter-spacing: 3px;
-    margin-bottom: 5px;
-    text-shadow: 2px 2px 0 rgba(0, 0, 0, 0.2);
-}
-
-.build-mode-hud {
-    margin-top: 6px;
-    font-size: 11px;
-    line-height: 1.35;
-    color: #f3f7ed;
-    opacity: 0.95;
-}
-
-/* Building Panel */
-.building-panel {
-    flex: 1;
-    overflow-y: auto;
-    padding: 15px;
-}
-
-.building-grid {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 12px;
-}
-
-.building-card {
-    background: var(--stardew-card-bg);
-    border-radius: var(--border-radius);
-    padding: 12px;
-    cursor: pointer;
-    border: 3px solid #d4c598;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-}
-
-.building-card:hover {
-    background: #f0dcb0;
-    border-color: var(--stardew-green-light);
-    transform: translateX(3px);
-}
-
-.building-card.selected {
-    background: var(--stardew-green-light);
-    border-color: var(--stardew-green-dark);
-    box-shadow: 0 6px 0 rgba(0, 0, 0, 0.2);
-}
-
-.building-icon {
-    font-size: 32px;
-    background: #fff;
-    width: 50px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 12px;
-    border: 2px solid #d4c598;
-    box-shadow: inset 0 0 0 2px rgba(0, 0, 0, 0.1);
-}
-
-.building-info {
-    flex: 1;
-}
-
-.building-name {
-    font-size: 15px;
-    font-weight: 700;
-    margin-bottom: 3px;
-    color: var(--stardew-text);
-}
-
-.building-desc {
-    font-size: 11px;
-    color: #666;
-    line-height: 1.3;
-}
-
-.building-cost {
-    display: flex;
-    gap: 6px;
-    font-size: 11px;
-    margin-top: 6px;
-}
-
-.cost-item {
-    display: flex;
-    align-items: center;
-    gap: 3px;
-    padding: 3px 6px;
-    background: #fff;
-    border-radius: 6px;
-    border: 2px solid #d4c598;
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
-}
-
-.cost-item.gold { color: var(--stardew-gold); }
-.cost-item.wood { color: var(--stardew-wood); }
-.cost-item.food { color: #8b4513; }
-
-/* Bottom Info Panel - Wood Box Style */
-.info-panel {
-    height: 180px;
-    background: var(--stardew-wood);
-    border-top: 4px solid var(--stardew-green-dark);
-    padding: 15px;
-    flex-shrink: 0;
-    box-shadow: inset 0 8px 16px rgba(0, 0, 0, 0.15);
-}
-
-.info-header {
+.minimap-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 8px;
-    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
+    padding: 4px 8px;
+    border-bottom: 1px solid var(--border);
 }
-
-.info-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-}
-
-.info-tabs {
-    display: flex;
-    gap: 8px;
-}
-
-.tab {
-    padding: 6px 14px;
-    background: #fff;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
-    cursor: pointer;
-    border: 2px solid #d4c598;
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.1);
-    transition: all 0.2s ease;
-}
-
-.tab.active {
-    background: var(--stardew-green);
-    color: #fff;
-    border-color: var(--stardew-green-dark);
-    box-shadow: 0 3px 0 rgba(0, 0, 0, 0.2);
-}
-
-/* Debug Info Button */
-.btn-debug-info {
-    padding: 6px 12px;
-    background: var(--stardew-blue);
-    color: #fff;
-    border: 2px solid var(--stardew-blue-dark);
-    border-radius: 8px;
-    font-size: 11px;
-    font-weight: 600;
-    cursor: pointer;
-    box-shadow: 0 2px 0 var(--stardew-blue-dark);
-    transition: all 0.1s ease;
-}
-
-.btn-debug-info:hover {
-    background: var(--stardew-blue-light);
-    transform: translateY(-1px);
-}
-
-.btn-debug-info:active {
-    transform: translateY(2px);
-    box-shadow: none;
-}
-
-/* Message Log - Paper Style */
-.message-log {
-    height: 100%;
-    overflow-y: auto;
-    font-family: 'Segoe UI', sans-serif;
-    font-size: 13px;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    padding-right: 6px;
-    background: rgba(255, 255, 255, 0.15);
-    border-radius: 8px;
-}
-
-.message-log::-webkit-scrollbar {
-    width: 8px;
-}
-
-.message-log::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-}
-
-.message-log::-webkit-scrollbar-thumb {
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 4px;
-}
-
-.message {
-    padding: 10px 12px;
-    background: #fff;
-    border-radius: 8px;
-    border-left: 4px solid var(--stardew-green);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    max-width: 90%;
-}
-
-@keyframes popIn {
-    from { opacity: 0; transform: scale(0.9) translateY(10px); }
-    to { opacity: 1; transform: scale(1) translateY(0); }
-}
-
-.message.crisis {
-    background: #fff0e0;
-    border-left-color: #e6b800;
-    color: #8b4513;
-}
-
-.message.victory {
-    background: #f0fff0;
-    border-left-color: var(--stardew-green);
-    color: var(--stardew-green-dark);
-    font-weight: 700;
-}
-
-.message.success {
-    background: #e8f5e9;
-    border-left-color: var(--stardew-green-light);
-    color: var(--stardew-green-dark);
-}
-
-.message.day-start {
-    background: #e8d5b0;
-    border-left-color: var(--stardew-gold);
-    color: var(--stardew-wood);
-    font-style: italic;
-}
-
-/* Overlays - Rustic Wood Frame */
-.overlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(62, 91, 68, 0.95);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 100;
-    animation: fadeIn 0.5s ease;
-    pointer-events: auto;
-}
-
-.overlay.hidden {
-    display: none;
-    pointer-events: none;
-}
-
-.overlay-content {
-    text-align: center;
-    max-width: 90vw;
-    max-height: 90vh;
-    padding: 20px;
-    overflow-y: auto;
-    background: repeating-linear-gradient(
-        45deg,
-        #fff8e1,
-        #fff8e1 10px,
-        #fff0d1 10px,
-        #fff0d1 20px
-    );
-    border-radius: 24px;
-    border: 8px solid var(--stardew-wood);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    position: relative;
-    pointer-events: auto;
-}
-
-.overlay-content::before {
-    content: '';
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    right: 8px;
-    bottom: 8px;
-    border: 2px dashed var(--stardew-green);
-    border-radius: 16px;
-    pointer-events: none;
-}
-
-.overlay h1 {
-    font-size: clamp(24px, 8vw, 48px);
-    margin-bottom: 20px;
-    color: var(--stardew-green-dark);
-    text-shadow: 2px 2px 0 rgba(230, 184, 0, 0.3);
-}
-
-.overlay p {
-    font-size: clamp(14px, 4vw, 18px);
-    color: #5d5d5d;
-    margin-bottom: 30px;
-    line-height: 1.6;
-}
-
-.btn {
-    padding: 12px 30px;
-    font-size: clamp(14px, 4vw, 18px);
-    font-weight: 700;
-    border: 3px solid var(--stardew-green-dark);
-    border-radius: 50px;
-    cursor: pointer;
-    margin: 8px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    transition: all 0.2s ease;
-    background: var(--stardew-green-light);
-    color: #fff;
-    box-shadow: 0 6px 0 var(--stardew-green-dark);
-}
-
-.btn:hover {
-    background: var(--stardew-green);
-    transform: translateY(-3px);
-    box-shadow: 0 9px 0 var(--stardew-green-dark);
-}
-
-.btn:active {
-    transform: translateY(0);
-    box-shadow: 0 3px 0 var(--stardew-green-dark);
-}
-
-.btn-secondary {
-    background: var(--stardew-gold-light);
-    border-color: var(--stardew-gold-dark);
-    box-shadow: 0 6px 0 var(--stardew-gold);
-}
-
-.btn-secondary:hover {
-    background: var(--stardew-gold);
-}
-
-.btn-secondary:active {
-    box-shadow: 0 3px 0 var(--stardew-gold);
-}
-
-/* Settings Button - Wood Button Style */
-.settings-btn {
-    position: absolute;
-    top: 20px;
-    right: 20px;
-    background: var(--stardew-wood);
-    border: 3px solid var(--stardew-green-dark);
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    cursor: pointer;
-    z-index: 50;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
-    transition: all 0.2s ease;
-}
-
-.settings-btn:hover {
-    background: var(--stardew-green);
-    transform: rotate(90deg);
-}
-
-.settings-btn:active {
-    transform: rotate(90deg) scale(0.95);
-    box-shadow: 0 2px 0 rgba(0, 0, 0, 0.3);
-}
-
-.settings-btn svg {
-    width: 26px;
-    height: 26px;
-    fill: #fff;
-}
-
-/* Victory Screen Specifics */
-.victory-icon {
-    font-size: 80px;
-    margin-bottom: 30px;
-    animation: bounce 2s infinite;
-    filter: drop-shadow(0 4px 0 rgba(0, 0, 0, 0.3));
-}
-
-@keyframes bounce {
-    0%, 20%, 50%, 80%, 100% { transform: translateY(0) rotate(0deg); }
-    40% { transform: translateY(-20px) rotate(-10deg); }
-    60% { transform: translateY(-10px) rotate(5deg); }
-}
-
-/* Stats Panel */
-.stats-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
-    margin-bottom: 20px;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 15px;
-    border-radius: 12px;
-    border: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.stat-item {
-    background: #fff;
-    padding: 15px;
-    border-radius: 8px;
-    border: 2px solid #e8d5b0;
-}
-
-.stat-label {
-    font-size: 11px;
-    color: var(--stardew-wood);
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    font-weight: 700;
-}
-
-.stat-value {
-    font-size: 22px;
-    font-weight: 700;
-    color: var(--stardew-text);
-    margin-top: 5px;
-}
-
-/* Victory Progress Bars */
-.progress-container {
-    margin-top: 20px;
-    background: rgba(0, 0, 0, 0.05);
-    padding: 15px;
-    border-radius: 12px;
-}
-
-.progress-label {
-    font-size: 14px;
-    color: var(--stardew-wood);
-    font-weight: 700;
-    margin-bottom: 8px;
-}
-
-.progress-bar {
-    height: 12px;
-    background: #d4c598;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 8px;
-    border: 2px solid #cbbda4;
-}
-
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--stardew-green-light) 0%, var(--stardew-gold) 100%);
-    transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-    border-radius: 6px;
-}
-
-/* Responsive */
-@media (max-width: 768px) {
-    .sidebar {
-        width: 60px;
-        padding: 10px 0;
-    }
-
-    .sidebar-header h3,
-    .building-panel { display: none; }
-
-    .building-icon {
-        font-size: 28px;
-        width: 44px;
-        height: 44px;
-    }
-
-    .resource {
-        padding: 8px 12px;
-        min-width: 70px;
-    }
-
-    .resource .amount { font-size: 16px; }
-    .resource .icon { font-size: 22px; }
-
-    .overlay-content { padding: 20px; }
-    .overlay h1 { font-size: 32px; }
-    .btn { padding: 12px 30px; font-size: 16px; }
-}
-
-/* Minimap */
-.minimap-container {
-    padding: 15px;
-    background: rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    margin: 10px 0;
-}
-
 .minimap-title {
-    font-size: 12px;
-    font-weight: 700;
-    color: #fff;
-    text-transform: uppercase;
-    margin-bottom: 8px;
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
 }
-
+.minimap-mode {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--neon-cyan);
+    letter-spacing: 0.1em;
+}
 .minimap {
-    width: 100%;
-    height: 100px;
-    background: #d4c598;
-    border-radius: 6px;
-    overflow: hidden;
     position: relative;
-    cursor: pointer;
+    width: 100%;
+    aspect-ratio: 1;
 }
-
-#minimap-canvas {
+.minimap canvas {
     width: 100%;
     height: 100%;
     display: block;
 }
-
-.minimap-dot {
-    position: absolute;
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--stardew-gold-light);
-    border: 1px solid rgba(0,0,0,0.35);
-    pointer-events: none;
-    transform: translate(-50%, -50%);
-}
-
-/* Main menu options */
-.menu-options {
-    margin-top: 14px;
-    display: grid;
-    gap: 10px;
-}
-
-.option-row {
-    display: grid;
-    grid-template-columns: 90px 1fr;
-    gap: 10px;
-    align-items: center;
-}
-
-.option-row label {
-    font-weight: 700;
-    text-align: right;
-    opacity: 0.9;
-}
-
-.option-row select,
-.option-row input {
-    padding: 10px 12px;
-    border-radius: 10px;
-    border: 2px solid rgba(0,0,0,0.15);
-    outline: none;
-    font-weight: 600;
-}
-
-/* Crisis modal */
-.crisis-options {
-    display: grid;
-    gap: 10px;
-    margin-top: 14px;
-}
-
-.crisis-options .btn {
-    width: 100%;
-}
-
 .minimap-view {
     position: absolute;
-    background: rgba(255, 255, 255, 0.5);
-    border: 2px solid var(--stardew-green);
-    box-shadow: 0 0 8px rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    pointer-events: none;
+}
+.minimap-dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 6px var(--neon-cyan);
+    pointer-events: none;
+}
+
+/* Hide old minimap containers */
+.minimap-container { display: none !important; }
+
+/* ═══════════════════════════════════════
+   HUD: STREET VIEW LAYER
+   ═══════════════════════════════════════ */
+.hud-street-layer {
+    pointer-events: none;
+}
+.hud-street-layer > * {
+    pointer-events: auto;
+}
+
+/* Weapon / Hack Wheel */
+.hud-weapon-wheel {
+    position: fixed;
+    bottom: 16px;
+    right: 16px;
+    z-index: 30;
+    display: flex;
+    gap: 4px;
+}
+.wheel-slot {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 8px 12px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+    min-width: 56px;
+}
+.wheel-slot:hover,
+.wheel-slot.active {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.08);
+}
+.wheel-slot .slot-icon { font-size: 20px; }
+.wheel-slot .slot-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+}
+
+/* Health / Stamina Bars */
+.hud-health-stamina {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 200px;
+}
+.bar-group {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.bar-label {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+    width: 24px;
+    text-align: right;
+    letter-spacing: 0.05em;
+}
+.stat-bar {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 3px;
+    overflow: hidden;
+}
+.stat-bar .bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s ease;
+}
+.health-bar .bar-fill {
+    background: linear-gradient(90deg, var(--neon-red), var(--neon-green));
+}
+.stamina-bar .bar-fill {
+    background: linear-gradient(90deg, var(--neon-amber), var(--neon-cyan));
+}
+.approval-bar .bar-fill {
+    background: linear-gradient(90deg, var(--neon-red), var(--neon-green));
+}
+.bar-val {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text);
+    width: 28px;
+}
+
+/* Profiler Reticle */
+.profiler-reticle {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 20;
+    pointer-events: none;
+    width: 40px;
+    height: 40px;
+}
+.reticle-ring {
+    position: absolute;
+    inset: 0;
+    border: 1px solid rgba(0, 240, 255, 0.35);
+    border-radius: 50%;
+    animation: reticle-spin 4s linear infinite;
+}
+@keyframes reticle-spin {
+    from { transform: rotate(0deg); }
+    to   { transform: rotate(360deg); }
+}
+.reticle-ring::before {
+    content: '';
+    position: absolute;
+    top: -1px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 8px;
+    height: 2px;
+    background: var(--neon-cyan);
+    box-shadow: 0 0 6px var(--neon-cyan);
+}
+.reticle-dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 3px;
+    height: 3px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    box-shadow: 0 0 4px var(--neon-cyan);
+}
+
+/* ═══════════════════════════════════════
+   HUD: GOD VIEW LAYER
+   ═══════════════════════════════════════ */
+
+/* Build Ribbon */
+.build-ribbon {
+    position: fixed;
+    bottom: 56px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 30;
+    display: flex;
+    gap: 4px;
+}
+.ribbon-category {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+    padding: 10px 18px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.ribbon-category:hover {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.06);
+}
+.ribbon-category.active {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: var(--border-glow);
+}
+.cat-icon { font-size: 20px; }
+.cat-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+}
+
+/* Build Sidebar */
+.sidebar {
+    position: fixed;
+    top: 50px;
+    right: 10px;
+    bottom: 60px;
+    width: 180px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    z-index: 25;
+}
+.sidebar-header {
+    padding: 8px 10px;
+    border-bottom: 1px solid var(--border);
+}
+.sidebar-header h3 {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    margin: 0;
+}
+.build-tabs {
+    display: flex;
+    gap: 2px;
+    margin-top: 4px;
+}
+.build-tab {
+    flex: 1;
+    background: rgba(255,255,255,0.03);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3px 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
+    font-weight: 600;
+    cursor: pointer;
+    text-align: center;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.build-tab:hover { background: rgba(255,255,255,0.06); }
+.build-tab.active {
+    background: rgba(0, 240, 255, 0.08);
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.2);
+}
+
+.building-panel {
+    padding: 4px;
+    overflow-y: auto;
+    flex: 1;
+}
+.building-grid { display: flex; flex-direction: column; gap: 3px; }
+.building-card {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+}
+.building-card:hover {
+    background: rgba(0, 240, 255, 0.05);
+    border-color: var(--neon-cyan);
+}
+.building-card.selected {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.1);
+    box-shadow: var(--border-glow);
+}
+.building-card.locked { opacity: 0.4; cursor: not-allowed; }
+.building-card .building-icon { font-size: 20px; flex-shrink: 0; }
+.building-card .building-info { flex: 1; min-width: 0; }
+.building-card .building-name,
+.building-card h4 {
+    font-family: var(--font-body);
+    font-size: 11px;
+    color: var(--text);
+    margin: 0;
+    font-weight: 600;
+}
+.building-card .building-desc,
+.building-card p,
+.building-card .description {
+    font-size: 9px;
+    color: var(--text-faint);
+    margin: 1px 0 0;
+}
+.building-card .building-cost,
+.building-card .cost {
+    display: flex;
+    gap: 6px;
+    margin-top: 2px;
+}
+.building-card .cost-item {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    color: var(--text-dim);
+}
+.building-card .building-security-note {
+    font-size: 8px;
+    color: var(--neon-blue);
+    margin-top: 2px;
+}
+.building-card .building-unlock-req {
+    font-size: 8px;
+    color: var(--neon-amber);
+    margin-top: 2px;
+}
+.building-category-header {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 6px 4px 2px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+}
+
+/* Security building variant */
+.building-card.security-building {
+    border-color: rgba(68, 136, 255, 0.25);
+}
+.building-card.security-building:hover {
+    border-color: var(--neon-blue);
+    box-shadow: 0 0 8px rgba(68, 136, 255, 0.15);
 }
 
 .camera-controls {
-    display: flex;
-    gap: 8px;
-    margin-top: 10px;
+    padding: 4px;
+    border-top: 1px solid var(--border);
 }
-
-.camera-btn {
-    flex: 1;
-    padding: 8px;
-    font-size: 12px;
-    font-weight: 700;
-    border: 2px solid var(--stardew-green-dark);
-    border-radius: 6px;
+.camera-btn, #reset-camera {
+    width: 100%;
+    background: rgba(255,255,255,0.03);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 4px 0;
+    font-family: var(--font-mono);
+    font-size: 9px;
     cursor: pointer;
-    background: #fff;
-    transition: all 0.2s ease;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.camera-btn:hover, #reset-camera:hover {
+    background: rgba(0, 240, 255, 0.05);
+    border-color: var(--neon-cyan);
+    color: var(--text);
 }
 
-.camera-btn:hover {
-    background: var(--stardew-green-light);
-    color: #fff;
+/* Build mode HUD hint */
+.build-mode-hud {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    margin-top: 3px;
 }
 
-.camera-btn.reset {
-    background: var(--stardew-wood);
-    color: #fff;
-    border-color: var(--stardew-green-dark);
-}
-
-.camera-btn.reset:hover {
-    background: var(--stardew-green);
-}
-
-/* Tooltip */
-.tooltip {
-    position: absolute;
-    pointer-events: none;
-    padding: 10px 14px;
-    background: #fff;
-    border-radius: 8px;
-    border: 2px solid var(--stardew-green);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-    font-size: 13px;
-    font-family: 'Segoe UI', sans-serif;
-    z-index: 1000;
-    max-width: 250px;
-    opacity: 0;
-    transition: opacity 0.2s ease, transform 0.2s ease;
-    transform: translateY(-10px);
-}
-
-.tooltip.show {
-    opacity: 1;
-    transform: translateY(0);
-}
-
-.tooltip h4 {
-    margin: 0 0 6px 0;
-    font-size: 14px;
-    color: var(--stardew-green-dark);
-    font-weight: 700;
-}
-
-.tooltip p {
-    margin: 0;
-    font-size: 12px;
-    color: #555;
-    line-height: 1.4;
-}
-
-/* Quest Log Panel */
-.quest-log-panel {
+/* ═══════════════════════════════════════
+   PROFILER TOOLTIP (World-Space)
+   ═══════════════════════════════════════ */
+.profiler-tooltip {
     position: fixed;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 450px;
-    max-height: 80vh;
-    background: repeating-linear-gradient(
-        45deg,
-        #fff8e1,
-        #fff8e1 10px,
-        #fff0d1 10px,
-        #fff0d1 20px
-    );
-    border: 8px solid var(--stardew-wood);
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 200;
-    display: none;
-    flex-direction: column;
-}
-
-.quest-log-panel.open {
-    display: flex;
-}
-
-.quest-log-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.1);
-    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
-}
-
-.quest-log-header h2 {
-    font-size: 18px;
-    color: var(--stardew-green-dark);
-    text-transform: uppercase;
-    font-weight: 700;
-}
-
-.quest-log-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--stardew-green-dark);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.quest-log-content {
-    display: flex;
-    flex: 1;
-    overflow: hidden;
-}
-
-.quest-list {
-    width: 50%;
-    padding: 12px;
-    border-right: 3px solid rgba(0, 0, 0, 0.1);
-    overflow-y: auto;
-}
-
-.quest-list h3 {
-    font-size: 14px;
-    color: var(--stardew-wood);
-    text-transform: uppercase;
-    margin-bottom: 10px;
-    font-weight: 700;
-}
-
-.quest-list-items {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.quest-list-item {
-    padding: 10px 12px;
-    background: #fff;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-    cursor: pointer;
-    transition: all 0.2s ease;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-}
-
-.quest-list-item:hover {
-    border-color: var(--stardew-green-light);
-    background: var(--stardew-card-bg);
-}
-
-.quest-list-item.quest-completed {
-    opacity: 0.6;
-    border-color: #aaa;
-}
-
-.quest-status {
-    font-size: 11px;
-    padding: 3px 8px;
-    border-radius: 12px;
-    background: var(--stardew-green);
-    color: #fff;
-    font-weight: 700;
-}
-
-.quest-details {
-    width: 50%;
-    padding: 16px;
-    overflow-y: auto;
-}
-
-.quest-details h3 {
-    font-size: 18px;
-    color: var(--stardew-green-dark);
-    margin-bottom: 8px;
-    font-weight: 700;
-}
-
-.quest-desc {
-    color: #555;
-    font-size: 14px;
-    line-height: 1.5;
-    margin-bottom: 16px;
-}
-
-.quest-details h4 {
-    font-size: 14px;
-    color: var(--stardew-wood);
-    text-transform: uppercase;
-    margin: 16px 0 8px 0;
-    font-weight: 700;
-}
-
-.quest-details ul {
-    list-style: none;
-    padding-left: 0;
-}
-
-.quest-details li {
-    padding: 6px 8px;
-    background: #fff;
-    border-radius: 6px;
-    margin-bottom: 6px;
-    border: 2px solid #d4c598;
-    font-size: 13px;
-}
-
-.quest-progress {
-    margin: 16px 0;
-}
-
-.quest-progress-bar {
-    height: 12px;
-    background: #d4c598;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 6px;
-    border: 2px solid #cbbda4;
-}
-
-.quest-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--stardew-green-light) 0%, var(--stardew-gold) 100%);
-    border-radius: 6px;
-    transition: width 0.5s ease;
-}
-
-.quest-progress-text {
-    font-size: 12px;
-    color: var(--stardew-wood);
-    font-weight: 700;
-}
-
-.quest-waypoint {
-    margin-top: 16px;
-    padding: 12px;
-    background: var(--stardew-card-bg);
-    border-radius: 8px;
-    border: 2px solid var(--stardew-green);
-}
-
-.quest-waypoint p {
-    margin: 4px 0;
-    font-size: 13px;
-    color: var(--stardew-text);
-}
-
-.quest-waypoint span {
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-}
-
-.quest-log-footer {
-    padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.1);
-    border-top: 3px solid rgba(0, 0, 0, 0.15);
-    display: flex;
-    gap: 10px;
-}
-
-.quest-log-footer button {
-    padding: 8px 16px;
-    border: 2px solid var(--stardew-green-dark);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 700;
-    font-size: 12px;
-    background: #fff;
-    transition: all 0.2s ease;
-}
-
-.quest-log-footer button:hover:not(:disabled) {
-    background: var(--stardew-green-light);
-    color: #fff;
-}
-
-.quest-log-footer button:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-/* Action Prompt (for quest hacking) */
-.action-prompt {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    padding: 16px 24px;
-    background: rgba(60, 90, 66, 0.9);
-    border-radius: 12px;
-    border: 3px solid var(--stardew-green-light);
-    color: #fff;
-    font-size: 18px;
-    font-weight: 700;
-    text-align: center;
-    z-index: 150;
-    animation: pulse 1s infinite;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-}
-
-@keyframes pulse {
-    0%, 100% { transform: translate(-50%, -50%) scale(1); }
-    50% { transform: translate(-50%, -50%) scale(1.05); }
-}
-
-/* Build Confirmation Bubble */
-.build-feedback {
-    position: absolute;
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 700;
+    z-index: 40;
     pointer-events: none;
-    z-index: 200;
-    animation: floatUp 1.5s ease-out forwards;
-    white-space: nowrap;
-    transform: translate(-50%, -50%);
 }
-
-@keyframes floatUp {
-    0% { opacity: 1; transform: translate(-50%, -50%) translateY(0); }
-    50% { transform: translate(-50%, -50%) translateY(-30px); }
-    100% { opacity: 0; transform: translate(-50%, -50%) translateY(-60px); }
-}
-
-/* Hack Progress Ring */
-.hack-progress {
+.profiler-line {
     position: absolute;
-    width: 40px;
+    width: 1px;
     height: 40px;
-    border-radius: 50%;
-    background: conic-gradient(var(--stardew-green-light) 0deg, rgba(0, 0, 0, 0.2) 0deg);
-    border: 3px solid var(--stardew-green-dark);
-    z-index: 150;
-    animation: spin 1s linear infinite;
-    box-shadow: 0 0 0 3px rgba(60, 90, 66, 0.5);
-}
-
-.hack-progress.hack-success {
-    animation: none;
-    background: conic-gradient(#4caf50 360deg, rgba(0, 0, 0, 0.2) 0deg);
-    border-color: #4caf50;
-}
-
-.hack-progress.hack-fail {
-    animation: none;
-    background: conic-gradient(#f44336 360deg, rgba(0, 0, 0, 0.2) 0deg);
-    border-color: #f44336;
-}
-
-@keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-}
-
-/* Crisis Stinger Effect */
-.crisis-stinger {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    background: rgba(255, 0, 0, 0.3);
-    width: 100vw;
-    height: 100vh;
-    z-index: 500;
-    pointer-events: none;
-    animation: crisisFlash 0.5s ease-out forwards;
-}
-
-.crisis-stinger .stinger-content {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: rgba(255, 0, 0, 0.9);
-    color: #fff;
-    padding: 40px 60px;
-    border-radius: 24px;
-    text-align: center;
-    border: 8px solid #fff;
-    box-shadow: 0 0 40px rgba(255, 0, 0, 0.6);
-}
-
-.crisis-stinger .stinger-content h2 {
-    font-size: 36px;
-    margin-bottom: 10px;
-    text-transform: uppercase;
-}
-
-@keyframes crisisFlash {
-    0% { transform: translate(-50%, -50%) scale(0); opacity: 0; }
-    30% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
-    100% { transform: translate(-50%, -50%) scale(1.5); opacity: 0; }
-}
-
-/* Settings Menu Overlay */
-.settings-overlay {
-    position: absolute;
-    top: 0;
+    background: linear-gradient(180deg, var(--neon-cyan), transparent);
     left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(62, 91, 68, 0.95);
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    z-index: 250;
+    top: -40px;
 }
-
-.settings-content {
-    width: 500px;
-    max-height: 90vh;
-    overflow-y: auto;
-    background: #fff;
-    border-radius: 24px;
-    border: 8px solid var(--stardew-wood);
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-}
-
-.settings-content .overlay-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    background: var(--stardew-wood);
-    color: #fff;
-    border-radius: 16px 16px 0 0;
-}
-
-.settings-content .overlay-header h2 {
-    font-size: 24px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.settings-content .overlay-footer {
-    display: flex;
-    justify-content: center;
-    padding: 16px 24px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 0 0 16px 16px;
-}
-
-.settings-content .overlay-footer .btn {
-    width: 100%;
-}
-
-.settings-content .settings-tabs {
-    display: flex;
-    border-bottom: 2px solid #e8d5b0;
-}
-
-.settings-content .settings-tabs .tab {
-    flex: 1;
-    padding: 14px;
-    background: none;
-    border: none;
-    border-bottom: 3px solid transparent;
-    font-weight: 700;
-    color: #666;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.settings-content .settings-tabs .tab.active {
-    background: #f0f0f0;
-    border-bottom-color: var(--stardew-green);
-    color: var(--stardew-green-dark);
-}
-
-.settings-content .settings-tab-content {
-    display: none;
-    padding: 20px 24px;
-}
-
-.settings-content .settings-tab-content.active {
-    display: block;
-}
-
-.settings-content .setting-row {
-    margin-bottom: 20px;
-}
-
-.settings-content .setting-row label {
-    display: block;
-    font-weight: 700;
-    margin-bottom: 8px;
-    color: var(--stardew-wood);
-}
-
-.settings-content .setting-row small {
-    display: block;
-    font-size: 11px;
-    color: #999;
-    margin-top: 4px;
-}
-
-.settings-content .slider-container {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-}
-
-.settings-content .slider-container input[type="range"] {
-    flex: 1;
-    height: 6px;
-    background: #e8d5b0;
-    border-radius: 3px;
-    outline: none;
-    -webkit-appearance: none;
-}
-
-.settings-content .slider-container input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    width: 20px;
-    height: 20px;
-    background: var(--stardew-green);
-    border-radius: 50%;
-    cursor: pointer;
-    border: 3px solid #fff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.settings-content .checkbox-label {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    cursor: pointer;
-    padding: 10px;
-    background: #f0f0f0;
-    border-radius: 8px;
-}
-
-.settings-content .checkbox-label input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
-}
-
-.settings-content .value-display {
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-    font-size: 14px;
-    min-width: 60px;
-    text-align: right;
-}
-
-.settings-content .btn {
-    background: var(--stardew-green-light);
-    border-color: var(--stardew-green-dark);
-    box-shadow: 0 4px 0 var(--stardew-green-dark);
-}
-
-.settings-content .btn:hover {
-    background: var(--stardew-green);
-}
-
-.settings-content .btn:active {
-    box-shadow: 0 2px 0 var(--stardew-green-dark);
-}
-
-.settings-content .btn-reset {
-    background: #f44336;
-    border-color: #d32f2f;
-    box-shadow: 0 4px 0 #d32f2f;
-}
-
-.settings-content .btn-reset:hover {
-    background: #e53935;
-}
-
-.settings-content .btn-reset:active {
-    box-shadow: 0 2px 0 #c62828;
-}
-
-.settings-content .setting-select {
-    flex: 1;
-    min-width: 150px;
-    padding: 8px 12px;
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
-    color: var(--text-primary, #e0e0e0);
-    font-size: 14px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: border-color 0.2s ease, background-color 0.2s ease;
-}
-
-.settings-content .setting-select:hover {
-    border-color: rgba(255, 255, 255, 0.2);
-    background: rgba(0, 0, 0, 0.4);
-}
-
-.settings-content .setting-select:focus {
-    outline: none;
-    border-color: var(--primary-color, #00d4ff);
-    background: rgba(0, 0, 0, 0.4);
-}
-
-.settings-content .setting-select option {
-    background: rgba(20, 20, 30, 0.95);
-    color: var(--text-primary, #e0e0e0);
-    padding: 8px 12px;
-}
-
-/* Quest Choice Overlay */
-.quest-choice-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(62, 91, 68, 0.95);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 300;
-}
-
-.quest-choice-list {
-    display: grid;
-    gap: 12px;
-    margin-top: 20px;
-    max-width: 400px;
-}
-
-.quest-choice-list .btn {
-    width: 100%;
-    padding: 12px 20px;
-    font-size: 16px;
-}
-
-/* Dev Overlay */
-.dev-overlay {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    width: 300px;
-    background: #fff;
-    border: 4px solid var(--stardew-green);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-    z-index: 400;
-    font-family: 'Segoe UI', sans-serif;
-}
-
-.dev-overlay-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
+.profiler-card {
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius);
     padding: 10px 14px;
-    background: var(--stardew-green);
-    color: #fff;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+    min-width: 180px;
+    box-shadow: var(--glow-cyan);
 }
-
-.dev-overlay-header h3 {
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.dev-overlay-close {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 0;
-}
-
-.dev-overlay-content {
-    padding: 14px;
-    max-height: 400px;
-    overflow-y: auto;
-}
-
-.dev-status {
-    font-size: 12px;
-    color: var(--stardew-wood);
-    margin-bottom: 10px;
-    padding: 6px 8px;
-    background: #e8f5e9;
-    border-radius: 6px;
-    border: 2px solid var(--stardew-green);
-}
-
-.dev-status-indicator {
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-}
-
-.dev-actions {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.dev-btn {
-    display: flex;
-    flex-direction: column;
-    padding: 10px 12px;
-    background: var(--stardew-card-bg);
-    border: 2px solid #d4c598;
-    border-radius: 8px;
-    cursor: pointer;
-    text-align: left;
-    transition: all 0.2s ease;
-}
-
-.dev-btn:hover {
-    background: #f0dcb0;
-    border-color: var(--stardew-green-light);
-}
-
-.dev-btn-label {
-    font-weight: 700;
-    color: var(--stardew-text);
+.profiler-name {
+    font-family: var(--font-display);
     font-size: 13px;
-}
-
-.dev-btn-desc {
-    font-size: 11px;
-    color: #666;
-    margin-top: 4px;
-}
-
-.dev-overlay-content .dev-btn {
-    width: 100%;
-}
-
-/* Tech Screen */
-.tech-unlock-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-top: 10px;
-}
-
-.tech-unlock-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: #fff;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-}
-
-.tech-unlock-item.unlocked {
-    border-color: var(--stardew-green);
-    background: #e8f5e9;
-}
-
-.tech-unlock-item.locked {
-    border-color: #aaa;
-    opacity: 0.6;
-}
-
-.tech-unlock-item .unlock-icon {
-    font-size: 20px;
-}
-
-.tech-unlock-item .unlock-info {
-    flex: 1;
-}
-
-.tech-unlock-item .unlock-name {
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-    font-size: 14px;
-}
-
-.tech-unlock-item .unlock-desc {
-    font-size: 12px;
-    color: #666;
-    line-height: 1.3;
-}
-
-.tech-unlock-item .unlock-trigger {
-    font-size: 10px;
-    color: var(--stardew-wood);
-    margin-top: 4px;
-}
-
-.tech-stability-list {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-    margin-top: 10px;
-}
-
-.stability-item {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px;
-    background: #fff;
-    border-radius: 6px;
-    border: 2px solid #d4c598;
-}
-
-.stability-name {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--stardew-text);
-    min-width: 80px;
-}
-
-.stability-bar {
-    flex: 1;
-    height: 10px;
-    background: #e8d5b0;
-    border-radius: 5px;
-    overflow: hidden;
-}
-
-.stability-fill {
-    height: 100%;
-    background: var(--stardew-green);
-    transition: width 0.3s ease;
-    border-radius: 5px;
-}
-
-.stability-value {
-    font-size: 12px;
-    font-weight: 700;
-    color: var(--stardew-text);
-    min-width: 35px;
-}
-
-/* Hack scan list */
-.hack-list {
-    position: absolute;
-    left: 14px;
-    top: 78px;
-    width: min(360px, 42vw);
-    padding: 10px;
-    border-radius: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.35);
-    background: rgba(14, 22, 18, 0.78);
-    color: #eaf6eb;
-    z-index: 60;
-    pointer-events: none;
-}
-
-.hack-list-title {
-    font-size: 12px;
-    font-weight: 700;
-    letter-spacing: 0.4px;
-    margin-bottom: 6px;
-    opacity: 0.9;
-}
-
-.hack-list-rows {
-    display: grid;
-    gap: 4px;
-}
-
-.hack-row {
-    font-family: 'Courier New', monospace;
-    font-size: 12px;
-    line-height: 1.3;
-    padding: 4px 6px;
-    border-radius: 8px;
-    background: rgba(255, 255, 255, 0.05);
-    min-height: 24px;
-}
-
-.hack-row.active {
-    background: rgba(116, 226, 169, 0.26);
-    outline: 1px solid rgba(116, 226, 169, 0.75);
-}
-
-/* Breach mini-game modal */
-.breach-content {
-    min-width: min(520px, 92vw);
-}
-
-.breach-track {
-    position: relative;
-    width: 100%;
-    height: 22px;
-    background: rgba(16, 31, 20, 0.15);
-    border-radius: 99px;
-    border: 2px solid rgba(0, 0, 0, 0.2);
-    overflow: hidden;
-    margin: 14px 0 10px;
-}
-
-#breach-window {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    background: rgba(60, 170, 96, 0.55);
-}
-
-#breach-needle {
-    position: absolute;
-    top: -2px;
-    width: 4px;
-    height: 26px;
-    background: #1d1d1d;
-    border-radius: 2px;
-    box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.45);
-}
-
-.factions-panel {
-    position: absolute;
-    right: 16px;
-    top: 76px;
-    width: min(360px, 40vw);
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: rgba(20, 30, 24, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.24);
-    color: #eef6ef;
-    z-index: 65;
-    font-size: 12px;
-}
-
-.factions-title {
+    color: var(--text-bright);
     font-weight: 700;
     margin-bottom: 6px;
+    letter-spacing: 0.05em;
 }
-
-.f-row {
-    display: grid;
-    grid-template-columns: 66px 1fr 36px 54px;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-}
-
-.f-bar {
-    height: 8px;
-    background: rgba(255, 255, 255, 0.18);
-    border-radius: 999px;
-    overflow: hidden;
-}
-
-.f-fill {
-    height: 100%;
-    width: 50%;
-    background: linear-gradient(90deg, #de5e5e, #f0c95f, #4fbf74);
-}
-
-.f-band {
-    text-transform: lowercase;
-    opacity: 0.9;
-}
-
-.factions-changes {
-    margin-top: 6px;
-    font-size: 11px;
-    opacity: 0.95;
-}
-
-/* Politics Panel */
-.politics-panel {
-    position: absolute;
-    right: 16px;
-    top: 470px;
-    width: min(360px, 40vw);
-    padding: 8px 10px;
-    border-radius: 10px;
-    background: rgba(20, 30, 24, 0.8);
-    border: 2px solid rgba(255, 255, 255, 0.24);
-    color: #eef6ef;
-    z-index: 65;
-    font-size: 12px;
-}
-
-.politics-tabs {
-    display: flex;
-    gap: 4px;
-    margin-bottom: 8px;
-}
-
-.tab-btn {
-    flex: 1;
-    padding: 4px 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    color: #eef6ef;
-    font-size: 11px;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.tab-btn:hover {
-    background: rgba(255, 255, 255, 0.15);
-}
-
-.tab-btn.active {
-    background: rgba(79, 191, 116, 0.3);
-    border-color: rgba(79, 191, 116, 0.5);
-}
-
-.politics-content {
-    margin-bottom: 8px;
-}
-
-.tab-content {
-    display: none;
-}
-
-.tab-content.active {
-    display: block;
-}
-
-.policy-category {
-    margin-bottom: 8px;
-}
-
-.category-title {
-    font-weight: 700;
-    font-size: 11px;
-    margin-bottom: 4px;
-    color: #8fbf96;
-}
-
-.policy-row {
-    display: grid;
-    grid-template-columns: 1fr 40px 50px;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    padding: 4px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-}
-
-.policy-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.policy-name {
-    font-weight: 600;
-    font-size: 11px;
-}
-
-.policy-desc {
+.profiler-detail {
+    font-family: var(--font-mono);
     font-size: 10px;
-    opacity: 0.8;
-}
-
-.policy-cost, .policy-duration {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    font-size: 10px;
-    text-align: right;
-}
-
-.cost, .duration {
-    opacity: 0.9;
-}
-
-.policy-btn {
-    padding: 4px 8px;
-    border: none;
-    border-radius: 4px;
-    cursor: pointer;
-    font-size: 10px;
-}
-
-.policy-btn.enact {
-    background: rgba(79, 191, 116, 0.3);
-    color: #eef6ef;
-}
-
-.policy-btn.enact.enabled:hover {
-    background: rgba(79, 191, 116, 0.5);
-}
-
-.policy-btn.enact.disabled {
-    background: rgba(100, 100, 100, 0.3);
-    color: #888;
-    cursor: not-allowed;
-}
-
-.policy-btn.revoke {
-    background: rgba(222, 94, 94, 0.3);
-    color: #eef6ef;
-}
-
-.policy-btn.revoke:hover {
-    background: rgba(222, 94, 94, 0.5);
-}
-
-.appointment-row {
-    display: grid;
-    grid-template-columns: 1fr 50px;
-    align-items: center;
-    gap: 6px;
-    margin-bottom: 4px;
-    padding: 4px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 4px;
-}
-
-.appointment-info {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-}
-
-.appointment-title {
-    font-weight: 600;
-    font-size: 11px;
-}
-
-.appointment-desc {
-    font-size: 10px;
-    opacity: 0.8;
-}
-
-.appointment-status {
-    display: flex;
-    flex-direction: column;
-    gap: 1px;
-    font-size: 10px;
-    text-align: right;
-}
-
-.appointment-rep {
-    opacity: 0.9;
-}
-
-.politics-status {
-    font-size: 10px;
-    opacity: 0.8;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    padding-top: 6px;
-}
-
-/* Citizen Profile Panel */
-#citizen-profile-panel {
-    position: fixed;
-    top: 50px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 450px;
-    max-height: 85vh;
-    background: repeating-linear-gradient(
-        45deg,
-        #fff8e1,
-        #fff8e1 10px,
-        #fff0d1 10px,
-        #fff0d1 20px
-    );
-    border: 8px solid var(--stardew-green);
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 200;
-    display: none;
-    flex-direction: column;
-}
-
-.citizen-overview {
-    padding: 16px;
-    border-bottom: 3px solid rgba(0, 0, 0, 0.1);
-    background: rgba(255, 255, 255, 0.6);
-    border-radius: 8px;
-    margin: 8px;
-}
-
-.citizen-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-}
-
-.citizen-avatar {
-    width: 50px;
-    height: 50px;
-    background: var(--stardew-green-light);
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 24px;
-    box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.1);
-}
-
-.citizen-info .citizen-name {
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-}
-
-.citizen-info .citizen-meta {
-    font-size: 12px;
-    color: #666;
-}
-
-.citizen-stats {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 12px;
-}
-
-.stat-box {
-    text-align: center;
-    background: #fff;
-    padding: 8px 12px;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-    flex: 1;
-}
-
-.stat-box .stat-label {
-    font-size: 11px;
-    color: var(--stardew-wood);
-    text-transform: uppercase;
-    margin-bottom: 4px;
-    font-weight: 700;
-}
-
-.stat-box .stat-value {
-    font-size: 18px;
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-}
-
-.citizen-traits {
-    display: flex;
-    gap: 6px;
-    flex-wrap: wrap;
-}
-
-.trait-tag {
-    padding: 4px 10px;
-    background: var(--stardew-green);
-    color: #fff;
-    border-radius: 12px;
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.citizen-section {
-    padding: 16px;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.08);
-}
-
-.citizen-section h3 {
-    font-size: 14px;
-    color: var(--stardew-green-dark);
-    text-transform: uppercase;
-    margin-bottom: 12px;
-    font-weight: 700;
-}
-
-.needs-grid {
-    display: grid;
-    grid-template-columns: 1fr 1fr 1fr;
-    gap: 12px;
-}
-
-.need-item {
-    background: #fff;
-    padding: 10px;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-}
-
-.need-label {
-    font-size: 11px;
-    color: var(--stardew-wood);
-    font-weight: 700;
-    margin-bottom: 6px;
-}
-
-.need-bar {
-    height: 8px;
-    background: #e8d5b0;
-    border-radius: 4px;
-    overflow: hidden;
-}
-
-.need-fill {
-    height: 100%;
-    background: var(--stardew-green);
-    border-radius: 4px;
-    transition: width 0.5s ease;
-}
-
-.employment-info {
-    background: #fff;
-    padding: 12px;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-}
-
-.job-title {
-    font-size: 16px;
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-    margin-bottom: 4px;
-}
-
-.job-income {
-    font-size: 13px;
-    color: var(--stardew-text);
-}
-
-.household-info {
-    background: #fff;
-    padding: 12px;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-}
-
-.hh-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-    margin-bottom: 4px;
-}
-
-.hh-capacity {
-    font-size: 12px;
-    color: var(--stardew-wood);
+    color: var(--text-dim);
     margin-bottom: 2px;
 }
-
-.hh-quality {
-    font-size: 12px;
-    color: #666;
+.profiler-secret {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--neon-magenta);
+    margin-top: 6px;
+    padding-top: 6px;
+    border-top: 1px solid rgba(255, 0, 170, 0.2);
 }
 
-.connections-list, .crime-list {
+/* ═══════════════════════════════════════
+   NETWORK VISION OVERLAY
+   ═══════════════════════════════════════ */
+.network-vision {
+    position: fixed;
+    inset: 0;
+    z-index: 15;
+    pointer-events: none;
+    background: rgba(0, 5, 15, 0.6);
+    border: 2px solid rgba(0, 240, 255, 0.15);
+}
+.nv-label {
+    position: absolute;
+    top: 50px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--neon-cyan);
+    letter-spacing: 0.3em;
+    opacity: 0.6;
+    animation: nv-blink 2s ease-in-out infinite;
+}
+@keyframes nv-blink {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 0.3; }
+}
+
+/* ═══════════════════════════════════════
+   BREACH MINIGAME
+   ═══════════════════════════════════════ */
+.breach-window {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 50;
+    width: min(500px, 90vw);
+    background: var(--bg-panel-solid);
+    border: 1px solid var(--neon-cyan);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glow-cyan);
+    overflow: hidden;
+}
+.breach-header {
     display: flex;
-    flex-direction: column;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: rgba(0, 240, 255, 0.06);
+    border-bottom: 1px solid var(--border);
+}
+.breach-title {
+    font-family: var(--font-display);
+    font-size: 13px;
+    color: var(--neon-cyan);
+    letter-spacing: 0.1em;
+}
+.breach-timer {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--neon-amber);
+    font-weight: 700;
+}
+.breach-close {
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-size: 18px;
+    cursor: pointer;
+    padding: 0 4px;
+}
+.breach-close:hover { color: var(--neon-red); }
+.breach-grid {
+    padding: 20px;
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
     gap: 6px;
 }
-
-.connection-item {
-    padding: 8px 10px;
-    background: #fff;
-    border-radius: 6px;
-    border: 2px solid #d4c598;
-    font-size: 12px;
+.breach-status {
+    padding: 8px 14px;
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-dim);
+    text-align: center;
 }
 
-.conn-name {
-    font-weight: 700;
-    color: var(--stardew-blue);
-}
-
-.conn-relationship {
-    color: var(--stardew-green-dark);
-    font-weight: 600;
-}
-
-.conn-affinity {
-    color: #888;
-}
-
-.crime-item {
-    padding: 8px 10px;
-    background: #fff8e1;
-    border-radius: 6px;
-    border: 2px solid #e6b800;
-    font-size: 12px;
-}
-
-.crime-type {
-    font-weight: 700;
-    color: var(--stardew-heat);
-}
-
-.crime-severity {
-    color: var(--stardew-text);
-}
-
-.crime-status {
-    color: #888;
-    font-size: 10px;
-    text-transform: uppercase;
-}
-
-/* Campaign Panel */
-.campaign-panel {
+/* ═══════════════════════════════════════
+   MANAGEMENT PANELS
+   ═══════════════════════════════════════ */
+.mgmt-panel {
     position: fixed;
-    top: 50px;
-    right: 20px;
-    width: 320px;
-    max-height: 85vh;
-    background: repeating-linear-gradient(
-        45deg,
-        #fff8e1,
-        #fff8e1 10px,
-        #fff0d1 10px,
-        #fff0d1 20px
-    );
-    border: 8px solid var(--stardew-wood);
-    border-radius: 16px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-    z-index: 200;
-    display: none;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 45;
+    width: min(550px, 92vw);
+    max-height: 80vh;
+    background: var(--bg-panel-solid);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.6);
+    display: flex;
     flex-direction: column;
-    font-size: 14px;
+    overflow: hidden;
 }
-
-.campaign-panel.open {
+.panel-header {
     display: flex;
-}
-
-.campaign-panel-header {
-    display: flex;
-    justify-content: space-between;
     align-items: center;
+    justify-content: space-between;
     padding: 12px 16px;
-    background: rgba(0, 0, 0, 0.1);
-    border-bottom: 3px solid rgba(0, 0, 0, 0.15);
-    border-radius: 16px 16px 0 0;
-    overflow: hidden;
+    background: rgba(0, 240, 255, 0.04);
+    border-bottom: 1px solid var(--border);
 }
-
-.campaign-panel-header h2 {
-    font-size: 16px;
-    color: var(--stardew-green-dark);
-    text-transform: uppercase;
-    font-weight: 700;
-    margin: 0;
-}
-
-.campaign-panel-close {
-    background: none;
-    border: none;
-    font-size: 24px;
-    color: var(--stardew-green-dark);
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.campaign-content {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-}
-
-.campaign-tabs {
-    display: flex;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.campaign-tab {
-    flex: 1;
-    padding: 10px;
-    background: none;
-    border: none;
+.panel-title {
+    font-family: var(--font-display);
     font-size: 13px;
+    color: var(--text);
+    letter-spacing: 0.1em;
     font-weight: 600;
-    color: #888;
+}
+.panel-close {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text-dim);
+    font-size: 16px;
+    width: 28px;
+    height: 28px;
     cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
 }
-
-.campaign-tab:hover {
-    background: rgba(0, 0, 0, 0.05);
+.panel-close:hover {
+    border-color: var(--neon-red);
+    color: var(--neon-red);
 }
-
-.campaign-tab.active {
-    color: var(--stardew-green-dark);
-    border-bottom-color: var(--stardew-green);
-    background: rgba(0, 0, 0, 0.03);
-}
-
-.campaign-section {
-    padding: 12px;
+.panel-body {
+    padding: 16px;
     overflow-y: auto;
     flex: 1;
 }
 
-.campaign-section-title {
-    font-size: 12px;
-    color: var(--stardew-wood);
-    text-transform: uppercase;
-    font-weight: 700;
-    margin-bottom: 8px;
-    padding-bottom: 4px;
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.campaign-section.empty {
-    text-align: center;
-    color: #888;
-    padding: 20px;
-    font-style: italic;
-}
-
-/* News Feed Styles */
-.news-item {
-    padding: 10px 12px;
-    background: #fff;
-    border-radius: 8px;
-    border-left: 4px solid #ccc;
-    margin-bottom: 8px;
-    transition: all 0.2s;
-}
-
-.news-item:hover {
-    background: var(--stardew-card-bg);
-}
-
-.news-item.important {
-    border-left-color: var(--stardew-heat);
-    background: #fff8e8;
-}
-
-.news-item.critical {
-    border-left-color: var(--stardew-heat);
-    background: #ffe8e8;
-}
-
-.news-header {
+/* Budget Sliders */
+.budget-sliders {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 4px;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 16px;
 }
-
-.news-title {
-    font-weight: 700;
-    color: var(--stardew-text);
-    font-size: 13px;
-}
-
-.news-source {
-    font-size: 10px;
-    color: #888;
-    text-transform: uppercase;
-}
-
-.news-time {
-    font-size: 10px;
-    color: #aaa;
-}
-
-.news-description {
-    font-size: 12px;
-    color: var(--stardew-text);
-    line-height: 1.4;
-}
-
-/* Briefing Styles */
-.briefing-item {
-    padding: 10px 12px;
-    background: #fff;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-    margin-bottom: 8px;
-}
-
-.briefing-item.priority-high {
-    border-color: var(--stardew-heat);
-}
-
-.briefing-item.priority-critical {
-    border-color: var(--stardew-heat);
-    background: #fff0e8;
-}
-
-.briefing-header {
+.slider-row {
     display: flex;
-    justify-content: space-between;
     align-items: center;
-    margin-bottom: 6px;
+    gap: 10px;
 }
-
-.briefing-title {
-    font-weight: 700;
-    color: var(--stardew-text);
-    font-size: 13px;
-}
-
-.briefing-priority {
+.slider-row label {
+    font-family: var(--font-mono);
     font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
+    color: var(--text-dim);
+    width: 120px;
+    flex-shrink: 0;
+}
+.slider-row input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    outline: none;
+}
+.slider-row input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 14px;
+    height: 14px;
+    background: var(--neon-cyan);
+    border-radius: 50%;
+    cursor: pointer;
+    box-shadow: 0 0 6px var(--neon-cyan);
+}
+.slider-val {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+    width: 36px;
+    text-align: right;
 }
 
-.briefing-priority.critical {
-    color: var(--stardew-heat);
-}
-
-.briefing-priority.high {
-    color: var(--stardew-gold);
-}
-
-.briefing-priority.medium {
-    color: var(--stardew-blue);
-}
-
-.briefing-priority.low {
-    color: var(--stardew-green);
-}
-
-.briefing-content {
-    font-size: 12px;
-    color: var(--stardew-text);
-    line-height: 1.4;
-}
-
-/* Active Case Display */
-.active-case-display {
-    padding: 12px;
-    background: var(--stardew-card-bg);
-    border-radius: 12px;
+/* Transit Stats */
+.transit-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
     margin-bottom: 12px;
 }
-
-.active-case-title {
-    font-size: 14px;
+.transit-stat {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+.ts-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+}
+.ts-val {
+    font-family: var(--font-mono);
+    font-size: 16px;
+    color: var(--neon-cyan);
     font-weight: 700;
-    color: var(--stardew-green-dark);
-    margin-bottom: 4px;
 }
 
-.active-case-meta {
+/* ═══════════════════════════════════════
+   SMARTPHONE OVERLAY
+   ═══════════════════════════════════════ */
+.smartphone-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 48;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.6);
+    backdrop-filter: blur(4px);
+}
+.phone-frame {
+    width: min(320px, 85vw);
+    max-height: 80vh;
+    background: var(--bg-panel-solid);
+    border: 1px solid var(--border-bright);
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: var(--glow-cyan);
+    display: flex;
+    flex-direction: column;
+}
+.phone-header {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 14px;
+    background: rgba(0, 240, 255, 0.04);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono);
     font-size: 11px;
-    color: var(--stardew-text);
-    opacity: 0.8;
+    color: var(--text-dim);
+}
+.phone-apps {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 2px;
+    padding: 12px;
+}
+.phone-app {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 6px;
+    background: transparent;
+    border: 1px solid transparent;
+    border-radius: var(--radius-lg);
+    cursor: pointer;
+    transition: all 0.2s;
+    color: var(--text);
+}
+.phone-app:hover {
+    background: rgba(0, 240, 255, 0.06);
+    border-color: var(--border);
+}
+.app-icon { font-size: 24px; }
+.app-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+}
+.phone-panel {
+    padding: 12px;
+    overflow-y: auto;
+    flex: 1;
+    border-top: 1px solid var(--border);
 }
 
-.active-case-progress {
-    margin-top: 8px;
-}
-
-.progress-bar {
-    height: 6px;
-    background: #d4c598;
-    border-radius: 3px;
+/* ═══════════════════════════════════════
+   MULTIPLAYER PANEL
+   ═══════════════════════════════════════ */
+.mp-panel {
+    position: fixed;
+    top: 10px;
+    right: 10px;
+    z-index: 30;
+    width: 260px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     overflow: hidden;
 }
+.mp-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--border);
+}
+.mp-title {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    flex: 1;
+}
+.mp-sync {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--neon-green);
+    box-shadow: 0 0 6px var(--neon-green);
+}
+.mp-sync.lagging {
+    background: var(--neon-red);
+    box-shadow: 0 0 6px var(--neon-red);
+}
+.mp-lobby {
+    padding: 6px 12px;
+    border-bottom: 1px solid var(--border);
+}
+.lobby-player {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 3px 0;
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text);
+}
+.lobby-ping { color: var(--text-faint); font-size: 9px; }
 
-.progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--stardew-green), var(--stardew-green-dark));
-    transition: width 0.3s ease;
+/* Chat */
+.chat-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+}
+.chat-tab {
+    flex: 1;
+    padding: 4px 0;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-faint);
+    font-family: var(--font-mono);
+    font-size: 9px;
+    cursor: pointer;
+    text-align: center;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+.chat-tab:hover { color: var(--text-dim); }
+.chat-tab.active {
+    color: var(--neon-cyan);
+    border-bottom-color: var(--neon-cyan);
+}
+.chat-messages {
+    height: 120px;
+    overflow-y: auto;
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-dim);
+}
+.chat-input-row {
+    display: flex;
+    border-top: 1px solid var(--border);
+}
+.chat-input {
+    flex: 1;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: none;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 10px;
+    outline: none;
+}
+.chat-send {
+    padding: 6px 10px;
+    background: rgba(0, 240, 255, 0.08);
+    border: none;
+    border-left: 1px solid var(--border);
+    color: var(--neon-cyan);
+    cursor: pointer;
+    font-size: 14px;
+    transition: background 0.15s;
+}
+.chat-send:hover { background: rgba(0, 240, 255, 0.15); }
+
+/* ═══════════════════════════════════════
+   LOG PANEL (Bottom Center)
+   ═══════════════════════════════════════ */
+.log-float {
+    position: fixed;
+    bottom: 10px;
+    left: 200px;
+    right: 200px;
+    max-height: 110px;
+    z-index: 25;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+}
+.log-float-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 10px;
+    border-bottom: 1px solid var(--border);
+}
+.info-title {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    letter-spacing: 0.2em;
+    color: var(--text-dim);
+    font-weight: 600;
+}
+.info-tabs {
+    display: flex;
+    gap: 2px;
+}
+.info-tabs .tab {
+    font-family: var(--font-mono);
+    font-size: 9px;
+    padding: 2px 6px;
+    color: var(--text-faint);
+    cursor: pointer;
+    background: transparent;
+    border: none;
+    border-radius: var(--radius);
+    transition: all 0.15s;
+}
+.info-tabs .tab:hover { color: var(--text-dim); }
+.info-tabs .tab.active { color: var(--neon-cyan); }
+.btn-debug-info, #debug-info-btn {
+    margin-left: auto;
+    background: transparent;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-family: var(--font-mono);
+    font-size: 8px;
+    padding: 2px 6px;
+    cursor: pointer;
+    letter-spacing: 0.05em;
+    transition: all 0.15s;
+}
+#debug-info-btn:hover {
+    border-color: var(--neon-cyan);
+    color: var(--text-dim);
 }
 
-/* Case List */
-.case-list-item {
-    padding: 10px 12px;
-    background: #fff;
-    border-radius: 8px;
-    border: 2px solid #d4c598;
-    margin-bottom: 8px;
+#message-log, .message-log {
+    padding: 3px 10px;
+    max-height: 70px;
+    overflow-y: auto;
+}
+#message-log div, .message-log .message {
+    font-family: var(--font-mono);
+    font-size: 10px;
+    color: var(--text-faint);
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.02);
+}
+#message-log .message.success { color: var(--neon-green); }
+#message-log .message.warning { color: var(--neon-amber); }
+#message-log .message.crisis  { color: var(--neon-red); }
+#message-log .message.rival-action { color: var(--neon-magenta); }
+.message .day-indicator {
+    color: var(--text-faint);
+    opacity: 0.6;
+}
+
+.stats-panel {
+    padding: 6px 10px;
+    overflow-y: auto;
+    max-height: 70px;
+}
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    gap: 4px;
+}
+.stat-item {
+    background: rgba(255,255,255,0.02);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 5px 8px;
+}
+.stat-item.full-width { grid-column: 1 / -1; }
+.stat-label {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+}
+.stat-value {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    color: var(--text);
+    font-weight: 600;
+}
+.stats-section-title {
+    font-family: var(--font-mono);
+    font-size: 8px;
+    color: var(--text-faint);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    padding: 6px 0 2px;
+}
+
+/* ═══════════════════════════════════════
+   SETTINGS BUTTON
+   ═══════════════════════════════════════ */
+#settings-btn, .settings-btn {
+    position: fixed;
+    top: 48px;
+    right: 200px;
+    z-index: 35;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border);
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    padding: 6px;
     cursor: pointer;
     transition: all 0.2s;
 }
-
-.case-list-item:hover {
-    border-color: var(--stardew-green-light);
-    background: var(--stardew-card-bg);
+#settings-btn:hover {
+    border-color: var(--neon-cyan);
+    box-shadow: var(--border-glow);
 }
+#settings-btn svg { fill: var(--text-dim); transition: fill 0.2s; }
+#settings-btn:hover svg { fill: var(--neon-cyan); }
 
-.case-list-item.completed {
-    opacity: 0.6;
-    background: #f0f0f0;
+/* ═══════════════════════════════════════
+   PAUSE MENU
+   ═══════════════════════════════════════ */
+.pause-backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(8px);
 }
-
-.case-list-header {
+.pause-content {
+    position: relative;
+    z-index: 2;
+    text-align: center;
+}
+.pause-title {
+    font-family: var(--font-display);
+    font-size: 32px;
+    color: var(--text-bright);
+    letter-spacing: 0.3em;
+    text-shadow: 0 0 20px var(--neon-cyan);
+    margin-bottom: 32px;
+}
+.pause-buttons {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
+    flex-direction: column;
+    gap: 8px;
+    width: 280px;
+    margin: 0 auto;
 }
-
-.case-list-type {
-    font-weight: 700;
-    color: var(--stardew-text);
+.pause-btn {
+    padding: 12px 20px;
+    background: var(--bg-glass);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    color: var(--text);
+    font-family: var(--font-display);
     font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.15em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.pause-btn:hover {
+    border-color: var(--neon-cyan);
+    background: rgba(0, 240, 255, 0.08);
+    box-shadow: var(--border-glow);
+}
+.pause-btn-danger:hover {
+    border-color: var(--neon-red);
+    color: var(--neon-red);
+    box-shadow: 0 0 8px rgba(255, 34, 68, 0.15);
 }
 
-.case-list-status {
-    font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-}
-
-.case-list-status.active {
-    color: var(--stardew-green);
-}
-
-.case-list-status.completed {
-    color: #888;
-}
-
-/* Tips Box */
-@keyframes tipFadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(-20px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
-}
-
-@keyframes tipFadeOut {
-    from {
-        opacity: 1;
-        transform: translateY(0);
-    }
-    to {
-        opacity: 0;
-        transform: translateY(-10px);
-    }
-}
-
-.tip-box {
-    animation: tipFadeIn 0.3s ease-out;
-}
-
-.tip-box.closing {
-    animation: tipFadeOut 0.3s ease-out forwards;
-}
-
-/* Tutorial Overlay Styles */
-.tutorial-overlay {
+/* ═══════════════════════════════════════
+   OVERLAYS (Victory, Defeat, Crisis, etc.)
+   ═══════════════════════════════════════ */
+.overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.85);
-    z-index: 1000;
+    inset: 0;
+    z-index: 9000;
     display: flex;
-    justify-content: center;
     align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(6px);
+}
+.overlay.hidden { display: none !important; }
+
+.overlay-content,
+.overlay .overlay-content {
+    background: var(--bg-panel-solid);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 32px;
+    max-width: 480px;
+    width: 92%;
+    text-align: center;
+    box-shadow: 0 8px 60px rgba(0, 0, 0, 0.7);
+}
+.overlay-content h1,
+.overlay-content h2 {
+    font-family: var(--font-display);
+    color: var(--text-bright);
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+}
+.overlay-content p {
+    color: var(--text-dim);
+    font-size: 13px;
+    margin-bottom: 16px;
+}
+.overlay-content select,
+.overlay-content input {
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 10px;
+    font-family: var(--font-mono);
+    font-size: 11px;
+}
+.overlay-content label {
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+    font-size: 10px;
+}
+
+.victory-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    display: block;
+}
+.defeat-icon { filter: grayscale(0.3); }
+.crisis-icon { animation: crisis-shake 0.5s ease-in-out infinite; }
+@keyframes crisis-shake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-3px); }
+    75% { transform: translateX(3px); }
+}
+
+.victory-panel { border-color: rgba(0, 240, 255, 0.3); box-shadow: 0 0 40px rgba(0, 240, 255, 0.1); }
+.defeat-panel { border-color: rgba(255, 34, 68, 0.3); box-shadow: 0 0 40px rgba(255, 34, 68, 0.1); }
+.crisis-panel { border-color: rgba(255, 170, 0, 0.3); box-shadow: 0 0 40px rgba(255, 170, 0, 0.1); }
+.quest-panel { border-color: rgba(170, 68, 255, 0.3); box-shadow: 0 0 40px rgba(170, 68, 255, 0.1); }
+.error-panel { border-color: rgba(255, 34, 68, 0.3); }
+
+/* Crisis Options */
+.crisis-options {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+/* Quest Choice List */
+.quest-choice-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 12px;
+}
+
+/* Progress bar */
+.progress-container { margin: 16px 0; }
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+    margin-top: 6px;
+}
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--neon-cyan), var(--neon-green));
+    border-radius: var(--radius);
+    transition: width 0.5s ease;
+}
+
+/* ═══════════════════════════════════════
+   GENERIC BUTTONS
+   ═══════════════════════════════════════ */
+.btn, button.btn {
+    background: rgba(255,255,255,0.04);
+    color: var(--text-dim);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 6px 14px;
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+.btn:hover {
+    background: rgba(0, 240, 255, 0.06);
+    border-color: var(--neon-cyan);
+    color: var(--text);
+}
+.btn-primary {
+    background: rgba(0, 240, 255, 0.08);
+    color: var(--neon-cyan);
+    border-color: rgba(0, 240, 255, 0.2);
+}
+.btn-secondary {
+    background: rgba(255, 170, 0, 0.06);
+    color: var(--neon-amber);
+    border-color: rgba(255, 170, 0, 0.15);
+}
+
+/* ═══════════════════════════════════════
+   TOOLTIPS
+   ═══════════════════════════════════════ */
+.game-tooltip, [class*="tooltip"] {
+    background: var(--bg-panel-solid) !important;
+    border: 1px solid var(--border-bright) !important;
+    border-radius: var(--radius) !important;
+    color: var(--text) !important;
+    box-shadow: var(--glow-cyan) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+}
+
+/* ═══════════════════════════════════════
+   FLOATING PANELS (existing Svelte panels)
+   ═══════════════════════════════════════ */
+.factions-panel, #factions-panel, [class*="faction-panel"],
+.politics-panel, [class*="politics"] {
+    background: var(--bg-panel) !important;
+    backdrop-filter: var(--panel-blur) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    color: var(--text) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+}
+.factions-panel h4, .politics-panel h4 {
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    letter-spacing: 0.1em !important;
+    color: var(--text-dim) !important;
+    text-transform: uppercase !important;
+}
+.politics-panel button, .politics-tabs button {
+    background: rgba(255,255,255,0.03) !important;
+    color: var(--text-dim) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    padding: 3px 8px !important;
+}
+
+/* Mode Indicator */
+#mode-indicator, .mode-indicator {
+    background: var(--bg-panel) !important;
+    backdrop-filter: var(--panel-blur) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    padding: 3px 8px !important;
+}
+.mode-label {
+    font-family: var(--font-mono) !important;
+    font-size: 10px !important;
+    color: var(--text) !important;
+    font-weight: 500 !important;
+}
+.mode-icon { font-size: 12px !important; }
+
+/* Hack panels */
+.hack-list, .hack-scan, [class*="hack-list"] {
+    background: var(--bg-panel) !important;
+    backdrop-filter: var(--panel-blur) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+}
+.hack-list-item, [class*="hack-item"] {
+    color: var(--text-dim) !important;
+    font-size: 11px !important;
+    font-family: var(--font-mono) !important;
+    padding: 3px 8px !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+
+/* ═══════════════════════════════════════
+   SCROLLBAR
+   ═══════════════════════════════════════ */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0, 240, 255, 0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(0, 240, 255, 0.25); }
+
+/* ═══════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════ */
+@keyframes tipFadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes tipFadeOut {
+    from { opacity: 1; transform: translateY(0); }
+    to   { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ═══════════════════════════════════════
+   POINTER EVENTS — pass through to canvas
+   ═══════════════════════════════════════ */
+.hud-street-layer,
+.profiler-reticle,
+.network-vision {
+    pointer-events: none;
+}
+.hud-weapon-wheel,
+.hud-health-stamina {
     pointer-events: auto;
 }
 
-.tutorial-overlay.hidden {
-    display: none;
-    pointer-events: none;
-}
-
-.tutorial-content {
-    background: linear-gradient(135deg, #fff8e1 0%, #ffe0b2 100%);
-    border-radius: 24px;
-    border: 6px solid var(--stardew-wood);
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5), inset 0 0 40px rgba(255, 255, 255, 0.2);
-    padding: 40px;
-    max-width: 700px;
-    max-height: 90vh;
-    overflow-y: auto;
-    position: relative;
-    animation: tutorialSlideIn 0.5s ease-out;
-}
-
-@keyframes tutorialSlideIn {
-    from {
-        opacity: 0;
-        transform: scale(0.9) translateY(30px);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1) translateY(0);
-    }
-}
-
-.tutorial-close {
-    position: absolute;
-    top: 15px;
-    right: 15px;
-    background: var(--stardew-wood);
-    border: none;
-    border-radius: 50%;
-    width: 36px;
-    height: 36px;
-    cursor: pointer;
-    font-size: 20px;
-    color: #fff;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
-}
-
-.tutorial-close:hover {
-    background: var(--stardew-green-dark);
-    transform: rotate(90deg);
-}
-
-.tutorial-header {
-    text-align: center;
-    margin-bottom: 30px;
-}
-
-.tutorial-header h1 {
-    font-size: 36px;
-    color: var(--stardew-green-dark);
-    margin-bottom: 10px;
-    text-shadow: 2px 2px 0 rgba(230, 184, 0, 0.3);
-}
-
-.tutorial-header .subtitle {
-    font-size: 16px;
-    color: var(--stardew-wood);
-    font-style: italic;
-}
-
-.tutorial-step {
-    display: none;
-    animation: tutorialFadeIn 0.3s ease-out;
-}
-
-.tutorial-step.active {
-    display: block;
-}
-
-@keyframes tutorialFadeIn {
-    from { opacity: 0; }
-    to { opacity: 1; }
-}
-
-.tutorial-step-icon {
-    font-size: 64px;
-    text-align: center;
-    margin-bottom: 20px;
-    animation: tutorialBounce 2s infinite;
-}
-
-@keyframes tutorialBounce {
-    0%, 100% { transform: translateY(0); }
-    50% { transform: translateY(-10px); }
-}
-
-.tutorial-step-title {
-    font-size: 24px;
-    color: var(--stardew-green-dark);
-    margin-bottom: 15px;
-    text-align: center;
-}
-
-.tutorial-step-content {
-    font-size: 16px;
-    color: var(--stardew-text);
-    line-height: 1.6;
-    margin-bottom: 20px;
-}
-
-.tutorial-step-content ul {
-    margin: 15px 0;
-    padding-left: 25px;
-}
-
-.tutorial-step-content li {
-    margin-bottom: 8px;
-}
-
-.tutorial-step-content code {
-    background: rgba(92, 184, 117, 0.2);
-    padding: 2px 8px;
-    border-radius: 4px;
-    font-family: 'Courier New', monospace;
-    font-size: 14px;
-}
-
-.tutorial-step-content .highlight {
-    background: rgba(230, 184, 0, 0.3);
-    padding: 2px 6px;
-    border-radius: 4px;
-    font-weight: 600;
-}
-
-.tutorial-navigation {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-top: 30px;
-    padding-top: 20px;
-    border-top: 2px dashed rgba(0, 0, 0, 0.1);
-}
-
-.tutorial-progress {
-    font-size: 14px;
-    color: var(--stardew-wood);
-    font-weight: 600;
-}
-
-.tutorial-progress-bar {
-    width: 100%;
-    height: 8px;
-    background: #d4c598;
-    border-radius: 4px;
-    margin-top: 8px;
-    overflow: hidden;
-}
-
-.tutorial-progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--stardew-green), var(--stardew-green-light));
-    transition: width 0.3s ease;
-    border-radius: 4px;
-}
-
-.tutorial-nav-btn {
-    padding: 12px 24px;
-    font-size: 14px;
-    font-weight: 700;
-    border: 3px solid var(--stardew-green-dark);
-    border-radius: 50px;
-    cursor: pointer;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    transition: all 0.2s ease;
-    background: var(--stardew-green-light);
-    color: #fff;
-    box-shadow: 0 4px 0 var(--stardew-green-dark);
-    min-width: 100px;
-}
-
-.tutorial-nav-btn:hover:not(:disabled) {
-    background: var(--stardew-green);
-    transform: translateY(-2px);
-    box-shadow: 0 6px 0 var(--stardew-green-dark);
-}
-
-.tutorial-nav-btn:active:not(:disabled) {
-    transform: translateY(0);
-    box-shadow: 0 2px 0 var(--stardew-green-dark);
-}
-
-.tutorial-nav-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-}
-
-.tutorial-nav-btn.primary {
-    background: var(--stardew-gold-light);
-    border-color: var(--stardew-gold);
-    box-shadow: 0 4px 0 var(--stardew-gold);
-}
-
-.tutorial-nav-btn.primary:hover:not(:disabled) {
-    background: var(--stardew-gold);
-    box-shadow: 0 6px 0 var(--stardew-gold);
-}
-
-.tutorial-nav-btn.primary:active:not(:disabled) {
-    box-shadow: 0 2px 0 var(--stardew-gold);
-}
-
-/* Tutorial Tooltip (in-game hints) */
-.tutorial-tooltip {
+/* ═══════════════════════════════════════
+   ACTION PROMPT (E key interact)
+   ═══════════════════════════════════════ */
+.action-prompt, #action-prompt {
     position: fixed;
-    background: rgba(62, 91, 68, 0.95);
-    border: 3px solid var(--stardew-green-light);
-    border-radius: 12px;
-    padding: 16px 20px;
-    max-width: 300px;
-    z-index: 999;
-    animation: tutorialTooltipPop 0.3s ease-out;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-}
-
-@keyframes tutorialTooltipPop {
-    from {
-        opacity: 0;
-        transform: scale(0.8);
-    }
-    to {
-        opacity: 1;
-        transform: scale(1);
-    }
-}
-
-.tutorial-tooltip.hidden {
-    display: none;
-}
-
-.tutorial-tooltip-arrow {
-    position: absolute;
-    width: 0;
-    height: 0;
-    border-style: solid;
-}
-
-.tutorial-tooltip-arrow.bottom {
-    border-width: 10px 10px 0;
-    border-color: var(--stardew-green-light) transparent transparent;
-    top: -10px;
+    bottom: 130px;
     left: 50%;
     transform: translateX(-50%);
-}
-
-.tutorial-tooltip-arrow.top {
-    border-width: 0 10px 10px;
-    border-color: transparent transparent var(--stardew-green-light);
-    bottom: -10px;
-    left: 50%;
-    transform: translateX(-50%);
-}
-
-.tutorial-tooltip-arrow.left {
-    border-width: 10px 10px 10px 0;
-    border-color: transparent var(--stardew-green-light) transparent;
-    right: -10px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.tutorial-tooltip-arrow.right {
-    border-width: 10px 0 10px 10px;
-    border-color: transparent transparent transparent var(--stardew-green-light);
-    left: -10px;
-    top: 50%;
-    transform: translateY(-50%);
-}
-
-.tutorial-tooltip-title {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--stardew-gold-light);
-    margin-bottom: 8px;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-}
-
-.tutorial-tooltip-content {
-    font-size: 13px;
-    color: #fff;
-    line-height: 1.5;
-}
-
-.tutorial-tooltip-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.6);
-    cursor: pointer;
-    font-size: 16px;
-    padding: 0;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: color 0.2s;
-}
-
-.tutorial-tooltip-close:hover {
-    color: #fff;
-}
-
-/* Tutorial Highlight (overlay effect) */
-.tutorial-highlight {
-    position: fixed;
-    background: rgba(0, 0, 0, 0.7);
-    z-index: 998;
-    transition: all 0.3s ease;
-}
-
-.tutorial-highlight.hidden {
-    display: none;
-}
-
-/* Day/Night Overlay */
-.day-night-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    pointer-events: none;
-    z-index: 50;
-    transition: background-color 1s ease;
-}
-
-/* Economy Balancer Panel */
-.economy-balancer-panel {
-    position: fixed;
-    bottom: 20px;
-    left: 20px;
-    width: 320px;
-    background: rgba(255, 255, 255, 0.95);
-    border: 4px solid var(--stardew-green);
-    border-radius: 12px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
-    z-index: 400;
-    font-family: 'Segoe UI', sans-serif;
-    display: none;
-}
-
-.economy-balancer-panel.open {
-    display: block;
-}
-
-.economy-balancer-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px 14px;
-    background: var(--stardew-green);
-    color: #fff;
-    border-radius: 8px 8px 0 0;
-}
-
-.economy-balancer-header h3 {
-    font-size: 14px;
-    font-weight: 700;
-    text-transform: uppercase;
-    margin: 0;
-}
-
-.economy-balancer-close {
-    background: none;
-    border: none;
-    color: #fff;
-    font-size: 20px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-}
-
-.economy-balancer-content {
-    padding: 14px;
-}
-
-.economy-stat-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 8px 0;
-    border-bottom: 1px solid #e8d5b0;
-}
-
-.economy-stat-row:last-child {
-    border-bottom: none;
-}
-
-/* ============================================
-   News Feed Panel (Tier 2B - Emergent Narrative)
-   ============================================ */
-
-.news-feed-panel {
-    position: fixed;
-    top: 20px;
-    right: 20px;
-    width: 380px;
-    max-height: calc(100vh - 40px);
-    background: rgba(255, 255, 255, 0.98);
-    border: 3px solid var(--stardew-green);
-    border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-    z-index: 350;
-    font-family: 'Segoe UI', sans-serif;
-    display: none;
-    flex-direction: column;
-}
-
-.news-feed-panel.open {
-    display: flex;
-}
-
-.news-feed-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 12px 16px;
-    background: linear-gradient(180deg, var(--stardew-green) 0%, var(--stardew-green-dark) 100%);
-    color: #fff;
-    border-radius: 7px 7px 0 0;
-}
-
-.news-feed-header h3 {
-    font-size: 15px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin: 0;
+    z-index: 35;
+    padding: 8px 18px;
+    background: var(--bg-panel);
+    backdrop-filter: var(--panel-blur);
+    border: 1px solid var(--border-bright);
+    border-radius: var(--radius-lg);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    color: var(--text);
     display: flex;
     align-items: center;
     gap: 8px;
+    box-shadow: var(--glow-cyan);
+    animation: prompt-appear 0.2s ease-out;
 }
-
-.news-feed-header h3::before {
-    content: '📰';
-    font-size: 18px;
+@keyframes prompt-appear {
+    from { opacity: 0; transform: translateX(-50%) translateY(8px); }
+    to   { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-
-.news-feed-close {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 22px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    transition: color 0.2s;
+.prompt-icon {
+    color: var(--neon-cyan);
+    font-weight: 700;
 }
-
-.news-feed-close:hover {
-    color: #fff;
+.prompt-text {
+    color: var(--text);
 }
-
-.news-feed-filter-bar {
-    display: flex;
-    gap: 4px;
-    padding: 10px 12px;
-    background: rgba(0, 0, 0, 0.05);
-    border-bottom: 2px solid rgba(0, 0, 0, 0.1);
-}
-
-.news-filter-btn {
-    flex: 1;
-    padding: 6px 10px;
-    background: rgba(255, 255, 255, 0.8);
-    border: 2px solid transparent;
-    border-radius: 6px;
-    font-size: 11px;
-    font-weight: 600;
-    text-transform: uppercase;
-    color: var(--stardew-text);
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.news-filter-btn:hover {
-    background: rgba(255, 255, 255, 1);
-    border-color: var(--stardew-green-light);
-}
-
-.news-filter-btn.active {
-    background: var(--stardew-green);
-    color: #fff;
-    border-color: var(--stardew-green-dark);
-}
-
-.news-feed-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 12px;
-}
-
-.news-feed-list::-webkit-scrollbar {
-    width: 8px;
-}
-
-.news-feed-list::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
-}
-
-.news-feed-list::-webkit-scrollbar-thumb {
-    background: var(--stardew-green-light);
-    border-radius: 4px;
-}
-
-.news-feed-list::-webkit-scrollbar-thumb:hover {
-    background: var(--stardew-green);
-}
-
-.news-feed-article {
-    background: #fff;
-    border: 2px solid rgba(0, 0, 0, 0.1);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 10px;
-    cursor: pointer;
-    transition: all 0.2s;
-    position: relative;
-}
-
-.news-feed-article:hover {
-    border-color: var(--stardew-green);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    transform: translateY(-2px);
-}
-
-.news-feed-article.read {
-    opacity: 0.7;
-}
-
-.news-feed-article.breaking {
-    border-color: #d32f2f;
-    border-width: 3px;
-    animation: breakingNewsPulse 2s ease-in-out infinite;
-}
-
-@keyframes breakingNewsPulse {
-    0%, 100% {
-        box-shadow: 0 0 0 0 rgba(211, 47, 47, 0.4);
-    }
-    50% {
-        box-shadow: 0 0 0 8px rgba(211, 47, 47, 0);
-    }
-}
-
-.news-feed-article.important {
-    border-color: var(--stardew-gold);
-    border-width: 3px;
-}
-
-.news-feed-article-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 8px;
-}
-
-.news-feed-article-category {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.05);
-    border-radius: 4px;
+.prompt-state {
+    color: var(--text-dim);
     font-size: 10px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
 }
 
-.news-feed-article-category.case {
-    background: rgba(76, 175, 80, 0.15);
-    color: #2e7d32;
+/* ═══════════════════════════════════════
+   PHOTO MODE / MAP SCREEN / TUTORIAL
+   (overlays created dynamically by JS)
+   ═══════════════════════════════════════ */
+#photo-mode-overlay,
+#map-screen-overlay,
+#tutorial-overlay {
+    font-family: var(--font-mono);
 }
 
-.news-feed-article-category.case::before {
-    content: '🔍';
-}
-
-.news-feed-article-category.crisis {
-    background: rgba(244, 67, 54, 0.15);
-    color: #c62828;
-}
-
-.news-feed-article-category.crisis::before {
-    content: '⚠️';
-}
-
-.news-feed-article-category.briefing {
-    background: rgba(33, 150, 243, 0.15);
-    color: #1565c0;
-}
-
-.news-feed-article-category.briefing::before {
-    content: '📋';
-}
-
-.news-feed-article-category.player_action {
-    background: rgba(255, 152, 0, 0.15);
-    color: #e65100;
-}
-
-.news-feed-article-category.player_action::before {
-    content: '🎮';
-}
-
-/* Tier 2B: Rival action category styling */
-.news-feed-article-category.rival_action {
-    background: rgba(156, 39, 176, 0.15);
-    color: #6a1b9a;
-}
-
-.news-feed-article-category.rival_action::before {
-    content: '🎯';
-}
-
-.news-feed-article.rival_action {
-    border-left: 4px solid #9c27b0;
-}
-
-.news-feed-article-time {
-    font-size: 10px;
-    color: rgba(0, 0, 0, 0.5);
-    white-space: nowrap;
-}
-
-.news-feed-article-title {
-    font-size: 13px;
-    font-weight: 700;
-    color: var(--stardew-text);
-    margin-bottom: 6px;
-    line-height: 1.4;
-}
-
-.news-feed-article.breaking .news-feed-article-title {
-    color: #d32f2f;
-}
-
-.news-feed-article-description {
-    font-size: 12px;
-    color: rgba(0, 0, 0, 0.7);
-    line-height: 1.5;
-}
-
-.news-feed-article-source {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    margin-top: 8px;
-    padding-top: 8px;
-    border-top: 1px solid rgba(0, 0, 0, 0.08);
-}
-
-.news-feed-article-source-icon {
-    font-size: 14px;
-}
-
-.news-feed-article-source-name {
-    font-size: 10px;
-    font-weight: 600;
-    color: rgba(0, 0, 0, 0.6);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.news-feed-empty {
-    text-align: center;
-    padding: 40px 20px;
-    color: rgba(0, 0, 0, 0.5);
-}
-
-.news-feed-empty-icon {
-    font-size: 48px;
-    margin-bottom: 12px;
-}
-
-.news-feed-empty-text {
-    font-size: 14px;
-    font-weight: 600;
-}
-
-.news-feed-empty-subtext {
-    font-size: 12px;
-    margin-top: 4px;
-}
-
-/* Breaking News Notification Banner */
-.breaking-news-banner {
-    position: fixed;
-    top: 20px;
-    left: 50%;
-    transform: translateX(-50%) translateY(-100px);
-    width: calc(100% - 40px);
-    max-width: 600px;
-    background: linear-gradient(90deg, #d32f2f 0%, #b71c1c 100%);
-    color: #fff;
-    border-radius: 8px;
-    padding: 14px 20px;
-    box-shadow: 0 8px 24px rgba(211, 47, 47, 0.4);
-    z-index: 400;
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    animation: breakingNewsSlideIn 0.5s ease-out;
-}
-
-.breaking-news-banner.show {
-    transform: translateX(-50%) translateY(0);
-}
-
-@keyframes breakingNewsSlideIn {
-    from {
-        transform: translateX(-50%) translateY(-100px);
-        opacity: 0;
-    }
-    to {
-        transform: translateX(-50%) translateY(0);
-        opacity: 1;
-    }
-}
-
-.breaking-news-banner-label {
-    font-size: 11px;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 1px;
-    background: rgba(0, 0, 0, 0.3);
-    padding: 4px 8px;
-    border-radius: 4px;
-    white-space: nowrap;
-}
-
-.breaking-news-banner-title {
-    flex: 1;
-    font-size: 14px;
-    font-weight: 700;
-    line-height: 1.3;
-}
-
-.breaking-news-banner-close {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 20px;
-    cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    transition: color 0.2s;
-}
-
-.breaking-news-banner-close:hover {
-    color: #fff;
-}
-
-/* NPC Mention Highlight */
-.news-feed-article .npc-mention {
-    color: var(--stardew-green-dark);
-    font-weight: 600;
-    text-decoration: underline;
-    text-decoration-style: dotted;
-    text-decoration-thickness: 2px;
-}
-
-.news-feed-article .npc-mention:hover {
-    text-decoration-style: solid;
-    color: var(--stardew-green);
-}
-
-.economy-stat-label {
-    font-size: 12px;
-    color: var(--stardew-text);
-}
-
-.economy-stat-value {
-    font-size: 14px;
-    font-weight: 700;
-    color: var(--stardew-green-dark);
-}
-
-.economy-stat-value.positive {
-    color: #4caf50;
-}
-
-.economy-stat-value.negative {
-    color: #f44336;
-}
-
-/* Accessibility: honour OS-level reduced motion preference (4C) */
-@media (prefers-reduced-motion: reduce) {
-    *, *::before, *::after {
-        animation-duration: 0.01ms !important;
-        animation-iteration-count: 1 !important;
-        transition-duration: 0.01ms !important;
-        scroll-behavior: auto !important;
-    }
-}
-
-/* High-contrast mode (4C) — activated via settings toggle */
-:root[style*="--high-contrast: 1"] body,
-body:has(:root[style*="--high-contrast: 1"]) {
-    filter: contrast(1.4) saturate(1.2);
-}
-
-/* High-contrast mode (4C) — applies when settings toggle is on */
-body.high-contrast,
-body.high-contrast * {
-    outline-color: #ffff00 !important;
-}
-body.high-contrast button,
-body.high-contrast .btn,
-body.high-contrast [role="button"] {
-    border: 2px solid #ffffff !important;
-    font-weight: 700 !important;
-}
-body.high-contrast input,
-body.high-contrast select,
-body.high-contrast textarea {
-    border: 2px solid #ffffff !important;
-    background: #000000 !important;
-    color: #ffffff !important;
-}
-body.high-contrast .message { border-left: 4px solid #ffffff !important; }
-body.high-contrast .message.crisis { border-left-color: #ff4444 !important; }
-body.high-contrast .message.success { border-left-color: #00ff88 !important; }
+/* Hide old-UI remnants */
+.info-panel { display: none !important; }
