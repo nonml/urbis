@@ -79,6 +79,11 @@ import { extractRoadGraph } from './sim/traffic/graph_extractor.js';
 import { TrafficPathfinder } from './sim/traffic/pathfinder.js';
 import { TrafficManager } from './sim/agents/traffic_agent.js';
 import { VehicleSystem } from './sim/traffic/vehicle_system.ts';
+import { VehicleController } from './vehicles/vehicle_controller.js';
+import { PlayerHealth } from './player/health.js';
+import { CombatSystem } from './player/combat.js';
+import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
+import { WorldHackEffects } from './sim/world_hacks.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
 import { ModLoader } from './mod/mod_loader.js';
@@ -318,6 +323,24 @@ export class Game {
         this.trafficManager = new TrafficManager(this, this.rngStreams.sim);
         this.vehicleSystem = new VehicleSystem(this);
 
+        // Player-drivable vehicle controller (bridges to vehicleSystem traffic vehicles)
+        this.vehicleController = new VehicleController(this);
+
+        // Player health/damage system
+        this.playerHealth = new PlayerHealth(this);
+
+        // Player combat system
+        this.combat = new CombatSystem(this);
+
+        // NPC reaction system (flee, dodge, report)
+        this.npcReactions = new NPCReactionSystem(this);
+
+        // Police system (pursuit, enforcement)
+        this.policeSystem = new PoliceSystem(this);
+
+        // World hack effects (blackout, traffic freeze, CCTV disable)
+        this.worldHacks = new WorldHackEffects(this);
+
         // Weather and particle systems
         this.weatherSystem = new WeatherSystem(this);
         this.particleSystem = createParticleSystem(this);
@@ -500,6 +523,21 @@ export class Game {
             this.vehicleSystem.update(frameDt / 1000);
         }
 
+        // Player-driven vehicle physics (every frame)
+        if (!this.state.time.paused && this.vehicleController?.activeVehicleId) {
+            this.vehicleController.update(this.state.time.tick);
+        }
+
+        // Player health update (respawn timer, damage flash)
+        if (this.playerHealth) {
+            this.playerHealth.update(frameDt);
+        }
+
+        // Combat system update (muzzle flash timer)
+        if (this.combat) {
+            this.combat.update(frameDt);
+        }
+
         // UI updates (every frame)
         // Pass simDt for consistent player movement physics
         this.ui.render(frameDt, simDt);
@@ -657,6 +695,7 @@ export class Game {
         this.trafficManager.update(this.state.time.tick);
         this.trafficManager.updateBusRoutes(this.buildings.buildings);
         this.policeRouter.updatePursuit();
+        this.policeSystem.update(this.state.time.tick);
         const policeCov = this.servicesManager.metrics?.city?.police || 0;
         if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
         else if (policeCov > 0.6) this.factionSystem.modifyRep('citizens', 0.25, 'safe_streets', 'services');
@@ -745,6 +784,9 @@ export class Game {
         // 8b. Interactables update (cooldowns, state management)
         this.interactables.updateAll(this.state.time.tick);
 
+        // World hack effects (blackout, traffic freeze, CCTV disable)
+        this.worldHacks.update(this.state.time.tick);
+
         // 8b. Quest engine update
         this.questEngine.update();
         this.caseManager.update();
@@ -817,6 +859,11 @@ export class Game {
         const newTime = this.state.time.timeOfDay;
         this.citizenSim.updateAll(this.citizens.citizens, newTime, this.state.time.tick);
         this.nav = this.scheduleManager.nav;
+
+        // NPC reactions (flee, dodge, report to police)
+        if (this.npcReactions) {
+            this.npcReactions.update();
+        }
     }
 
     attemptBuild(type, x, y, options = {}) {

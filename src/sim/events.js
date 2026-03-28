@@ -13,6 +13,9 @@ export const EVENT_TYPES = {
     PLAYER_PICKED_INTERACTABLE: 'player_picked_interactable',
     PLAYER_DECISION: 'player_decision',
     PLAYER_BUILT_BUILDING: 'player_built_building',
+    PLAYER_FIRED_WEAPON: 'player_fired_weapon',
+    PLAYER_ENTERED_VEHICLE: 'player_entered_vehicle',
+    PLAYER_EXITED_VEHICLE: 'player_exited_vehicle',
     MAP_SCREEN_TOGGLED: 'map_screen_toggled',
 
     // System events

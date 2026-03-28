@@ -29,6 +29,8 @@ import { HackNetwork } from './ui/hack_network.js';
 import { createTutorialOverlay, TutorialOverlay } from './ui/tutorial_overlay.js';
 import { TooltipManager } from './ui/tooltips.js';
 import { PhotoMode } from './ui/photo_mode.js';
+import { VehicleAudio } from './audio/vehicle_audio.js';
+import { ActionHUD } from './ui/action_hud.js';
 
 function getFallbackCanvasId(mainCanvas) {
     return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
@@ -357,6 +359,7 @@ export class UIManager {
         this.breachMinigame = new BreachMinigame(this.game);
         this.hackNetwork = new HackNetwork(this.game);
         this.photoMode = new PhotoMode(this.game);
+        this.actionHUD = new ActionHUD(this.game);
         this._breachWasPaused = false;
 
         // Player movement state (third-person controller)
@@ -709,6 +712,43 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 e.preventDefault();
                 this.photoMode?.toggle();
             }
+            // Weapon switching: 1 = fist, 2 = pistol, scroll = cycle
+            if (e.key === '1' && this.game.combat) {
+                this.game.combat.currentWeapon = 'fist';
+                this.showMessage('Equipped: Fists', 'normal');
+            }
+            if (e.key === '2' && this.game.combat) {
+                this.game.combat.currentWeapon = 'pistol';
+                this.showMessage('Equipped: Pistol', 'normal');
+            }
+            if (e.key.toLowerCase() === 'f') {
+                e.preventDefault();
+                const vc = this.game.vehicleController;
+                if (vc) {
+                    if (vc.isDriving) {
+                        vc.exitVehicle();
+                        if (this.renderer3d._player) this.renderer3d._player.visible = true;
+                        this.renderer3d.syncPlayer();
+                        // Stop vehicle audio
+                        this._vehicleAudio?.stop();
+                    } else {
+                        const px = this.game.player.wx ?? this.game.player.x;
+                        const py = this.game.player.wz ?? this.game.player.y;
+                        const result = vc.enterVehicle(px, py);
+                        if (result.ok) {
+                            if (this.renderer3d._player) this.renderer3d._player.visible = false;
+                            // Start vehicle audio
+                            const am = this.audioManager;
+                            if (am?.context && am.isInitialized) {
+                                if (!this._vehicleAudio) {
+                                    this._vehicleAudio = new VehicleAudio(am.context, am.masterGain);
+                                }
+                                this._vehicleAudio.start();
+                            }
+                        }
+                    }
+                }
+            }
             if (e.key.toLowerCase() === 'h') {
                 e.preventDefault();
                 this.hackScanVisible = !this.hackScanVisible;
@@ -720,6 +760,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     e.preventDefault();
                     this.buildMenu.rotateCCW();
                     this.updateBuildGhost();
+                } else if (this.game.worldHacks) {
+                    // Quick-hack nearest node
+                    e.preventDefault();
+                    this.game.worldHacks.quickHack();
                 }
             }
             if (e.key.toLowerCase() === 't') {
@@ -896,6 +940,19 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     } else {
                         this.buildMenu.updateHUD({ ok: false, reason: result.reason || 'Invalid placement.' });
                     }
+                } else if (this.game.mode === MODE_STREET && this.game.combat && !this.game.playerHealth?.isDead) {
+                    // Street mode: left-click fires weapon
+                    const combat = this.game.combat;
+                    const result = combat.fire(tile.x, tile.y);
+                    if (result.hit && result.target) {
+                        this.showMessage(`Hit!`, 'warning');
+                    }
+                    // Play gunshot SFX
+                    if (combat.weapon.type === 'ranged' && this.audioManager?.sfxGenerator) {
+                        this.audioManager.sfxGenerator.play('UI_CLICK', {
+                            frequency: 200, frequencyEnd: 80, duration: 0.1, volume: 0.4
+                        });
+                    }
                 } else {
                     this.game.showTileInfo(tile.x, tile.y);
                     this.updateStats();
@@ -1005,7 +1062,38 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     }
 
     updatePlayerMovement(dtMs) {
-        const dt = Math.min(0.05, dtMs / 1000);
+        // dtMs is actually in seconds (from simDt = tickRate/1000)
+        const dt = Math.min(0.05, dtMs);
+
+        // Block movement when dead
+        if (this.game.playerHealth?.isDead) return { moved: false };
+
+        // If player is driving, route WASD to vehicle controller instead
+        const vc = this.game.vehicleController;
+        if (vc && vc.isDriving) {
+            vc.setInputFromKeys({
+                w: this.keys.has('w'),
+                a: this.keys.has('a'),
+                s: this.keys.has('s'),
+                d: this.keys.has('d'),
+                shift: this.keys.has('shift'),
+            });
+            // Sync renderer to vehicle position
+            this.renderer3d.syncPlayer();
+            // Update vehicle audio
+            const vehicle = vc.getActiveVehicle();
+            if (vehicle && this._vehicleAudio) {
+                this._vehicleAudio.update(
+                    vehicle.speed || 0,
+                    vehicle.maxSpeed || 22,
+                    vehicle.driftFactor || 0
+                );
+                if (vc._lastCollision) {
+                    this._vehicleAudio.playCollision();
+                }
+            }
+            return { moved: true };
+        }
 
         // Build input state from keys
         const input = {
@@ -1029,11 +1117,24 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         // Sync renderer's player position if moved
         if (result.moved) {
             this.renderer3d.syncPlayer();
-            // Update debug info for nearest POI
-            if (this.renderer3d._debugMode === 'pois') {
-                const nearestDist = this.renderer3d.getNearestPOIDistance();
-                if (nearestDist >= 0) {
-                    // Could display nearest POI info
+        }
+
+        // Check pedestrian-vehicle collision (on foot only)
+        const vs = this.game.vehicleSystem;
+        const ph = this.game.playerHealth;
+        if (vs && ph && !ph.isDead) {
+            const px = this.game.player.wx ?? this.game.player.x;
+            const py = this.game.player.wz ?? this.game.player.y;
+            for (const v of vs.vehicles) {
+                const speed = v.speed || 0;
+                if (speed < 2) continue; // slow vehicles don't hurt
+                const dx = v.x - px;
+                const dy = v.y - py;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < 1.2) {
+                    const damage = Math.floor(speed * 3);
+                    ph.takeDamage(damage, 'vehicle');
+                    break;
                 }
             }
         }
@@ -1059,7 +1160,8 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         if (!this.game.paused && !this.game.state.time.paused) {
             // Player movement uses sim dt (fixed tick) for consistent physics
-            const movementDt = this.simDt > 0 ? this.simDt : (dt * 0.001);
+            // Use frame delta (dt is in ms) for smooth per-frame movement
+            const movementDt = dt * 0.001; // convert ms to seconds
             this.updatePlayerMovement(movementDt);
             // Check for nearby interactables
             this.checkInteractableProximity();
@@ -1081,6 +1183,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             this.proceduralMusic.setVolume(vol * 0.6);
         }
         
+        // Update action HUD (health, wanted, weapon, speed)
+        this.actionHUD?.update();
+
         try {
             this.renderer3d.render();
         } catch (e) {

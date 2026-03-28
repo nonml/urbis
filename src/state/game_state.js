@@ -127,7 +127,11 @@ export function createNewGameState(options = {}) {
             heat: 0, // Player heat/wanted level
             heatState: 'calm',
             exposure: 0, // How exposed the player is to rivals
-            reputation: 50 // Player reputation with citizens
+            reputation: 50, // Player reputation with citizens
+            health: 100,
+            maxHealth: 100,
+            armor: 0,
+            isDead: false
         },
         rival: {
             influence: RIVAL_CONFIG.baseInfluence,

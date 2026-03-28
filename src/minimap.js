@@ -56,6 +56,23 @@ export class Minimap {
             this.dot.style.left = `${x}px`;
             this.dot.style.top = `${y}px`;
         }
+
+        // Draw police blips on minimap during pursuit
+        const ps = this.game.policeSystem;
+        if (ps && ps.units.length > 0 && this.canvas) {
+            const ctx = this.canvas.getContext('2d');
+            const rect = this.canvas.getBoundingClientRect();
+            const flash = Math.sin(performance.now() * 0.008) > 0;
+            ctx.fillStyle = flash ? '#2255ff' : '#ff2222';
+            for (const u of ps.units) {
+                if (!u.active) continue;
+                const bx = (u.x / this.game.map.width) * rect.width;
+                const by = (u.y / this.game.map.height) * rect.height;
+                ctx.beginPath();
+                ctx.arc(bx, by, 2, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
     }
 
     drawTerrain() {

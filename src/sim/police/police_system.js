@@ -247,19 +247,71 @@ export class PoliceSystem {
         unit.x += Math.sin(headingRad) * unit.speed * 0.1;
         unit.y += -Math.cos(headingRad) * unit.speed * 0.1;
 
-        // Check for encounter with player
+        // Physical enforcement
         if (dist <= 2 && unit.state === 'pursuit') {
+            const vc = this.game.vehicleController;
+            const ph = this.game.playerHealth;
+
+            if (vc?.isDriving) {
+                // Ram damage to player vehicle
+                const playerVehicle = vc.getActiveVehicle();
+                if (playerVehicle && unit.speed > 5) {
+                    playerVehicle.health -= 15;
+                    playerVehicle.speed *= 0.5;
+                    unit.speed *= 0.3;
+                    if (ph) ph.takeDamage(10, 'police_ram');
+                    this.game.ui?.showMessage?.('Police ram!', 'warning');
+                }
+            } else if (ph && !ph.isDead) {
+                // On foot: arrest the player
+                this._arrestPlayer();
+            }
+
             eventBus.emit(EVENT_TYPES.POLICE_ENCOUNTER, {
                 unit,
                 distance: dist,
                 heat,
                 tick
             });
+        }
+    }
 
-            // Increase heat on encounter
-            if (this.game.rng.int(0, 100) < 30) {
-                this.game.heatSystem?.addHeat?.(2);
-            }
+    /**
+     * Arrest the player — lose money, reset heat, respawn
+     */
+    _arrestPlayer() {
+        const player = this.game.state.player;
+        const resources = this.game.state.resources;
+
+        // Fine: lose 25% of gold
+        const fine = Math.floor(resources.gold * 0.25);
+        resources.gold -= fine;
+
+        // Reset heat
+        player.heat = 0;
+        player.heatState = 'calm';
+        if (this.game.heatSystem) this.game.heatSystem.setHeat(0);
+
+        // Respawn at map center (or police station)
+        const policeStation = (this.game.buildings.buildings || []).find(b => b.type === 'police_station');
+        const rx = policeStation?.x ?? Math.floor(this.game.map.width / 2);
+        const ry = policeStation?.y ?? Math.floor(this.game.map.height / 2);
+
+        player.x = rx;
+        player.y = ry;
+        player.wx = rx + 0.5;
+        player.wz = ry + 0.5;
+
+        // Heal to full
+        player.health = player.maxHealth;
+
+        // Despawn all police
+        this.units = [];
+
+        this.game.ui?.showMessage?.(`Busted! Fined $${fine}`, 'warning');
+        this.game.ui?.renderer3d?.syncPlayer?.();
+        if (this.game.ui?.renderer3d?._player) {
+            this.game.ui.renderer3d._player.visible = true;
         }
     }
 

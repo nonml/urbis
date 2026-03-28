@@ -158,7 +158,17 @@ export class Renderer3D {
             yawSpeed: 0.003,
             pitchSpeed: 0.003
         };
-        
+        this.vehicleCamera = {
+            pitch: -0.25,
+            followDist: 6,
+            followHeight: 2.5,
+            fov: 70,
+            yawSpeed: 0.004,
+            pitchSpeed: 0.003,
+            maxSpeedFOV: 85, // FOV at max vehicle speed
+        };
+        this._vehicleCamYaw = 0; // smooth yaw that tracks vehicle heading
+
         // Camera shake system with severity levels
         this.shakeIntensity = 0;
         this.shakeDuration = 0;
@@ -331,6 +341,16 @@ export class Renderer3D {
         // Vehicle mesh group (updated every frame from vehicleSystem)
         this._vehicleGroup = new THREE.Group();
         this.scene.add(this._vehicleGroup);
+
+        // Police unit meshes
+        this._policeGroup = new THREE.Group();
+        this.scene.add(this._policeGroup);
+
+        // Weather FX: rain particles
+        this._rainGroup = null;
+        this._rainDrops = null;
+        this._lightningTimer = 0;
+        this._lightningFlash = 0;
 
         // Terrain texture library: terrainType -> THREE.Texture (loaded async)
         this._terrainTextures = new Map();
@@ -2564,6 +2584,139 @@ export class Renderer3D {
         }
     }
 
+    updatePoliceUnits() {
+        const ps = this.game.policeSystem;
+        if (!ps) return;
+        const units = ps.units || [];
+
+        // Rebuild police meshes when count changes
+        if (this._policeGroup.children.length !== units.length) {
+            this._policeGroup.clear();
+            for (const u of units) {
+                // Police car: white box with blue top
+                const body = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.45, 0.15, 0.22),
+                    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.4 })
+                );
+                const lights = new THREE.Mesh(
+                    new THREE.BoxGeometry(0.2, 0.06, 0.22),
+                    new THREE.MeshStandardMaterial({ color: 0x2255ff, emissive: 0x2255ff, emissiveIntensity: 0.8 })
+                );
+                lights.position.y = 0.1;
+                const group = new THREE.Group();
+                group.add(body);
+                group.add(lights);
+                group.castShadow = true;
+                group.userData.policeId = u.id;
+                this._policeGroup.add(group);
+            }
+        }
+
+        // Update positions
+        for (let i = 0; i < units.length; i++) {
+            const u = units[i];
+            const child = this._policeGroup.children[i];
+            if (!child) continue;
+            const wx = u.x - this._mapHalfW + 0.5;
+            const wz = u.y - this._mapHalfH + 0.5;
+            child.position.set(wx, 0.06, wz);
+            const headingRad = (u.heading || 0) * Math.PI / 180;
+            child.rotation.y = headingRad;
+
+            // Flash police lights in pursuit
+            if (u.state === 'pursuit') {
+                const flash = Math.sin(performance.now() * 0.01) > 0;
+                const lights = child.children[1];
+                if (lights?.material) {
+                    lights.material.color.setHex(flash ? 0x2255ff : 0xff2222);
+                    lights.material.emissive.setHex(flash ? 0x2255ff : 0xff2222);
+                }
+            }
+        }
+    }
+
+    updateWeatherFX(dt) {
+        const ws = this.game?.weatherSystem;
+        if (!ws) return;
+
+        const weatherType = ws.state?.type;
+        const intensity = ws.state?.intensity || 0;
+        const isRain = weatherType === 'rain' || weatherType === 'storm';
+        const isStorm = weatherType === 'storm';
+        const isFog = weatherType === 'fog';
+
+        // Create rain particles on first use
+        if (isRain && !this._rainGroup) {
+            const count = 2000;
+            const positions = new Float32Array(count * 3);
+            for (let i = 0; i < count; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 30;
+                positions[i * 3 + 1] = Math.random() * 10;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+            }
+            const geom = new THREE.BufferGeometry();
+            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            const mat = new THREE.PointsMaterial({
+                color: 0xaaccee,
+                size: 0.03,
+                transparent: true,
+                opacity: 0.6,
+            });
+            this._rainGroup = new THREE.Points(geom, mat);
+            this._rainDrops = positions;
+            this.scene.add(this._rainGroup);
+        }
+
+        // Update rain
+        if (this._rainGroup) {
+            this._rainGroup.visible = isRain;
+            if (isRain && this._rainDrops) {
+                const p = this._player?.position;
+                if (p) {
+                    this._rainGroup.position.set(p.x, 0, p.z);
+                }
+                const positions = this._rainDrops;
+                const speed = isStorm ? 0.4 : 0.2;
+                for (let i = 0; i < positions.length / 3; i++) {
+                    positions[i * 3 + 1] -= speed * intensity;
+                    if (positions[i * 3 + 1] < 0) {
+                        positions[i * 3 + 1] = 10;
+                        positions[i * 3] = (Math.random() - 0.5) * 30;
+                        positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+                    }
+                }
+                this._rainGroup.geometry.attributes.position.needsUpdate = true;
+                this._rainGroup.material.opacity = 0.3 + intensity * 0.5;
+            }
+        }
+
+        // Lightning flashes during storms
+        if (isStorm && this.ambientLight) {
+            this._lightningTimer -= dt;
+            if (this._lightningTimer <= 0) {
+                this._lightningTimer = 3000 + Math.random() * 8000;
+                this._lightningFlash = 300; // ms
+            }
+            if (this._lightningFlash > 0) {
+                this._lightningFlash -= dt;
+                const flashIntensity = Math.max(0, this._lightningFlash / 300);
+                this.ambientLight.intensity = Math.min(3, this.ambientLight.intensity + flashIntensity * 2);
+            }
+        }
+
+        // Enhanced fog during fog weather
+        if (isFog && this.scene.fog) {
+            this.scene.fog.density = 0.003 + intensity * 0.005;
+        }
+
+        // Wet ground: darken terrain slightly during rain
+        if (this._terrainMesh?.material && isRain) {
+            this._terrainMesh.material.metalness = Math.min(0.5, intensity * 0.4);
+        } else if (this._terrainMesh?.material) {
+            this._terrainMesh.material.metalness = 0;
+        }
+    }
+
     // Convert mouse pixel coords to tile (or null)
     pickTile(clientX, clientY) {
         const rect = this.canvas.getBoundingClientRect();
@@ -2628,11 +2781,45 @@ export class Renderer3D {
         }
         const t = this.cameraModeTransition; // 0 = street, 1 = god
 
-        // Interpolate camera settings based on mode transition
-        const currentPitch = THREE.MathUtils.lerp(this.streetCamera.pitch, this.godCamera.pitch, t);
-        const currentFollowDist = THREE.MathUtils.lerp(this.streetCamera.followDist, this.godCamera.followDist, t);
-        const currentFollowHeight = THREE.MathUtils.lerp(this.streetCamera.followHeight, this.godCamera.followHeight, t);
-        const currentFOV = THREE.MathUtils.lerp(this.streetCamera.fov, this.godCamera.fov, t);
+        // Vehicle camera override when player is driving
+        const vc = this.game.vehicleController;
+        const isDriving = vc && vc.isDriving;
+        let currentPitch, currentFollowDist, currentFollowHeight, currentFOV;
+
+        if (isDriving) {
+            const vehicle = vc.getActiveVehicle();
+            const speed = vehicle ? (vehicle.speed || 0) : 0;
+            const maxSpeed = vehicle ? (vehicle.maxSpeed || 22) : 22;
+            const speedRatio = Math.min(1, speed / maxSpeed);
+
+            currentPitch = this.vehicleCamera.pitch;
+            currentFollowDist = this.vehicleCamera.followDist;
+            currentFollowHeight = this.vehicleCamera.followHeight;
+            // Speed-based FOV widening
+            currentFOV = THREE.MathUtils.lerp(this.vehicleCamera.fov, this.vehicleCamera.maxSpeedFOV, speedRatio);
+
+            // Auto-rotate camera yaw to follow vehicle heading
+            if (vehicle && vehicle.angle !== undefined) {
+                const targetYaw = vehicle.angle + Math.PI; // behind the vehicle
+                let diff = targetYaw - this._vehicleCamYaw;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                this._vehicleCamYaw += diff * 0.08; // smooth follow
+                this.yaw = this._vehicleCamYaw;
+            }
+
+            // Speed-based camera shake
+            if (speedRatio > 0.6) {
+                const shakeAmt = (speedRatio - 0.6) * 0.015;
+                this.shakeIntensity = Math.max(this.shakeIntensity, shakeAmt);
+            }
+        } else {
+            // Interpolate camera settings based on mode transition
+            currentPitch = THREE.MathUtils.lerp(this.streetCamera.pitch, this.godCamera.pitch, t);
+            currentFollowDist = THREE.MathUtils.lerp(this.streetCamera.followDist, this.godCamera.followDist, t);
+            currentFollowHeight = THREE.MathUtils.lerp(this.streetCamera.followHeight, this.godCamera.followHeight, t);
+            currentFOV = THREE.MathUtils.lerp(this.streetCamera.fov, this.godCamera.fov, t);
+        }
 
         // Calculate ideal camera position from orbit
         const cos = Math.cos(this.yaw);
@@ -3035,6 +3222,8 @@ export class Renderer3D {
         }
 
         this.updateVehicles();
+        this.updatePoliceUnits();
+        this.updateWeatherFX(dt);
 
         this.syncPlayer();
         this.updateCamera(dt);
@@ -3051,6 +3240,18 @@ export class Renderer3D {
         if (season && season !== this._lastSeason) {
             this._lastSeason = season;
             this._applySeasonalColors(season);
+        }
+
+        // Blackout effect: dim scene when player is in a blacked-out district
+        const wh = this.game?.worldHacks;
+        if (wh && this.ambientLight) {
+            const playerDistrict = this.game.map.getDistrictAt?.(this.game.player.x, this.game.player.y) ?? -1;
+            if (wh.isBlackedOut(playerDistrict)) {
+                this.ambientLight.intensity = Math.max(0.05, this.ambientLight.intensity * 0.3);
+                if (this.scene.fog) {
+                    this.scene.fog.density = Math.max(this.scene.fog.density, 0.004);
+                }
+            }
         }
 
         // Sync fog density from weather system — overrides seasonal base (6B)

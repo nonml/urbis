@@ -131,6 +131,9 @@ export class VehicleSystem {
         const nodeIds = Array.from(graph.nodes.keys());
 
         for (const v of this.vehicles) {
+            // Skip player-driven vehicles — VehicleController handles their physics
+            if ((v as any)._playerDriven) continue;
+
             if (v.path.length < 2 || v.pathIndex >= v.path.length - 1) {
                 this._assignNewDestination(v, nodeIds);
                 if (v.path.length < 2) continue;
