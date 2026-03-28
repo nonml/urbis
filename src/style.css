@@ -377,6 +377,7 @@ body {
 #main-area {
     position: absolute;
     inset: 0;
+    z-index: 1;
     background: var(--bg-void);
 }
 
@@ -386,6 +387,25 @@ body {
     width: 100%;
     height: 100%;
     display: block;
+    z-index: 1;
+}
+
+/* HUD wrapper layers — must not block canvas */
+.hud-street-layer,
+.hud-god-layer,
+#hud-street-layer,
+#hud-god-layer {
+    position: fixed;
+    inset: 0;
+    z-index: 20;
+    pointer-events: none;
+    background: transparent;
+}
+.hud-street-layer > *,
+.hud-god-layer > *,
+#hud-street-layer > *,
+#hud-god-layer > * {
+    pointer-events: auto;
 }
 
 /* ═══════════════════════════════════════
