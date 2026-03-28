@@ -29,7 +29,8 @@ import { VERSION, BUILD_TIMESTAMP } from './version.js?v=20260220';
 import { ChunkManager } from './world/chunks.js';
 import { validatePlacement } from './build/placement.js';
 import { EconomyLedger } from './sim/economy/ledger.js';
-import { ServiceManager } from './sim/services/services.js';
+import { ServiceManager, computeTransitMetrics } from './sim/services/services.js';
+import { BUILDING_EXTENDED, calculateBuildingEffects } from './buildings_extended.js';
 import { GoalsManager } from './sim/goals/goals.js';
 import { createVictoryManager } from './sim/victory_conditions.js';
 import { steam } from './platform/steam.js';
@@ -191,6 +192,8 @@ export class Game {
             this.ui = new UIManager(this);
             this.ui.applySettings();
             this.minimap = new Minimap(this);
+            // Wire audio manager to resources for resource change sounds
+            this.resources.setAudioManager(this.ui.audioManager);
         }
 
         // Sandbox game-mode overrides difficulty to SANDBOX preset
@@ -214,6 +217,7 @@ export class Game {
         this.economyLedger = new EconomyLedger(30);
         this.servicesManager = new ServiceManager(this);
         this.powerShortageTicks = 0;
+        this.transitMetrics = { mobilityBonus: 0, transitCoverage: 0, congestionReduction: 0, busRoutes: 0, tollRevenue: 0, trafficControl: 0, connectivityBonus: 0, subwayStations: 0 };
         this.goalsManager = new GoalsManager(this);
         this.goalsManager.setMode(mode);
         this.victoryManager = createVictoryManager(this);
@@ -514,6 +518,15 @@ export class Game {
         // Multiplayer lockstep gate — skip simulation body if waiting for server advance
         if (this.mp?.connected && !this.mp.onTick(this.state.time.tick)) return;
 
+        // Compute transit metrics from placed buildings
+        const placedBuildings = this.buildings.buildings.reduce((map, b) => {
+            if (!map.has(b.type)) map.set(b.type, []);
+            map.get(b.type).push(b);
+            return map;
+        }, new Map());
+        this.transitMetrics = computeTransitMetrics(placedBuildings, BUILDING_EXTENDED);
+        this.buildingEffects = calculateBuildingEffects(this.buildings.buildings);
+
         const oldTime = this.state.time.timeOfDay;
         const tickPerDay = this.state.time.tickPerDay || 24;
 
@@ -560,6 +573,13 @@ export class Game {
         const upkeep = this.buildings.getTotalUpkeep();
         this.resources.remove('gold', upkeep);
         this.economyLedger.addDelta(ledgerTick, 'gold', -(upkeep || 0), 'buildings_upkeep');
+
+        // 2a. Toll revenue from transit buildings
+        if (this.transitMetrics && this.transitMetrics.tollRevenue > 0) {
+            const tollIncome = Math.floor(this.transitMetrics.tollRevenue);
+            this.resources.add('gold', tollIncome);
+            this.economyLedger.addDelta(ledgerTick, 'gold', tollIncome, 'toll_revenue');
+        }
 
         // 2b. Tier 2C: Building decay (degrades when city is running a deficit)
         const inDebt = (this.state.resources.gold ?? 0) < 0;
@@ -630,10 +650,12 @@ export class Game {
 
         // 5a. Services + citizen effects
         this.servicesManager.update();
-        this.servicesManager.applyCitizenEffects(this.citizens.citizens);
+        this.servicesManager.applyCitizenEffects(this.citizens.citizens, this.transitMetrics, this.buildingEffects);
 
         // Milestone I: Traffic system updates
+        this.trafficManager.transitMetrics = this.transitMetrics;
         this.trafficManager.update(this.state.time.tick);
+        this.trafficManager.updateBusRoutes(this.buildings.buildings);
         this.policeRouter.updatePursuit();
         const policeCov = this.servicesManager.metrics?.city?.police || 0;
         if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
@@ -814,6 +836,10 @@ export class Game {
         // Check resources
         if (!this.resources.canAfford(cost)) {
             this.ui.showMessage(`Cannot afford ${buildingType.name}! Need more resources.`, 'crisis');
+            // Trigger gold flash animation for visual feedback
+            if (this.ui.triggerUnaffordableFlash) {
+                this.ui.triggerUnaffordableFlash();
+            }
             return { ok: false, reason: 'Cannot afford building.' };
         }
 
@@ -1085,6 +1111,7 @@ export class Game {
             const heat = this.heatSystem.addHeat(5);
             this.factionSystem.modifyRep('police', -3, 'failed_loud_hack', 'hacks');
             this.factionSystem.modifyRep('citizens', -1, 'failed_loud_hack', 'hacks');
+            this.audioManager?.playHackFail();
             return { ok: true, success: false, cooldownUntil: tick + 10, heat };
         }
 
@@ -1103,6 +1130,7 @@ export class Game {
                 this.factionSystem.modifyRep('corp', 1, `stealth_hack_${action}`, 'hacks');
             }
         }
+        this.audioManager?.playHackSuccess();
         return {
             ok: true,
             success: true,

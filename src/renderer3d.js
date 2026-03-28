@@ -138,6 +138,7 @@ export class Renderer3D {
         this.cameraMode = 'street'; // 'street' or 'god'
         this.cameraModeTransition = 0; // 0 = street, 1 = god
         this.cameraModeTarget = 0; // target for smooth transition
+        this.cameraModeTransitionTimer = 0; // for 400ms transition
         
         // Mode-specific camera settings
         this.streetCamera = {
@@ -157,11 +158,20 @@ export class Renderer3D {
             pitchSpeed: 0.003
         };
         
-        // Camera shake
+        // Camera shake system with severity levels
         this.shakeIntensity = 0;
         this.shakeDuration = 0;
         this.shakeDecay = 1.0;
         this.shakeOffset = new THREE.Vector3(0, 0, 0);
+        this.shakeSeverity = 'none'; // 'none', 'light', 'medium', 'heavy', 'extreme'
+        
+        // Shake severity configuration
+        this.shakeConfig = {
+            light: { intensity: 0.5, decay: 0.985, durationScale: 1.0 },
+            medium: { intensity: 1.5, decay: 0.975, durationScale: 1.2 },
+            heavy: { intensity: 3.0, decay: 0.96, durationScale: 1.5 },
+            extreme: { intensity: 6.0, decay: 0.94, durationScale: 2.0 }
+        };
 
         // Citizen animation
         this._citizenAnimTimes = [];
@@ -1490,6 +1500,52 @@ export class Renderer3D {
             }
             markMesh.instanceMatrix.needsUpdate = true;
             meshes.push(markMesh);
+            
+            // Glowing edge strips for night lighting (runway-style lights)
+            const stripGeom = new THREE.BoxGeometry(1.0, 0.05, 0.08);
+            const stripMat = new THREE.MeshStandardMaterial({
+                color: 0xffee88,
+                emissive: 0xffee88,
+                emissiveIntensity: 0.0,
+                roughness: 0.3,
+                metalness: 0.0
+            });
+            const stripMesh = new THREE.InstancedMesh(stripGeom, stripMat, highwayTiles.length * 2);
+            stripMesh.receiveShadow = false;
+            stripMesh.castShadow = true;
+            let si = 0;
+            for (const tile of highwayTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                for (const offset of [-0.48, 0.48]) {
+                    dummy.position.set(wx + offset, 0.18, wz);
+                    dummy.updateMatrix();
+                    stripMesh.setMatrixAt(si++, dummy.matrix);
+                }
+            }
+            stripMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(stripMesh);
+            
+            // Store reference for day/night updates
+            if (!this._highwayLightStrips) this._highwayLightStrips = [];
+            this._highwayLightStrips.push(stripMesh);
+            
+            // Center divider (median strip) - raised barrier down the middle
+            const medianGeom = new THREE.BoxGeometry(0.12, 0.08, 1.0);
+            const medianMat = new THREE.MeshStandardMaterial({ color: 0x444444, roughness: 0.85, metalness: 0.0 });
+            const medianMesh = new THREE.InstancedMesh(medianGeom, medianMat, highwayTiles.length);
+            medianMesh.receiveShadow = true;
+            medianMesh.castShadow = true;
+            let medIdx = 0;
+            for (const tile of highwayTiles) {
+                const wx = tile.x - this._mapHalfW + 0.5;
+                const wz = tile.y - this._mapHalfH + 0.5;
+                dummy.position.set(wx, 0.12 + 0.04, wz); // highwayElevation + 0.04
+                dummy.updateMatrix();
+                medianMesh.setMatrixAt(medIdx++, dummy.matrix);
+            }
+            medianMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(medianMesh);
         }
 
         // Bridge tiles — raised concrete slab with side railings
@@ -1739,26 +1795,62 @@ export class Renderer3D {
 
         // Box instanced mesh fallback for types without a loaded model
         const dummy = new THREE.Object3D();
+        const winTex = this._getWindowTexture();
         for (const [type, arr] of boxGroups.entries()) {
             if (arr.length === 0) continue;
-            const h = (BUILDING_3D[type]?.height ?? 0.6) * 3.5;
-            const geom = new THREE.BoxGeometry(0.85, h, 0.85);
-            const mat = new THREE.MeshStandardMaterial({ color: buildingHex(type), roughness: 0.7, metalness: 0.05 });
+            const baseH = (BUILDING_3D[type]?.height ?? 0.6) * 3.5;
+            const geom = new THREE.BoxGeometry(0.85, baseH, 0.85);
+            const mat = new THREE.MeshStandardMaterial({
+                color: buildingHex(type),
+                roughness: 0.65,
+                metalness: 0.08,
+                map: winTex,
+                emissive: new THREE.Color(0xffcc44),
+                emissiveMap: winTex,
+                emissiveIntensity: 0.15,
+            });
             const mesh = new THREE.InstancedMesh(geom, mat, arr.length);
             mesh.castShadow = true;
             mesh.receiveShadow = true;
             for (let i = 0; i < arr.length; i++) {
                 const b = arr[i];
+                const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                const hVar = baseH * (0.75 + heightHash * 0.5);
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
                 const terrainY = this._smoothTerrainY(b.x, b.y);
-                dummy.position.set(wx, h / 2 + terrainY, wz);
+                dummy.position.set(wx, hVar / 2 + terrainY, wz);
+                dummy.scale.set(1, hVar / baseH, 1);
                 dummy.rotation.y = ((b.rotation ?? ((b.id || i) % 4)) % 4) * (Math.PI / 2);
                 dummy.updateMatrix();
                 mesh.setMatrixAt(i, dummy.matrix);
             }
             mesh.instanceMatrix.needsUpdate = true;
             objects.push(mesh);
+
+            // Rooftop details for tall box-fallback buildings
+            if (baseH >= 1.5) {
+                const roofGeom = new THREE.BoxGeometry(0.25, 0.18, 0.25);
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0x556677, roughness: 0.9 });
+                const roofMesh = new THREE.InstancedMesh(roofGeom, roofMat, arr.length);
+                roofMesh.castShadow = true;
+                for (let i = 0; i < arr.length; i++) {
+                    const b = arr[i];
+                    const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                    const hVar = baseH * (0.75 + heightHash * 0.5);
+                    const wx = b.x - this._mapHalfW + 0.5;
+                    const wz = b.y - this._mapHalfH + 0.5;
+                    const terrainY = this._smoothTerrainY(b.x, b.y);
+                    const offsetX = (heightHash - 0.5) * 0.3;
+                    dummy.position.set(wx + offsetX, hVar + 0.09 + terrainY, wz);
+                    dummy.scale.set(1, 1, 1);
+                    dummy.rotation.y = 0;
+                    dummy.updateMatrix();
+                    roofMesh.setMatrixAt(i, dummy.matrix);
+                }
+                roofMesh.instanceMatrix.needsUpdate = true;
+                objects.push(roofMesh);
+            }
         }
         return objects;
     }
@@ -2319,9 +2411,24 @@ export class Renderer3D {
 
         const p = this._player.position;
 
-        // Smooth camera mode transition
-        const transitionSpeed = 0.08;
-        this.cameraModeTransition += (this.cameraModeTarget - this.cameraModeTransition) * transitionSpeed;
+        // Smooth camera mode transition with 400ms delta-time based animation
+        if (this.cameraModeTransition !== this.cameraModeTarget) {
+            this.cameraModeTransitionTimer += dt;
+            const transitionProgress = Math.min(this.cameraModeTransitionTimer / 400, 1);
+            // Apply ease-in-out smoothing
+            const easedProgress = transitionProgress * transitionProgress * (3 - 2 * transitionProgress);
+            this.cameraModeTransition = THREE.MathUtils.lerp(
+                this.cameraModeTransition,
+                this.cameraModeTarget,
+                easedProgress
+            );
+            if (transitionProgress >= 1) {
+                this.cameraModeTransition = this.cameraModeTarget;
+                this.cameraModeTransitionTimer = 0;
+            }
+        } else {
+            this.cameraModeTransitionTimer = 0;
+        }
         const t = this.cameraModeTransition; // 0 = street, 1 = god
 
         // Interpolate camera settings based on mode transition
@@ -2420,18 +2527,22 @@ export class Renderer3D {
 
         this.followDist += (this.targetFollowDist - this.followDist) * this.zoomDampening;
 
-        // Apply camera shake
+        // Apply camera shake with delta-time based decay
         if (this.shakeIntensity > 0 && this.shakeDuration > 0) {
-            this.shakeDuration -= 16.67; // Assume ~60fps
+            // Delta-time based duration decay
+            this.shakeDuration -= dt;
             if (this.shakeDuration <= 0) {
                 this.shakeDuration = 0;
                 this.shakeIntensity = 0;
+                this.shakeDecay = 1.0;
+                this.shakeSeverity = 'none';
             } else {
-                // Decay shake intensity
-                this.shakeDecay = Math.max(0, this.shakeDecay - 0.02);
+                // Exponential decay based on severity configuration
+                const config = this.shakeConfig[this.shakeSeverity] || this.shakeConfig.light;
+                this.shakeDecay *= config.decay;
                 const currentShake = this.shakeIntensity * this.shakeDecay;
                 
-                // Generate random shake offset
+                // Generate random shake offset with severity-based intensity
                 this.shakeOffset.x = (Math.random() - 0.5) * currentShake;
                 this.shakeOffset.y = (Math.random() - 0.5) * currentShake * 0.5; // Less vertical shake
                 this.shakeOffset.z = (Math.random() - 0.5) * currentShake;
@@ -2636,11 +2747,59 @@ export class Renderer3D {
         }
     }
 
-    // Trigger camera shake
-    shakeCamera(intensity, duration) {
+    // Trigger camera shake with severity-based configuration
+    shakeCamera(intensity, duration, severity = 'medium') {
         this.shakeIntensity = intensity;
         this.shakeDuration = duration;
         this.shakeDecay = 1.0;
+        this.shakeSeverity = severity;
+    }
+    
+    // Convenience methods for triggering shake by severity level
+    shakeLight(duration = 500) {
+        const config = this.shakeConfig.light;
+        this.shakeCamera(config.intensity, duration * config.durationScale, 'light');
+    }
+    
+    shakeMedium(duration = 500) {
+        const config = this.shakeConfig.medium;
+        this.shakeCamera(config.intensity, duration * config.durationScale, 'medium');
+    }
+    
+    shakeHeavy(duration = 800) {
+        const config = this.shakeConfig.heavy;
+        this.shakeCamera(config.intensity, duration * config.durationScale, 'heavy');
+    }
+    
+    shakeExtreme(duration = 1000) {
+        const config = this.shakeConfig.extreme;
+        this.shakeCamera(config.intensity, duration * config.durationScale, 'extreme');
+    }
+    
+    // Shake by game event type
+    shakeForEvent(eventType, severity = 1) {
+        const baseDurations = {
+            'building_placed': 300,
+            'building_demolished': 400,
+            'crisis_alert': 800,
+            'crisis_resolved': 500,
+            'explosion': 1000,
+            'vehicle_collision': 400,
+            'hack_success': 200,
+            'hack_fail': 300
+        };
+        
+        const duration = (baseDurations[eventType] || 500) * severity;
+        
+        if (severity <= 0.5) {
+            this.shakeLight(duration);
+        } else if (severity <= 1.0) {
+            this.shakeMedium(duration);
+        } else if (severity <= 2.0) {
+            this.shakeHeavy(duration);
+        } else {
+            this.shakeExtreme(duration);
+        }
     }
 
     render() {
@@ -2706,7 +2865,7 @@ export class Renderer3D {
         if (this._scaffolds?.length) this._updateScaffolding(dt);
 
         // Update build ghost animation
-        this._updateBuildGhostAnim();
+        this._updateBuildGhostAnim(dt);
         
         // Update hover highlight pulse animation
         if (this._hoverHighlight && this._hoveredTile) {
@@ -2761,6 +2920,22 @@ export class Renderer3D {
 
         // Store current phase for debugging
         this.currentPhase = lighting.phase;
+        
+        // Update highway edge light strips based on day/night
+        if (this._highwayLightStrips) {
+            const isNight = lighting.phase === DAY_PHASES.NIGHT || lighting.phase === DAY_PHASES.DUSK;
+            const targetIntensity = isNight ? 2.0 : 0.0;
+            for (const stripMesh of this._highwayLightStrips) {
+                if (stripMesh.material) {
+                    // Smooth transition for emissive intensity
+                    stripMesh.material.emissiveIntensity = THREE.MathUtils.lerp(
+                        stripMesh.material.emissiveIntensity,
+                        targetIntensity,
+                        0.1
+                    );
+                }
+            }
+        }
     }
 
     /**
@@ -3063,24 +3238,55 @@ export class Renderer3D {
         };
     }
 
-    setBuildGhost(type, x, y, rotation = 0, ok = true) {
+    setBuildGhost(type, x, y, rotation = 0, ok = true, warning = false) {
         const h = (BUILDING_3D[type]?.height ?? 0.6);
+        
+        // Determine color based on state: green (valid), red (invalid), yellow (warning)
+        let ghostColor;
+        if (!ok) {
+            ghostColor = 0xe25555; // Red for invalid
+        } else if (warning) {
+            ghostColor = 0xffaa00; // Yellow/orange for warning (insufficient funds)
+        } else {
+            ghostColor = 0x3ecf8e; // Green for valid
+        }
+        
         if (!this._buildGhost || this._buildGhostType !== type) {
             if (this._buildGhost) {
                 this.scene.remove(this._buildGhost);
                 this._buildGhost.geometry.dispose();
                 this._buildGhost.material.dispose();
             }
+            if (this._buildGhostOutline) {
+                this.scene.remove(this._buildGhostOutline);
+                this._buildGhostOutline.geometry.dispose();
+                this._buildGhostOutline.material.dispose();
+            }
+            
             const geom = new THREE.BoxGeometry(0.85, h, 0.85);
             const mat = new THREE.MeshLambertMaterial({
-                color: ok ? 0x3ecf8e : 0xe25555,
+                color: ghostColor,
                 transparent: true,
-                opacity: 0.45,
+                opacity: 0.5,
+                blending: THREE.AdditiveBlending,
                 depthWrite: false,
             });
             this._buildGhost = new THREE.Mesh(geom, mat);
             this._buildGhostType = type;
             this.scene.add(this._buildGhost);
+            
+            // Create footprint outline
+            const outlineGeom = new THREE.RingGeometry(0.48, 0.52, 16);
+            const outlineMat = new THREE.MeshBasicMaterial({
+                color: ghostColor,
+                transparent: true,
+                opacity: 0.8,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+            });
+            this._buildGhostOutline = new THREE.Mesh(outlineGeom, outlineMat);
+            this._buildGhostOutline.rotation.x = -Math.PI / 2;
+            this.scene.add(this._buildGhostOutline);
             
             // Initialize animation state
             this._buildGhostAnim = {
@@ -3103,7 +3309,11 @@ export class Renderer3D {
         this._buildGhost.rotation.y = ((rotation % 4) + 4) % 4 * (Math.PI / 2);
         
         // Update color
-        this._buildGhost.material.color.setHex(ok ? 0x3ecf8e : 0xe25555);
+        this._buildGhost.material.color.setHex(ghostColor);
+        
+        // Update outline position and color
+        this._buildGhostOutline.position.set(wx, 0.02, wz);
+        this._buildGhostOutline.material.color.setHex(ghostColor);
         
         // Trigger snap animation if ghost was not visible
         if (!this._buildGhost.visible) {
@@ -3114,11 +3324,15 @@ export class Renderer3D {
         }
         
         this._buildGhost.visible = true;
+        this._buildGhostOutline.visible = true;
     }
 
     clearBuildGhost() {
         if (!this._buildGhost) return;
         this._buildGhost.visible = false;
+        if (this._buildGhostOutline) {
+            this._buildGhostOutline.visible = false;
+        }
         this._buildGhostAnim = null;
     }
     
@@ -3166,8 +3380,8 @@ export class Renderer3D {
         }
     }
     
-    // Update build ghost snap animation
-    _updateBuildGhostAnim() {
+    // Update build ghost snap animation (200ms duration)
+    _updateBuildGhostAnim(dt = 16.67) {
         if (!this._buildGhost || !this._buildGhostAnim || !this._buildGhostAnim.active) return;
         
         const anim = this._buildGhostAnim;
@@ -3175,8 +3389,9 @@ export class Renderer3D {
         // Ease-in-out cubic function for smooth snap
         const easeInOutCubic = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
         
-        // Update animation progress
-        anim.progress += 0.15; // Animation speed
+        // Update animation progress based on delta time (200ms duration)
+        // dt is in milliseconds, so we divide by 200 to get progress per frame
+        anim.progress += (dt / 200);
         if (anim.progress >= 1) {
             anim.progress = 1;
             anim.active = false;
@@ -3193,12 +3408,30 @@ export class Renderer3D {
     }
 
     /**
-     * Show floating build confirmation text
+     * Show floating build confirmation text with particle burst and SFX
      */
     showBuildFeedback(x, y, type, success) {
         const text = success ? `Built ${type}` : 'Build Failed';
         const color = success ? '#4caf50' : '#f44336';
         this.showFloatingText(x, y, text, color, 1500);
+        
+        if (success) {
+            // Show particle burst on successful placement
+            const wx = x - this._mapHalfW + 0.5;
+            const wz = y - this._mapHalfH + 0.5;
+            const buildingColor = buildingHex(type) || 0x4caf50;
+            this.showParticleBurst(x, y, buildingColor, 12);
+            
+            // Trigger building placement SFX
+            if (this.game?.audioManager) {
+                this.game.audioManager.playBuildingPlace(type);
+            }
+        } else {
+            // Trigger invalid placement SFX
+            if (this.game?.audioManager) {
+                this.game.audioManager.playBuildingInvalid();
+            }
+        }
     }
 
     /**

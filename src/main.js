@@ -22,6 +22,7 @@ import CampaignPanel from './ui/components/CampaignPanel.svelte';
 import RunSummary from './ui/components/RunSummary.svelte';
 import Shop from './ui/components/Shop.svelte';
 import SeedBrowser from './ui/components/SeedBrowser.svelte';
+import StatsPanel from './ui/components/StatsPanel.svelte';
 
 // Display version
 document.addEventListener('DOMContentLoaded', () => {
@@ -160,6 +161,13 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Mount Svelte components
     const rbMount = document.getElementById('resource-bar-mount');
     if (rbMount) new ResourceBar({ target: rbMount });
+
+    // Stats panel — replaces static HTML content with reactive Svelte component
+    const statsPanel = document.getElementById('stats-panel');
+    if (statsPanel) {
+        statsPanel.innerHTML = '';
+        new StatsPanel({ target: statsPanel });
+    }
 
     // Settings panel mounts into body; manager prop is injected after game init
     const settingsMount = document.createElement('div');

@@ -8,6 +8,7 @@ import {
     BUILDING_CCTV_NETWORK,
     BUILDING_COUNTERINTEL
 } from '../../constants.js';
+import { BUILDING_EXTENDED } from '../../buildings_extended.js';
 
 const SERVICES = ['power', 'water', 'health', 'police'];
 
@@ -38,6 +39,74 @@ export function clamp01(v) {
 
 function mapUintToQuality(value) {
     return clamp01((value || 0) / 255);
+}
+
+/**
+ * Compute transit metrics from placed buildings
+ * @param {Map} placedBuildings - Map of building key to array of placed buildings
+ * @param {Object} BUILDING_EXTENDED - Building definitions with effects
+ * @returns {Object} Transit metrics object
+ */
+export function computeTransitMetrics(placedBuildings, BUILDING_EXTENDED) {
+    let totalMobilityBonus = 0;
+    let totalTransitCoverage = 0;
+    let totalCongestionReduction = 0;
+    let totalBusRoutes = 0;
+    let totalTollRevenue = 0;
+    let totalTrafficControl = 0;
+    let totalConnectivityBonus = 0;
+    let totalSubwayStations = 0;
+
+    for (const [buildingKey, buildings] of placedBuildings.entries()) {
+        const buildingDef = BUILDING_EXTENDED[buildingKey];
+        if (buildingDef && buildingDef.effects) {
+            const effects = buildingDef.effects;
+            const count = buildings.length;
+
+            if (effects.mobilityBonus) {
+                totalMobilityBonus += effects.mobilityBonus * count;
+            }
+            if (effects.transitCoverage) {
+                totalTransitCoverage += effects.transitCoverage * count;
+            }
+            if (effects.congestionReduction) {
+                totalCongestionReduction += effects.congestionReduction * count;
+            }
+            if (effects.busRoutes) {
+                totalBusRoutes += effects.busRoutes * count;
+            }
+            if (effects.tollRevenue) {
+                totalTollRevenue += effects.tollRevenue * count;
+            }
+            if (effects.trafficControl) {
+                totalTrafficControl += effects.trafficControl * count;
+            }
+            if (effects.connectivityBonus) {
+                totalConnectivityBonus += effects.connectivityBonus * count;
+            }
+            if (effects.subwayAccess) {
+                totalSubwayStations += count;
+            }
+        }
+    }
+
+    // Clamp bonuses to reasonable maxima
+    totalMobilityBonus = Math.min(totalMobilityBonus, 0.80);
+    totalTransitCoverage = Math.min(totalTransitCoverage, 1.0);
+    totalCongestionReduction = Math.min(totalCongestionReduction, 0.50);
+    totalTrafficControl = Math.min(totalTrafficControl, 0.50);
+    totalConnectivityBonus = Math.min(totalConnectivityBonus, 0.50);
+
+    return {
+        mobilityBonus: totalMobilityBonus,
+        transitCoverage: totalTransitCoverage,
+        congestionReduction: totalCongestionReduction,
+        busRoutes: totalBusRoutes,
+        tollRevenue: totalTollRevenue,
+        trafficControl: totalTrafficControl,
+        connectivityBonus: totalConnectivityBonus,
+        subwayStations: totalSubwayStations,
+    };
 }
 
 export class ServiceManager {
@@ -95,8 +164,10 @@ export class ServiceManager {
         this.metrics.computeMs = performance.now() - t0;
     }
 
-    applyCitizenEffects(citizens) {
+    applyCitizenEffects(citizens, transitMetrics = null, buildingEffects = null) {
         const brownout = this.metrics.city.brownout;
+        const mobilityBonus = transitMetrics?.mobilityBonus || 0;
+
         for (const c of citizens) {
             const power = this.getTileCoverage(c.x, c.y, 'power');
             const water = this.getTileCoverage(c.x, c.y, 'water');
@@ -111,6 +182,21 @@ export class ServiceManager {
             if (health < 0.35) happinessDelta -= 1;
             if (police < 0.3) happinessDelta -= 1.2;
             if (brownout) happinessDelta -= 1.8;
+
+            // Apply mobility bonus from transit buildings
+            if (mobilityBonus > 0) {
+                happinessDelta += mobilityBonus * 2; // Scale to meaningful happiness impact
+            }
+
+            // Building effects on citizen happiness
+            if (buildingEffects) {
+                if (buildingEffects.happinessBonus > 0) {
+                    happinessDelta += Math.min(buildingEffects.happinessBonus * 0.1, 3);
+                }
+                if (buildingEffects.healthBonus > 0 && health < 0.5) {
+                    happinessDelta += 0.5; // Hospital mitigates low health coverage
+                }
+            }
 
             c.happiness = Math.max(0, Math.min(100, c.happiness + happinessDelta));
             if (water < 0.35) {

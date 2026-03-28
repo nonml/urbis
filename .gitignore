@@ -5,3 +5,18 @@ build/
 !public/assets/audio/build/
 src-tauri/target/
 dist-electron/
+
+# Test outputs
+test-results/
+test_output.json
+buttons_results.json
+
+# Screenshots
+ss_*.png
+
+# Diagnostic/debug scripts
+diag*.mjs
+
+# Session planning
+NEXT_SESSION_PLAN.md
+plans/

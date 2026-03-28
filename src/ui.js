@@ -2,6 +2,7 @@
 import { BUILDING_TYPES, BUILDING_SECURITY } from './constants.js';
 import { BUILDING_EXTENDED, isBuildingUnlocked, getBuildingRequirements } from './buildings_extended.js';
 import { resourceStore } from './stores/resources.js';
+import { statsStore } from './stores/stats.js';
 import { MapScreen } from './ui/map_screen.js';
 import { MODE_STREET, MODE_GOD, MODE_LABELS } from './ui/mode_indicator.js';
 import { TechScreen } from './ui/tech_screen.js';
@@ -290,6 +291,22 @@ export class UIManager {
         // Audio
         this.audioManager = createAudioManager(game);
 
+        // Initialize audio context on first user interaction (browser autoplay policy)
+        const _initAudio = async () => {
+            if (this.audioManager && !this.audioManager.isInitialized) {
+                await this.audioManager.initialize();
+                console.log('[Audio] Initialized:', {
+                    isInitialized: this.audioManager.isInitialized,
+                    canPlay: this.audioManager.canPlay,
+                    context: this.audioManager.context?.state
+                });
+            }
+            window.removeEventListener('click', _initAudio);
+            window.removeEventListener('keydown', _initAudio);
+        };
+        window.addEventListener('click', _initAudio, { once: true });
+        window.addEventListener('keydown', _initAudio, { once: true });
+
         // Procedural music (6D) — starts on first user gesture (browser audio policy)
         this.proceduralMusic = getProceduralMusic(game);
         const _startMusic = () => {
@@ -317,6 +334,13 @@ export class UIManager {
         this.isRDragging = false;
         this.lastMouseX = 0;
         this.lastMouseY = 0;
+        
+        // Edge panning configuration (God mode only)
+        this.edgePanDeadzone = 0.9; // 90% deadzone - only outer 10% triggers panning
+        this.edgePanSpeed = 2.0; // Pan speed multiplier
+        this.edgePanVelocity = { x: 0, y: 0 };
+        this.edgePanAcceleration = 15.0; // Acceleration per second
+        this.edgePanDamping = 0.92; // Velocity damping when not at edge
 
         // Dirty flags
         this._lastBuildingCount = 0;
@@ -428,8 +452,13 @@ export class UIManager {
         if (!grid) return;
         grid.innerHTML = '';
 
+        // Debug: Log all building types
+        console.log('[UI] BUILDING_TYPES keys:', Object.keys(BUILDING_TYPES));
+        console.log('[UI] BUILDING_TYPES entries:', Object.entries(BUILDING_TYPES).map(([k, v]) => `${k}: ${v.name}`));
+
         // Add basic buildings
         for (const [key, building] of Object.entries(BUILDING_TYPES)) {
+            console.log(`[UI] Creating building card for: ${key} (${building.name})`);
             this.createBuildingCard(grid, key, building);
         }
 
@@ -458,6 +487,7 @@ export class UIManager {
                 const which = tab.dataset.tab;
                 document.getElementById('building-grid').style.display = which === 'core' ? '' : 'none';
                 document.getElementById('building-grid-city').style.display = which === 'city' ? '' : 'none';
+                this.playUISound('click');
             });
         });
     }
@@ -547,6 +577,7 @@ export class UIManager {
                     document.getElementById('message-log').classList.remove('hidden');
                     document.getElementById('stats-panel').classList.add('hidden');
                 }
+                this.playUISound('click');
             });
         });
 
@@ -565,6 +596,7 @@ export class UIManager {
             console.log('[UIManager] Adding click listener to settings button');
             settingsBtn.addEventListener('click', () => {
                 console.log('[UIManager] Settings button clicked!');
+                this.playUISound('click');
                 this.toggleSettings();
             });
         } else {
@@ -881,15 +913,72 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
                 this.updateBuildGhost(tile);
             }
-            if (!this.isRDragging) return;
-            const dx = e.clientX - this.lastMouseX;
-            const dy = e.clientY - this.lastMouseY;
-            this.lastMouseX = e.clientX;
-            this.lastMouseY = e.clientY;
+            if (this.isRDragging) {
+                const dx = e.clientX - this.lastMouseX;
+                const dy = e.clientY - this.lastMouseY;
+                this.lastMouseX = e.clientX;
+                this.lastMouseY = e.clientY;
 
-            this.renderer3d.yaw -= dx * this.renderer3d.mouseSensitivity;
-            this.renderer3d.pitch -= dy * this.renderer3d.mouseSensitivity * 0.6;
-            this.renderer3d.pitch = Math.max(-1.2, Math.min(-0.1, this.renderer3d.pitch));
+                this.renderer3d.yaw -= dx * this.renderer3d.mouseSensitivity;
+                this.renderer3d.pitch -= dy * this.renderer3d.mouseSensitivity * 0.6;
+                this.renderer3d.pitch = Math.max(-1.2, Math.min(-0.1, this.renderer3d.pitch));
+                return;
+            }
+            
+            // Edge panning for God mode (90% deadzone - only outer 10% triggers panning)
+            if (this.game.mode === 'god' && this.renderer3d && !this.selectedBuilding) {
+                const canvasRect = this.canvas.getBoundingClientRect();
+                const canvasWidth = canvasRect.width;
+                const canvasHeight = canvasRect.height;
+                const mouseX = e.clientX - canvasRect.left;
+                const mouseY = e.clientY - canvasRect.top;
+                
+                // Calculate normalized mouse position (0 to 1)
+                const normX = mouseX / canvasWidth;
+                const normY = mouseY / canvasHeight;
+                
+                // Deadzone boundaries (90% center area is inactive)
+                const deadzoneLeft = (1 - this.edgePanDeadzone) / 2;
+                const deadzoneRight = 1 - deadzoneLeft;
+                const deadzoneTop = (1 - this.edgePanDeadzone) / 2;
+                const deadzoneBottom = 1 - deadzoneTop;
+                
+                // Calculate edge distance (how far into the active edge zone)
+                let edgeX = 0, edgeY = 0;
+                
+                if (normX < deadzoneLeft) {
+                    edgeX = -(deadzoneLeft - normX) / deadzoneLeft; // Left edge
+                } else if (normX > deadzoneRight) {
+                    edgeX = (normX - deadzoneRight) / deadzoneLeft; // Right edge
+                }
+                
+                if (normY < deadzoneTop) {
+                    edgeY = -(deadzoneTop - normY) / deadzoneTop; // Top edge
+                } else if (normY > deadzoneBottom) {
+                    edgeY = (normY - deadzoneBottom) / deadzoneTop; // Bottom edge
+                }
+                
+                // Apply edge panning with smooth acceleration/deceleration
+                if (edgeX !== 0 || edgeY !== 0) {
+                    // Accelerate towards edge direction
+                    this.edgePanVelocity.x += edgeX * this.edgePanAcceleration * 0.016; // Assume ~60fps
+                    this.edgePanVelocity.y += edgeY * this.edgePanAcceleration * 0.016;
+                    
+                    // Clamp maximum velocity
+                    const maxVel = this.edgePanSpeed * 2;
+                    this.edgePanVelocity.x = Math.max(-maxVel, Math.min(maxVel, this.edgePanVelocity.x));
+                    this.edgePanVelocity.y = Math.max(-maxVel, Math.min(maxVel, this.edgePanVelocity.y));
+                } else {
+                    // Apply damping when not at edge
+                    this.edgePanVelocity.x *= this.edgePanDamping;
+                    this.edgePanVelocity.y *= this.edgePanDamping;
+                }
+                
+                // Apply velocity to camera
+                this.renderer3d.yaw -= this.edgePanVelocity.x * this.edgePanSpeed * 0.016;
+                this.renderer3d.pitch -= this.edgePanVelocity.y * this.edgePanSpeed * 0.016 * 0.6;
+                this.renderer3d.pitch = Math.max(-1.2, Math.min(-0.1, this.renderer3d.pitch));
+            }
         });
 
         // Tooltip hover events
@@ -1029,8 +1118,14 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             tile.x,
             tile.y,
             this.buildMenu.rotation,
-            preview.ok
+            preview.ok,
+            preview.warning
         );
+        
+        // Trigger unaffordable flash on gold display when hovering over building that can't be afforded
+        if (preview.warning) {
+            resourceStore.update(r => ({ ...r, unaffordable: true }));
+        }
     }
 
     updateResources(resources = this.game?.resources) {
@@ -1062,6 +1157,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             housing: resources.housing ?? 0,
             day: resources.day,
             heat: player.heat ?? 0,
+            unaffordable: false, // Reset flash flag on each update
             weather: {
                 icon: ws?.getWeatherIcon?.() ?? '☀️',
                 type: ws?.state?.type ?? 'clear',
@@ -1072,6 +1168,15 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 currentAction: rival?.currentAction ?? null,
             },
         });
+    }
+
+    /** Trigger gold flash animation for insufficient funds feedback */
+    triggerUnaffordableFlash() {
+        resourceStore.update(r => ({ ...r, unaffordable: true }));
+        // Auto-reset after 300ms
+        setTimeout(() => {
+            resourceStore.update(r => ({ ...r, unaffordable: false }));
+        }, 300);
     }
 
     /** Emit VFX resource gain/loss events without touching the DOM counter directly. */
@@ -1162,265 +1267,69 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
     updateStats() {
         const citizens = this.game.citizens;
-        const stats = document.getElementById('stats-pop');
-        const employment = document.getElementById('stats-employment');
-        const happiness = document.getElementById('stats-happiness');
-        const housing = document.getElementById('stats-housing');
-
-        const jobGold = document.getElementById('stats-job-gold');
-        const jobFood = document.getElementById('stats-job-food');
-        const jobWood = document.getElementById('stats-job-wood');
-        const jobDist = document.getElementById('stats-job-dist');
-
-        if (stats) stats.textContent = citizens.getPopulation();
-        if (employment) employment.textContent = citizens.getEmploymentRate() + '%';
-        if (happiness) happiness.textContent = citizens.getAverageHappiness() + '%';
-        if (housing) housing.textContent = `${this.game.resources.population}/${this.game.resources.housing}`;
-
-        // Job production (last computed tick)
         const jp = this.game.resources.jobProduction || { gold: 0, food: 0, wood: 0 };
-        if (jobGold) jobGold.textContent = Math.floor(jp.gold || 0);
-        if (jobFood) jobFood.textContent = Math.floor(jp.food || 0);
-        if (jobWood) jobWood.textContent = Math.floor(jp.wood || 0);
 
         // Job distribution
-        if (jobDist) {
-            const dist = new Map();
-            for (const c of citizens.citizens) {
-                const j = (c.job || 'unemployed');
-                dist.set(j, (dist.get(j) || 0) + 1);
-            }
-            const employed = Array.from(dist.entries()).filter(([j]) => j !== 'unemployed');
-            if (employed.length === 0) {
-                jobDist.textContent = 'No employed citizens';
-            } else {
-                employed.sort((a, b) => b[1] - a[1]);
-                jobDist.textContent = employed.map(([j, n]) => `${j}: ${n}`).join(' • ');
-            }
+        const dist = new Map();
+        for (const c of citizens.citizens) {
+            const j = c.job || 'unemployed';
+            dist.set(j, (dist.get(j) || 0) + 1);
+        }
+        const employed = Array.from(dist.entries()).filter(([j]) => j !== 'unemployed');
+        employed.sort((a, b) => b[1] - a[1]);
+
+        // Economy
+        let economy = null;
+        if (this.game.getResourceReport) {
+            const report = this.game.getResourceReport();
+            const fmt = (resName) => {
+                const row = report.report?.[resName];
+                const net = row?.net || 0;
+                const sign = net >= 0 ? '+' : '';
+                const top = row?.contributors?.[0];
+                const source = top ? `${top.source} (${top.delta >= 0 ? '+' : ''}${top.delta})` : 'n/a';
+                return `${resName.toUpperCase()}: ${sign}${net} | top: ${source}`;
+            };
+            economy = { gold: fmt('gold'), food: fmt('food'), wood: fmt('wood') };
         }
 
-        this.updateEconomyReport();
-        this.updateServicesReport();
-        this.updateDemandReport();
-    }
-
-    updateEconomyReport() {
-        const statsPanel = document.getElementById('stats-panel');
-        if (!statsPanel || !this.game.getResourceReport) return;
-
-        let box = document.getElementById('economy-report');
-        if (!box) {
-            box = document.createElement('div');
-            box.id = 'economy-report';
-            box.className = 'stat-item full-width';
-            box.innerHTML = `
-                <div class="stat-label">Economy (last tick)</div>
-                <div class="stat-value" id="econ-gold-row"></div>
-                <div class="stat-value" id="econ-food-row"></div>
-                <div class="stat-value" id="econ-wood-row"></div>
-            `;
-            statsPanel.appendChild(box);
-        }
-
-        const report = this.game.getResourceReport();
-        const fmt = (resName) => {
-            const row = report.report?.[resName];
-            const net = row?.net || 0;
-            const sign = net >= 0 ? '+' : '';
-            const top = row?.contributors?.[0];
-            const source = top ? `${top.source} (${top.delta >= 0 ? '+' : ''}${top.delta})` : 'n/a';
-            return `${resName.toUpperCase()}: ${sign}${net} | top: ${source}`;
+        // Services
+        const m = this.game.servicesManager?.metrics?.city || {};
+        const services = {
+            powerText: `Power ${Math.round(m.powerSupply || 0)}/${Math.round(m.powerDemand || 0)} (${m.brownout ? 'brownout' : 'stable'})`,
+            brownout: !!m.brownout,
         };
 
-        const goldRow = document.getElementById('econ-gold-row');
-        const foodRow = document.getElementById('econ-food-row');
-        const woodRow = document.getElementById('econ-wood-row');
-        if (goldRow) goldRow.textContent = fmt('gold');
-        if (foodRow) foodRow.textContent = fmt('food');
-        if (woodRow) woodRow.textContent = fmt('wood');
-    }
+        // Transit
+        const tm = this.game.transitMetrics || {};
+        const transit = {
+            mobility: Math.round((tm.mobilityBonus || 0) * 100),
+            coverage: Math.round((tm.transitCoverage || 0) * 100),
+            congestion: Math.round((tm.congestionReduction || 0) * 100),
+            busRoutes: tm.busRoutes || 0,
+            tollRevenue: tm.tollRevenue || 0,
+        };
 
-    updateServicesReport() {
-        const statsPanel = document.getElementById('stats-panel');
-        if (!statsPanel || !this.game.servicesManager) return;
-
-        let box = document.getElementById('services-report');
-        if (!box) {
-            box = document.createElement('div');
-            box.id = 'services-report';
-            box.className = 'stat-item full-width';
-            box.innerHTML = `
-                <div class="stat-label">Services</div>
-                <div class="stat-value" id="svc-city-row"></div>
-            `;
-            statsPanel.appendChild(box);
-        }
-
-        const m = this.game.servicesManager.metrics.city || {};
-        const powerState = m.brownout ? 'brownout' : 'stable';
-        const row = document.getElementById('svc-city-row');
-        if (row) {
-            row.textContent = `Power ${Math.round(m.powerSupply || 0)}/${Math.round(m.powerDemand || 0)} (${powerState})`;
-        }
-    }
-
-    updateDemandReport() {
-        const statsPanel = document.getElementById('stats-panel');
-        if (!statsPanel || !this.game.demandCalculator) return;
-
-        let box = document.getElementById('demand-report');
-        if (!box) {
-            box = document.createElement('div');
-            box.id = 'demand-report';
-            box.className = 'stat-item full-width';
-            box.innerHTML = `
-                <div class="stat-label">Demand (R/C/I)</div>
-                <div class="stat-value" id="demand-res-row"></div>
-                <div class="stat-value" id="demand-com-row"></div>
-                <div class="stat-value" id="demand-ind-row"></div>
-            `;
-            statsPanel.appendChild(box);
-        }
-
+        // Demand
         const demand = this.game.state?.economy?.demand || { residential: 0, commercial: 0, industrial: 0 };
 
-        const fmtDemand = (val, label) => {
-            const percentage = Math.min(100, Math.round(val * 100));
-            const barColor = percentage < 30 ? '#ff6b6b' : percentage < 70 ? '#ffd93d' : '#6bcb77';
-            return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;">
-                <span>${label}</span>
-                <span style="color:${barColor};font-weight:600;">${percentage}%</span>
-            </div>`;
-        };
-
-        const resRow = document.getElementById('demand-res-row');
-        const comRow = document.getElementById('demand-com-row');
-        const indRow = document.getElementById('demand-ind-row');
-
-        if (resRow) resRow.innerHTML = fmtDemand(demand.residential || 0, 'Residential');
-        if (comRow) comRow.innerHTML = fmtDemand(demand.commercial || 0, 'Commercial');
-        if (indRow) indRow.innerHTML = fmtDemand(demand.industrial || 0, 'Industrial');
-
-        this.updateIntelReport();
-    }
-
-    updateIntelReport() {
-        const statsPanel = document.getElementById('stats-panel');
-        if (!statsPanel) return;
-
-        // Intel Database
-        if (this.game.intelDatabase) {
-            let intelBox = document.getElementById('intel-report');
-            if (!intelBox) {
-                intelBox = document.createElement('div');
-                intelBox.id = 'intel-report';
-                intelBox.className = 'stat-item full-width';
-                intelBox.innerHTML = `
-                    <div class="stat-label">Intel Database</div>
-                    <div class="stat-value" id="intel-total-entries"></div>
-                    <div class="stat-value" id="intel-active-entries"></div>
-                `;
-                statsPanel.appendChild(intelBox);
-            }
-            const summary = this.game.intelDatabase.getSummary();
-            const totalEntries = document.getElementById('intel-total-entries');
-            const activeEntries = document.getElementById('intel-active-entries');
-            if (totalEntries) totalEntries.textContent = `Total entries: ${summary.totalEntries}`;
-            if (activeEntries) activeEntries.textContent = `Active entries: ${summary.activeEntries}`;
-        }
-
-        // Surveillance Sources
-        if (this.game.surveillanceSources) {
-            let surveillanceBox = document.getElementById('surveillance-report');
-            if (!surveillanceBox) {
-                surveillanceBox = document.createElement('div');
-                surveillanceBox.id = 'surveillance-report';
-                surveillanceBox.className = 'stat-item full-width';
-                surveillanceBox.innerHTML = `
-                    <div class="stat-label">Surveillance</div>
-                    <div class="stat-value" id="surv-source-count"></div>
-                    <div class="stat-value" id="surv-active-sources"></div>
-                `;
-                statsPanel.appendChild(surveillanceBox);
-            }
-            const summary = this.game.surveillanceSources.getSummary();
-            const sourceCount = document.getElementById('surv-source-count');
-            const activeSources = document.getElementById('surv-active-sources');
-            if (sourceCount) sourceCount.textContent = `Sources: ${summary.totalSources}`;
-            if (activeSources) activeSources.textContent = `Active: ${summary.activeSources}`;
-        }
-
-        // Influence Engine
-        if (this.game.influenceEngine) {
-            let influenceBox = document.getElementById('influence-report');
-            if (!influenceBox) {
-                influenceBox = document.createElement('div');
-                influenceBox.id = 'influence-report';
-                influenceBox.className = 'stat-item full-width';
-                influenceBox.innerHTML = `
-                    <div class="stat-label">Influence</div>
-                    <div class="stat-value" id="inf-score"></div>
-                    <div class="stat-value" id="inf-active-ops"></div>
-                `;
-                statsPanel.appendChild(influenceBox);
-            }
-            const overview = this.game.influenceEngine.getOverview();
-            const score = document.getElementById('inf-score');
-            const activeOps = document.getElementById('inf-active-ops');
-            if (score) score.textContent = `Score: ${Math.round(overview.score)}`;
-            if (activeOps) activeOps.textContent = `Active operations: ${overview.activeCount}`;
-        }
-
-        // Sentiment Manager
-        if (this.game.sentimentManager) {
-            let sentimentBox = document.getElementById('sentiment-report');
-            if (!sentimentBox) {
-                sentimentBox = document.createElement('div');
-                sentimentBox.id = 'sentiment-report';
-                sentimentBox.className = 'stat-item full-width';
-                sentimentBox.innerHTML = `
-                    <div class="stat-label">Sentiment</div>
-                    <div class="stat-value" id="sent-overall"></div>
-                    <div class="stat-value" id="sent-trust"></div>
-                `;
-                statsPanel.appendChild(sentimentBox);
-            }
-            const mood = this.game.sentimentManager.getMoodSummary();
-            const overall = document.getElementById('sent-overall');
-            const trust = document.getElementById('sent-trust');
-            const sentimentLevel = mood.overall.level;
-            const levelColor = sentimentLevel === 'highly_positive' ? '#6bcb77' :
-                              sentimentLevel === 'positive' ? '#a8d67b' :
-                              sentimentLevel === 'neutral' ? '#ffd93d' :
-                              sentimentLevel === 'negative' ? '#ff9f43' : '#ff6b6b';
-            if (overall) overall.innerHTML = `<span style="color:${levelColor};font-weight:600;">${mood.overall.level.toUpperCase()}</span>: ${Math.round(mood.overall.sentiment * 100)}%`;
-            if (trust) trust.textContent = `Trust (Gov/Police): ${Math.round(mood.trust.government * 100)}% / ${Math.round(mood.trust.police * 100)}%`;
-        }
-
-        // Heat Manager
-        if (this.game.heatManager) {
-            let heatBox = document.getElementById('heat-report');
-            if (!heatBox) {
-                heatBox = document.createElement('div');
-                heatBox.id = 'heat-report';
-                heatBox.className = 'stat-item full-width';
-                heatBox.innerHTML = `
-                    <div class="stat-label">Exposure/Heat</div>
-                    <div class="stat-value" id="heat-level"></div>
-                    <div class="stat-value" id="heat-exposure"></div>
-                `;
-                statsPanel.appendChild(heatBox);
-            }
-            const heatOverview = this.game.heatManager.getHeatOverview();
-            const heatLevel = document.getElementById('heat-level');
-            const heatExposure = document.getElementById('heat-exposure');
-            const heatColor = heatOverview.state === 'calm' ? '#6bcb77' :
-                             heatOverview.state === 'alert' ? '#ffd93d' :
-                             heatOverview.state === 'search' ? '#ff9f43' :
-                             heatOverview.state === 'pursuit' ? '#ff6b6b' : '#c44569';
-            if (heatLevel) heatLevel.innerHTML = `<span style="color:${heatColor};font-weight:600;">${heatOverview.state.toUpperCase()}</span>: ${Math.round(heatOverview.heat)}%`;
-            if (heatExposure) heatExposure.textContent = `Exposure score: ${Math.round(heatOverview.exposureScore)}`;
-        }
+        statsStore.set({
+            population: citizens.getPopulation(),
+            employmentRate: citizens.getEmploymentRate() + '%',
+            happiness: citizens.getAverageHappiness() + '%',
+            housing: `${this.game.resources.population}/${this.game.resources.housing}`,
+            jobProduction: { gold: Math.floor(jp.gold || 0), food: Math.floor(jp.food || 0), wood: Math.floor(jp.wood || 0) },
+            jobDistribution: employed.length === 0 ? 'No employed citizens' : employed.map(([j, n]) => `${j}: ${n}`).join(' \u2022 '),
+            economy,
+            services,
+            transit,
+            demand,
+            intel: this.game.intelDatabase ? this.game.intelDatabase.getSummary() : null,
+            surveillance: this.game.surveillanceSources ? this.game.surveillanceSources.getSummary() : null,
+            influence: this.game.influenceEngine ? this.game.influenceEngine.getOverview() : null,
+            sentiment: this.game.sentimentManager ? this.game.sentimentManager.getMoodSummary() : null,
+            heat: this.game.heatManager ? this.game.heatManager.getHeatOverview() : null,
+        });
     }
 
     showVictory(condition, progress) {
@@ -1494,6 +1403,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             btn.className = 'btn btn-primary';
             btn.textContent = formatOption(opt);
             btn.addEventListener('click', () => {
+                this.playUISound('click');
                 overlay.classList.add('hidden');
                 onPick(opt);
             });
@@ -1746,6 +1656,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             btn.className = 'btn btn-primary';
             btn.textContent = `[${i + 1}] ${choice.label}`;
             btn.addEventListener('click', () => {
+                this.playUISound('click');
                 overlay.classList.add('hidden');
                 onChoice(choice);
                 this.questChoiceOptions = [];
@@ -1788,14 +1699,15 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     playUISound(type) {
         if (this.audioManager) {
             const soundMap = {
-                'click': 'playClick',
-                'slider': 'playSlider',
-                'success': 'playSuccess',
-                'error': 'playError'
+                'click': () => this.audioManager.playUIClick(),
+                'hover': () => this.audioManager.playUIHover(),
+                'slider': () => this.audioManager.playUISlider(),
+                'success': () => this.audioManager.playUISuccess(),
+                'error': () => this.audioManager.playUIError()
             };
-            const method = soundMap[type];
-            if (method && this.audioManager[method]) {
-                this.audioManager[method]();
+            const soundFn = soundMap[type];
+            if (soundFn) {
+                soundFn();
             }
         }
     }

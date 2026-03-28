@@ -125,6 +125,10 @@ export class TrafficAgent {
 
         // Adjust speed based on congestion and distance
         let desiredSpeed = this.maxSpeed;
+        // Transit coverage boosts effective speed (better transit = less road congestion)
+        if (trafficManager?.transitMetrics?.transitCoverage > 0) {
+            desiredSpeed *= (1 + trafficManager.transitMetrics.transitCoverage * 0.25);
+        }
         if (congestion > 0.5) {
             desiredSpeed *= (1 - congestion * 0.5);
         }
@@ -151,8 +155,9 @@ export class TrafficAgent {
             this.stuckTicks = 0;
         }
 
-        // If stuck for too long, wait
-        if (this.stuckTicks > 15) {
+        // If stuck for too long, wait (trafficControl from tollway gates reduces threshold)
+        const stuckThreshold = 15 - Math.floor((trafficManager?.transitMetrics?.trafficControl || 0) * 8);
+        if (this.stuckTicks > stuckThreshold) {
             this.state = 'WAITING';
             this.waitTimer = 7 + (this.id % 3);
             this.consecutiveWaitTicks++;
@@ -316,6 +321,7 @@ export class TrafficManager {
         this.congestionGrid = new Float32Array(game.map.width * game.map.height);
         this.edgeCongestion = new Map();
         this.lastUpdateTick = 0;
+        this.transitMetrics = null;
     }
 
     /**
@@ -373,6 +379,30 @@ export class TrafficManager {
                 }
             }
         }
+
+        // Apply congestion reduction from transit buildings
+        if (this.transitMetrics && this.transitMetrics.congestionReduction > 0) {
+            const reductionFactor = 1 - this.transitMetrics.congestionReduction;
+            for (let i = 0; i < this.congestionGrid.length; i++) {
+                this.congestionGrid[i] *= reductionFactor;
+            }
+        }
+
+        // Connectivity bonus from highway ramps reduces congestion further
+        if (this.transitMetrics && this.transitMetrics.connectivityBonus > 0) {
+            const connFactor = 1 - this.transitMetrics.connectivityBonus * 0.5;
+            for (let i = 0; i < this.congestionGrid.length; i++) {
+                this.congestionGrid[i] *= connFactor;
+            }
+        }
+
+        // Subway network effect: 2+ stations create a city-wide congestion reduction
+        if (this.transitMetrics && this.transitMetrics.subwayStations >= 2) {
+            const subwayFactor = 1 - Math.min(0.15, (this.transitMetrics.subwayStations - 1) * 0.03);
+            for (let i = 0; i < this.congestionGrid.length; i++) {
+                this.congestionGrid[i] *= subwayFactor;
+            }
+        }
     }
 
     /**
@@ -416,6 +446,33 @@ export class TrafficManager {
     setEdgeCongestion(x1, y1, x2, y2, congestion) {
         const key = `${x1},${y1}->${x2},${y2}`;
         this.edgeCongestion.set(key, congestion);
+    }
+
+    /**
+     * Spawn bus agents based on busRoutes metric and placed bus-stop/bus-depot buildings.
+     * Called once per tick from game.js after traffic update.
+     */
+    updateBusRoutes(buildings) {
+        if (!this.transitMetrics || this.transitMetrics.busRoutes <= 0) return;
+
+        const busAgents = this.agents.filter(a => a.type === 'SERVICE' && a._isBus);
+        const targetBusCount = Math.min(Math.floor(this.transitMetrics.busRoutes), 6);
+
+        if (busAgents.length >= targetBusCount) return;
+
+        const busStops = buildings.filter(b => b.type === 'bus-stop' || b.type === 'bus-depot');
+        if (busStops.length < 2) return;
+
+        const spawn = busStops[this.lastUpdateTick % busStops.length];
+        const bus = new TrafficAgent(randomId(), {
+            type: 'SERVICE',
+            x: spawn.x,
+            y: spawn.y,
+            maxSpeed: 0.5,
+            spawnTick: this.lastUpdateTick,
+        });
+        bus._isBus = true;
+        this.addAgent(bus);
     }
 
     /**
