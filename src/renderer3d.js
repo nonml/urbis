@@ -90,6 +90,7 @@ import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_n
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
+import { CharacterPool } from './render/character_pool.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -428,6 +429,16 @@ export class Renderer3D {
         // Citizens
         this._citizensDirty = true;
         this.rebuildCitizens();
+
+        // Detailed character pool (LOD: articulated humanoids for nearby citizens)
+        this._characterPool = new CharacterPool(THREE, this.scene, this.game);
+        this._detailedCitizenSet = new Set();
+        this._lastFrameTime = performance.now() / 1000;
+
+        // Try loading rigged GLTF character (Soldier model with Walk/Idle animations)
+        this._characterPool.useGLTFModel('assets/models/characters/Soldier.glb').catch(() => {
+            console.log('[Renderer] GLTF character not found, using procedural humanoids');
+        });
 
         // Player
         this._player = this.buildPlayer();
@@ -2454,12 +2465,12 @@ export class Renderer3D {
             const cp = this._citizenPositions[i];
             const anim = this._citizenAnimTimes?.[i];
 
+            // Update interpolation state (needed for both capsule and detailed characters)
             // Detect sim-level movement (citizen tile changed)
             if (c.x !== cp.prevX || c.y !== cp.prevY) {
-                // Calculate heading from movement direction
                 const dx = c.x - cp.prevX;
                 const dy = c.y - cp.prevY;
-                cp.heading = Math.atan2(dx, dy); // +X = right, +Y = down in map coords
+                cp.heading = Math.atan2(dx, dy);
                 cp.isMoving = true;
                 cp.moveStartTime = currentTime;
                 cp.prevX = c.x;
@@ -2469,30 +2480,36 @@ export class Renderer3D {
             // Smooth interpolation toward target tile
             cp.dispX += (c.x - cp.dispX) * lerpSpeed;
             cp.dispY += (c.y - cp.dispY) * lerpSpeed;
-
-            // Snap if very close (avoid perpetual drift)
             if (Math.abs(c.x - cp.dispX) < 0.01) cp.dispX = c.x;
             if (Math.abs(c.y - cp.dispY) < 0.01) cp.dispY = c.y;
 
-            // Detect idle (stopped moving for > 0.5s)
             const isMoving = cp.dispX !== c.x || cp.dispY !== c.y ||
                              (currentTime - cp.moveStartTime) < 0.5;
             cp.isMoving = isMoving;
 
+            // Hide instanced capsule if this citizen has a detailed character model
+            if (this._detailedCitizenSet?.has(i)) {
+                dummy.position.set(0, -10, 0);
+                dummy.scale.set(0, 0, 0);
+                dummy.updateMatrix();
+                this._citizensMesh.setMatrixAt(i, dummy.matrix);
+                continue;
+            }
+
+            // Capsule rendering for far citizens
+            dummy.scale.set(1, 1, 1);
             const wx = cp.dispX - this._mapHalfW + 0.5;
             const wz = cp.dispY - this._mapHalfH + 0.5;
 
             if (anim) {
                 if (isMoving) {
-                    // Walking animation: faster bob + lean + stride swing
                     const walkSpeed = anim.speed * 2.5;
                     const stride = Math.sin(currentTime * walkSpeed + anim.phase);
-                    const yBob = 0.12 + Math.abs(stride) * 0.035; // bounce up on each step
-                    const lean = stride * 0.12;                     // body lean side-to-side
+                    const yBob = 0.12 + Math.abs(stride) * 0.035;
+                    const lean = stride * 0.12;
                     dummy.position.set(wx, yBob, wz);
                     dummy.rotation.set(0, cp.heading, lean);
                 } else {
-                    // Idle animation: gentle breathing bob
                     const breathe = Math.sin(currentTime * anim.speed * 0.5 + anim.phase) * 0.01;
                     dummy.position.set(wx, 0.12 + breathe, wz);
                     dummy.rotation.set(0, cp.heading, 0);
@@ -3001,6 +3018,21 @@ export class Renderer3D {
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
         this.updatePets();
+
+        // Update detailed character pool (articulated humanoids near camera)
+        if (this._characterPool && this.game.citizens?.citizens) {
+            const now = performance.now() / 1000;
+            const frameDelta = now - (this._lastFrameTime || now);
+            this._lastFrameTime = now;
+            const px = this.game.state?.player?.x ?? 0;
+            const py = this.game.state?.player?.y ?? 0;
+            this._detailedCitizenSet = this._characterPool.update(
+                this.game.citizens.citizens,
+                this._citizenPositions,
+                px, py,
+                frameDelta
+            );
+        }
 
         this.updateVehicles();
 
