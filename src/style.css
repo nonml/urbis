@@ -1834,32 +1834,185 @@ body {
 }
 
 /* ═══════════════════════════════════════
-   FLOATING PANELS (existing Svelte panels)
+   FLOATING PANELS (Svelte: Factions, Politics)
+   Hidden by default — shown via smartphone/shortcut
    ═══════════════════════════════════════ */
-.factions-panel, #factions-panel, [class*="faction-panel"],
-.politics-panel, [class*="politics"] {
-    background: var(--bg-panel) !important;
+.factions-panel, #factions-panel, [class*="faction-panel"] {
+    display: none !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 46 !important;
+    width: min(400px, 90vw) !important;
+    max-height: 70vh !important;
+    overflow-y: auto !important;
+    background: var(--bg-panel-solid) !important;
     backdrop-filter: var(--panel-blur) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-lg) !important;
     color: var(--text) !important;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+    padding: 16px !important;
 }
-.factions-panel h4, .politics-panel h4 {
+.factions-panel.visible, #factions-panel.visible {
+    display: block !important;
+}
+.factions-title {
+    font-family: var(--font-display) !important;
+    font-size: 13px !important;
+    color: var(--text-bright) !important;
+    letter-spacing: 0.1em !important;
+    margin-bottom: 10px !important;
+    padding-bottom: 6px !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.factions-rows { display: flex; flex-direction: column; gap: 4px; }
+.f-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 4px 6px !important;
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    font-family: var(--font-mono) !important;
+    font-size: 11px !important;
+}
+.f-name { color: var(--text) !important; flex-shrink: 0; width: 60px; }
+.f-bar {
+    flex: 1 !important;
+    height: 4px !important;
+    background: rgba(255,255,255,0.08) !important;
+    border-radius: 2px !important;
+    overflow: hidden !important;
+}
+.f-fill {
+    height: 100% !important;
+    background: linear-gradient(90deg, var(--neon-red), var(--neon-amber), var(--neon-green)) !important;
+    border-radius: 2px !important;
+}
+.f-rep { color: var(--text-dim) !important; font-size: 10px !important; width: 30px; text-align: right; }
+.f-band { color: var(--text-faint) !important; font-size: 9px !important; width: 50px; }
+.factions-changes {
+    margin-top: 8px !important;
     font-family: var(--font-mono) !important;
     font-size: 9px !important;
-    letter-spacing: 0.1em !important;
-    color: var(--text-dim) !important;
-    text-transform: uppercase !important;
+    color: var(--text-faint) !important;
 }
-.politics-panel button, .politics-tabs button {
+
+.politics-panel, #politics-panel, [class*="politics-panel"] {
+    display: none !important;
+    position: fixed !important;
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    z-index: 46 !important;
+    width: min(500px, 92vw) !important;
+    max-height: 75vh !important;
+    overflow-y: auto !important;
+    background: var(--bg-panel-solid) !important;
+    backdrop-filter: var(--panel-blur) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius-lg) !important;
+    color: var(--text) !important;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6) !important;
+    padding: 16px !important;
+}
+.politics-panel.visible, #politics-panel.visible {
+    display: block !important;
+}
+.politics-tabs {
+    display: flex !important;
+    gap: 2px !important;
+    margin-bottom: 10px !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 0 !important;
+    position: static !important;
+}
+.politics-tabs .tab-btn,
+.politics-tabs button {
+    flex: 1 !important;
     background: rgba(255,255,255,0.03) !important;
     color: var(--text-dim) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius) !important;
     font-family: var(--font-mono) !important;
     font-size: 10px !important;
+    padding: 5px 8px !important;
+    cursor: pointer !important;
+    transition: all 0.15s !important;
+}
+.politics-tabs .tab-btn.active,
+.politics-tabs button.active {
+    background: rgba(0, 240, 255, 0.08) !important;
+    color: var(--neon-cyan) !important;
+    border-color: rgba(0, 240, 255, 0.2) !important;
+}
+.politics-content {
+    margin-bottom: 8px !important;
+}
+.policy-category { margin-bottom: 8px; }
+.category-title {
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    color: var(--text-faint) !important;
+    letter-spacing: 0.1em !important;
+    text-transform: uppercase !important;
+    margin-bottom: 4px !important;
+}
+.policy-row {
+    display: flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 5px 8px !important;
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    margin-bottom: 3px !important;
+}
+.policy-name { font-size: 11px !important; color: var(--text) !important; }
+.policy-desc { font-size: 9px !important; color: var(--text-faint) !important; display: block; }
+.policy-cost { font-family: var(--font-mono) !important; font-size: 9px !important; color: var(--text-dim) !important; }
+.policy-btn {
     padding: 3px 8px !important;
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    border-radius: var(--radius) !important;
+    cursor: pointer !important;
+}
+.policy-btn.enact {
+    background: rgba(0, 240, 255, 0.08) !important;
+    color: var(--neon-cyan) !important;
+    border: 1px solid rgba(0, 240, 255, 0.2) !important;
+}
+.policy-btn.revoke {
+    background: rgba(255, 34, 68, 0.08) !important;
+    color: var(--neon-red) !important;
+    border: 1px solid rgba(255, 34, 68, 0.2) !important;
+}
+.policy-btn.disabled { opacity: 0.4 !important; cursor: not-allowed !important; }
+.appointment-row {
+    display: flex !important;
+    justify-content: space-between !important;
+    padding: 5px 8px !important;
+    background: rgba(255,255,255,0.02) !important;
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius) !important;
+    margin-bottom: 3px !important;
+    font-size: 11px !important;
+}
+.appointment-title { color: var(--text) !important; }
+.appointment-desc { font-size: 9px !important; color: var(--text-faint) !important; display: block; }
+.appointment-rep { font-family: var(--font-mono) !important; font-size: 9px !important; color: var(--text-dim) !important; }
+.pressure-info { font-size: 11px !important; color: var(--text-faint) !important; }
+.politics-status {
+    font-family: var(--font-mono) !important;
+    font-size: 9px !important;
+    color: var(--text-faint) !important;
+    padding-top: 6px !important;
+    border-top: 1px solid var(--border) !important;
 }
 
 /* Mode Indicator */
@@ -1878,19 +2031,45 @@ body {
 }
 .mode-icon { font-size: 12px !important; }
 
-/* Hack panels */
-.hack-list, .hack-scan, [class*="hack-list"] {
+/* Hack scan list (bottom-left, above minimap) */
+.hack-list, #hack-list {
+    position: fixed !important;
+    bottom: 200px !important;
+    left: 10px !important;
+    width: 200px !important;
+    z-index: 26 !important;
     background: var(--bg-panel) !important;
     backdrop-filter: var(--panel-blur) !important;
     border: 1px solid var(--border) !important;
     border-radius: var(--radius-lg) !important;
+    overflow: hidden !important;
 }
-.hack-list-item, [class*="hack-item"] {
+.hack-list-title {
+    font-family: var(--font-mono) !important;
+    font-size: 8px !important;
     color: var(--text-dim) !important;
-    font-size: 11px !important;
+    letter-spacing: 0.15em !important;
+    padding: 4px 8px !important;
+    border-bottom: 1px solid var(--border) !important;
+}
+.hack-list-rows {
+    max-height: 160px !important;
+    overflow-y: auto !important;
+}
+.hack-row {
+    color: var(--text-dim) !important;
+    font-size: 10px !important;
     font-family: var(--font-mono) !important;
     padding: 3px 8px !important;
-    border-bottom: 1px solid var(--border) !important;
+    border-bottom: 1px solid rgba(255,255,255,0.02) !important;
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+}
+.hack-row:empty { display: none !important; }
+.hack-row.active {
+    color: var(--neon-cyan) !important;
+    background: rgba(0, 240, 255, 0.06) !important;
 }
 
 /* ═══════════════════════════════════════
@@ -1973,6 +2152,36 @@ body {
 #map-screen-overlay,
 #tutorial-overlay {
     font-family: var(--font-mono);
+}
+
+/* ═══════════════════════════════════════
+   SVELTE MOUNT CONTAINERS
+   Prevent mount wrappers from affecting layout
+   ═══════════════════════════════════════ */
+#factions-panel-mount,
+#politics-panel-mount {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    z-index: 46 !important;
+    pointer-events: none !important;
+}
+#factions-panel-mount > *,
+#politics-panel-mount > * {
+    pointer-events: auto !important;
+}
+#citizen-profile-mount,
+#quest-log-mount,
+#tech-screen-mount,
+#case-file-mount,
+#codex-mount,
+#campaign-panel-mount,
+#run-summary-mount,
+#shop-mount,
+#seed-browser-mount,
+#news-feed-mount {
+    position: fixed !important;
+    z-index: 47 !important;
 }
 
 /* Hide old-UI remnants */

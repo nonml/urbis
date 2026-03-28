@@ -533,7 +533,9 @@ export class UIManager {
                 break;
             case 'factions':
                 this._smartphoneOverlay?.classList.add('hidden');
-                document.getElementById('factions-politics-panel')?.classList.remove('hidden');
+                // Toggle factions panel visibility
+                const fp = document.getElementById('factions-panel');
+                if (fp) fp.classList.toggle('visible');
                 break;
             case 'transit':
                 this._smartphoneOverlay?.classList.add('hidden');
