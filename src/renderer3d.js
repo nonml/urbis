@@ -2253,6 +2253,133 @@ export class Renderer3D {
         this._citizensMesh.instanceMatrix.needsUpdate = true;
         this.scene.add(this._citizensMesh);
         this._citizensDirty = false;
+
+        // Build pets — ~20% of citizens own a pet
+        this._rebuildPets(n);
+    }
+
+    /** Pet types with geometry and color configs */
+    static PET_TYPES = [
+        { name: 'dog',  bodyW: 0.10, bodyH: 0.06, bodyD: 0.05, headR: 0.03, color: 0x8d6e4c, tailLen: 0.04 },
+        { name: 'cat',  bodyW: 0.08, bodyH: 0.05, bodyD: 0.04, headR: 0.025, color: 0xff8c42, tailLen: 0.05 },
+        { name: 'dog2', bodyW: 0.09, bodyH: 0.055, bodyD: 0.045, headR: 0.028, color: 0xf5f5dc, tailLen: 0.035 },
+        { name: 'cat2', bodyW: 0.07, bodyH: 0.045, bodyD: 0.035, headR: 0.022, color: 0x333333, tailLen: 0.045 },
+    ];
+
+    _rebuildPets(citizenCount) {
+        // Clean up old pet meshes
+        if (this._petMesh) {
+            this.scene.remove(this._petMesh);
+            this._petMesh.geometry.dispose();
+            this._petMesh = null;
+        }
+
+        // Determine which citizens have pets (deterministic by citizen index)
+        this._petOwners = [];
+        this._petData = [];
+        for (let i = 0; i < citizenCount; i++) {
+            // ~20% chance based on hash of citizen index
+            const hash = ((i * 2654435761) >>> 0) / 4294967296;
+            if (hash < 0.20) {
+                const petType = Renderer3D.PET_TYPES[Math.floor(hash * 20) % Renderer3D.PET_TYPES.length];
+                this._petOwners.push(i);
+                this._petData.push({
+                    ownerIdx: i,
+                    type: petType,
+                    offsetAngle: hash * Math.PI * 2, // orbit angle behind owner
+                    dispX: 0, dispY: 0,              // interpolated display position
+                    phase: hash * Math.PI * 4,        // animation phase
+                    trailDist: 0.3 + hash * 0.2,     // distance behind owner
+                });
+            }
+        }
+
+        const petCount = this._petOwners.length;
+        if (petCount === 0) return;
+
+        // Build a small body+head geometry for pets (similar to citizen but smaller)
+        const bodyGeom = new THREE.BoxGeometry(0.10, 0.05, 0.05);
+        bodyGeom.translate(0, 0.025, 0);
+        const headGeom = new THREE.SphereGeometry(0.025, 6, 4);
+        headGeom.translate(0.04, 0.04, 0);
+        const tailGeom = new THREE.CylinderGeometry(0.005, 0.003, 0.04, 4);
+        tailGeom.rotateZ(Math.PI * 0.3);
+        tailGeom.translate(-0.05, 0.04, 0);
+        const mergedGeom = this._mergeBufferGeometries([bodyGeom, headGeom, tailGeom]);
+        bodyGeom.dispose();
+        headGeom.dispose();
+        tailGeom.dispose();
+
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xffffff, roughness: 0.7, metalness: 0.0,
+            vertexColors: false,
+        });
+        this._petMesh = new THREE.InstancedMesh(mergedGeom, mat, petCount);
+        this._petMesh.castShadow = true;
+        this._petMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+
+        // Set per-pet colors
+        for (let i = 0; i < petCount; i++) {
+            this._petMesh.setColorAt(i, new THREE.Color(this._petData[i].type.color));
+        }
+        if (this._petMesh.instanceColor) {
+            this._petMesh.instanceColor.needsUpdate = true;
+        }
+
+        this.scene.add(this._petMesh);
+    }
+
+    updatePets() {
+        if (!this._petMesh || !this._petData || !this._citizenPositions) return;
+        const currentTime = performance.now() / 1000;
+        const dummy = new THREE.Object3D();
+        const lerpSpeed = 0.06; // Slightly slower than citizen for trailing effect
+
+        for (let i = 0; i < this._petData.length; i++) {
+            const pet = this._petData[i];
+            const cp = this._citizenPositions[pet.ownerIdx];
+            if (!cp) continue;
+
+            // Pet target: offset behind owner based on heading
+            const targetX = cp.dispX - Math.sin(cp.heading) * pet.trailDist;
+            const targetY = cp.dispY - Math.cos(cp.heading) * pet.trailDist;
+
+            // First frame init
+            if (pet.dispX === 0 && pet.dispY === 0) {
+                pet.dispX = targetX;
+                pet.dispY = targetY;
+            }
+
+            // Smooth follow
+            pet.dispX += (targetX - pet.dispX) * lerpSpeed;
+            pet.dispY += (targetY - pet.dispY) * lerpSpeed;
+
+            const wx = pet.dispX - this._mapHalfW + 0.5;
+            const wz = pet.dispY - this._mapHalfH + 0.5;
+
+            // Pet heading: face toward owner
+            const dx = cp.dispX - pet.dispX;
+            const dy = cp.dispY - pet.dispY;
+            const petHeading = Math.atan2(dx, dy);
+
+            // Animation: trotting bob when owner is moving, idle sniff when stationary
+            const isMoving = cp.isMoving;
+            if (isMoving) {
+                const trot = Math.sin(currentTime * 8 + pet.phase);
+                const yBob = 0.02 + Math.abs(trot) * 0.015;
+                dummy.position.set(wx, yBob, wz);
+                dummy.rotation.set(0, petHeading, trot * 0.1);
+            } else {
+                // Idle: slight head movement (simulated via small rotation)
+                const sniff = Math.sin(currentTime * 1.5 + pet.phase) * 0.06;
+                dummy.position.set(wx, 0.02, wz);
+                dummy.rotation.set(0, petHeading + sniff, 0);
+            }
+
+            dummy.updateMatrix();
+            this._petMesh.setMatrixAt(i, dummy.matrix);
+        }
+        this._petMesh.instanceMatrix.needsUpdate = true;
     }
 
     /** Merge multiple BufferGeometry objects into one (simple position+normal merge) */
@@ -2305,23 +2432,76 @@ export class Renderer3D {
 
         const dummy = new THREE.Object3D();
         const currentTime = performance.now() / 1000;
+        const lerpSpeed = 0.08; // Smoothing factor for position interpolation
+
+        // Lazy-init per-citizen interpolation state
+        if (!this._citizenPositions || this._citizenPositions.length !== n) {
+            this._citizenPositions = [];
+            for (let i = 0; i < n; i++) {
+                const c = this.game.citizens.citizens[i];
+                this._citizenPositions.push({
+                    dispX: c.x, dispY: c.y,   // displayed (interpolated) position
+                    prevX: c.x, prevY: c.y,   // last known sim position
+                    heading: 0,                // facing angle (radians)
+                    isMoving: false,
+                    moveStartTime: 0,
+                });
+            }
+        }
 
         for (let i = 0; i < n; i++) {
             const c = this.game.citizens.citizens[i];
-            const wx = c.x - this._mapHalfW + 0.5;
-            const wz = c.y - this._mapHalfH + 0.5;
+            const cp = this._citizenPositions[i];
+            const anim = this._citizenAnimTimes?.[i];
 
-            let yPos = 0.12;
-            if (this._citizenAnimTimes[i]) {
-                const anim = this._citizenAnimTimes[i];
-                // Vertical bobbing
-                const bobOffset = Math.sin(currentTime * anim.speed + anim.phase) * anim.amplitude;
-                yPos = 0.12 + bobOffset;
-                // Slight tilt/wobble for walking feel
-                dummy.rotation.z = Math.sin(currentTime * anim.speed * 1.5 + (anim.wobblePhase || 0)) * 0.08;
+            // Detect sim-level movement (citizen tile changed)
+            if (c.x !== cp.prevX || c.y !== cp.prevY) {
+                // Calculate heading from movement direction
+                const dx = c.x - cp.prevX;
+                const dy = c.y - cp.prevY;
+                cp.heading = Math.atan2(dx, dy); // +X = right, +Y = down in map coords
+                cp.isMoving = true;
+                cp.moveStartTime = currentTime;
+                cp.prevX = c.x;
+                cp.prevY = c.y;
             }
 
-            dummy.position.set(wx, yPos, wz);
+            // Smooth interpolation toward target tile
+            cp.dispX += (c.x - cp.dispX) * lerpSpeed;
+            cp.dispY += (c.y - cp.dispY) * lerpSpeed;
+
+            // Snap if very close (avoid perpetual drift)
+            if (Math.abs(c.x - cp.dispX) < 0.01) cp.dispX = c.x;
+            if (Math.abs(c.y - cp.dispY) < 0.01) cp.dispY = c.y;
+
+            // Detect idle (stopped moving for > 0.5s)
+            const isMoving = cp.dispX !== c.x || cp.dispY !== c.y ||
+                             (currentTime - cp.moveStartTime) < 0.5;
+            cp.isMoving = isMoving;
+
+            const wx = cp.dispX - this._mapHalfW + 0.5;
+            const wz = cp.dispY - this._mapHalfH + 0.5;
+
+            if (anim) {
+                if (isMoving) {
+                    // Walking animation: faster bob + lean + stride swing
+                    const walkSpeed = anim.speed * 2.5;
+                    const stride = Math.sin(currentTime * walkSpeed + anim.phase);
+                    const yBob = 0.12 + Math.abs(stride) * 0.035; // bounce up on each step
+                    const lean = stride * 0.12;                     // body lean side-to-side
+                    dummy.position.set(wx, yBob, wz);
+                    dummy.rotation.set(0, cp.heading, lean);
+                } else {
+                    // Idle animation: gentle breathing bob
+                    const breathe = Math.sin(currentTime * anim.speed * 0.5 + anim.phase) * 0.01;
+                    dummy.position.set(wx, 0.12 + breathe, wz);
+                    dummy.rotation.set(0, cp.heading, 0);
+                }
+            } else {
+                dummy.position.set(wx, 0.12, wz);
+                dummy.rotation.set(0, 0, 0);
+            }
+
             dummy.updateMatrix();
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
         }
@@ -2820,6 +3000,7 @@ export class Renderer3D {
 
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
+        this.updatePets();
 
         this.updateVehicles();
 
