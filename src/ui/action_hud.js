@@ -1,232 +1,360 @@
 /**
- * Action HUD — GTA-style HUD overlay
- * Shows: health bar, armor bar, wanted stars, weapon/ammo, speedometer
+ * Action HUD — Watch Dogs-inspired minimal overlay inside the 3D viewport
  */
 
 export class ActionHUD {
     constructor(game) {
         this.game = game;
         this._el = null;
+        this._cache = {};
         this._init();
     }
 
     _init() {
+        document.getElementById('action-hud')?.remove();
+
+        const anchor = document.getElementById('main-area') || document.body;
+        anchor.style.position = anchor.style.position || 'relative';
+
         this._el = document.createElement('div');
         this._el.id = 'action-hud';
         this._el.innerHTML = `
-            <div class="ahud-top-right">
-                <div class="ahud-wanted" id="ahud-wanted"></div>
+            <div class="ahud-stars" id="ahud-stars">
+                <span></span><span></span><span></span><span></span><span></span>
             </div>
-            <div class="ahud-bottom-left">
-                <div class="ahud-health-group">
-                    <div class="ahud-bar ahud-health-bar">
-                        <div class="ahud-bar-fill ahud-health-fill" id="ahud-health-fill"></div>
-                    </div>
-                    <div class="ahud-bar ahud-armor-bar">
-                        <div class="ahud-bar-fill ahud-armor-fill" id="ahud-armor-fill"></div>
-                    </div>
+            <div class="ahud-vitals">
+                <div class="ahud-vital-ring" id="ahud-ring">
+                    <svg viewBox="0 0 48 48">
+                        <circle class="ahud-ring-bg" cx="24" cy="24" r="20"/>
+                        <circle class="ahud-ring-hp" id="ahud-ring-hp" cx="24" cy="24" r="20"/>
+                        <circle class="ahud-ring-ar" id="ahud-ring-ar" cx="24" cy="24" r="16"/>
+                    </svg>
+                    <div class="ahud-vital-icon" id="ahud-vital-icon">+</div>
+                </div>
+                <div class="ahud-vital-text">
+                    <span class="ahud-hp-num" id="ahud-hp-num">100</span>
                 </div>
             </div>
-            <div class="ahud-bottom-right">
-                <div class="ahud-weapon" id="ahud-weapon"></div>
-                <div class="ahud-speed" id="ahud-speed"></div>
+            <div class="ahud-weapon-box" id="ahud-weapon-box">
+                <div class="ahud-weapon-name" id="ahud-wname"></div>
+                <div class="ahud-weapon-ammo" id="ahud-wammo"></div>
             </div>
-            <div class="ahud-damage-flash" id="ahud-damage-flash"></div>
-            <div class="ahud-death-overlay" id="ahud-death-overlay">WASTED</div>
+            <div class="ahud-speedo" id="ahud-speedo">
+                <span class="ahud-speedo-num" id="ahud-speedo-num">0</span>
+                <span class="ahud-speedo-unit">km/h</span>
+            </div>
+            <div class="ahud-crosshair" id="ahud-crosshair">
+                <svg viewBox="0 0 24 24" width="24" height="24">
+                    <line x1="12" y1="4" x2="12" y2="9" stroke="white" stroke-width="1.5" opacity="0.7"/>
+                    <line x1="12" y1="15" x2="12" y2="20" stroke="white" stroke-width="1.5" opacity="0.7"/>
+                    <line x1="4" y1="12" x2="9" y2="12" stroke="white" stroke-width="1.5" opacity="0.7"/>
+                    <line x1="15" y1="12" x2="20" y2="12" stroke="white" stroke-width="1.5" opacity="0.7"/>
+                    <circle cx="12" cy="12" r="1.5" fill="white" opacity="0.5"/>
+                </svg>
+            </div>
+            <div class="ahud-flash" id="ahud-flash"></div>
+            <div class="ahud-death" id="ahud-death">
+                <div class="ahud-death-line"></div>
+                <div class="ahud-death-text">WASTED</div>
+                <div class="ahud-death-line"></div>
+            </div>
         `;
 
-        const style = document.createElement('style');
-        style.textContent = `
-            #action-hud {
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                pointer-events: none;
-                z-index: 50;
-                font-family: 'Courier New', monospace;
-            }
-            .ahud-top-right {
-                position: absolute;
-                top: 12px;
-                right: 12px;
-            }
-            .ahud-wanted {
-                display: flex;
-                gap: 4px;
-                font-size: 22px;
-                filter: drop-shadow(0 1px 2px rgba(0,0,0,0.8));
-            }
-            .ahud-star {
-                color: #333;
-                transition: color 0.2s;
-            }
-            .ahud-star.active {
-                color: #ffcc00;
-                text-shadow: 0 0 8px #ff8800;
-            }
-            .ahud-star.flashing {
-                animation: starFlash 0.4s infinite alternate;
-            }
-            @keyframes starFlash {
-                from { opacity: 1; }
-                to { opacity: 0.3; }
-            }
-            .ahud-bottom-left {
-                position: absolute;
-                bottom: 16px;
-                left: 16px;
-            }
-            .ahud-health-group {
-                display: flex;
-                flex-direction: column;
-                gap: 3px;
-            }
-            .ahud-bar {
-                width: 200px;
-                height: 12px;
-                background: rgba(0,0,0,0.6);
-                border-radius: 2px;
-                overflow: hidden;
-                border: 1px solid rgba(255,255,255,0.15);
-            }
-            .ahud-bar-fill {
-                height: 100%;
-                transition: width 0.15s ease;
-            }
-            .ahud-health-fill {
-                background: linear-gradient(90deg, #cc2222, #ee4444);
-                width: 100%;
-            }
-            .ahud-armor-fill {
-                background: linear-gradient(90deg, #2266cc, #4488ee);
-                width: 0%;
-            }
-            .ahud-bottom-right {
-                position: absolute;
-                bottom: 16px;
-                right: 16px;
-                text-align: right;
-                color: #fff;
-                text-shadow: 0 1px 3px rgba(0,0,0,0.9);
-            }
-            .ahud-weapon {
-                font-size: 14px;
-                margin-bottom: 4px;
-            }
-            .ahud-speed {
-                font-size: 24px;
-                font-weight: bold;
-                opacity: 0;
-                transition: opacity 0.3s;
-            }
-            .ahud-speed.visible {
-                opacity: 1;
-            }
-            .ahud-damage-flash {
-                position: fixed;
-                top: 0; left: 0; right: 0; bottom: 0;
-                background: radial-gradient(ellipse at center, transparent 40%, rgba(180,0,0,0.4) 100%);
-                pointer-events: none;
-                opacity: 0;
-                transition: opacity 0.15s;
-            }
-            .ahud-damage-flash.active {
-                opacity: 1;
-            }
-            .ahud-death-overlay {
-                position: fixed;
-                top: 50%;
-                left: 50%;
-                transform: translate(-50%, -50%);
-                font-size: 72px;
-                font-weight: bold;
-                color: #cc0000;
-                text-shadow: 0 0 20px rgba(200,0,0,0.8), 0 4px 8px rgba(0,0,0,0.9);
-                letter-spacing: 8px;
-                opacity: 0;
-                transition: opacity 0.5s;
-                pointer-events: none;
-            }
-            .ahud-death-overlay.active {
-                opacity: 1;
-            }
-        `;
+        if (!document.getElementById('ahud-css')) {
+            const s = document.createElement('style');
+            s.id = 'ahud-css';
+            s.textContent = `
+                #action-hud {
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                    z-index: 20;
+                    font-family: 'Consolas', 'SF Mono', 'Courier New', monospace;
+                    overflow: hidden;
+                }
 
-        document.head.appendChild(style);
-        document.body.appendChild(this._el);
+                /* ── Wanted Stars ── top-right inside viewport */
+                .ahud-stars {
+                    position: absolute;
+                    top: 14px;
+                    right: 14px;
+                    display: flex;
+                    gap: 4px;
+                    padding: 5px 8px;
+                    background: rgba(0,0,0,0.55);
+                    border: 1px solid rgba(255,255,255,0.06);
+                    border-radius: 3px;
+                    backdrop-filter: blur(4px);
+                }
+                .ahud-stars span {
+                    width: 10px;
+                    height: 10px;
+                    background: rgba(255,255,255,0.08);
+                    clip-path: polygon(50% 0%, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%);
+                    transition: background 0.2s, filter 0.2s;
+                }
+                .ahud-stars span.on {
+                    background: #f39c12;
+                    filter: drop-shadow(0 0 3px rgba(243,156,18,0.6));
+                }
+                .ahud-stars span.blink {
+                    animation: ahud-blink .3s infinite alternate;
+                }
+                @keyframes ahud-blink { to { opacity: .15 } }
+
+                /* ── Vitals (health ring) ── bottom-left */
+                .ahud-vitals {
+                    position: absolute;
+                    bottom: 16px;
+                    left: 16px;
+                    display: flex;
+                    align-items: center;
+                    gap: 8px;
+                }
+                .ahud-vital-ring {
+                    width: 48px;
+                    height: 48px;
+                    position: relative;
+                }
+                .ahud-vital-ring svg {
+                    width: 100%;
+                    height: 100%;
+                    transform: rotate(-90deg);
+                }
+                .ahud-ring-bg {
+                    fill: none;
+                    stroke: rgba(255,255,255,0.06);
+                    stroke-width: 3;
+                }
+                .ahud-ring-hp {
+                    fill: none;
+                    stroke: #e74c3c;
+                    stroke-width: 3;
+                    stroke-linecap: round;
+                    stroke-dasharray: 125.66;
+                    stroke-dashoffset: 0;
+                    transition: stroke-dashoffset 0.3s ease;
+                    filter: drop-shadow(0 0 3px rgba(231,76,60,0.4));
+                }
+                .ahud-ring-ar {
+                    fill: none;
+                    stroke: #3498db;
+                    stroke-width: 2.5;
+                    stroke-linecap: round;
+                    stroke-dasharray: 100.53;
+                    stroke-dashoffset: 100.53;
+                    transition: stroke-dashoffset 0.3s ease;
+                    filter: drop-shadow(0 0 3px rgba(52,152,219,0.4));
+                }
+                .ahud-vital-icon {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    align-items: center;
+                    justify-content: center;
+                    font-size: 16px;
+                    font-weight: 700;
+                    color: rgba(255,255,255,0.5);
+                }
+                .ahud-vital-text {
+                    display: flex;
+                    flex-direction: column;
+                }
+                .ahud-hp-num {
+                    font-size: 20px;
+                    font-weight: 700;
+                    color: #fff;
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.8);
+                    line-height: 1;
+                }
+
+                /* ── Weapon Box ── bottom-right */
+                .ahud-weapon-box {
+                    position: absolute;
+                    bottom: 16px;
+                    right: 16px;
+                    text-align: right;
+                    background: rgba(0,0,0,0.55);
+                    border: 1px solid rgba(255,255,255,0.06);
+                    border-radius: 3px;
+                    padding: 6px 12px;
+                    backdrop-filter: blur(4px);
+                }
+                .ahud-weapon-name {
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: rgba(255,255,255,0.45);
+                    text-transform: uppercase;
+                    letter-spacing: 1.5px;
+                }
+                .ahud-weapon-ammo {
+                    font-size: 22px;
+                    font-weight: 700;
+                    color: #fff;
+                    line-height: 1.1;
+                    text-shadow: 0 1px 4px rgba(0,0,0,0.6);
+                }
+
+                /* ── Speedometer ── above weapon when driving */
+                .ahud-speedo {
+                    position: absolute;
+                    bottom: 72px;
+                    right: 16px;
+                    text-align: right;
+                    opacity: 0;
+                    transition: opacity 0.25s;
+                }
+                .ahud-speedo.on { opacity: 1; }
+                .ahud-speedo-num {
+                    font-size: 32px;
+                    font-weight: 800;
+                    color: #fff;
+                    text-shadow: 0 2px 6px rgba(0,0,0,0.8);
+                }
+                .ahud-speedo-unit {
+                    font-size: 11px;
+                    font-weight: 600;
+                    color: rgba(255,255,255,0.4);
+                    margin-left: 3px;
+                    letter-spacing: 1px;
+                }
+
+                /* ── Crosshair ── center of viewport */
+                .ahud-crosshair {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                }
+                .ahud-crosshair.on { opacity: 1; }
+
+                /* ── Damage Flash ── */
+                .ahud-flash {
+                    position: absolute;
+                    inset: 0;
+                    background: radial-gradient(ellipse at center, transparent 40%, rgba(200,30,30,0.4) 100%);
+                    opacity: 0;
+                    transition: opacity .08s;
+                    pointer-events: none;
+                }
+                .ahud-flash.on { opacity: 1; }
+
+                /* ── Death Screen ── */
+                .ahud-death {
+                    position: absolute;
+                    inset: 0;
+                    display: flex;
+                    flex-direction: column;
+                    align-items: center;
+                    justify-content: center;
+                    gap: 12px;
+                    background: rgba(0,0,0,0.6);
+                    opacity: 0;
+                    transition: opacity .6s;
+                    pointer-events: none;
+                }
+                .ahud-death.on { opacity: 1; }
+                .ahud-death-text {
+                    font-size: 48px;
+                    font-weight: 900;
+                    color: #c0392b;
+                    letter-spacing: 14px;
+                    text-shadow: 0 0 30px rgba(192,57,43,0.5);
+                }
+                .ahud-death-line {
+                    width: 200px;
+                    height: 1px;
+                    background: linear-gradient(90deg, transparent, rgba(192,57,43,0.6), transparent);
+                }
+            `;
+            document.head.appendChild(s);
+        }
+
+        anchor.appendChild(this._el);
     }
 
     update() {
-        const game = this.game;
-        const player = game.state.player;
-        const ph = game.playerHealth;
-        const combat = game.combat;
-        const vc = game.vehicleController;
+        const now = performance.now();
+        if (now - (this._lastUpdate || 0) < 66) return;
+        this._lastUpdate = now;
 
-        // Health bar
-        const healthFill = this._el.querySelector('#ahud-health-fill');
-        if (healthFill) {
-            const ratio = (player.health ?? 100) / (player.maxHealth ?? 100);
-            healthFill.style.width = `${ratio * 100}%`;
+        const { state, playerHealth: ph, combat, vehicleController: vc, policeSystem: ps } = this.game;
+        const player = state.player;
+
+        // Health ring (circumference = 2 * PI * 20 = 125.66)
+        const hp = Math.round(((player.health ?? 100) / (player.maxHealth ?? 100)) * 100);
+        if (hp !== this._cache.hp) {
+            this._cache.hp = hp;
+            const ring = this._el.querySelector('#ahud-ring-hp');
+            if (ring) ring.style.strokeDashoffset = (125.66 * (1 - hp / 100)).toFixed(1);
+            const num = this._el.querySelector('#ahud-hp-num');
+            if (num) num.textContent = player.health ?? 100;
+            // Change icon color when low
+            const icon = this._el.querySelector('#ahud-vital-icon');
+            if (icon) icon.style.color = hp < 30 ? '#e74c3c' : 'rgba(255,255,255,0.5)';
         }
 
-        // Armor bar
-        const armorFill = this._el.querySelector('#ahud-armor-fill');
-        if (armorFill) {
-            const ratio = (player.armor ?? 0) / 100;
-            armorFill.style.width = `${ratio * 100}%`;
+        // Armor ring (circumference = 2 * PI * 16 = 100.53)
+        const ar = Math.round(player.armor ?? 0);
+        if (ar !== this._cache.ar) {
+            this._cache.ar = ar;
+            const ring = this._el.querySelector('#ahud-ring-ar');
+            if (ring) ring.style.strokeDashoffset = (100.53 * (1 - ar / 100)).toFixed(1);
         }
 
-        // Wanted stars (5 stars based on heat)
-        const wantedEl = this._el.querySelector('#ahud-wanted');
-        if (wantedEl) {
-            const heat = player.heat || 0;
-            let stars = 0;
-            if (heat >= 90) stars = 5;
-            else if (heat >= 75) stars = 4;
-            else if (heat >= 50) stars = 3;
-            else if (heat >= 25) stars = 2;
-            else if (heat >= 10) stars = 1;
-
-            const inPursuit = game.policeSystem?.getResponseLevel() === 'pursuit';
-            let html = '';
-            for (let i = 0; i < 5; i++) {
-                const active = i < stars;
-                const flashing = active && inPursuit;
-                html += `<span class="ahud-star${active ? ' active' : ''}${flashing ? ' flashing' : ''}">★</span>`;
-            }
-            wantedEl.innerHTML = html;
+        // Wanted stars
+        const heat = player.heat || 0;
+        const stars = heat >= 90 ? 5 : heat >= 75 ? 4 : heat >= 50 ? 3 : heat >= 25 ? 2 : heat >= 10 ? 1 : 0;
+        if (stars !== this._cache.stars) {
+            this._cache.stars = stars;
+            const pursuit = ps?.getResponseLevel() === 'pursuit';
+            const spans = this._el.querySelectorAll('.ahud-stars span');
+            spans.forEach((s, i) => {
+                s.className = i < stars ? (pursuit ? 'on blink' : 'on') : '';
+            });
         }
 
-        // Weapon / ammo
-        const weaponEl = this._el.querySelector('#ahud-weapon');
-        if (weaponEl && combat) {
-            const w = combat.weapon;
+        // Weapon
+        if (combat) {
+            const name = combat.weapon.name;
             const ammo = combat.getAmmoDisplay();
-            weaponEl.textContent = `${w.name} | ${ammo}`;
-        }
-
-        // Speedometer (only when driving)
-        const speedEl = this._el.querySelector('#ahud-speed');
-        if (speedEl) {
-            if (vc?.isDriving) {
-                speedEl.classList.add('visible');
-                speedEl.textContent = `${vc.getSpeedKmh()} km/h`;
-            } else {
-                speedEl.classList.remove('visible');
+            const key = name + ammo;
+            if (key !== this._cache.weapon) {
+                this._cache.weapon = key;
+                const n = this._el.querySelector('#ahud-wname');
+                const a = this._el.querySelector('#ahud-wammo');
+                if (n) n.textContent = name;
+                if (a) a.textContent = ammo;
             }
         }
 
-        // Damage flash
-        const flashEl = this._el.querySelector('#ahud-damage-flash');
-        if (flashEl) {
-            flashEl.classList.toggle('active', ph?.showDamageFlash || false);
+        // Crosshair — show in street mode when not driving
+        const crosshair = this._el.querySelector('#ahud-crosshair');
+        if (crosshair) {
+            const show = this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead;
+            crosshair.classList.toggle('on', show);
         }
 
-        // Death overlay
-        const deathEl = this._el.querySelector('#ahud-death-overlay');
-        if (deathEl) {
-            deathEl.classList.toggle('active', ph?.isDead || false);
+        // Speedometer
+        const speedo = this._el.querySelector('#ahud-speedo');
+        if (speedo) {
+            if (vc?.isDriving) {
+                speedo.classList.add('on');
+                const spd = vc.getSpeedKmh();
+                if (spd !== this._cache.spd) {
+                    this._cache.spd = spd;
+                    this._el.querySelector('#ahud-speedo-num').textContent = spd;
+                }
+            } else {
+                speedo.classList.remove('on');
+            }
         }
+
+        // Effects
+        this._el.querySelector('#ahud-flash')?.classList.toggle('on', ph?.showDamageFlash || false);
+        this._el.querySelector('#ahud-death')?.classList.toggle('on', ph?.isDead || false);
     }
 
     destroy() {

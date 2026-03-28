@@ -1119,22 +1119,24 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             this.renderer3d.syncPlayer();
         }
 
-        // Check pedestrian-vehicle collision (on foot only)
-        const vs = this.game.vehicleSystem;
-        const ph = this.game.playerHealth;
-        if (vs && ph && !ph.isDead) {
-            const px = this.game.player.wx ?? this.game.player.x;
-            const py = this.game.player.wz ?? this.game.player.y;
-            for (const v of vs.vehicles) {
-                const speed = v.speed || 0;
-                if (speed < 2) continue; // slow vehicles don't hurt
-                const dx = v.x - px;
-                const dy = v.y - py;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-                if (dist < 1.2) {
-                    const damage = Math.floor(speed * 3);
-                    ph.takeDamage(damage, 'vehicle');
-                    break;
+        // Check pedestrian-vehicle collision (on foot only, throttled to ~10fps)
+        const now = performance.now();
+        if (now - (this._lastVehicleCollisionCheck || 0) > 100) {
+            this._lastVehicleCollisionCheck = now;
+            const vs = this.game.vehicleSystem;
+            const ph = this.game.playerHealth;
+            if (vs && ph && !ph.isDead) {
+                const px = this.game.player.wx ?? this.game.player.x;
+                const py = this.game.player.wz ?? this.game.player.y;
+                for (const v of vs.vehicles) {
+                    const speed = v.speed || 0;
+                    if (speed < 2) continue;
+                    const dx = v.x - px;
+                    const dy = v.y - py;
+                    if (dx * dx + dy * dy < 1.44) { // 1.2^2, skip sqrt
+                        ph.takeDamage(Math.floor(speed * 3), 'vehicle');
+                        break;
+                    }
                 }
             }
         }

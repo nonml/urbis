@@ -136,8 +136,8 @@ export class Renderer3D {
         this.LOD_TERRAIN_ONLY_DIST = 150;
         
         // Camera mode settings (God vs Street)
-        this.cameraMode = 'street'; // 'street' or 'god'
-        this.cameraModeTransition = 0; // 0 = street, 1 = god
+        this.cameraMode = 'god'; // 'street' or 'god'
+        this.cameraModeTransition = 1; // 0 = street, 1 = god
         this.cameraModeTarget = 0; // target for smooth transition
         this.cameraModeTransitionTimer = 0; // for 400ms transition
         
@@ -192,10 +192,10 @@ export class Renderer3D {
         this._hoverHighlight = null;
 
         // Renderer
-        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: true });
-        this.renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+        this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
+        this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
         this.renderer.shadowMap.enabled = true;
-        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        this.renderer.shadowMap.type = THREE.PCFShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.3;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -213,8 +213,8 @@ export class Renderer3D {
         this.sunLight = new THREE.DirectionalLight(0xfffbe0, 2.2);
         this.sunLight.position.set(30, 50, 20);
         this.sunLight.castShadow = true;
-        this.sunLight.shadow.mapSize.width = 4096;
-        this.sunLight.shadow.mapSize.height = 4096;
+        this.sunLight.shadow.mapSize.width = 1024;
+        this.sunLight.shadow.mapSize.height = 1024;
         this.sunLight.shadow.camera.near = 1;
         this.sunLight.shadow.camera.far = 150;
         this.sunLight.shadow.camera.left = -50;
@@ -225,12 +225,12 @@ export class Renderer3D {
         this.sunLight.shadow.normalBias = 0.03;
         this.scene.add(this.sunLight);
 
-        // Secondary distant sun — wider, softer shadows for distant objects
+        // Secondary distant sun — wider fill light, no shadow (perf)
         this.sunLightFar = new THREE.DirectionalLight(0xfff4e0, 0.4);
         this.sunLightFar.position.set(30, 40, 20);
-        this.sunLightFar.castShadow = true;
-        this.sunLightFar.shadow.mapSize.width = 1024;
-        this.sunLightFar.shadow.mapSize.height = 1024;
+        this.sunLightFar.castShadow = false;
+        this.sunLightFar.shadow.mapSize.width = 512;
+        this.sunLightFar.shadow.mapSize.height = 512;
         this.sunLightFar.shadow.camera.near = 1;
         this.sunLightFar.shadow.camera.far = 200;
         this.sunLightFar.shadow.camera.left = -80;
@@ -270,6 +270,12 @@ export class Renderer3D {
         this.composer = null;
         this._sky = null;
         this._sunPosition = new THREE.Vector3();
+        // Reusable vectors for per-frame camera math (avoid GC pressure)
+        this._camIdeal = new THREE.Vector3();
+        this._camPlayerPos = new THREE.Vector3();
+        this._camRayDir = new THREE.Vector3();
+        this._camCheckPos = new THREE.Vector3();
+        this._camRaycaster = new THREE.Raycaster();
 
         // Internal
         this._mapHalfW = 0;
@@ -861,16 +867,16 @@ export class Renderer3D {
             const renderPass = new RenderPass(this.scene, this.camera);
             this.composer.addPass(renderPass);
 
-            // SSAO — ambient occlusion for contact shadows and depth (optional)
-            if (SSAOMod) {
-                const { SSAOPass } = SSAOMod;
-                const ssaoPass = new SSAOPass(this.scene, this.camera, rect.width, rect.height);
-                ssaoPass.kernelRadius = 8;
-                ssaoPass.minDistance = 0.005;
-                ssaoPass.maxDistance = 0.3;
-                this.composer.addPass(ssaoPass);
-                this._ssaoPass = ssaoPass;
-            }
+            // SSAO disabled for performance — was rendering full scene an extra time
+            // if (SSAOMod) {
+            //     const { SSAOPass } = SSAOMod;
+            //     const ssaoPass = new SSAOPass(this.scene, this.camera, rect.width, rect.height);
+            //     ssaoPass.kernelRadius = 8;
+            //     ssaoPass.minDistance = 0.005;
+            //     ssaoPass.maxDistance = 0.3;
+            //     this.composer.addPass(ssaoPass);
+            //     this._ssaoPass = ssaoPass;
+            // }
 
             // Bloom — subtle glow on bright surfaces (sun, water glints)
             const bloomPass = new UnrealBloomPass(
@@ -2589,47 +2595,48 @@ export class Renderer3D {
         if (!ps) return;
         const units = ps.units || [];
 
-        // Rebuild police meshes when count changes
+        // No police = hide and skip
+        if (units.length === 0) {
+            if (this._policeGroup.children.length > 0) this._policeGroup.clear();
+            return;
+        }
+
+        // Rebuild police meshes only when count changes — reuse shared geometry/material
         if (this._policeGroup.children.length !== units.length) {
             this._policeGroup.clear();
+            if (!this._policeBodyGeo) {
+                this._policeBodyGeo = new THREE.BoxGeometry(0.45, 0.15, 0.22);
+                this._policeBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.4 });
+                this._policeLightGeo = new THREE.BoxGeometry(0.2, 0.06, 0.22);
+            }
             for (const u of units) {
-                // Police car: white box with blue top
-                const body = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.45, 0.15, 0.22),
-                    new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.4 })
-                );
-                const lights = new THREE.Mesh(
-                    new THREE.BoxGeometry(0.2, 0.06, 0.22),
+                const body = new THREE.Mesh(this._policeBodyGeo, this._policeBodyMat);
+                const lights = new THREE.Mesh(this._policeLightGeo,
                     new THREE.MeshStandardMaterial({ color: 0x2255ff, emissive: 0x2255ff, emissiveIntensity: 0.8 })
                 );
                 lights.position.y = 0.1;
                 const group = new THREE.Group();
                 group.add(body);
                 group.add(lights);
-                group.castShadow = true;
-                group.userData.policeId = u.id;
                 this._policeGroup.add(group);
             }
         }
 
         // Update positions
+        const flash = Math.sin(performance.now() * 0.01) > 0;
         for (let i = 0; i < units.length; i++) {
             const u = units[i];
             const child = this._policeGroup.children[i];
             if (!child) continue;
-            const wx = u.x - this._mapHalfW + 0.5;
-            const wz = u.y - this._mapHalfH + 0.5;
-            child.position.set(wx, 0.06, wz);
-            const headingRad = (u.heading || 0) * Math.PI / 180;
-            child.rotation.y = headingRad;
+            child.position.set(u.x - this._mapHalfW + 0.5, 0.06, u.y - this._mapHalfH + 0.5);
+            child.rotation.y = (u.heading || 0) * Math.PI / 180;
 
-            // Flash police lights in pursuit
             if (u.state === 'pursuit') {
-                const flash = Math.sin(performance.now() * 0.01) > 0;
                 const lights = child.children[1];
                 if (lights?.material) {
-                    lights.material.color.setHex(flash ? 0x2255ff : 0xff2222);
-                    lights.material.emissive.setHex(flash ? 0x2255ff : 0xff2222);
+                    const hex = flash ? 0x2255ff : 0xff2222;
+                    lights.material.color.setHex(hex);
+                    lights.material.emissive.setHex(hex);
                 }
             }
         }
@@ -2644,6 +2651,20 @@ export class Renderer3D {
         const isRain = weatherType === 'rain' || weatherType === 'storm';
         const isStorm = weatherType === 'storm';
         const isFog = weatherType === 'fog';
+
+        // Hide rain when not raining
+        if (this._rainGroup && !isRain) {
+            this._rainGroup.visible = false;
+        }
+
+        // Skip heavy updates when weather is clear
+        if (!isRain && !isFog && !isStorm) {
+            // Reset wet ground
+            if (this._terrainMesh?.material?.metalness > 0) {
+                this._terrainMesh.material.metalness = 0;
+            }
+            return;
+        }
 
         // Create rain particles on first use
         if (isRain && !this._rainGroup) {
@@ -2837,20 +2858,14 @@ export class Renderer3D {
         const pitchDamp = 0.15;
         this.pitch = this.pitch + (Math.max(-1.2, Math.min(-0.1, currentPitch)) - this.pitch) * pitchDamp;
 
-        // Build ideal camera position
-        let idealCamPos = new THREE.Vector3(idealX, targetHeight, idealZ);
+        // Build ideal camera position (reuse cached vector)
+        let idealCamPos = this._camIdeal.set(idealX, targetHeight, idealZ);
 
         // Collision detection: raycast from player to camera position
         // Check for obstacles (mountains, buildings) along the line
         if (this.cameraCollision) {
-            const playerPos = new THREE.Vector3(p.x, p.y + 1.5, p.z);
-            const rayOrigin = playerPos.clone();
-            const rayDirection = idealCamPos.clone().sub(playerPos).normalize();
-
-            // Raycast length = follow distance
-            const raycaster = new THREE.Raycaster(rayOrigin, rayDirection);
-            raycaster.near = 0.1;
-            raycaster.far = this.followDist;
+            const playerPos = this._camPlayerPos.set(p.x, p.y + 1.5, p.z);
+            const rayDirection = this._camRayDir.copy(idealCamPos).sub(playerPos).normalize();
 
             // Check terrain collisions by sampling heights along the path
             let collisionFound = false;
@@ -2859,7 +2874,7 @@ export class Renderer3D {
 
             for (let i = 1; i < steps; i++) {
                 const distance = i * stepSize;
-                const checkPos = new THREE.Vector3(
+                const checkPos = this._camCheckPos.set(
                     playerPos.x + rayDirection.x * distance,
                     0,
                     playerPos.z + rayDirection.z * distance
@@ -3244,7 +3259,7 @@ export class Renderer3D {
 
         // Blackout effect: dim scene when player is in a blacked-out district
         const wh = this.game?.worldHacks;
-        if (wh && this.ambientLight) {
+        if (wh && wh._blackoutDistricts.size > 0 && this.ambientLight) {
             const playerDistrict = this.game.map.getDistrictAt?.(this.game.player.x, this.game.player.y) ?? -1;
             if (wh.isBlackedOut(playerDistrict)) {
                 this.ambientLight.intensity = Math.max(0.05, this.ambientLight.intensity * 0.3);

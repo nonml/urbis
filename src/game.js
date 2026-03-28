@@ -1,6 +1,6 @@
 // Core Game class managing state and systems
 import { Resources } from './resources.js';
-import { Map } from './map.js';
+import { Map as GameMap } from './map.js';
 import { CitizenManager } from './citizen.js';
 import { BuildingManager } from './buildings.js';
 import { CrisisManager } from './crisis.js';
@@ -173,7 +173,7 @@ export class Game {
         // Initialize systems with references to state
         this.resources = new Resources(this.state.resources);
         this.resources.syncFromState();
-        this.map = new Map(this.state.map.width, this.state.map.height, this.state.meta.seed, this.rngStreams.world);
+        this.map = new GameMap(this.state.map.width, this.state.map.height, this.state.meta.seed, this.rngStreams.world);
         this.citizens = new CitizenManager(this.rngStreams.sim);
         this.buildings = new BuildingManager(this);
         this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
@@ -301,7 +301,7 @@ export class Game {
         this.demandCalculator = createDemandCalculator();
 
         // Milestone F: Mode system (default to Street Mode)
-        this.mode = MODE_STREET;
+        this.mode = MODE_GOD;
         if (!this.isHeadless) {
             this.modeIndicator = new ModeIndicator(this);
             this.modeIndicator.setMode(this.mode);
@@ -483,11 +483,18 @@ export class Game {
      * @param {boolean} options.newSeed - Generate new random seed
      */
     restart(options = {}) {
+        // Stop old game loop first
+        this.stop();
+
+        // Clean up old DOM elements to prevent duplication
+        this.modeIndicator?.destroy?.();
+        this.ui?.actionHUD?.destroy?.();
+        document.querySelectorAll('#mode-indicator').forEach(el => el.remove());
+
         const seed = options.newSeed ? undefined : (options.seed || randomSeed32());
         const preset = this.state.map.preset || 'CITY';
         const mode = this.state.progress?.mode || 'standard';
 
-        // Create new game state with the same or new seed
         window.game = new Game({ mapPreset: preset, seed, mode });
         window.game.init();
     }
@@ -513,7 +520,11 @@ export class Game {
         if (!this.state.time.paused) {
             while (this.tickAccumulator >= this.tickRate) {
                 simDt = this.tickRate / 1000; // convert ms to seconds
-                this.tickOnce(simDt);
+                try {
+                    this.tickOnce(simDt);
+                } catch (e) {
+                    console.error('[Game] tickOnce error:', e.message, e.stack?.split('\n')[1]);
+                }
                 this.tickAccumulator -= this.tickRate;
             }
         }
@@ -667,6 +678,7 @@ export class Game {
 
         // 4. Citizen updates (includes job production)
         // Sort citizens by ID for deterministic ordering
+        if (!this.citizens?.citizens) return;
         this.citizens.citizens.sort((a, b) => a.id - b.id);
         const citizenResult = this.citizens.updateAll(this.map, this.buildings);
         this.state.resources.population = this.citizens.getPopulation();
@@ -856,6 +868,7 @@ export class Game {
      * Process citizen daily schedules - move them between home, work, and leisure
      */
     processCitizenSchedules() {
+        if (!this.citizens?.citizens) return;
         const newTime = this.state.time.timeOfDay;
         this.citizenSim.updateAll(this.citizens.citizens, newTime, this.state.time.tick);
         this.nav = this.scheduleManager.nav;
@@ -1372,7 +1385,7 @@ export class Game {
                     this.rngStreams = createRNGStreams(this.state.meta.seed);
                 }
                 this.rng = this.rngStreams.sim;
-                this.map = new Map(meta.mapWidth, meta.mapHeight, this.state.meta.seed, this.rngStreams.world);
+                this.map = new GameMap(meta.mapWidth, meta.mapHeight, this.state.meta.seed, this.rngStreams.world);
                 this.citizens = new CitizenManager(this.rngStreams.sim);
                 this.crisisManager = new CrisisManager(this, this.rngStreams.sim);
                 this.scheduleManager = new ScheduleManager(this.map.width, this.map.height, this.map, this.buildings);

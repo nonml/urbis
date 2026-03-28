@@ -48,6 +48,9 @@ export class ModeIndicator {
     createUI(container = this.container) {
         if (this.uiElement) return;
 
+        // Remove any pre-existing mode indicator (prevents HMR/restart duplication)
+        this.doc.querySelectorAll('#mode-indicator').forEach(el => el.remove());
+
         const indicatorContainer = this.doc.createElement('div');
         indicatorContainer.id = 'mode-indicator';
         indicatorContainer.className = 'mode-indicator';

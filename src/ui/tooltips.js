@@ -267,7 +267,7 @@ export class TooltipManager {
         `;
         
         // Stats section
-        if (data.stats.length > 0) {
+        if (data.stats?.length > 0) {
             html += `<div style="border-top: 1px solid ${style.statColor}33; padding-top: 8px; margin-bottom: 8px;">`;
             for (const stat of data.stats) {
                 html += `
@@ -286,7 +286,7 @@ export class TooltipManager {
         }
         
         // Effects section
-        if (data.effects.length > 0) {
+        if (data.effects?.length > 0) {
             html += `<div style="border-top: 1px solid ${style.statColor}33; padding-top: 8px; margin-bottom: 8px;">`;
             for (const effect of data.effects) {
                 let effectColor = style.effectNeutral;
@@ -304,7 +304,7 @@ export class TooltipManager {
         }
         
         // Actions section
-        if (data.actions.length > 0) {
+        if (data.actions?.length > 0) {
             html += `<div style="border-top: 1px solid ${style.statColor}33; padding-top: 8px; display: flex; gap: 8px; flex-wrap: wrap;">`;
             for (const action of data.actions) {
                 html += `

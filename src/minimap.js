@@ -57,9 +57,9 @@ export class Minimap {
             this.dot.style.top = `${y}px`;
         }
 
-        // Draw police blips on minimap during pursuit
+        // Draw police blips on minimap during pursuit (only when police active)
         const ps = this.game.policeSystem;
-        if (ps && ps.units.length > 0 && this.canvas) {
+        if (ps?.units?.length > 0 && this.canvas) {
             const ctx = this.canvas.getContext('2d');
             const rect = this.canvas.getBoundingClientRect();
             const flash = Math.sin(performance.now() * 0.008) > 0;

@@ -97,6 +97,15 @@ window.startGame = async function() {
 
         await nextFrame();
         updateLoading(35, 'Generating world...');
+
+        // Clean up previous game instance if any
+        if (window.game) {
+            window.game.stop?.();
+            window.game.modeIndicator?.destroy?.();
+            window.game.ui?.actionHUD?.destroy?.();
+        }
+        document.querySelectorAll('#mode-indicator').forEach(el => el.remove());
+
         window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
         updateLoading(60, 'Booting systems...');
         window.perfOverlay = new PerfOverlay(window.game);
@@ -128,6 +137,15 @@ window.restartGame = async function() {
 
         await nextFrame();
         updateLoading(35, 'Generating world...');
+
+        // Clean up previous game instance
+        if (window.game) {
+            window.game.stop?.();
+            window.game.modeIndicator?.destroy?.();
+            window.game.ui?.actionHUD?.destroy?.();
+        }
+        document.querySelectorAll('#mode-indicator').forEach(el => el.remove());
+
         window.game = new Game({ mapPreset: preset, seed: Number.isFinite(seed) ? seed : undefined, mode, difficulty });
 
         updateLoading(60, 'Booting systems...');
