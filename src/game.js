@@ -795,7 +795,7 @@ export class Game {
         this.policyManager.update(this.state.time.tick);
         this.appointmentsManager.update(this.state.time.tick);
         this.pressureMapManager.update(this.state.time.tick);
-        this.rivalIntegrationManager.update(this.state, this.state.time.tick);
+        this.rivalIntegrationManager?.update?.(this.state, this.state.time.tick);
 
         // 6. Day start message (first tick of each day)
         if (this.resources.day === 1 || this.rng.chance(0.3)) {
