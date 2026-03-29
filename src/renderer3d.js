@@ -203,14 +203,14 @@ export class Renderer3D {
         this.setRenderScale(1.0);
 
         // Lighting — hemisphere light for natural sky/ground fill
-        this.hemiLight = new THREE.HemisphereLight(0x9fd8fb, 0x4a7a3a, 0.7);
+        this.hemiLight = new THREE.HemisphereLight(0xb8e4ff, 0x6aaa60, 1.1);
         this.scene.add(this.hemiLight);
 
-        this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.3);
+        this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.55);
         this.scene.add(this.ambientLight);
 
         // Primary sun light — tighter frustum for sharper nearby shadows
-        this.sunLight = new THREE.DirectionalLight(0xfffbe0, 2.2);
+        this.sunLight = new THREE.DirectionalLight(0xfffbe0, 1.8);
         this.sunLight.position.set(30, 50, 20);
         this.sunLight.castShadow = true;
         this.sunLight.shadow.mapSize.width = 1024;
@@ -339,6 +339,8 @@ export class Renderer3D {
         this._roadModels = new Map();
         // Street prop model library: propName -> THREE.Group
         this._propModels = new Map();
+        // Urban detail models: detailName -> THREE.Group (awnings, parasols, fences)
+        this._detailModels = new Map();
         this._bridgeModels = new Map();  // road-bridge, bridge-pillar
         this._transitModels = new Map(); // bus, metro entrance geometry
 
@@ -393,18 +395,25 @@ export class Renderer3D {
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('wheel', (e) => this.handleWheel(e));
 
+        // Init sky + post-processing immediately so sky is visible from frame 1
+        this._initPostProcessing();
         // Async: load Kenney GLB models + terrain textures, then rebuild once ready
         this._preloadAssets();
     }
 
     resize() {
         const rect = this.canvas.getBoundingClientRect();
-        this.renderer.setSize(rect.width, rect.height, false);
-        this.camera.aspect = rect.width / rect.height;
+        const w = rect.width || window.innerWidth;
+        const h = rect.height || window.innerHeight;
+        if (w === 0 || h === 0) return;
+        this.renderer.setSize(w, h, true);
+        this.camera.aspect = w / h;
         this.camera.updateProjectionMatrix();
-        // Resize post-processing composer
         if (this.composer) {
-            this.composer.setSize(rect.width, rect.height);
+            this.composer.setSize(w, h);
+        }
+        if (this._fxaaPass) {
+            this._fxaaPass.material.uniforms['resolution'].value.set(1 / w, 1 / h);
         }
     }
 
@@ -490,9 +499,24 @@ export class Renderer3D {
     /** Street prop model paths */
     static PROP_MODEL_MAP = {
         'light-square':       'assets/models/kenney_roads/light-square.glb',
+        'light-curved':       'assets/models/kenney_roads/light-curved.glb',
         'construction-cone':  'assets/models/kenney_roads/construction-cone.glb',
+        'construction-barrier':'assets/models/kenney_roads/construction-barrier.glb',
+        'construction-light': 'assets/models/kenney_roads/construction-light.glb',
         'sign-highway':       'assets/models/kenney_roads/sign-highway.glb',
+        'sign-highway-wide':  'assets/models/kenney_roads/sign-highway-wide.glb',
         'bridge-pillar':      'assets/models/kenney_roads/bridge-pillar.glb',
+    };
+
+    /** Urban detail prop model paths — scattered near commercial buildings */
+    static DETAIL_MODEL_MAP = {
+        'awning':             'assets/models/kenney_commercial/detail-awning.glb',
+        'awning-wide':        'assets/models/kenney_commercial/detail-awning-wide.glb',
+        'overhang':           'assets/models/kenney_commercial/detail-overhang.glb',
+        'parasol-a':          'assets/models/kenney_commercial/detail-parasol-a.glb',
+        'parasol-b':          'assets/models/kenney_commercial/detail-parasol-b.glb',
+        'fence':              'assets/models/kenney_suburban/fence.glb',
+        'fence-low':          'assets/models/kenney_suburban/fence-low.glb',
     };
 
     /** Vegetation model paths */
@@ -825,6 +849,23 @@ export class Renderer3D {
             for (const [name, url] of Object.entries(Renderer3D.VEGETATION_MODEL_MAP)) {
                 jobs.push(loadVegetation(name, url));
             }
+            // Load urban detail models (awnings, parasols, fences)
+            const loadDetail = (name, url) => new Promise((resolve) => {
+                loader.load(url, (gltf) => {
+                    const root = gltf.scene;
+                    root.scale.setScalar(0.40);
+                    const box = new THREE.Box3().setFromObject(root);
+                    const center = box.getCenter(new THREE.Vector3());
+                    root.position.x -= center.x;
+                    root.position.z -= center.z;
+                    root.position.y -= box.min.y;
+                    this._detailModels.set(name, root);
+                    resolve();
+                }, undefined, () => resolve());
+            });
+            for (const [name, url] of Object.entries(Renderer3D.DETAIL_MODEL_MAP)) {
+                jobs.push(loadDetail(name, url));
+            }
         }
 
         await Promise.all(jobs);
@@ -832,8 +873,6 @@ export class Renderer3D {
         // Procedural bus (no bus.glb in asset pack)
         this._vehicleModels.set('bus', this._createProceduralBus());
 
-        // Initialize post-processing and sky (async addon imports)
-        await this._initPostProcessing();
         this._initEnvMap(); // non-blocking HDR env map
 
         this.rebuildWorld();
@@ -851,8 +890,9 @@ export class Renderer3D {
                 import('three/addons/postprocessing/UnrealBloomPass.js'),
                 import('three/addons/objects/Sky.js'),
                 import('three/addons/postprocessing/SSAOPass.js'),
+                import('three/addons/postprocessing/ShaderPass.js'),
             ]);
-            const [EffectComposerMod, RenderPassMod, BloomMod, SkyMod, SSAOMod] = imports.map(r => r.status === 'fulfilled' ? r.value : null);
+            const [EffectComposerMod, RenderPassMod, BloomMod, SkyMod, SSAOMod, ShaderPassMod] = imports.map(r => r.status === 'fulfilled' ? r.value : null);
             if (!EffectComposerMod || !RenderPassMod || !BloomMod || !SkyMod) throw new Error('core addons missing');
             const { EffectComposer } = EffectComposerMod;
             const { RenderPass } = RenderPassMod;
@@ -867,26 +907,88 @@ export class Renderer3D {
             const renderPass = new RenderPass(this.scene, this.camera);
             this.composer.addPass(renderPass);
 
-            // SSAO disabled for performance — was rendering full scene an extra time
-            // if (SSAOMod) {
-            //     const { SSAOPass } = SSAOMod;
-            //     const ssaoPass = new SSAOPass(this.scene, this.camera, rect.width, rect.height);
-            //     ssaoPass.kernelRadius = 8;
-            //     ssaoPass.minDistance = 0.005;
-            //     ssaoPass.maxDistance = 0.3;
-            //     this.composer.addPass(ssaoPass);
-            //     this._ssaoPass = ssaoPass;
-            // }
+            // SSAO — ambient occlusion for depth (tuned for perf: half-res, small kernel)
+            if (SSAOMod) {
+                const { SSAOPass } = SSAOMod;
+                const ssaoW = Math.round(rect.width * 0.5);
+                const ssaoH = Math.round(rect.height * 0.5);
+                const ssaoPass = new SSAOPass(this.scene, this.camera, ssaoW, ssaoH);
+                ssaoPass.kernelRadius = 4;
+                ssaoPass.minDistance = 0.001;
+                ssaoPass.maxDistance = 0.15;
+                ssaoPass.output = SSAOPass.OUTPUT.Default;
+                this.composer.addPass(ssaoPass);
+                this._ssaoPass = ssaoPass;
+            }
 
-            // Bloom — subtle glow on bright surfaces (sun, water glints)
+            // Bloom — subtle glow on bright surfaces (sun, water, street lights)
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(rect.width, rect.height),
-                0.25,   // strength (a bit more visible)
+                0.25,   // strength — boosted at night dynamically
                 0.5,    // radius
                 0.80    // threshold
             );
             this.composer.addPass(bloomPass);
             this._bloomPass = bloomPass;
+            // Store base bloom values for day/night interpolation
+            this._bloomDayStrength = 0.20;
+            this._bloomNightStrength = 0.55;
+
+            // FXAA anti-aliasing
+            if (ShaderPassMod) {
+                try {
+                    const { FXAAShader } = await import('three/addons/shaders/FXAAShader.js');
+                    const { ShaderPass } = ShaderPassMod;
+                    const fxaaPass = new ShaderPass(FXAAShader);
+                    fxaaPass.material.uniforms['resolution'].value.set(1 / rect.width, 1 / rect.height);
+                    this.composer.addPass(fxaaPass);
+                    this._fxaaPass = fxaaPass;
+                } catch { /* FXAA shader not available */ }
+            }
+
+            // Vignette + color grading (single custom pass)
+            if (ShaderPassMod) {
+                const { ShaderPass } = ShaderPassMod;
+                const VignetteColorGradeShader = {
+                    uniforms: {
+                        tDiffuse: { value: null },
+                        vignetteStrength: { value: 0.35 },
+                        vignetteRadius: { value: 0.85 },
+                        saturation: { value: 1.08 },
+                        contrast: { value: 1.05 },
+                        tintColor: { value: new THREE.Vector3(1.0, 0.98, 0.95) },
+                    },
+                    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+                    fragmentShader: `
+                        uniform sampler2D tDiffuse;
+                        uniform float vignetteStrength;
+                        uniform float vignetteRadius;
+                        uniform float saturation;
+                        uniform float contrast;
+                        uniform vec3 tintColor;
+                        varying vec2 vUv;
+                        void main(){
+                            vec4 col=texture2D(tDiffuse,vUv);
+                            // Vignette
+                            vec2 uv=vUv*2.0-1.0;
+                            float d=length(uv);
+                            float vig=smoothstep(vignetteRadius,vignetteRadius-0.45,d);
+                            col.rgb*=mix(1.0-vignetteStrength,1.0,vig);
+                            // Saturation
+                            float lum=dot(col.rgb,vec3(0.299,0.587,0.114));
+                            col.rgb=mix(vec3(lum),col.rgb,saturation);
+                            // Contrast
+                            col.rgb=(col.rgb-0.5)*contrast+0.5;
+                            // Tint
+                            col.rgb*=tintColor;
+                            gl_FragColor=col;
+                        }
+                    `,
+                };
+                const vignettePass = new ShaderPass(VignetteColorGradeShader);
+                this.composer.addPass(vignettePass);
+                this._vignettePass = vignettePass;
+            }
 
             // --- Procedural Sky ---
             const sky = new Sky();
@@ -995,7 +1097,7 @@ export class Renderer3D {
         // Shared animated water material
         if (!this._waterMaterial) {
             this._waterMaterial = new THREE.MeshPhysicalMaterial({
-                color: 0x1565c0,       // deep ocean blue
+                color: 0x3aa0e0,       // bright tropical blue
                 transparent: true,
                 opacity: 0.82,
                 roughness: 0.05,       // very reflective
@@ -1744,7 +1846,7 @@ export class Renderer3D {
                 clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
                 const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
                 // Darker roof — avoids washout under bright sun
-                const roofColor = bldColor.clone().multiplyScalar(0.42);
+                const roofColor = bldColor.clone().multiplyScalar(0.62);
                 // Glass/steel buildings get more reflective material
                 const isGlassType = Renderer3D.SKYSCRAPER_TYPES.has(b.type);
                 clone.traverse((child) => {
@@ -1763,12 +1865,13 @@ export class Renderer3D {
                                     const size = box.getSize(new THREE.Vector3());
                                     const isSmall = size.x < 0.15 && size.z < 0.15;
                                     if (isSmall) {
-                                        // Window: emissive warm glow
+                                        // Window: emissive warm glow (intensity driven by day/night)
                                         nm.color.set(0xffee88);
                                         nm.emissive = new THREE.Color(0xffcc44);
                                         nm.emissiveIntensity = 0.8;
                                         nm.roughness = 0.1;
                                         nm.metalness = 0.0;
+                                        nm.userData = { isWindow: true };
                                     } else if (size.y < 0.08) {
                                         // Flat/roof mesh
                                         nm.color.set(roofColor);
@@ -1836,15 +1939,16 @@ export class Renderer3D {
         for (const [type, arr] of boxGroups.entries()) {
             if (arr.length === 0) continue;
             const baseH = (BUILDING_3D[type]?.height ?? 0.6) * 3.5;
+            const isTall = baseH >= 1.2; // only office/commercial towers get window overlay
             const geom = new THREE.BoxGeometry(0.85, baseH, 0.85);
             const mat = new THREE.MeshStandardMaterial({
                 color: buildingHex(type),
-                roughness: 0.65,
-                metalness: 0.08,
-                map: winTex,
-                emissive: new THREE.Color(0xffcc44),
-                emissiveMap: winTex,
-                emissiveIntensity: 0.15,
+                roughness: isTall ? 0.55 : 0.75,
+                metalness: isTall ? 0.08 : 0.02,
+                map: isTall ? winTex : null,
+                emissive: isTall ? new THREE.Color(0xffcc44) : new THREE.Color(0),
+                emissiveMap: isTall ? winTex : null,
+                emissiveIntensity: isTall ? 0.15 : 0,
             });
             const mesh = new THREE.InstancedMesh(geom, mat, arr.length);
             mesh.castShadow = true;
@@ -2048,6 +2152,65 @@ export class Renderer3D {
         return objects;
     }
 
+    /**
+     * Scatter urban detail props (awnings, parasols, fences) near commercial/residential buildings.
+     */
+    _buildDetailPropsForChunk(bounds, buildings) {
+        const objects = [];
+        if (this._detailModels.size === 0) return objects;
+
+        const hash = (x, y, salt) => {
+            let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
+            h = ((h ^ (h >> 13)) * 1274126177) | 0;
+            return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+        };
+
+        // Commercial building types get awnings/parasols; residential get fences
+        const commercialTypes = new Set([
+            'market', 'restaurant', 'nightclub', 'shopping-mall', 'hotel', 'theater',
+            'museum', 'library', 'hospital',
+        ]);
+        const residentialTypes = new Set([
+            'house', 'apartment', 'farm',
+        ]);
+
+        for (const b of buildings) {
+            if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
+            const h = hash(b.x, b.y, 500);
+            if (h > 0.35) continue; // only 35% of buildings get a detail prop
+
+            const wx = b.x - this._mapHalfW + 0.5;
+            const wz = b.y - this._mapHalfH + 0.5;
+            const terrainY = this._smoothTerrainY(b.x, b.y);
+            const side = hash(b.x, b.y, 510) > 0.5 ? 0.52 : -0.52;
+            const rotY = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
+
+            let modelName = null;
+            if (commercialTypes.has(b.type)) {
+                const pick = hash(b.x, b.y, 520);
+                if (pick < 0.35) modelName = 'awning';
+                else if (pick < 0.55) modelName = 'parasol-a';
+                else if (pick < 0.75) modelName = 'parasol-b';
+                else modelName = 'awning-wide';
+            } else if (residentialTypes.has(b.type)) {
+                modelName = hash(b.x, b.y, 520) > 0.5 ? 'fence' : 'fence-low';
+            }
+
+            if (!modelName) continue;
+            const model = this._detailModels.get(modelName);
+            if (!model) continue;
+
+            const clone = model.clone(true);
+            clone.position.set(wx + side * Math.cos(rotY), terrainY, wz + side * Math.sin(rotY));
+            clone.rotation.y = rotY + (hash(b.x, b.y, 530) - 0.5) * 0.3;
+            clone.traverse((child) => {
+                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+            });
+            objects.push(clone);
+        }
+        return objects;
+    }
+
     _createChunkEntry(chunkId) {
         const bounds = this.game.chunks.getChunkBounds(chunkId);
         const group = new THREE.Group();
@@ -2065,6 +2228,12 @@ export class Renderer3D {
         const vegMeshes = this._buildVegetationForChunk(bounds);
         for (const mesh of vegMeshes) {
             mesh.userData.kind = 'vegetation';
+            group.add(mesh);
+        }
+        // Urban detail props (awnings, parasols, fences near buildings)
+        const detailMeshes = this._buildDetailPropsForChunk(bounds, this.game.buildings.buildings);
+        for (const mesh of detailMeshes) {
+            mesh.userData.kind = 'detail';
             group.add(mesh);
         }
 
@@ -2648,93 +2817,200 @@ export class Renderer3D {
 
         const weatherType = ws.state?.type;
         const intensity = ws.state?.intensity || 0;
+        const windDir = ws.state?.windDirection || 0;
+        const windSpeed = ws.state?.windSpeed || 0;
         const isRain = weatherType === 'rain' || weatherType === 'storm';
         const isStorm = weatherType === 'storm';
         const isFog = weatherType === 'fog';
+        const isSnow = weatherType === 'snow';
 
-        // Hide rain when not raining
-        if (this._rainGroup && !isRain) {
-            this._rainGroup.visible = false;
+        // Hide particles when not needed
+        if (this._rainGroup && !isRain) this._rainGroup.visible = false;
+        if (this._snowGroup && !isSnow) this._snowGroup.visible = false;
+
+        // --- Wet ground accumulation (persists briefly after rain stops) ---
+        if (!this._wetness) this._wetness = 0;
+        if (isRain || isStorm) {
+            this._wetness = Math.min(1.0, this._wetness + 0.008 * intensity);
+        } else {
+            this._wetness = Math.max(0, this._wetness - 0.002); // slow dry
         }
 
-        // Skip heavy updates when weather is clear
-        if (!isRain && !isFog && !isStorm) {
-            // Reset wet ground
-            if (this._terrainMesh?.material?.metalness > 0) {
-                this._terrainMesh.material.metalness = 0;
-            }
-            return;
-        }
-
-        // Create rain particles on first use
-        if (isRain && !this._rainGroup) {
-            const count = 2000;
-            const positions = new Float32Array(count * 3);
-            for (let i = 0; i < count; i++) {
-                positions[i * 3] = (Math.random() - 0.5) * 30;
-                positions[i * 3 + 1] = Math.random() * 10;
-                positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
-            }
-            const geom = new THREE.BufferGeometry();
-            geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-            const mat = new THREE.PointsMaterial({
-                color: 0xaaccee,
-                size: 0.03,
-                transparent: true,
-                opacity: 0.6,
-            });
-            this._rainGroup = new THREE.Points(geom, mat);
-            this._rainDrops = positions;
-            this.scene.add(this._rainGroup);
-        }
-
-        // Update rain
-        if (this._rainGroup) {
-            this._rainGroup.visible = isRain;
-            if (isRain && this._rainDrops) {
-                const p = this._player?.position;
-                if (p) {
-                    this._rainGroup.position.set(p.x, 0, p.z);
-                }
-                const positions = this._rainDrops;
-                const speed = isStorm ? 0.4 : 0.2;
-                for (let i = 0; i < positions.length / 3; i++) {
-                    positions[i * 3 + 1] -= speed * intensity;
-                    if (positions[i * 3 + 1] < 0) {
-                        positions[i * 3 + 1] = 10;
-                        positions[i * 3] = (Math.random() - 0.5) * 30;
-                        positions[i * 3 + 2] = (Math.random() - 0.5) * 30;
+        // Apply wetness to road/terrain materials in visible chunks
+        if (this._wetness > 0.01 || this._prevWetness > 0.01) {
+            const targetMetal = this._wetness * 0.45;
+            const targetRough = 1.0 - this._wetness * 0.3;
+            for (const [, entry] of this._chunkMeshes) {
+                entry.group.traverse((obj) => {
+                    if (obj.isMesh && obj.userData?.kind === 'terrain' && obj.material && !Array.isArray(obj.material)) {
+                        obj.material.metalness = THREE.MathUtils.lerp(obj.material.metalness, targetMetal, 0.1);
+                        obj.material.roughness = THREE.MathUtils.lerp(obj.material.roughness, targetRough, 0.1);
                     }
-                }
-                this._rainGroup.geometry.attributes.position.needsUpdate = true;
-                this._rainGroup.material.opacity = 0.3 + intensity * 0.5;
+                });
+            }
+        }
+        this._prevWetness = this._wetness;
+
+        // --- Fog density adapts to weather ---
+        if (this.scene.fog) {
+            let targetDensity = 0.0012; // default
+            if (isFog) targetDensity = 0.004 + intensity * 0.006;
+            else if (isRain) targetDensity = 0.0018 + intensity * 0.002;
+            else if (isSnow) targetDensity = 0.0020 + intensity * 0.003;
+            this.scene.fog.density = THREE.MathUtils.lerp(this.scene.fog.density, targetDensity, 0.05);
+            // Fog color shifts for weather mood
+            if (isFog) {
+                this.scene.fog.color.lerp(new THREE.Color(0xc0c8d0), 0.03);
+            } else if (isRain || isStorm) {
+                this.scene.fog.color.lerp(new THREE.Color(0x8899aa), 0.03);
+            } else {
+                this.scene.fog.color.lerp(new THREE.Color(0xa8d8ea), 0.02);
             }
         }
 
-        // Lightning flashes during storms
+        // Skip particle updates when weather is clear
+        if (!isRain && !isFog && !isStorm && !isSnow && this._wetness < 0.01) return;
+
+        // --- Rain particle system (streaks with wind) ---
+        if (isRain) {
+            const RAIN_COUNT = 4000;
+            if (!this._rainGroup) {
+                const positions = new Float32Array(RAIN_COUNT * 6); // line segments: start+end per drop
+                for (let i = 0; i < RAIN_COUNT; i++) {
+                    const bx = (Math.random() - 0.5) * 40;
+                    const by = Math.random() * 12;
+                    const bz = (Math.random() - 0.5) * 40;
+                    const streakLen = 0.15 + Math.random() * 0.2;
+                    const j = i * 6;
+                    positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
+                    positions[j + 3] = bx; positions[j + 4] = by - streakLen; positions[j + 5] = bz;
+                }
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const mat = new THREE.LineBasicMaterial({
+                    color: 0x99bbdd,
+                    transparent: true,
+                    opacity: 0.5,
+                    linewidth: 1,
+                });
+                this._rainGroup = new THREE.LineSegments(geom, mat);
+                this._rainDrops = positions;
+                this._rainStreakLens = new Float32Array(RAIN_COUNT);
+                for (let i = 0; i < RAIN_COUNT; i++) this._rainStreakLens[i] = 0.15 + Math.random() * 0.2;
+                this.scene.add(this._rainGroup);
+            }
+
+            this._rainGroup.visible = true;
+            const p = this._player?.position;
+            if (p) this._rainGroup.position.set(p.x, 0, p.z);
+
+            const positions = this._rainDrops;
+            const fallSpeed = (isStorm ? 0.45 : 0.25) * intensity;
+            const windX = Math.cos(windDir) * windSpeed * 0.02;
+            const windZ = Math.sin(windDir) * windSpeed * 0.02;
+            for (let i = 0; i < RAIN_COUNT; i++) {
+                const j = i * 6;
+                positions[j + 1] -= fallSpeed;
+                positions[j + 4] -= fallSpeed;
+                positions[j] += windX;
+                positions[j + 3] += windX;
+                positions[j + 2] += windZ;
+                positions[j + 5] += windZ;
+                if (positions[j + 4] < 0) {
+                    const bx = (Math.random() - 0.5) * 40;
+                    const by = 10 + Math.random() * 3;
+                    const bz = (Math.random() - 0.5) * 40;
+                    const len = this._rainStreakLens[i];
+                    positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
+                    positions[j + 3] = bx; positions[j + 4] = by - len; positions[j + 5] = bz;
+                }
+            }
+            this._rainGroup.geometry.attributes.position.needsUpdate = true;
+            this._rainGroup.material.opacity = 0.25 + intensity * 0.45;
+        }
+
+        // --- Snow particle system ---
+        if (isSnow) {
+            const SNOW_COUNT = 2000;
+            if (!this._snowGroup) {
+                const positions = new Float32Array(SNOW_COUNT * 3);
+                for (let i = 0; i < SNOW_COUNT; i++) {
+                    positions[i * 3] = (Math.random() - 0.5) * 40;
+                    positions[i * 3 + 1] = Math.random() * 12;
+                    positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+                }
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                const mat = new THREE.PointsMaterial({
+                    color: 0xeeeeff,
+                    size: 0.06,
+                    transparent: true,
+                    opacity: 0.85,
+                });
+                this._snowGroup = new THREE.Points(geom, mat);
+                this._snowDrops = positions;
+                this.scene.add(this._snowGroup);
+            }
+
+            this._snowGroup.visible = true;
+            const p = this._player?.position;
+            if (p) this._snowGroup.position.set(p.x, 0, p.z);
+
+            const positions = this._snowDrops;
+            const t = performance.now() * 0.001;
+            const fallSpeed = 0.04 * intensity;
+            for (let i = 0; i < SNOW_COUNT; i++) {
+                const j = i * 3;
+                // Gentle wobble drift
+                positions[j] += Math.sin(t + i * 0.7) * 0.003 + Math.cos(windDir) * windSpeed * 0.005;
+                positions[j + 1] -= fallSpeed;
+                positions[j + 2] += Math.cos(t + i * 1.1) * 0.003 + Math.sin(windDir) * windSpeed * 0.005;
+                if (positions[j + 1] < 0) {
+                    positions[j] = (Math.random() - 0.5) * 40;
+                    positions[j + 1] = 10 + Math.random() * 3;
+                    positions[j + 2] = (Math.random() - 0.5) * 40;
+                }
+            }
+            this._snowGroup.geometry.attributes.position.needsUpdate = true;
+            this._snowGroup.material.opacity = 0.5 + intensity * 0.4;
+        }
+
+        // --- Lightning flashes during storms (with screen shake + thunder timing) ---
         if (isStorm && this.ambientLight) {
+            if (!this._lightningTimer) this._lightningTimer = 5000;
             this._lightningTimer -= dt;
             if (this._lightningTimer <= 0) {
-                this._lightningTimer = 3000 + Math.random() * 8000;
-                this._lightningFlash = 300; // ms
+                this._lightningTimer = 2000 + Math.random() * 7000;
+                this._lightningFlash = 250;
+                // Screen shake for close strikes
+                if (Math.random() < 0.4) {
+                    this.shakeCamera(0.8, 400);
+                }
             }
             if (this._lightningFlash > 0) {
                 this._lightningFlash -= dt;
-                const flashIntensity = Math.max(0, this._lightningFlash / 300);
-                this.ambientLight.intensity = Math.min(3, this.ambientLight.intensity + flashIntensity * 2);
+                const flashIntensity = Math.max(0, this._lightningFlash / 250);
+                // Flash the sun light for dramatic shadow recalculation
+                if (this.sunLight) {
+                    this.sunLight.intensity = Math.max(this.sunLight.intensity, flashIntensity * 4.0);
+                }
+                this.ambientLight.intensity = Math.min(4, this.ambientLight.intensity + flashIntensity * 3);
             }
         }
 
-        // Enhanced fog during fog weather
-        if (isFog && this.scene.fog) {
-            this.scene.fog.density = 0.003 + intensity * 0.005;
-        }
-
-        // Wet ground: darken terrain slightly during rain
-        if (this._terrainMesh?.material && isRain) {
-            this._terrainMesh.material.metalness = Math.min(0.5, intensity * 0.4);
-        } else if (this._terrainMesh?.material) {
-            this._terrainMesh.material.metalness = 0;
+        // --- Sky darkening during weather ---
+        if (this._sky) {
+            const skyUniforms = this._sky.material.uniforms;
+            if (isRain || isStorm) {
+                skyUniforms['turbidity'].value = THREE.MathUtils.lerp(skyUniforms['turbidity'].value, 12 + intensity * 6, 0.02);
+                skyUniforms['rayleigh'].value = THREE.MathUtils.lerp(skyUniforms['rayleigh'].value, 1.5, 0.02);
+            } else if (isFog) {
+                skyUniforms['turbidity'].value = THREE.MathUtils.lerp(skyUniforms['turbidity'].value, 10, 0.02);
+                skyUniforms['rayleigh'].value = THREE.MathUtils.lerp(skyUniforms['rayleigh'].value, 2.0, 0.02);
+            } else {
+                skyUniforms['turbidity'].value = THREE.MathUtils.lerp(skyUniforms['turbidity'].value, 4, 0.01);
+                skyUniforms['rayleigh'].value = THREE.MathUtils.lerp(skyUniforms['rayleigh'].value, 3, 0.01);
+            }
         }
     }
 
@@ -2814,25 +3090,34 @@ export class Renderer3D {
             const speedRatio = Math.min(1, speed / maxSpeed);
 
             currentPitch = this.vehicleCamera.pitch;
-            currentFollowDist = this.vehicleCamera.followDist;
-            currentFollowHeight = this.vehicleCamera.followHeight;
+            // Camera pulls back at high speed for wider view
+            currentFollowDist = this.vehicleCamera.followDist + speedRatio * 2.5;
+            currentFollowHeight = this.vehicleCamera.followHeight + speedRatio * 0.8;
             // Speed-based FOV widening
             currentFOV = THREE.MathUtils.lerp(this.vehicleCamera.fov, this.vehicleCamera.maxSpeedFOV, speedRatio);
 
-            // Auto-rotate camera yaw to follow vehicle heading
+            // Auto-rotate camera yaw to follow vehicle heading (lag behind)
             if (vehicle && vehicle.angle !== undefined) {
                 const targetYaw = vehicle.angle + Math.PI; // behind the vehicle
                 let diff = targetYaw - this._vehicleCamYaw;
                 while (diff > Math.PI) diff -= Math.PI * 2;
                 while (diff < -Math.PI) diff += Math.PI * 2;
-                this._vehicleCamYaw += diff * 0.08; // smooth follow
+                // Faster follow at low speed, laggier at high speed for cinematic feel
+                const followRate = THREE.MathUtils.lerp(0.12, 0.05, speedRatio);
+                this._vehicleCamYaw += diff * followRate;
                 this.yaw = this._vehicleCamYaw;
             }
 
-            // Speed-based camera shake
-            if (speedRatio > 0.6) {
-                const shakeAmt = (speedRatio - 0.6) * 0.015;
+            // Speed-based camera shake (stronger off-road)
+            if (speedRatio > 0.5) {
+                const offRoad = (vehicle && !vehicle._onRoad) ? 2.0 : 1.0;
+                const shakeAmt = (speedRatio - 0.5) * 0.018 * offRoad;
                 this.shakeIntensity = Math.max(this.shakeIntensity, shakeAmt);
+            }
+
+            // Collision screen shake
+            if (vc._lastCollision && vc._lastImpactSpeed > 3) {
+                this.shakeCamera(Math.min(2.5, vc._lastImpactSpeed * 0.3), 300);
             }
         } else {
             // Interpolate camera settings based on mode transition
@@ -3202,6 +3487,17 @@ export class Renderer3D {
     }
 
     render() {
+        // Auto-resize whenever the canvas layout changes (handles Electron startup timing)
+        const cw = this.canvas.clientWidth;
+        const ch = this.canvas.clientHeight;
+        if (cw > 0 && ch > 0) {
+            const pr = this.renderer.getPixelRatio();
+            if (Math.abs(this.renderer.domElement.width - cw * pr) > 2 ||
+                Math.abs(this.renderer.domElement.height - ch * pr) > 2) {
+                this.resize();
+            }
+        }
+
         const now = performance.now();
         const dt = this._lastRenderTime ? Math.min(50, now - this._lastRenderTime) : 16.67;
         this._lastRenderTime = now;
@@ -3356,13 +3652,76 @@ export class Renderer3D {
             const targetIntensity = isNight ? 2.0 : 0.0;
             for (const stripMesh of this._highwayLightStrips) {
                 if (stripMesh.material) {
-                    // Smooth transition for emissive intensity
                     stripMesh.material.emissiveIntensity = THREE.MathUtils.lerp(
                         stripMesh.material.emissiveIntensity,
                         targetIntensity,
                         0.1
                     );
                 }
+            }
+        }
+
+        // Window emission scaling — bright at night, dim during day
+        {
+            const nightFactor = (lighting.phase === DAY_PHASES.NIGHT) ? 1.0
+                : (lighting.phase === DAY_PHASES.DUSK) ? 0.7
+                : (lighting.phase === DAY_PHASES.DAWN) ? 0.4
+                : 0.05;
+            const targetEmissive = 0.1 + nightFactor * 0.9; // 0.1 day → 1.0 night
+            if (this._windowEmissiveTarget === undefined) this._windowEmissiveTarget = 0.8;
+            this._windowEmissiveTarget = THREE.MathUtils.lerp(this._windowEmissiveTarget, targetEmissive, 0.05);
+            // Apply to all building window materials in loaded chunks (throttled: every 30 frames)
+            if (!this._windowUpdateCounter) this._windowUpdateCounter = 0;
+            if (++this._windowUpdateCounter >= 30) {
+                this._windowUpdateCounter = 0;
+                for (const [, entry] of this._chunkMeshes) {
+                    entry.group.traverse((obj) => {
+                        if (obj.isMesh && obj.material && !Array.isArray(obj.material) && obj.material.userData?.isWindow) {
+                            obj.material.emissiveIntensity = this._windowEmissiveTarget;
+                        } else if (obj.isMesh && Array.isArray(obj.material)) {
+                            for (const m of obj.material) {
+                                if (m.userData?.isWindow) m.emissiveIntensity = this._windowEmissiveTarget;
+                            }
+                        }
+                    });
+                }
+            }
+        }
+
+        // Night-adaptive bloom — stronger glow from street lights and windows at night
+        if (this._bloomPass) {
+            const nightFactor = (lighting.phase === DAY_PHASES.NIGHT) ? 1.0
+                : (lighting.phase === DAY_PHASES.DUSK || lighting.phase === DAY_PHASES.DAWN) ? 0.5
+                : 0.0;
+            const targetBloom = THREE.MathUtils.lerp(
+                this._bloomDayStrength ?? 0.20,
+                this._bloomNightStrength ?? 0.55,
+                nightFactor
+            );
+            this._bloomPass.strength = THREE.MathUtils.lerp(this._bloomPass.strength, targetBloom, 0.08);
+        }
+
+        // Night vignette and color grading tint shift
+        if (this._vignettePass) {
+            const isNightPhase = lighting.phase === DAY_PHASES.NIGHT;
+            const isDusk = lighting.phase === DAY_PHASES.DUSK;
+            const isDawn = lighting.phase === DAY_PHASES.DAWN;
+            const u = this._vignettePass.material.uniforms;
+            // Stronger vignette at night for cinematic framing
+            u.vignetteStrength.value = THREE.MathUtils.lerp(
+                u.vignetteStrength.value,
+                isNightPhase ? 0.55 : 0.30,
+                0.06
+            );
+            // Warm tint at dusk/dawn, cool blue at night, neutral during day
+            if (isNightPhase) {
+                u.tintColor.value.lerp(new THREE.Vector3(0.85, 0.90, 1.05), 0.04);
+            } else if (isDusk) {
+                u.tintColor.value.lerp(new THREE.Vector3(1.08, 0.95, 0.88), 0.04);
+            } else if (isDawn) {
+                u.tintColor.value.lerp(new THREE.Vector3(1.05, 0.97, 0.92), 0.04);
+            } else {
+                u.tintColor.value.lerp(new THREE.Vector3(1.0, 0.98, 0.95), 0.04);
             }
         }
     }
@@ -4137,16 +4496,24 @@ const BUILDING_PALETTES = {
 function buildingPaletteColor(type, id) {
     const palette = BUILDING_PALETTES[type] || BUILDING_PALETTES['default'];
     const hex = palette[(id || 0) % palette.length];
-    // Cap luminance to ≤ 0.48 so no palette color blows out under 2.2 sun
+    // Boost palette colors: shift dark colors up and allow up to 0.72 luminance
     const r = ((hex >> 16) & 0xff) / 255;
     const g = ((hex >>  8) & 0xff) / 255;
     const b = ( hex        & 0xff) / 255;
     const lum = r * 0.299 + g * 0.587 + b * 0.114;
-    if (lum > 0.48) {
-        const s = 0.48 / lum;
-        return (Math.round(r * s * 255) << 16) | (Math.round(g * s * 255) << 8) | Math.round(b * s * 255);
+    // Boost dark colors (lum < 0.25) up toward 0.35 so buildings aren't black
+    let sr = r, sg = g, sb = b;
+    if (lum < 0.25 && lum > 0) {
+        const boost = 0.35 / lum;
+        sr = Math.min(1, r * boost); sg = Math.min(1, g * boost); sb = Math.min(1, b * boost);
     }
-    return hex;
+    // Cap very bright colors at 0.72 so they don't blow out
+    const lum2 = sr * 0.299 + sg * 0.587 + sb * 0.114;
+    if (lum2 > 0.72) {
+        const s = 0.72 / lum2;
+        sr *= s; sg *= s; sb *= s;
+    }
+    return (Math.round(sr * 255) << 16) | (Math.round(sg * 255) << 8) | Math.round(sb * 255);
 }
 
 function buildingHex(type) {

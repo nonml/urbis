@@ -25,8 +25,8 @@ import {
 
 let THREE = null;
 
-const MAX_DETAILED_CHARACTERS = 60;
-const NEAR_DISTANCE = 20; // tiles
+const MAX_DETAILED_CHARACTERS = 120;
+const NEAR_DISTANCE = 25; // tiles
 
 export class CharacterPool {
     /**

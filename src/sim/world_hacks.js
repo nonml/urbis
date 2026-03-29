@@ -1,7 +1,10 @@
 /**
  * World Hack Effects — makes hack actions physically affect the game world
  * Reads world.blackouts, world.trafficSwitches from game state and applies effects.
+ * Phase 5: adds traffic light chaos, barriers, environmental explosions, NPC profiler.
  */
+
+import { eventBus, EVENT_TYPES } from './events.js';
 
 export class WorldHackEffects {
     constructor(game) {
@@ -9,6 +12,15 @@ export class WorldHackEffects {
         this._blackoutDistricts = new Set();
         this._trafficFrozenUntil = 0;
         this._cctvDisabledUntil = 0;
+
+        // Traffic light hacking state
+        this._trafficLightChaos = []; // { x, y, untilTick }
+        // Barrier state
+        this._raisedBarriers = [];    // { x, y, untilTick }
+        // Environmental explosions
+        this._explosions = [];         // { x, y, radius, tick }
+        // Quick-hack cooldowns per category
+        this._cooldowns = new Map();   // hackType -> untilTick
     }
 
     /**
@@ -45,6 +57,25 @@ export class WorldHackEffects {
                 }
             }
             world.trafficSwitches = world.trafficSwitches.filter(t => tick < t.untilTick);
+        }
+
+        // Clean up expired traffic light chaos / barriers / explosions
+        this._trafficLightChaos = this._trafficLightChaos.filter(t => tick < t.untilTick);
+        this._raisedBarriers = this._raisedBarriers.filter(b => tick < b.untilTick);
+        this._explosions = this._explosions.filter(e => tick - e.tick < 10);
+
+        // Barrier enforcement: keep blocking vehicles each tick
+        for (const barrier of this._raisedBarriers) {
+            const vs = this.game.vehicleSystem;
+            if (!vs) break;
+            for (const v of vs.vehicles) {
+                if (v._playerDriven) continue;
+                const dx = v.x - barrier.x;
+                const dy = v.y - barrier.y;
+                if (Math.sqrt(dx * dx + dy * dy) < 2.5) {
+                    v.speed = 0;
+                }
+            }
         }
 
         // CCTV hack reduces police detection range
@@ -161,5 +192,197 @@ export class WorldHackEffects {
      */
     get isCCTVDisabled() {
         return this._cctvDisabledUntil > (this.game.state.time.tick || 0);
+    }
+
+    // ── Phase 5: World-Affecting Hacks ──────────────────────────────────
+
+    /**
+     * Hack traffic lights — all lights at intersection go green, causing NPC vehicle collisions
+     * @param {number} x - Intersection tile X
+     * @param {number} y - Intersection tile Y
+     */
+    hackTrafficLights(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('traffic_lights', tick)) return { ok: false, reason: 'On cooldown' };
+
+        this._trafficLightChaos.push({ x, y, untilTick: tick + 15, radius: 8 });
+        this._setCooldown('traffic_lights', tick, 30);
+
+        // Freeze/confuse NPC vehicles near the intersection
+        const vs = this.game.vehicleSystem;
+        if (vs) {
+            for (const v of vs.vehicles) {
+                if (v._playerDriven) continue;
+                const dx = v.x - x;
+                const dy = v.y - y;
+                if (Math.sqrt(dx * dx + dy * dy) < 6) {
+                    // Vehicles entering intersection don't stop → collide
+                    v.speed = Math.min(v.speed + 3, v.maxSpeed || 15);
+                    v._chaosUntil = tick + 10;
+                }
+            }
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(12);
+        this.game.ui?.showMessage?.('Traffic lights hacked — chaos at intersection!', 'success');
+
+        try { eventBus.emit(EVENT_TYPES.HACK_SUCCESS, { type: 'traffic_lights', x, y }); } catch {}
+        return { ok: true };
+    }
+
+    /**
+     * Raise a barrier — blocks vehicles at the specified location
+     * @param {number} x - Barrier tile X
+     * @param {number} y - Barrier tile Y
+     */
+    raiseBarrier(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('barrier', tick)) return { ok: false, reason: 'On cooldown' };
+
+        this._raisedBarriers.push({ x, y, untilTick: tick + 30 });
+        this._setCooldown('barrier', tick, 45);
+
+        // Stop vehicles at barrier
+        const vs = this.game.vehicleSystem;
+        if (vs) {
+            for (const v of vs.vehicles) {
+                if (v._playerDriven) continue;
+                const dx = v.x - x;
+                const dy = v.y - y;
+                if (Math.sqrt(dx * dx + dy * dy) < 3) {
+                    v.speed = 0;
+                    v._barrierBlocked = true;
+                }
+            }
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(8);
+        this.game.ui?.showMessage?.('Barrier raised — road blocked!', 'success');
+
+        try { eventBus.emit(EVENT_TYPES.HACK_SUCCESS, { type: 'barrier', x, y }); } catch {}
+        return { ok: true };
+    }
+
+    /**
+     * Trigger environmental explosion (steam pipe, electrical junction, gas pipe)
+     * @param {number} x - Explosion center X
+     * @param {number} y - Explosion center Y
+     * @param {string} type - 'steam' | 'electrical' | 'gas'
+     */
+    triggerEnvironmentalExplosion(x, y, type = 'steam') {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown(`explosion_${type}`, tick)) return { ok: false, reason: 'On cooldown' };
+
+        const config = {
+            steam:      { radius: 4, damage: 30, cooldown: 40, heatCost: 15, msg: 'Steam pipe exploded!' },
+            electrical: { radius: 3, damage: 40, cooldown: 50, heatCost: 20, msg: 'Electrical junction overloaded!' },
+            gas:        { radius: 5, damage: 50, cooldown: 60, heatCost: 25, msg: 'Gas pipe ignited!' },
+        }[type] || { radius: 4, damage: 30, cooldown: 40, heatCost: 15, msg: 'Explosion!' };
+
+        this._explosions.push({ x, y, radius: config.radius, tick, type });
+        this._setCooldown(`explosion_${type}`, tick, config.cooldown);
+
+        // Damage nearby citizens
+        const citizens = this.game.citizens?.citizens || [];
+        for (const c of citizens) {
+            const dx = (c.x ?? 0) - x;
+            const dy = (c.y ?? 0) - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < config.radius) {
+                c.health = (c.health ?? 100) - config.damage * (1 - dist / config.radius);
+                // Knockback
+                if (dist > 0.1) {
+                    c.x += (dx / dist) * 1.5;
+                    c.y += (dy / dist) * 1.5;
+                }
+            }
+        }
+
+        // Damage nearby vehicles
+        const vs = this.game.vehicleSystem;
+        if (vs) {
+            for (const v of vs.vehicles) {
+                const dx = v.x - x;
+                const dy = v.y - y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                if (dist < config.radius) {
+                    v.health = (v.health ?? 100) - config.damage * (1 - dist / config.radius);
+                }
+            }
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(config.heatCost);
+        this.game.ui?.showMessage?.(config.msg, 'warning');
+
+        try { eventBus.emit(EVENT_TYPES.HACK_SUCCESS, { type: `explosion_${type}`, x, y }); } catch {}
+        return { ok: true, config };
+    }
+
+    /**
+     * Profile an NPC — scan citizen data (income, record, faction alignment)
+     * @param {number} citizenId - Citizen ID to profile
+     */
+    profileNPC(citizenId) {
+        const citizens = this.game.citizens?.citizens || [];
+        const citizen = citizens.find(c => c.id === citizenId);
+        if (!citizen) return { ok: false, reason: 'Citizen not found' };
+
+        // Build profile from existing citizen data
+        const profile = {
+            name: citizen.name || `Citizen #${citizenId}`,
+            occupation: citizen.job || citizen.occupation || 'Unemployed',
+            income: citizen.income ?? Math.floor(Math.random() * 5000) + 1000,
+            criminalRecord: citizen.criminalRecord || (Math.random() < 0.15 ? 'Petty theft' : 'None'),
+            faction: citizen.faction || 'citizens',
+            happiness: citizen.happiness ?? 50,
+            traits: citizen.traits || [],
+        };
+
+        // Intel gain
+        const intel = this.game.intelSystem;
+        if (intel) {
+            intel.addIntel?.({ type: 'profile', targetId: citizenId, data: profile });
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(3);
+        return { ok: true, profile };
+    }
+
+    /**
+     * Hack-steal money from a profiled NPC
+     * @param {number} citizenId
+     */
+    hackStealMoney(citizenId) {
+        const citizens = this.game.citizens?.citizens || [];
+        const citizen = citizens.find(c => c.id === citizenId);
+        if (!citizen) return { ok: false, reason: 'Citizen not found' };
+
+        const stolen = Math.floor(Math.random() * 200) + 50;
+        this.game.state.resources.gold += stolen;
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(10);
+        this.game.ui?.showMessage?.(`Stole $${stolen} from ${citizen.name || 'citizen'}`, 'success');
+        return { ok: true, amount: stolen };
+    }
+
+    /**
+     * Get all active environmental effects for renderer visualization
+     */
+    getActiveEffects() {
+        const tick = this.game.state.time.tick;
+        return {
+            trafficLightChaos: this._trafficLightChaos.filter(t => tick < t.untilTick),
+            raisedBarriers: this._raisedBarriers.filter(b => tick < b.untilTick),
+            recentExplosions: this._explosions.filter(e => tick - e.tick < 5),
+        };
+    }
+
+    // ── Internal helpers ──
+
+    _isOnCooldown(hackType, tick) {
+        return (this._cooldowns.get(hackType) || 0) > tick;
+    }
+
+    _setCooldown(hackType, tick, duration) {
+        this._cooldowns.set(hackType, tick + duration);
     }
 }

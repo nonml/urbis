@@ -11,7 +11,7 @@ import { StreetModeManager, StreetIntervention, INTERVENTION_TYPES } from './sim
 import { AftermathManager, CrisisAftermath, RECOVERY_STATE, RECOVERY_PHASE } from './sim/crisis/aftermath.js';
 import { UIManager } from './ui.js';
 import { Minimap } from './minimap.js';
-import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY } from './constants.js';
+import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY, TERRAIN_ROAD, TERRAIN_GRASS } from './constants.js';
 import { RNG, randomSeed32 } from './rng.js';
 import { createRNGStreams, createRNGStreamSeeds, createRNGsFromSeeds } from './rng_streams.js';
 import { createNewGameState, validateGameState as validateState, migrateState, CURRENT_SCHEMA_VERSION } from './state/game_state.js';
@@ -63,6 +63,7 @@ import { createInfluenceEngine } from './sim/intel/influence_engine.js';
 import { createSentimentManager } from './sim/intel/sentiment.js';
 import { createHeatManager } from './sim/intel/heat_manager.js';
 import { ZoningManager, createZoningManager, ZONE_TYPES } from './sim/zoning/zoning.js';
+import { GrowthSimulator } from './sim/zoning/growth_sim.js';
 import { DemandCalculator, createDemandCalculator } from './sim/economy/demand.js';
 import { ModeIndicator, MODE_STREET, MODE_GOD } from './ui/mode_indicator.js';
 import { PolicyManager } from './sim/politics/policies.js';
@@ -82,6 +83,7 @@ import { VehicleSystem } from './sim/traffic/vehicle_system.ts';
 import { VehicleController } from './vehicles/vehicle_controller.js';
 import { PlayerHealth } from './player/health.js';
 import { CombatSystem } from './player/combat.js';
+import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
@@ -296,9 +298,14 @@ export class Game {
 
         // Milestone F: Zoning system
         this.zoningManager = createZoningManager(this.map.width, this.map.height);
+        // Alias for consistent naming
+        this.zoning = this.zoningManager;
 
         // Milestone F: Demand calculator
         this.demandCalculator = createDemandCalculator();
+
+        // Organic zone growth simulator (Cities: Skylines-style)
+        this.growthSim = new GrowthSimulator(this);
 
         // Milestone F: Mode system (default to Street Mode)
         this.mode = MODE_GOD;
@@ -331,6 +338,11 @@ export class Game {
 
         // Player combat system
         this.combat = new CombatSystem(this);
+        // Also expose as combatSystem for consistency
+        this.combatSystem = this.combat;
+
+        // Player stealth system
+        this.stealth = new StealthSystem(this);
 
         // NPC reaction system (flee, dodge, report)
         this.npcReactions = new NPCReactionSystem(this);
@@ -396,23 +408,38 @@ export class Game {
         this.state.player.wx = startX + 0.5;
         this.state.player.wz = startY + 0.5;
 
-        // Build initial house
-        const houseCost = BUILDING_TYPES['house'].cost;
-        this.resources.pay(houseCost);
-        this.buildings.build('house', startX, startY);
-        this.state.resources.housing = 4;
+        // --- Build starter village ---
+        // Clear a 13x13 patch of grass around the spawn point
+        for (let dy = -6; dy <= 6; dy++) {
+            for (let dx = -6; dx <= 6; dx++) {
+                this.map.setTileAt(startX + dx, startY + dy, TERRAIN_GRASS);
+            }
+        }
+        // Cross roads: one horizontal + one vertical
+        for (let dx = -5; dx <= 5; dx++) this.map.setTileAt(startX + dx, startY,     TERRAIN_ROAD);
+        for (let dy = -5; dy <= 5; dy++) this.map.setTileAt(startX,     startY + dy, TERRAIN_ROAD);
+        // Second parallel road one block north, east-west only
+        for (let dx = -4; dx <= 4; dx++) this.map.setTileAt(startX + dx, startY - 3, TERRAIN_ROAD);
 
-        for (let i = 0; i < 3; i++) this.citizens.spawnCitizen(startX + i, startY);
+        // Starter buildings: 4 houses + 1 farm arranged around the crossroads
+        this.buildings.build('house', startX - 2, startY - 2);
+        this.buildings.build('house', startX + 2, startY - 2);
+        this.buildings.build('house', startX - 2, startY + 2);
+        this.buildings.build('house', startX + 2, startY + 2);
+        this.buildings.build('farm',  startX - 4, startY - 2);
+
+        this.state.resources.housing = this.buildings.totalHousing;
+
+        for (let i = 0; i < 5; i++) this.citizens.spawnCitizen(startX + (i % 3) - 1, startY + Math.floor(i / 3));
         for (const c of this.citizens.citizens) ensureCitizenState(c, this.map);
 
         this.state.resources.population = this.citizens.getPopulation();
         this.state.resources.housing = this.buildings.totalHousing;
 
-        // Set starting resources (adjust for initial house cost)
-        const houseCost2 = BUILDING_TYPES['house'].cost;
-        this.state.resources.gold = 100 + houseCost2.gold;
-        this.state.resources.food = 100;
-        this.state.resources.wood = 100;
+        // Starting resources (generous enough to keep building)
+        this.state.resources.gold = 200;
+        this.state.resources.food = 150;
+        this.state.resources.wood = 150;
         this.state.resources.population = this.citizens.getPopulation();
 
         // Apply scenario and mutators
@@ -542,6 +569,11 @@ export class Game {
         // Player health update (respawn timer, damage flash)
         if (this.playerHealth) {
             this.playerHealth.update(frameDt);
+        }
+
+        // Stealth system update (visibility state)
+        if (this.stealth) {
+            this.stealth.update(frameDt);
         }
 
         // Combat system update (muzzle flash timer)
@@ -723,6 +755,11 @@ export class Game {
         // 5b. Milestone F: Demand calculation
         const demand = this.demandCalculator.calculate(this.state);
         this.state.economy.demand = demand;
+
+        // 5b2. Organic zone growth (Cities: Skylines-style)
+        if (this.growthSim) {
+            this.growthSim.update(newTick);
+        }
 
         // 5c. Milestone G: Budget calculation
         const budgetResult = this.budgetManager.processBudgetTick();

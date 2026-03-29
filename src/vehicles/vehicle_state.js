@@ -1,41 +1,131 @@
 // Vehicle state management - defines vehicle entity and physics properties
 
-// Vehicle types
+// Vehicle types — keyed to match traffic system / Kenney model names
 export const VEHICLE_TYPES = {
     PASSENGER: {
-        name: 'Passenger Car',
+        name: 'Sedan',
+        modelKey: 'sedan',
         maxSpeed: 22, // m/s (80 km/h)
         acceleration: 4, // m/s^2
         braking: 8, // m/s^2
         turningSpeed: 2.5, // degrees per tick
-        width: 1.5, // tiles
+        wheelbase: 2.2, // for bicycle steering model
+        width: 1.5,
         length: 3,
         traction: 1.0,
-        mass: 1500
+        mass: 1500,
     },
     SPORT: {
         name: 'Sports Car',
-        maxSpeed: 30, // m/s (108 km/h)
-        acceleration: 6,
-        braking: 10,
-        turningSpeed: 3.0,
+        modelKey: 'hatchback-sports',
+        maxSpeed: 32, // m/s (115 km/h)
+        acceleration: 7,
+        braking: 12,
+        turningSpeed: 3.2,
+        wheelbase: 2.0,
         width: 1.5,
         length: 3,
-        traction: 1.1,
-        mass: 1200
+        traction: 1.15,
+        mass: 1200,
+    },
+    TAXI: {
+        name: 'Taxi',
+        modelKey: 'taxi',
+        maxSpeed: 22,
+        acceleration: 4.5,
+        braking: 8,
+        turningSpeed: 2.6,
+        wheelbase: 2.2,
+        width: 1.5,
+        length: 3,
+        traction: 1.0,
+        mass: 1500,
+    },
+    SUV: {
+        name: 'SUV',
+        modelKey: 'suv',
+        maxSpeed: 20,
+        acceleration: 3.5,
+        braking: 7,
+        turningSpeed: 2.0,
+        wheelbase: 2.6,
+        width: 1.8,
+        length: 3.5,
+        traction: 1.05,
+        mass: 2000,
+    },
+    VAN: {
+        name: 'Van',
+        modelKey: 'van',
+        maxSpeed: 18,
+        acceleration: 3,
+        braking: 6,
+        turningSpeed: 1.8,
+        wheelbase: 2.8,
+        width: 1.8,
+        length: 4,
+        traction: 0.9,
+        mass: 2500,
     },
     TRUCK: {
         name: 'Delivery Truck',
+        modelKey: 'delivery',
         maxSpeed: 15, // m/s (54 km/h)
         acceleration: 2,
         braking: 5,
         turningSpeed: 1.5,
+        wheelbase: 3.5,
         width: 2,
         length: 5,
         traction: 0.8,
-        mass: 3500
-    }
+        mass: 3500,
+    },
+    POLICE: {
+        name: 'Police Car',
+        modelKey: 'police',
+        maxSpeed: 28,
+        acceleration: 6,
+        braking: 10,
+        turningSpeed: 2.8,
+        wheelbase: 2.3,
+        width: 1.5,
+        length: 3,
+        traction: 1.1,
+        mass: 1700,
+    },
+    FIRETRUCK: {
+        name: 'Firetruck',
+        modelKey: 'firetruck',
+        maxSpeed: 16,
+        acceleration: 2.5,
+        braking: 6,
+        turningSpeed: 1.2,
+        wheelbase: 4.0,
+        width: 2.2,
+        length: 6,
+        traction: 0.85,
+        mass: 5000,
+    },
+    BUS: {
+        name: 'City Bus',
+        modelKey: 'bus',
+        maxSpeed: 14,
+        acceleration: 1.8,
+        braking: 5,
+        turningSpeed: 1.0,
+        wheelbase: 4.5,
+        width: 2.2,
+        length: 7,
+        traction: 0.85,
+        mass: 6000,
+    },
 };
+
+/** Map traffic model keys (e.g. 'sedan', 'taxi') to VEHICLE_TYPES key */
+export const MODEL_TO_TYPE = {};
+for (const [key, cfg] of Object.entries(VEHICLE_TYPES)) {
+    MODEL_TO_TYPE[cfg.modelKey] = key;
+}
 
 // Traction multipliers by terrain
 export const TERRAIN_TRACTION = {
@@ -83,71 +173,93 @@ export function createVehicle(options = {}) {
 }
 
 /**
- * Updates vehicle physics state (kinematic model)
+ * Updates vehicle physics state (bicycle steering model with drift)
  * @param {Object} vehicle - Vehicle state
- * @param {Object} input - Input state (throttle, brake, steer)
+ * @param {Object} input - Input state (throttle, brake, steer, handbrake)
  * @param {number} dt - Delta time in ticks
  * @param {Object} terrain - Terrain properties at vehicle position
  */
 export function updateVehiclePhysics(vehicle, input, dt, terrain) {
     if (vehicle.health <= 0) return;
 
-    // Get traction based on terrain
     const traction = terrain.traction || 1.0;
     const effectiveTraction = vehicle.traction * traction;
 
-    // Steering
-    if (vehicle.speed > 0.5) {
-        const steerDir = input.steer || 0;
-        vehicle.heading += steerDir * vehicle.turningSpeed * effectiveTraction * dt;
-    }
-
-    // Acceleration
     const throttle = input.throttle || 0;
     const brake = input.brake || 0;
+    const steer = input.steer || 0;
+    const handbrake = input.handbrake || 0;
 
+    // --- Acceleration / braking / reverse ---
     if (throttle > 0) {
         vehicle.speed += vehicle.acceleration * effectiveTraction * throttle * dt;
     }
-
-    // Braking
     if (brake > 0) {
-        vehicle.speed -= vehicle.braking * effectiveTraction * brake * dt;
-        if (vehicle.speed < 0) {
-            vehicle.speed = 0;
+        if (vehicle.speed > 0.5) {
+            // Normal braking while moving forward
+            vehicle.speed -= vehicle.braking * effectiveTraction * brake * dt;
+            if (vehicle.speed < 0) vehicle.speed = 0;
+        } else {
+            // Reverse gear when nearly stopped and pressing brake
+            vehicle.speed -= vehicle.acceleration * 0.4 * effectiveTraction * brake * dt;
         }
     }
 
+    // Handbrake: lock rear wheels, allow sliding
+    if (handbrake > 0 && Math.abs(vehicle.speed) > 1) {
+        vehicle.driftFactor = Math.min(1, vehicle.driftFactor + 0.25);
+        vehicle.speed *= 0.97; // drag from locked wheels
+    }
+
     // Clamp speed
-    if (vehicle.speed > vehicle.maxSpeed) {
-        vehicle.speed = vehicle.maxSpeed;
+    const maxRev = vehicle.maxSpeed * 0.25; // reverse max is 25% of forward
+    vehicle.speed = Math.max(-maxRev, Math.min(vehicle.maxSpeed, vehicle.speed));
+
+    // Natural friction
+    if (throttle === 0 && brake === 0 && handbrake === 0) {
+        if (Math.abs(vehicle.speed) < 0.1) vehicle.speed = 0;
+        else vehicle.speed *= 0.98;
     }
 
-    // Natural friction (coasting slowdown)
-    if (throttle === 0 && brake === 0 && vehicle.speed > 0) {
-        vehicle.speed *= 0.98; // Simple friction
-        if (vehicle.speed < 0.1) vehicle.speed = 0;
+    // --- Bicycle steering model ---
+    const wheelbase = vehicle.wheelbase || 2.2;
+    const absSpeed = Math.abs(vehicle.speed);
+    if (absSpeed > 0.3 && steer !== 0) {
+        // At low speed: direct heading change. At high speed: wheelbase-limited turning radius.
+        const speedFactor = Math.min(1, absSpeed / 5); // 0-1 ramp over 0-5 m/s
+        const maxSteerAngle = 35; // degrees
+        const steerAngle = steer * maxSteerAngle * effectiveTraction;
+        const steerAngleRad = (steerAngle * Math.PI) / 180;
+        const turnRadius = wheelbase / Math.tan(Math.abs(steerAngleRad) + 0.001);
+        const angularVelocity = (vehicle.speed / turnRadius) * (steer > 0 ? 1 : -1);
+        const headingDelta = angularVelocity * (180 / Math.PI) * dt;
+        // Blend between direct steer and bicycle model based on speed
+        const directDelta = steer * vehicle.turningSpeed * effectiveTraction * dt;
+        vehicle.heading += directDelta * (1 - speedFactor) + headingDelta * speedFactor;
     }
 
-    // Calculate velocity vector from heading and speed
+    // --- Drift: oversteer at high speed + turn ---
+    if (absSpeed > vehicle.maxSpeed * 0.4 && Math.abs(steer) > 0.3) {
+        vehicle.driftFactor = Math.min(1, vehicle.driftFactor + 0.15);
+    } else if (handbrake === 0) {
+        vehicle.driftFactor = Math.max(0, vehicle.driftFactor - 0.08);
+    }
+
+    // Drift adds extra heading rotation
+    if (vehicle.driftFactor > 0.1) {
+        vehicle.heading += steer * vehicle.driftFactor * 1.5 * dt;
+    }
+
+    // --- Position update ---
     const headingRad = (vehicle.heading * Math.PI) / 180;
     vehicle.velocity.x = Math.sin(headingRad) * vehicle.speed;
     vehicle.velocity.y = -Math.cos(headingRad) * vehicle.speed;
-
-    // Position update
     vehicle.x += vehicle.velocity.x * dt;
     vehicle.y += vehicle.velocity.y * dt;
 
-    // Drift factor when turning at speed
-    if (vehicle.speed > vehicle.maxSpeed * 0.5 && Math.abs(input.steer || 0) > 0) {
-        vehicle.driftFactor = Math.min(1, vehicle.driftFactor + 0.2);
-    } else {
-        vehicle.driftFactor = Math.max(0, vehicle.driftFactor - 0.1);
-    }
-
-    // Clamp position to reasonable bounds
-    if (vehicle.x < 0) vehicle.x = 0;
-    if (vehicle.y < 0) vehicle.y = 0;
+    // Clamp to map bounds
+    if (vehicle.x < 0.5) vehicle.x = 0.5;
+    if (vehicle.y < 0.5) vehicle.y = 0.5;
 }
 
 /**

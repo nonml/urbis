@@ -32,236 +32,6 @@ import { PhotoMode } from './ui/photo_mode.js';
 import { VehicleAudio } from './audio/vehicle_audio.js';
 import { ActionHUD } from './ui/action_hud.js';
 
-function getFallbackCanvasId(mainCanvas) {
-    return `${mainCanvas?.id || 'game-canvas'}-fallback-2d`;
-}
-
-function removeFallbackCanvas(mainCanvas) {
-    const id = getFallbackCanvasId(mainCanvas);
-    const existing = document.getElementById(id);
-    if (existing) existing.remove();
-}
-
-function createRendererStub(game, canvas) {
-    const stub = {
-        isFallback: true,
-        game,
-        canvas,
-        drawCanvas: canvas,
-        ctx: null,
-        yaw: 0,
-        pitch: -0.35,
-        followDist: 7,
-        followHeight: 4,
-        _debugMode: 'none',
-        _renderScale: 1,
-        _showFPS: false,
-        _ghost: null,
-        _view: null,
-        _lastFrameMs: 0,
-        _lastFrameAt: 0,
-        _ensureCtx() {
-            // IMPORTANT:
-            // Never call getContext('2d') on the main canvas.
-            // If we do, the browser locks that canvas to a 2D context and Three.js
-            // cannot create a WebGL context later (exactly the error you saw).
-            if (!this.canvas) return null;
-            if (!this.ctx) {
-                const parent = this.canvas.parentElement;
-                if (!parent) return null;
-                const id = getFallbackCanvasId(this.canvas);
-                let overlay = document.getElementById(id);
-                if (!overlay) {
-                    overlay = document.createElement('canvas');
-                    overlay.id = id;
-                    overlay.style.position = 'absolute';
-                    overlay.style.pointerEvents = 'none';
-                    overlay.style.zIndex = '2';
-                    overlay.style.left = '0';
-                    overlay.style.top = '0';
-                    overlay.style.width = '100%';
-                    overlay.style.height = '100%';
-                    parent.style.position = parent.style.position || 'relative';
-                    parent.appendChild(overlay);
-                }
-                this.drawCanvas = overlay;
-                this.ctx = overlay.getContext('2d');
-            }
-            return this.ctx;
-        },
-        _resizeCanvas() {
-            if (!this.canvas || !this.drawCanvas) return;
-            const dpr = window.devicePixelRatio || 1;
-            const rect = this.canvas.getBoundingClientRect();
-            const w = Math.max(1, Math.floor(rect.width * dpr));
-            const h = Math.max(1, Math.floor(rect.height * dpr));
-            if (this.drawCanvas !== this.canvas) {
-                this.drawCanvas.style.left = `${this.canvas.offsetLeft}px`;
-                this.drawCanvas.style.top = `${this.canvas.offsetTop}px`;
-                this.drawCanvas.style.width = `${rect.width}px`;
-                this.drawCanvas.style.height = `${rect.height}px`;
-            }
-            if (this.drawCanvas.width !== w || this.drawCanvas.height !== h) {
-                this.drawCanvas.width = w;
-                this.drawCanvas.height = h;
-            }
-        },
-        _resolveView() {
-            const rect = this.canvas.getBoundingClientRect();
-            const dpr = window.devicePixelRatio || 1;
-            const canvasW = Math.max(1, Math.floor(rect.width * dpr));
-            const canvasH = Math.max(1, Math.floor(rect.height * dpr));
-            const scale = Math.max(0.65, Math.min(1.8, Number(this._renderScale) || 1));
-            const targetTilesX = Math.max(16, Math.round(30 / scale));
-            const tilePx = Math.max(14, Math.min(64, Math.floor(canvasW / targetTilesX)));
-            const tilesX = Math.max(8, Math.floor(canvasW / tilePx));
-            const tilesY = Math.max(6, Math.floor(canvasH / tilePx));
-
-            const px = Math.max(0, Math.min(game.map.width - 1, Math.floor((game.player?.wx ?? game.player?.x ?? 0))));
-            const py = Math.max(0, Math.min(game.map.height - 1, Math.floor((game.player?.wz ?? game.player?.y ?? 0))));
-            const maxStartX = Math.max(0, game.map.width - tilesX);
-            const maxStartY = Math.max(0, game.map.height - tilesY);
-            const startX = Math.max(0, Math.min(maxStartX, px - Math.floor(tilesX / 2)));
-            const startY = Math.max(0, Math.min(maxStartY, py - Math.floor(tilesY / 2)));
-
-            return { dpr, canvasW, canvasH, tilePx, tilesX, tilesY, startX, startY };
-        },
-        rebuildWorld() {},
-        syncPlayer() {},
-        markBuildingsDirty() {},
-        markCitizensDirty() {},
-        pickTile(clientX, clientY) {
-            const view = this._view || this._resolveView();
-            if (!view) return null;
-            const rect = this.canvas.getBoundingClientRect();
-            const mx = (clientX - rect.left) * view.dpr;
-            const my = (clientY - rect.top) * view.dpr;
-            const tx = view.startX + Math.floor(mx / view.tilePx);
-            const ty = view.startY + Math.floor(my / view.tilePx);
-            if (tx < 0 || ty < 0 || tx >= game.map.width || ty >= game.map.height) return null;
-            return { x: tx, y: ty };
-        },
-        render() {
-            const ctx = this._ensureCtx();
-            if (!ctx || !game?.map) return;
-            this._resizeCanvas();
-            this.yaw = 0;
-            this.pitch = -0.35;
-            const view = this._resolveView();
-            this._view = view;
-
-            ctx.setTransform(1, 0, 0, 1, 0, 0);
-            ctx.clearRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
-            ctx.fillStyle = '#0f1c1a';
-            ctx.fillRect(0, 0, this.drawCanvas.width, this.drawCanvas.height);
-
-            for (let y = 0; y < view.tilesY; y++) {
-                for (let x = 0; x < view.tilesX; x++) {
-                    const tx = view.startX + x;
-                    const ty = view.startY + y;
-                    if (tx >= game.map.width || ty >= game.map.height) continue;
-                    const px = x * view.tilePx;
-                    const py = y * view.tilePx;
-                    const idx = ty * game.map.width + tx;
-                    const terrain = game.map.getTileAt(tx, ty);
-                    let color = game.map.getTerrainColor(terrain);
-                    if (game.map.roadMap?.[idx]) color = '#68707a';
-                    else if (game.map.sidewalkMap?.[idx]) color = '#8f989f';
-                    ctx.fillStyle = color || '#2f5f4a';
-                    ctx.fillRect(px, py, view.tilePx, view.tilePx);
-                    ctx.strokeStyle = 'rgba(0,0,0,0.15)';
-                    ctx.strokeRect(px, py, view.tilePx, view.tilePx);
-                }
-            }
-
-            const buildingByTile = new Map();
-            for (const b of game.buildings?.buildings || []) {
-                buildingByTile.set(`${b.x},${b.y}`, b);
-            }
-            for (const [key, b] of buildingByTile.entries()) {
-                const [txs, tys] = key.split(',');
-                const tx = Number(txs);
-                const ty = Number(tys);
-                if (tx < view.startX || ty < view.startY || tx >= view.startX + view.tilesX || ty >= view.startY + view.tilesY) continue;
-                const px = (tx - view.startX) * view.tilePx;
-                const py = (ty - view.startY) * view.tilePx;
-                const pad = Math.max(2, Math.floor(view.tilePx * 0.14));
-                ctx.fillStyle = 'rgba(15, 26, 44, 0.9)';
-                ctx.fillRect(px + pad, py + pad, view.tilePx - pad * 2, view.tilePx - pad * 2);
-                ctx.strokeStyle = '#f2d27a';
-                ctx.lineWidth = Math.max(1, Math.floor(view.tilePx * 0.06));
-                ctx.strokeRect(px + pad, py + pad, view.tilePx - pad * 2, view.tilePx - pad * 2);
-                if (view.tilePx >= 18) {
-                    ctx.font = `${Math.max(10, Math.floor(view.tilePx * 0.45))}px sans-serif`;
-                    ctx.textAlign = 'center';
-                    ctx.textBaseline = 'middle';
-                    ctx.fillStyle = '#ffffff';
-                    ctx.fillText(b.icon || 'B', px + (view.tilePx / 2), py + (view.tilePx / 2) + 1);
-                }
-            }
-
-            if (this._ghost) {
-                const g = this._ghost;
-                if (g.x >= view.startX && g.y >= view.startY && g.x < view.startX + view.tilesX && g.y < view.startY + view.tilesY) {
-                    const px = (g.x - view.startX) * view.tilePx;
-                    const py = (g.y - view.startY) * view.tilePx;
-                    ctx.strokeStyle = g.ok ? '#4cff8a' : '#ff5f5f';
-                    ctx.lineWidth = Math.max(2, Math.floor(view.tilePx * 0.08));
-                    ctx.strokeRect(px + 2, py + 2, view.tilePx - 4, view.tilePx - 4);
-                }
-            }
-
-            const ptx = Math.floor(game.player?.wx ?? game.player?.x ?? 0);
-            const pty = Math.floor(game.player?.wz ?? game.player?.y ?? 0);
-            if (ptx >= view.startX && pty >= view.startY && ptx < view.startX + view.tilesX && pty < view.startY + view.tilesY) {
-                const cx = (ptx - view.startX) * view.tilePx + (view.tilePx / 2);
-                const cy = (pty - view.startY) * view.tilePx + (view.tilePx / 2);
-                ctx.fillStyle = '#58d5ff';
-                ctx.beginPath();
-                ctx.arc(cx, cy, Math.max(3, Math.floor(view.tilePx * 0.2)), 0, Math.PI * 2);
-                ctx.fill();
-            }
-
-            const now = performance.now();
-            this._lastFrameMs = this._lastFrameAt ? (now - this._lastFrameAt) : 16;
-            this._lastFrameAt = now;
-        },
-        clearBuildGhost() { this._ghost = null; },
-        setBuildGhost(buildingType, x, y, rotation, ok) { this._ghost = { buildingType, x, y, rotation, ok }; },
-        setDebugMode(mode) { this._debugMode = mode || 'none'; },
-        getNearestPOIDistance() {
-            const pois = game.map?.pois || [];
-            if (!pois.length) return -1;
-            const px = game.player?.wx ?? game.player?.x ?? 0;
-            const py = game.player?.wz ?? game.player?.y ?? 0;
-            let best = Infinity;
-            for (const poi of pois) {
-                const dx = poi.x - px;
-                const dy = poi.y - py;
-                const d = Math.sqrt(dx * dx + dy * dy);
-                if (d < best) best = d;
-            }
-            return Number.isFinite(best) ? best : -1;
-        },
-        setRenderScale(scale) { this._renderScale = scale; },
-        setShowFPS(show) { this._showFPS = !!show; },
-        showBuildFeedback() {},
-        updateHackProgress() {},
-        showHackResult() {},
-        setCameraHackView() {},
-        getPerfStats() {
-            return {
-                terrainInstances: 0,
-                buildingInstances: game?.buildings?.buildings?.length || 0,
-                citizenInstances: game?.citizens?.citizens?.length || 0,
-                activeChunks: game?.chunks?.getActiveChunkCount?.() ?? 0,
-                visibleChunks: 1,
-                drawCalls: 3,
-            };
-        },
-    };
-    return stub;
-}
 
 export class UIManager {
     constructor(game) {
@@ -330,9 +100,8 @@ export class UIManager {
         this.tutorial = createTutorialOverlay(this.game);
 
         // 3D
-        // Start in a lightweight stub so UI is responsive immediately, then upgrade to real 3D.
-        // If 3D fails, we stay on the stub (compatibility mode).
-        this.renderer3d = createRendererStub(this.game, this.canvas);
+        // renderer3d is null until loadRenderer3D() resolves
+        this.renderer3d = null;
 
         // Input
         this.keys = new Set();
@@ -715,7 +484,6 @@ export class UIManager {
     async loadRenderer3D() {
         try {
             const mod = await import('./renderer3d.js');
-            // Prefer async factory (robust Three.js loading + WebGL checks)
             if (typeof mod?.createRenderer3D === 'function') {
                 this.renderer3d = await mod.createRenderer3D(this.game, this.canvas);
             } else {
@@ -723,28 +491,24 @@ export class UIManager {
                 if (!Renderer3D) throw new Error('Renderer3D export missing.');
                 this.renderer3d = new Renderer3D(this.game, this.canvas);
             }
-            this.renderer3d.isFallback = false;
-            removeFallbackCanvas(this.canvas);
             this.applySettings();
             this.showMessage('3D renderer ready.', 'success');
         } catch (e) {
-            this.useCompatibilityRenderer(e);
+            console.error('[UI] 3D renderer failed:', e);
+            const short = (e?.message || String(e)).split('\n')[0].slice(0, 140);
+            this.showMessage(`3D renderer failed: ${short} (see console)`, 'crisis');
         }
     }
 
     useCompatibilityRenderer(reason = null) {
-        if (!this.renderer3d?.isFallback) {
-            console.error('[UI] 3D renderer unavailable, switching to compatibility mode:', reason);
-        }
-        this.renderer3d = createRendererStub(this.game, this.canvas);
-        this.applySettings();
-        const msg = (reason && (reason.message || String(reason))) ? (reason.message || String(reason)) : '';
-        const short = msg ? msg.split('\n')[0].slice(0, 140) : 'Unknown error';
-        this.showMessage(`3D renderer unavailable: ${short} (see console)`, 'crisis');
+        console.error('[UI] 3D render error:', reason);
+        this.renderer3d = null;
+        const short = (reason?.message || String(reason) || 'Unknown error').split('\n')[0].slice(0, 140);
+        this.showMessage(`Render error: ${short} (see console)`, 'crisis');
     }
 
     onWorldRebuilt() {
-        this.renderer3d.rebuildWorld();
+        this.renderer3d?.rebuildWorld();
         this._lastBuildingCount = 0;
         this._lastCitizenCount = 0;
     }
@@ -762,6 +526,7 @@ export class UIManager {
     }
 
     resetCamera() {
+        if (!this.renderer3d) return;
         this.renderer3d.yaw = 0;
         this.renderer3d.pitch = -0.35;
         this.renderer3d.followDist = 7;
@@ -1053,8 +818,8 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 if (vc) {
                     if (vc.isDriving) {
                         vc.exitVehicle();
-                        if (this.renderer3d._player) this.renderer3d._player.visible = true;
-                        this.renderer3d.syncPlayer();
+                        if (this.renderer3d?._player) this.renderer3d._player.visible = true;
+                        this.renderer3d?.syncPlayer();
                         // Stop vehicle audio
                         this._vehicleAudio?.stop();
                     } else {
@@ -1062,7 +827,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                         const py = this.game.player.wz ?? this.game.player.y;
                         const result = vc.enterVehicle(px, py);
                         if (result.ok) {
-                            if (this.renderer3d._player) this.renderer3d._player.visible = false;
+                            if (this.renderer3d?._player) this.renderer3d._player.visible = false;
                             // Start vehicle audio
                             const am = this.audioManager;
                             if (am?.context && am.isInitialized) {
@@ -1087,9 +852,31 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     this.buildMenu.rotateCCW();
                     this.updateBuildGhost();
                 } else if (this.game.worldHacks) {
-                    // Quick-hack nearest node
                     e.preventDefault();
-                    this.game.worldHacks.quickHack();
+                    // Quick-hack: try traffic lights first (at road intersections),
+                    // then environmental (near buildings), then standard node hack
+                    const px = this.game.state.player.wx ?? this.game.state.player.x;
+                    const py = this.game.state.player.wz ?? this.game.state.player.y;
+                    const wh = this.game.worldHacks;
+
+                    // Check if near a road intersection (4-way)
+                    const tileX = Math.floor(px);
+                    const tileY = Math.floor(py);
+                    const map = this.game.map;
+                    const isRoad = (tx, ty) => {
+                        const t = map?.getTileAt?.(tx, ty);
+                        return t === 4 || t === 7; // TERRAIN_ROAD or TERRAIN_HIGHWAY
+                    };
+                    const atIntersection = isRoad(tileX, tileY) &&
+                        isRoad(tileX, tileY - 1) && isRoad(tileX + 1, tileY) &&
+                        isRoad(tileX, tileY + 1) && isRoad(tileX - 1, tileY);
+
+                    if (atIntersection) {
+                        wh.hackTrafficLights(tileX, tileY);
+                    } else {
+                        // Fall back to standard quick-hack
+                        wh.quickHack();
+                    }
                 }
             }
             if (e.key.toLowerCase() === 't') {
@@ -1220,7 +1007,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         // Movement keys + mode toggle + zone overlay
         window.addEventListener('keydown', (e) => {
             const k = e.key.toLowerCase();
-            if (['w', 'a', 's', 'd', 'shift'].includes(k)) this.keys.add(k);
+            if (['w', 'a', 's', 'd', 'shift', ' '].includes(k)) this.keys.add(k);
             // Mode toggle: Tab key
             if (e.key === 'Tab') {
                 e.preventDefault(); // Prevent focus change
@@ -1241,9 +1028,14 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 }
             }
 
-            // Citizen profile: C key
+            // C key: toggle crouch (street mode) or citizen profile (god mode)
             if (e.key.toLowerCase() === 'c') {
-                this._showClosestCitizenProfile();
+                if (this.game.mode === MODE_STREET && this.game.stealth) {
+                    this.game.stealth.toggleCrouch();
+                    this.game.showMessage(this.game.stealth.isCrouching ? 'Crouching' : 'Standing', 'normal');
+                } else {
+                    this._showClosestCitizenProfile();
+                }
             }
         });
         window.addEventListener('keyup', (e) => {
@@ -1264,7 +1056,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
             // Left click: build/inspect
             if (e.button === 0) {
-                const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
+                const tile = this.renderer3d?.pickTile(e.clientX, e.clientY);
                 if (!tile) return;
 
                 if (this.selectedBuilding) {
@@ -1276,7 +1068,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                         rotation: this.buildMenu.rotation,
                     });
                     if (result.ok) {
-                        this.renderer3d.markBuildingsDirty();
+                        this.renderer3d?.markBuildingsDirty();
                         this.updateBuildGhost(tile);
                     } else {
                         this.buildMenu.updateHUD({ ok: false, reason: result.reason || 'Invalid placement.' });
@@ -1308,10 +1100,11 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         window.addEventListener('mousemove', (e) => {
             if (this.selectedBuilding && !this.isRDragging) {
-                const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
+                const tile = this.renderer3d?.pickTile(e.clientX, e.clientY);
                 this.updateBuildGhost(tile);
             }
             if (this.isRDragging) {
+                if (!this.renderer3d) return;
                 const dx = e.clientX - this.lastMouseX;
                 const dy = e.clientY - this.lastMouseY;
                 this.lastMouseX = e.clientX;
@@ -1381,7 +1174,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         // Tooltip hover events
         this.canvas.addEventListener('mousemove', (e) => {
-            const tile = this.renderer3d.pickTile(e.clientX, e.clientY);
+            const tile = this.renderer3d?.pickTile(e.clientX, e.clientY);
             if (tile) {
                 const tooltipData = this.getTooltipData(tile.x, tile.y);
                 if (tooltipData) {
@@ -1394,7 +1187,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             }
             
             // Update building hover highlight
-            this.renderer3d.setHoveredTile(tile);
+            this.renderer3d?.setHoveredTile(tile);
         });
 
         this.canvas.addEventListener('mouseleave', () => {
@@ -1418,9 +1211,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 s: this.keys.has('s'),
                 d: this.keys.has('d'),
                 shift: this.keys.has('shift'),
+                space: this.keys.has(' '),
             });
             // Sync renderer to vehicle position
-            this.renderer3d.syncPlayer();
+            this.renderer3d?.syncPlayer();
             // Update vehicle audio
             const vehicle = vc.getActiveVehicle();
             if (vehicle && this._vehicleAudio) {
@@ -1449,7 +1243,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         const result = updatePlayerMovement(
             dt,
             input,
-            this.renderer3d.yaw,
+            this.renderer3d?.yaw ?? 0,
             this.game.map,
             this.game.player,
             this.playerState
@@ -1457,7 +1251,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
         // Sync renderer's player position if moved
         if (result.moved) {
-            this.renderer3d.syncPlayer();
+            this.renderer3d?.syncPlayer();
         }
 
         // Check pedestrian-vehicle collision (on foot only, throttled to ~10fps)
@@ -1489,11 +1283,11 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         // Rebuild instances when needed
         if (this.game.buildings.buildings.length !== this._lastBuildingCount) {
             this._lastBuildingCount = this.game.buildings.buildings.length;
-            this.renderer3d.markBuildingsDirty();
+            this.renderer3d?.markBuildingsDirty();
         }
         if (this.game.citizens.citizens.length !== this._lastCitizenCount) {
             this._lastCitizenCount = this.game.citizens.citizens.length;
-            this.renderer3d.markCitizensDirty();
+            this.renderer3d?.markCitizensDirty();
         }
 
         // Update simDt for player movement physics
@@ -1536,11 +1330,12 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         this.updateHealthBars();
         this.updateHUDLayers();
 
-        try {
-            this.renderer3d.render();
-        } catch (e) {
-            this.useCompatibilityRenderer(e);
-            this.renderer3d.render();
+        if (this.renderer3d) {
+            try {
+                this.renderer3d.render();
+            } catch (e) {
+                this.useCompatibilityRenderer(e);
+            }
         }
     }
 
@@ -1557,18 +1352,18 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
 
     updateBuildGhost(tile = null) {
         if (!this.selectedBuilding) {
-            this.renderer3d.clearBuildGhost();
+            this.renderer3d?.clearBuildGhost();
             return;
         }
         if (!tile) {
-            this.renderer3d.clearBuildGhost();
+            this.renderer3d?.clearBuildGhost();
             return;
         }
 
         const preview = validatePlacement(this.game, this.selectedBuilding, tile.x, tile.y, this.buildMenu.rotation);
         this.buildMenu.setHoverTile(tile);
         this.buildMenu.updateHUD(preview);
-        this.renderer3d.setBuildGhost(
+        this.renderer3d?.setBuildGhost(
             this.selectedBuilding,
             tile.x,
             tile.y,
@@ -2243,6 +2038,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
     }
 
     toggleServiceOverlay() {
+        if (!this.renderer3d) return;
         const sequence = ['off', 'power', 'water', 'health', 'police'];
         const current = this.game.servicesManager?.getOverlayService?.() || 'power';
         const currentMode = this.renderer3d._debugMode === 'services' ? current : 'off';

@@ -1,7 +1,7 @@
 // Vehicle controller - handles player driving input and vehicle management
 // Bridges with VehicleSystem (AI traffic) so the player can enter/exit traffic vehicles
 
-import { createVehicle, updateVehiclePhysics, getVehicleBounds, getTerrainProperties, isOnRoad } from './vehicle_state.js';
+import { createVehicle, updateVehiclePhysics, getVehicleBounds, getTerrainProperties, isOnRoad, VEHICLE_TYPES, MODEL_TO_TYPE } from './vehicle_state.js';
 
 export class VehicleController {
     constructor(game) {
@@ -69,17 +69,24 @@ export class VehicleController {
                 bestVehicle.path = [];
                 bestVehicle.pathIndex = 0;
 
-                // Set driving properties if missing
+                // Apply type-specific handling from VEHICLE_TYPES based on model key
+                const modelKey = bestVehicle.modelType || bestVehicle.type || 'sedan';
+                const typeKey = MODEL_TO_TYPE[modelKey] || 'PASSENGER';
+                const typeCfg = VEHICLE_TYPES[typeKey] || VEHICLE_TYPES.PASSENGER;
+
                 if (bestVehicle.heading === undefined) {
                     bestVehicle.heading = (bestVehicle.angle ?? 0) * (180 / Math.PI);
                 }
-                if (bestVehicle.maxSpeed === undefined) bestVehicle.maxSpeed = 22;
-                if (bestVehicle.acceleration === undefined) bestVehicle.acceleration = 4;
-                if (bestVehicle.braking === undefined) bestVehicle.braking = 8;
-                if (bestVehicle.turningSpeed === undefined) bestVehicle.turningSpeed = 2.5;
-                if (bestVehicle.traction === undefined) bestVehicle.traction = 1.0;
-                if (bestVehicle.width === undefined) bestVehicle.width = 1.5;
-                if (bestVehicle.length === undefined) bestVehicle.length = 3;
+                bestVehicle.maxSpeed = typeCfg.maxSpeed;
+                bestVehicle.acceleration = typeCfg.acceleration;
+                bestVehicle.braking = typeCfg.braking;
+                bestVehicle.turningSpeed = typeCfg.turningSpeed;
+                bestVehicle.wheelbase = typeCfg.wheelbase;
+                bestVehicle.traction = typeCfg.traction;
+                bestVehicle.width = typeCfg.width;
+                bestVehicle.length = typeCfg.length;
+                bestVehicle.mass = typeCfg.mass;
+                bestVehicle._typeName = typeCfg.name;
                 if (bestVehicle.health === undefined) bestVehicle.health = 100;
                 if (bestVehicle.maxHealth === undefined) bestVehicle.maxHealth = 100;
                 if (bestVehicle.damage === undefined) bestVehicle.damage = 0;
@@ -170,13 +177,14 @@ export class VehicleController {
 
     /**
      * Build input from WASD key state
-     * @param {Object} keys - { w, a, s, d, shift } booleans
+     * @param {Object} keys - { w, a, s, d, shift, space } booleans
      */
     setInputFromKeys(keys) {
         this.input = {
             throttle: keys.w ? 1 : 0,
-            brake: keys.s ? 1 : (keys.shift ? 0.5 : 0),
-            steer: (keys.a ? -1 : 0) + (keys.d ? 1 : 0)
+            brake: keys.s ? 1 : 0,
+            steer: (keys.a ? -1 : 0) + (keys.d ? 1 : 0),
+            handbrake: keys.space ? 1 : 0,
         };
     }
 
@@ -203,15 +211,28 @@ export class VehicleController {
         // Sync heading back to angle for renderer
         vehicle.angle = (vehicle.heading * Math.PI) / 180;
 
-        // Check building collisions
+        // Check building collisions — bounce away with speed-proportional damage
         const collision = this.checkBuildingCollision(vehicle);
         if (collision) {
-            vehicle.speed *= -0.3;
-            vehicle.health -= 5;
-            vehicle.damage += 5;
+            const impactSpeed = Math.abs(vehicle.speed);
+            // Push vehicle away from building center
+            const bx = collision.building.x + 0.5;
+            const by = collision.building.y + 0.5;
+            const dx = vehicle.x - bx;
+            const dy = vehicle.y - by;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+            vehicle.x += (dx / dist) * 0.3;
+            vehicle.y += (dy / dist) * 0.3;
+            vehicle.speed *= -0.25; // bounce
+            // Damage scales with impact speed
+            const dmg = Math.max(1, Math.round(impactSpeed * 1.2));
+            vehicle.health -= dmg;
+            vehicle.damage += dmg;
             this._lastCollision = true;
+            this._lastImpactSpeed = impactSpeed;
         } else {
             this._lastCollision = false;
+            this._lastImpactSpeed = 0;
         }
 
         // Clamp to map bounds
@@ -280,7 +301,30 @@ export class VehicleController {
     getSpeedKmh() {
         const vehicle = this.getActiveVehicle();
         if (!vehicle) return 0;
-        return Math.round((vehicle.speed || 0) * 3.6);
+        return Math.round(Math.abs(vehicle.speed || 0) * 3.6);
+    }
+
+    /**
+     * Get vehicle type display name
+     */
+    getTypeName() {
+        const vehicle = this.getActiveVehicle();
+        if (!vehicle) return '';
+        return vehicle._typeName || 'Car';
+    }
+
+    /**
+     * Get damage stage: 0=pristine, 1=dented, 2=smoking, 3=burning, 4=destroyed
+     */
+    getDamageStage() {
+        const vehicle = this.getActiveVehicle();
+        if (!vehicle) return 0;
+        const hp = vehicle.health ?? 100;
+        if (hp > 75) return 0;
+        if (hp > 50) return 1;
+        if (hp > 25) return 2;
+        if (hp > 0) return 3;
+        return 4;
     }
 
     /**

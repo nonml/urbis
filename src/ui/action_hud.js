@@ -40,8 +40,10 @@ export class ActionHUD {
                 <div class="ahud-weapon-ammo" id="ahud-wammo"></div>
             </div>
             <div class="ahud-speedo" id="ahud-speedo">
+                <span class="ahud-vtype" id="ahud-vtype"></span>
                 <span class="ahud-speedo-num" id="ahud-speedo-num">0</span>
                 <span class="ahud-speedo-unit">km/h</span>
+                <div class="ahud-vhealth" id="ahud-vhealth"><div class="ahud-vhealth-fill" id="ahud-vhealth-fill"></div></div>
             </div>
             <div class="ahud-crosshair" id="ahud-crosshair">
                 <svg viewBox="0 0 24 24" width="24" height="24">
@@ -218,6 +220,29 @@ export class ActionHUD {
                     margin-left: 3px;
                     letter-spacing: 1px;
                 }
+                .ahud-vtype {
+                    display: block;
+                    font-size: 10px;
+                    font-weight: 600;
+                    color: rgba(255,255,255,0.5);
+                    text-transform: uppercase;
+                    letter-spacing: 2px;
+                    margin-bottom: 2px;
+                }
+                .ahud-vhealth {
+                    width: 80px;
+                    height: 4px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 2px;
+                    margin-top: 4px;
+                    margin-left: auto;
+                }
+                .ahud-vhealth-fill {
+                    height: 100%;
+                    border-radius: 2px;
+                    background: #4caf50;
+                    transition: width 0.3s, background 0.3s;
+                }
 
                 /* ── Crosshair ── center of viewport */
                 .ahud-crosshair {
@@ -337,7 +362,7 @@ export class ActionHUD {
             crosshair.classList.toggle('on', show);
         }
 
-        // Speedometer
+        // Speedometer + vehicle type + health bar
         const speedo = this._el.querySelector('#ahud-speedo');
         if (speedo) {
             if (vc?.isDriving) {
@@ -346,6 +371,24 @@ export class ActionHUD {
                 if (spd !== this._cache.spd) {
                     this._cache.spd = spd;
                     this._el.querySelector('#ahud-speedo-num').textContent = spd;
+                }
+                // Vehicle type name
+                const typeName = vc.getTypeName();
+                if (typeName !== this._cache.vtype) {
+                    this._cache.vtype = typeName;
+                    const vtypeEl = this._el.querySelector('#ahud-vtype');
+                    if (vtypeEl) vtypeEl.textContent = typeName;
+                }
+                // Vehicle health bar
+                const veh = vc.getActiveVehicle();
+                const hp = veh ? Math.max(0, veh.health ?? 100) : 100;
+                const maxHp = veh ? (veh.maxHealth ?? 100) : 100;
+                const pct = Math.round((hp / maxHp) * 100);
+                const fill = this._el.querySelector('#ahud-vhealth-fill');
+                if (fill && pct !== this._cache.vpct) {
+                    this._cache.vpct = pct;
+                    fill.style.width = pct + '%';
+                    fill.style.background = pct > 60 ? '#4caf50' : pct > 30 ? '#ff9800' : '#f44336';
                 }
             } else {
                 speedo.classList.remove('on');

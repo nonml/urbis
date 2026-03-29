@@ -13,7 +13,21 @@ export const WEAPONS = {
         fireRate: 500,   // ms between attacks
         ammo: Infinity,
         heatGain: 5,
-        type: 'melee'
+        type: 'melee',
+        spread: 0,
+        pellets: 1,
+    },
+    bat: {
+        name: 'Baseball Bat',
+        damage: 22,
+        range: 2.5,
+        fireRate: 600,
+        ammo: Infinity,
+        heatGain: 8,
+        type: 'melee',
+        spread: 0,
+        pellets: 1,
+        knockback: 1.5,
     },
     pistol: {
         name: 'Pistol',
@@ -23,8 +37,38 @@ export const WEAPONS = {
         ammo: 12,
         maxAmmo: 60,
         heatGain: 15,
-        type: 'ranged'
-    }
+        type: 'ranged',
+        spread: 0.5,     // degrees of random spread
+        pellets: 1,
+        soundRadius: 12,
+    },
+    shotgun: {
+        name: 'Shotgun',
+        damage: 12,       // per pellet
+        range: 8,
+        fireRate: 800,
+        ammo: 6,
+        maxAmmo: 30,
+        heatGain: 20,
+        type: 'ranged',
+        spread: 8,        // wide cone
+        pellets: 6,       // 6 pellets per shot
+        knockback: 2.0,
+        soundRadius: 18,
+    },
+    smg: {
+        name: 'SMG',
+        damage: 12,
+        range: 12,
+        fireRate: 80,     // very fast
+        ammo: 30,
+        maxAmmo: 120,
+        heatGain: 8,
+        type: 'ranged',
+        spread: 3,
+        pellets: 1,
+        soundRadius: 14,
+    },
 };
 
 export class CombatSystem {
@@ -94,82 +138,83 @@ export class CombatSystem {
             eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, { x: px, y: py, weapon: this.currentWeapon });
         } catch {}
 
-        // Find target — check citizens within range along the aim direction
+        // Find targets — multiple pellets for shotgun, single for others
         const range = this.weapon.range;
         const dx = targetX - px;
         const dy = targetY - py;
         const dist = Math.sqrt(dx * dx + dy * dy);
 
-        if (dist > range) return { hit: false };
+        if (dist > range && this.weapon.type === 'melee') return { hit: false };
 
-        // Check citizens for hit
-        const citizens = this.game.citizens?.citizens || [];
-        let bestHit = null;
-        let bestDist = range;
+        const pellets = this.weapon.pellets || 1;
+        const spread = (this.weapon.spread || 0) * (Math.PI / 180);
+        const baseAngle = Math.atan2(dx, -dy); // aim direction angle
+        const hits = [];
 
-        for (const c of citizens) {
-            const cx = c.x ?? 0;
-            const cy = c.y ?? 0;
-            const cdx = cx - px;
-            const cdy = cy - py;
-            const cDist = Math.sqrt(cdx * cdx + cdy * cdy);
+        for (let p = 0; p < pellets; p++) {
+            // Apply random spread per pellet
+            const angle = baseAngle + (Math.random() - 0.5) * spread;
+            const aimX = Math.sin(angle);
+            const aimY = -Math.cos(angle);
 
-            if (cDist > range) continue;
+            const citizens = this.game.citizens?.citizens || [];
+            let bestHit = null;
+            let bestDist = range;
 
-            // For melee, just check proximity
-            if (this.weapon.type === 'melee') {
-                if (cDist < bestDist) {
-                    bestDist = cDist;
-                    bestHit = c;
+            for (const c of citizens) {
+                const cx = c.x ?? 0;
+                const cy = c.y ?? 0;
+                const cdx = cx - px;
+                const cdy = cy - py;
+                const cDist = Math.sqrt(cdx * cdx + cdy * cdy);
+                if (cDist > range) continue;
+
+                if (this.weapon.type === 'melee') {
+                    if (cDist < bestDist) { bestDist = cDist; bestHit = c; }
+                    continue;
                 }
-                continue;
-            }
 
-            // For ranged, check if citizen is near the aim line
-            // Project citizen position onto aim vector
-            const aimNormX = dx / dist;
-            const aimNormY = dy / dist;
-            const dot = cdx * aimNormX + cdy * aimNormY;
-            if (dot < 0) continue; // behind player
-
-            // Perpendicular distance from aim line
-            const perpDist = Math.abs(cdx * aimNormY - cdy * aimNormX);
-            if (perpDist < 1.0 && dot < bestDist) {
-                bestDist = dot;
-                bestHit = c;
-            }
-        }
-
-        // Also check traffic vehicles for ranged hits
-        if (this.weapon.type === 'ranged' && this.game.vehicleSystem) {
-            for (const v of this.game.vehicleSystem.vehicles) {
-                const vdx = v.x - px;
-                const vdy = v.y - py;
-                const vDist = Math.sqrt(vdx * vdx + vdy * vdy);
-                if (vDist > range) continue;
-
-                const aimNormX = dx / dist;
-                const aimNormY = dy / dist;
-                const dot = vdx * aimNormX + vdy * aimNormY;
+                const dot = cdx * aimX + cdy * aimY;
                 if (dot < 0) continue;
-
-                const perpDist = Math.abs(vdx * aimNormY - vdy * aimNormX);
-                if (perpDist < 1.5 && dot < bestDist) {
-                    bestDist = dot;
-                    bestHit = v;
-                    bestHit._isVehicle = true;
+                const perpDist = Math.abs(cdx * aimY - cdy * aimX);
+                if (perpDist < 1.0 && dot < bestDist) {
+                    bestDist = dot; bestHit = c;
                 }
             }
-        }
 
-        if (bestHit) {
-            if (bestHit._isVehicle) {
-                bestHit.health = (bestHit.health || 100) - this.weapon.damage;
-                delete bestHit._isVehicle;
+            // Check traffic vehicles for ranged hits
+            if (this.weapon.type === 'ranged' && this.game.vehicleSystem) {
+                for (const v of this.game.vehicleSystem.vehicles) {
+                    const vdx = v.x - px;
+                    const vdy = v.y - py;
+                    const vDist = Math.sqrt(vdx * vdx + vdy * vdy);
+                    if (vDist > range) continue;
+                    const dot = vdx * aimX + vdy * aimY;
+                    if (dot < 0) continue;
+                    const perpDist = Math.abs(vdx * aimY - vdy * aimX);
+                    if (perpDist < 1.5 && dot < bestDist) {
+                        bestDist = dot; bestHit = v; bestHit._isVehicle = true;
+                    }
+                }
             }
-            return { hit: true, target: bestHit };
+
+            if (bestHit) {
+                if (bestHit._isVehicle) {
+                    bestHit.health = (bestHit.health || 100) - this.weapon.damage;
+                    delete bestHit._isVehicle;
+                }
+                // Knockback
+                if (this.weapon.knockback && bestHit.x !== undefined) {
+                    bestHit.x += aimX * this.weapon.knockback * 0.3;
+                    bestHit.y += aimY * this.weapon.knockback * 0.3;
+                }
+                hits.push(bestHit);
+            }
         }
 
+        if (hits.length > 0) {
+            return { hit: true, target: hits[0], allHits: hits, pelletCount: pellets };
+        }
         return { hit: false };
     }
 
