@@ -177,7 +177,7 @@ export const THEMES = {
 };
 
 // Default theme
-export const DEFAULT_THEME = 'NEO_NOIR';
+export const DEFAULT_THEME = 'STARDREW';
 
 // Default settings
 export const DEFAULT_THEME_SETTINGS = {
@@ -214,6 +214,8 @@ export class ThemeManager {
         if (stored) {
             try {
                 const parsed = JSON.parse(stored);
+                // Migrate: NEO_NOIR was the old default — let new default (STARDREW) take over
+                if (parsed.theme === 'NEO_NOIR') delete parsed.theme;
                 this.settings = { ...DEFAULT_THEME_SETTINGS, ...parsed };
             } catch (e) {
                 console.warn('Failed to parse theme settings, using defaults');

@@ -18,14 +18,14 @@
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
-    "electron:dev": "electron electron.js",
+    "electron:dev": "electron electron.cjs",
     "electron:build": "npm run build && electron-builder",
     "electron:pack": "electron-builder --dir",
     "mp:server": "node server/multiplayer_server.js",
     "mp:server:dev": "node --watch server/multiplayer_server.js",
     "greenworks:rebuild": "node_modules/.bin/electron-rebuild -f -w greenworks"
   },
-  "main": "electron.js",
+  "main": "electron.cjs",
   "build": {
     "appId": "com.nonta.city-builder",
     "productName": "City Builder",
@@ -35,8 +35,8 @@
     },
     "files": [
       "build/**/*",
-      "electron.js",
-      "electron-preload.js",
+      "electron.cjs",
+      "electron-preload.cjs",
       "steam_appid.txt",
       "greenworks.json",
       "node_modules/greenworks/**/*"

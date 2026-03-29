@@ -44,7 +44,7 @@ export function createNewGameState(options = {}) {
             paused: false,
             simDt: 0.2, // Fixed simulation delta (seconds)
             tickPerDay: 1, // Ticks per in-game day (1 tick = 1 day)
-            timeOfDay: 0.0, // Normalized time (0.0 to 1.0)
+            timeOfDay: 8.0, // Start at 8 AM (0–24 scale)
         },
         resources: {
             gold: 100,

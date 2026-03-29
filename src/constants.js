@@ -160,14 +160,14 @@ export const RESOURCE_NAMES = {
 
 // Simple 3D presentation config for each building type (used by third-person renderer)
 export const BUILDING_3D = {
-    [BUILDING_HOUSE]: { height: 0.8 },
-    [BUILDING_FARM]: { height: 0.35 },
-    [BUILDING_LUMBER_MILL]: { height: 0.6 },
-    [BUILDING_MARKET]: { height: 0.9 },
-    [BUILDING_TOWN_HALL]: { height: 1.2 },
-    [BUILDING_WAREHOUSE]: { height: 0.7 },
-    [BUILDING_BARRACKS]: { height: 0.85 },
-    [BUILDING_SCHOOL]: { height: 0.8 },
+    [BUILDING_HOUSE]: { height: 0.22 },      // 1-2 storey residential
+    [BUILDING_FARM]: { height: 0.14 },        // low barn
+    [BUILDING_LUMBER_MILL]: { height: 0.28 },
+    [BUILDING_MARKET]: { height: 0.32 },
+    [BUILDING_TOWN_HALL]: { height: 0.55 },
+    [BUILDING_WAREHOUSE]: { height: 0.30 },
+    [BUILDING_BARRACKS]: { height: 0.35 },
+    [BUILDING_SCHOOL]: { height: 0.30 },
     // Transit / infrastructure buildings
     'bus-stop':      { height: 0.30 },
     'bus-depot':     { height: 0.70 },

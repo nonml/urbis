@@ -72,27 +72,27 @@ export class ProceduralMusicEngine {
         // Master volume
         this._masterVolume = new Tone.Volume(-12).toDestination();
 
-        // --- Pad (ambient harmony layer) ---
+        // --- Pad (ambient harmony layer) — slow, floaty ---
         this._pad = new Tone.PolySynth(Tone.Synth, {
             oscillator: { type: 'sine' },
-            envelope: { attack: 1.5, decay: 0.5, sustain: 0.7, release: 3 },
-        }).connect(new Tone.Reverb({ decay: 4, wet: 0.6 }).connect(this._masterVolume));
-        this._pad.volume.value = -18;
+            envelope: { attack: 3.0, decay: 1.0, sustain: 0.6, release: 6 },
+        }).connect(new Tone.Reverb({ decay: 8, wet: 0.8 }).connect(this._masterVolume));
+        this._pad.volume.value = -22;
 
-        // --- Bass ---
+        // --- Bass — soft, minimal ---
         this._bass = new Tone.MonoSynth({
             oscillator: { type: 'triangle' },
-            envelope: { attack: 0.05, decay: 0.3, sustain: 0.4, release: 0.8 },
-            filterEnvelope: { attack: 0.05, decay: 0.2, sustain: 0.5, release: 1, baseFrequency: 200, octaves: 2 },
-        }).connect(new Tone.Filter(400, 'lowpass').connect(this._masterVolume));
-        this._bass.volume.value = -14;
+            envelope: { attack: 0.3, decay: 0.5, sustain: 0.3, release: 2.0 },
+            filterEnvelope: { attack: 0.2, decay: 0.4, sustain: 0.4, release: 2, baseFrequency: 150, octaves: 1.5 },
+        }).connect(new Tone.Filter(300, 'lowpass').connect(this._masterVolume));
+        this._bass.volume.value = -20;
 
-        // --- Melody ---
+        // --- Melody — gentle, breathy ---
         this._melody = new Tone.Synth({
-            oscillator: { type: 'triangle8' },
-            envelope: { attack: 0.02, decay: 0.2, sustain: 0.3, release: 0.6 },
-        }).connect(new Tone.Reverb({ decay: 2, wet: 0.3 }).connect(this._masterVolume));
-        this._melody.volume.value = -16;
+            oscillator: { type: 'sine' },
+            envelope: { attack: 0.1, decay: 0.4, sustain: 0.2, release: 1.8 },
+        }).connect(new Tone.Reverb({ decay: 5, wet: 0.55 }).connect(this._masterVolume));
+        this._melody.volume.value = -18;
 
         // --- Tension (crisis layer) ---
         this._tension = new Tone.PolySynth(Tone.Synth, {
@@ -141,7 +141,7 @@ export class ProceduralMusicEngine {
 
         // --- BPM from game speed ---
         const speed = game.state.time?.speed ?? 1;
-        const targetBPM = Math.round(70 + speed * 20); // 70–150
+        const targetBPM = Math.round(55 + speed * 10); // 55–75 — slow and calm
         if (Math.abs(this._currentBPM - targetBPM) > 2) {
             this._currentBPM = targetBPM;
             Tone.Transport.bpm.rampTo(targetBPM, 2);
@@ -205,7 +205,7 @@ export class ProceduralMusicEngine {
         new Tone.Sequence((time) => {
             if (!this.running) return;
             // Skip some notes for breathing room
-            if (Math.random() < 0.35) { melStep++; return; }
+            if (Math.random() < 0.55) { melStep++; return; } // sparser for breathing room
             const degree = melPattern[melStep % melPattern.length];
             const octave = melStep < 8 ? 1 : 2;
             const freq = noteInScale(degree, octave, this._currentScale);
