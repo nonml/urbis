@@ -60,6 +60,7 @@ export class ActionHUD {
                 <div class="ahud-death-text">WASTED</div>
                 <div class="ahud-death-line"></div>
             </div>
+            <div class="ahud-prompt" id="ahud-prompt"></div>
         `;
 
         if (!document.getElementById('ahud-css')) {
@@ -293,6 +294,39 @@ export class ActionHUD {
                     height: 1px;
                     background: linear-gradient(90deg, transparent, rgba(192,57,43,0.6), transparent);
                 }
+
+                /* ── Proximity Prompt ── */
+                .ahud-prompt {
+                    position: absolute;
+                    bottom: 120px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0,0,0,0.7);
+                    border: 1px solid rgba(255,255,255,0.15);
+                    border-radius: 4px;
+                    padding: 8px 16px;
+                    font-size: 13px;
+                    font-weight: 600;
+                    color: #fff;
+                    letter-spacing: 0.5px;
+                    opacity: 0;
+                    transition: opacity 0.2s;
+                    backdrop-filter: blur(4px);
+                    white-space: nowrap;
+                }
+                .ahud-prompt.on { opacity: 1; }
+                .ahud-prompt kbd {
+                    display: inline-block;
+                    background: rgba(255,255,255,0.15);
+                    border: 1px solid rgba(255,255,255,0.25);
+                    border-radius: 3px;
+                    padding: 1px 6px;
+                    margin: 0 3px;
+                    font-family: inherit;
+                    font-size: 12px;
+                    font-weight: 700;
+                    color: #fff;
+                }
             `;
             document.head.appendChild(s);
         }
@@ -360,6 +394,48 @@ export class ActionHUD {
         if (crosshair) {
             const show = this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead;
             crosshair.classList.toggle('on', show);
+        }
+
+        // Vehicle proximity prompt
+        const prompt = this._el.querySelector('#ahud-prompt');
+        if (prompt) {
+            let promptText = '';
+            if (this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead) {
+                // Check for nearby vehicles
+                const px = this.game.player.wx ?? this.game.player.x;
+                const py = this.game.player.wz ?? this.game.player.y;
+                const vehicles = this.game.vehicleSystem?.vehicles || [];
+                let nearestDist = 3.5; // slightly larger than enterVehicle's searchRadius of 3
+                for (const v of vehicles) {
+                    const dx = (v.x ?? 0) - px;
+                    const dy = (v.y ?? 0) - py;
+                    const d = Math.sqrt(dx * dx + dy * dy);
+                    if (d < nearestDist) {
+                        nearestDist = d;
+                        promptText = '<kbd>F</kbd> Enter Vehicle';
+                    }
+                }
+                // If no vehicle prompt, check for hackable nodes
+                if (!promptText) {
+                    const interactables = this.game.interactables?.getAll?.() || this.game.interactableNodes || [];
+                    for (const node of interactables) {
+                        const dx = (node.x ?? 0) - px;
+                        const dy = (node.y ?? 0) - py;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 6) {
+                            promptText = '<kbd>Q</kbd> Hack';
+                            break;
+                        }
+                    }
+                }
+            }
+            const showPrompt = promptText.length > 0;
+            if (showPrompt !== this._cache.promptVisible || promptText !== this._cache.promptText) {
+                this._cache.promptVisible = showPrompt;
+                this._cache.promptText = promptText;
+                prompt.classList.toggle('on', showPrompt);
+                if (showPrompt) prompt.innerHTML = promptText;
+            }
         }
 
         // Speedometer + vehicle type + health bar
