@@ -108,6 +108,7 @@ export class Renderer3D {
     constructor(game, canvas) {
         this.game = game;
         this.canvas = canvas;
+        this._THREE = THREE; // expose for external consumers (action_hud profiler)
 
         // Scene
         this.scene = new THREE.Scene();

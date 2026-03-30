@@ -826,6 +826,58 @@ body {
    HUD: GOD VIEW LAYER
    ═══════════════════════════════════════ */
 
+/* ── R/C/I Demand Bars ── */
+.demand-bars {
+    position: fixed;
+    bottom: 120px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 4px;
+    align-items: flex-end;
+    z-index: 31;
+    pointer-events: none;
+}
+.demand-bar {
+    width: 16px;
+    height: 60px;
+    background: rgba(0,0,0,0.5);
+    border: 1px solid rgba(255,255,255,0.1);
+    border-radius: 2px;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-end;
+}
+.demand-bar-fill {
+    width: 100%;
+    border-radius: 1px;
+    transition: height 0.5s ease;
+}
+.demand-bar[data-zone="R"] .demand-bar-fill {
+    background: linear-gradient(to top, #2ecc71, #27ae60);
+    box-shadow: 0 0 6px rgba(46,204,113,0.4);
+}
+.demand-bar[data-zone="C"] .demand-bar-fill {
+    background: linear-gradient(to top, #3498db, #2980b9);
+    box-shadow: 0 0 6px rgba(52,152,219,0.4);
+}
+.demand-bar[data-zone="I"] .demand-bar-fill {
+    background: linear-gradient(to top, #f39c12, #e67e22);
+    box-shadow: 0 0 6px rgba(243,156,18,0.4);
+}
+.demand-bar-label {
+    position: absolute;
+    bottom: -16px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    letter-spacing: 1px;
+}
+
 /* Build Ribbon */
 .build-ribbon {
     position: fixed;

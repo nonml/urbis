@@ -187,6 +187,12 @@ export class UIManager {
         this._breachWindow = document.getElementById('breach-window');
         this._lastWantedLevel = 0;
 
+        // Demand bar element references
+        this._demandR = document.getElementById('demand-r');
+        this._demandC = document.getElementById('demand-c');
+        this._demandI = document.getElementById('demand-i');
+        this._lastDemandUpdate = 0;
+
         // Mode toggle button
         const modeToggleBtn = document.getElementById('mode-toggle-btn');
         if (modeToggleBtn) {
@@ -412,6 +418,18 @@ export class UIManager {
         if (this._tickerWeatherIcon && ws?.getWeatherIcon) {
             this._tickerWeatherIcon.textContent = ws.getWeatherIcon();
         }
+    }
+
+    /** Update R/C/I demand bars (throttled to ~500ms) */
+    _updateDemandBars() {
+        const now = performance.now();
+        if (now - this._lastDemandUpdate < 500) return;
+        this._lastDemandUpdate = now;
+        const demand = this.game.state?.economy?.demand;
+        if (!demand) return;
+        if (this._demandR) this._demandR.style.height = (demand.residential * 100) + '%';
+        if (this._demandC) this._demandC.style.height = (demand.commercial * 100) + '%';
+        if (this._demandI) this._demandI.style.height = (demand.industrial * 100) + '%';
     }
 
     /** Update health/stamina bars */
@@ -1329,6 +1347,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         this.updateCityTicker();
         this.updateHealthBars();
         this.updateHUDLayers();
+        this._updateDemandBars();
 
         if (this.renderer3d) {
             try {

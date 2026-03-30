@@ -2,11 +2,35 @@
  * Action HUD — Watch Dogs-inspired minimal overlay inside the 3D viewport
  */
 
+let _vec3Cache = null;
+
+/** Lazily create a reusable Vector3 for screen projection */
+function getVec3(THREE_mod) {
+    if (!_vec3Cache && THREE_mod?.Vector3) {
+        _vec3Cache = new THREE_mod.Vector3();
+    }
+    return _vec3Cache;
+}
+
+/** Street-mode contextual hints — shown once per session as player encounters new situations */
+const STREET_HINTS = [
+    { id: 'move',    text: '<kbd>WASD</kbd> Move  <kbd>Shift</kbd> Sprint',            trigger: 'street_enter' },
+    { id: 'look',    text: '<kbd>Mouse</kbd> Look around  <kbd>Scroll</kbd> Zoom',     trigger: 'street_enter', delay: 3000 },
+    { id: 'combat',  text: '<kbd>LMB</kbd> Attack  <kbd>Tab</kbd> Cycle weapon',       trigger: 'street_enter', delay: 6000 },
+    { id: 'vehicle', text: '<kbd>F</kbd> Enter/exit vehicle',                            trigger: 'near_vehicle' },
+    { id: 'hack',    text: '<kbd>H</kbd> Hack scan  <kbd>Q</kbd> Quick hack',          trigger: 'near_node' },
+    { id: 'stealth', text: '<kbd>C</kbd> Crouch/stealth',                               trigger: 'street_enter', delay: 9000 },
+];
+
 export class ActionHUD {
     constructor(game) {
         this.game = game;
         this._el = null;
         this._cache = {};
+        this._shownHints = new Set(JSON.parse(localStorage.getItem('ahud_hints_shown') || '[]'));
+        this._hintQueue = [];
+        this._activeHint = null;
+        this._hintTimer = 0;
         this._init();
     }
 
@@ -61,6 +85,8 @@ export class ActionHUD {
                 <div class="ahud-death-line"></div>
             </div>
             <div class="ahud-prompt" id="ahud-prompt"></div>
+            <div class="ahud-profiler" id="ahud-profiler"></div>
+            <div class="ahud-hint" id="ahud-hint"></div>
         `;
 
         if (!document.getElementById('ahud-css')) {
@@ -296,6 +322,93 @@ export class ActionHUD {
                 }
 
                 /* ── Proximity Prompt ── */
+                /* ── NPC Profiler Cards ── */
+                .ahud-profiler {
+                    position: absolute;
+                    inset: 0;
+                    pointer-events: none;
+                    overflow: hidden;
+                }
+                .ahud-profile-card {
+                    position: absolute;
+                    background: rgba(0,10,20,0.82);
+                    border: 1px solid rgba(0,255,255,0.25);
+                    border-radius: 3px;
+                    padding: 5px 8px;
+                    min-width: 110px;
+                    transform: translate(-50%, -100%);
+                    font-size: 10px;
+                    line-height: 1.35;
+                    color: rgba(255,255,255,0.85);
+                    backdrop-filter: blur(3px);
+                    box-shadow: 0 0 8px rgba(0,255,255,0.15);
+                }
+                .ahud-profile-card::after {
+                    content: '';
+                    position: absolute;
+                    bottom: -5px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    border-left: 5px solid transparent;
+                    border-right: 5px solid transparent;
+                    border-top: 5px solid rgba(0,255,255,0.25);
+                }
+                .ahud-profile-name {
+                    font-weight: 700;
+                    font-size: 11px;
+                    color: #00ffff;
+                    margin-bottom: 2px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 130px;
+                }
+                .ahud-profile-row {
+                    display: flex;
+                    justify-content: space-between;
+                    gap: 8px;
+                }
+                .ahud-profile-income {
+                    font-weight: 600;
+                }
+                .ahud-profile-income.high { color: #2ecc71; }
+                .ahud-profile-income.mid { color: #f1c40f; }
+                .ahud-profile-income.low { color: #e74c3c; }
+
+                /* ── Contextual Hints ── */
+                .ahud-hint {
+                    position: absolute;
+                    top: 70px;
+                    left: 50%;
+                    transform: translateX(-50%);
+                    background: rgba(0,0,0,0.7);
+                    border: 1px solid rgba(255,255,255,0.12);
+                    border-radius: 4px;
+                    padding: 8px 18px;
+                    font-size: 12px;
+                    font-weight: 500;
+                    color: rgba(255,255,255,0.8);
+                    letter-spacing: 0.3px;
+                    opacity: 0;
+                    transition: opacity 0.4s;
+                    backdrop-filter: blur(4px);
+                    white-space: nowrap;
+                    pointer-events: none;
+                }
+                .ahud-hint.on { opacity: 1; }
+                .ahud-hint kbd {
+                    display: inline-block;
+                    background: rgba(255,255,255,0.12);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    border-radius: 3px;
+                    padding: 1px 5px;
+                    margin: 0 2px;
+                    font-family: inherit;
+                    font-size: 11px;
+                    font-weight: 700;
+                    color: #fff;
+                }
+
                 .ahud-prompt {
                     position: absolute;
                     bottom: 120px;
@@ -471,9 +584,167 @@ export class ActionHUD {
             }
         }
 
+        // Street-mode contextual hints
+        this._updateHints(now);
+
+        // NPC Profiler overlay — shows citizen data when hack scan is active
+        this._updateProfiler(state);
+
         // Effects
         this._el.querySelector('#ahud-flash')?.classList.toggle('on', ph?.showDamageFlash || false);
         this._el.querySelector('#ahud-death')?.classList.toggle('on', ph?.isDead || false);
+    }
+
+    /** Queue street-mode hints based on context triggers */
+    _updateHints(now) {
+        const hintEl = this._el.querySelector('#ahud-hint');
+        if (!hintEl) return;
+
+        const isStreet = this.game.mode === 'street';
+
+        // Trigger hints based on context
+        if (isStreet && !this._streetEnterTriggered) {
+            this._streetEnterTriggered = true;
+            for (const hint of STREET_HINTS) {
+                if (hint.trigger === 'street_enter' && !this._shownHints.has(hint.id)) {
+                    this._hintQueue.push({ ...hint, showAt: now + (hint.delay || 500) });
+                }
+            }
+        }
+        if (isStreet && this._cache.promptText === '<kbd>F</kbd> Enter Vehicle') {
+            const h = STREET_HINTS.find(h => h.id === 'vehicle');
+            if (h && !this._shownHints.has('vehicle') && !this._hintQueue.find(q => q.id === 'vehicle')) {
+                this._hintQueue.push({ ...h, showAt: now + 200 });
+            }
+        }
+        if (isStreet && this._cache.promptText === '<kbd>Q</kbd> Hack') {
+            const h = STREET_HINTS.find(h => h.id === 'hack');
+            if (h && !this._shownHints.has('hack') && !this._hintQueue.find(q => q.id === 'hack')) {
+                this._hintQueue.push({ ...h, showAt: now + 200 });
+            }
+        }
+
+        // Display active hint
+        if (this._activeHint) {
+            if (now > this._activeHint.hideAt) {
+                hintEl.classList.remove('on');
+                this._activeHint = null;
+            }
+        } else if (this._hintQueue.length > 0) {
+            // Find next ready hint
+            const readyIdx = this._hintQueue.findIndex(h => now >= h.showAt);
+            if (readyIdx >= 0) {
+                const hint = this._hintQueue.splice(readyIdx, 1)[0];
+                this._activeHint = { ...hint, hideAt: now + 4000 };
+                hintEl.innerHTML = hint.text;
+                hintEl.classList.add('on');
+                this._shownHints.add(hint.id);
+                try { localStorage.setItem('ahud_hints_shown', JSON.stringify([...this._shownHints])); } catch {}
+            }
+        }
+
+        // Reset triggers when leaving street mode
+        if (!isStreet) {
+            this._streetEnterTriggered = false;
+            if (this._activeHint) {
+                hintEl.classList.remove('on');
+                this._activeHint = null;
+            }
+            this._hintQueue = [];
+        }
+    }
+
+    /** Update NPC profiler overlay cards */
+    _updateProfiler(state) {
+        const container = this._el.querySelector('#ahud-profiler');
+        if (!container) return;
+
+        const hackScan = this.game.ui?.hackScanVisible;
+        const isStreet = this.game.mode === 'street';
+        const renderer = this.game.ui?.renderer3d;
+        const camera = renderer?.camera;
+        const canvas = renderer?.canvas;
+        const citizens = this.game.citizens?.citizens;
+
+        if (!hackScan || !isStreet || !camera || !canvas || !citizens) {
+            if (container.childElementCount > 0) container.innerHTML = '';
+            return;
+        }
+
+        const px = this.game.player.wx ?? this.game.player.x;
+        const py = this.game.player.wz ?? this.game.player.y;
+        const halfW = renderer._mapHalfW ?? 24;
+        const halfH = renderer._mapHalfH ?? 24;
+        const rect = canvas.getBoundingClientRect();
+
+        // Find up to 5 nearest citizens within 12 tiles
+        const nearby = [];
+        for (let i = 0; i < citizens.length; i++) {
+            const c = citizens[i];
+            const cx = c.x ?? 0;
+            const cy = c.y ?? 0;
+            const dx = cx - px;
+            const dy = cy - py;
+            const dist = dx * dx + dy * dy;
+            if (dist < 144) { // 12^2
+                nearby.push({ idx: i, c, dist });
+            }
+        }
+        nearby.sort((a, b) => a.dist - b.dist);
+        const show = nearby.slice(0, 5);
+
+        // Build/reuse card elements
+        while (container.childElementCount > show.length) {
+            container.lastElementChild.remove();
+        }
+        while (container.childElementCount < show.length) {
+            const card = document.createElement('div');
+            card.className = 'ahud-profile-card';
+            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div>';
+            container.appendChild(card);
+        }
+
+        // Update each card
+        for (let i = 0; i < show.length; i++) {
+            const { c } = show[i];
+            const card = container.children[i];
+            const cx = (c.x ?? 0) - halfW + 0.5;
+            const cz = (c.y ?? 0) - halfH + 0.5;
+
+            // Project to screen using camera matrices
+            const threeModule = renderer._THREE || window.THREE;
+            const vec = getVec3(threeModule);
+            if (!vec) { card.style.display = 'none'; continue; }
+            vec.set(cx, 2.2, cz);
+            vec.project(camera);
+
+            // Behind camera check
+            if (vec.z > 1) { card.style.display = 'none'; continue; }
+            card.style.display = '';
+
+            const sx = (vec.x * 0.5 + 0.5) * rect.width;
+            const sy = (-(vec.y * 0.5) + 0.5) * rect.height;
+            card.style.left = sx + 'px';
+            card.style.top = sy + 'px';
+
+            // Update content (throttled by checking name cache)
+            const name = c.name || `Citizen #${c.id ?? show[i].idx}`;
+            const nameEl = card.querySelector('.ahud-profile-name');
+            if (nameEl.textContent !== name) {
+                nameEl.textContent = name;
+                const rows = card.querySelectorAll('.ahud-profile-row');
+                const occupation = c.occupation || c.job || 'Unemployed';
+                const income = c.income ?? Math.floor(1000 + Math.random() * 5000);
+                const incomeClass = income > 4000 ? 'high' : income > 2000 ? 'mid' : 'low';
+                const happiness = c.happiness ?? 50;
+
+                rows[0].children[0].textContent = occupation;
+                rows[0].children[1].textContent = '$' + income;
+                rows[0].children[1].className = 'ahud-profile-income ' + incomeClass;
+                rows[1].children[0].textContent = c.faction || 'citizens';
+                rows[1].children[1].textContent = happiness + '% happy';
+            }
+        }
     }
 
     destroy() {
