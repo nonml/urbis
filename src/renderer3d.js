@@ -112,8 +112,8 @@ export class Renderer3D {
 
         // Scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x87ceeb);
-        this.scene.fog = new THREE.FogExp2(0xa8d8ea, 0.0012);
+        this.scene.background = new THREE.Color(0x4a8ab5);
+        this.scene.fog = new THREE.FogExp2(0x7ab0d0, 0.006);
 
         // Camera rig (Ticket B-2: Orbit + Follow + Collision)
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
@@ -476,8 +476,10 @@ export class Renderer3D {
             console.log('[Renderer] GLTF character not found, using procedural humanoids');
         });
 
-        // Player
+        // Player + sky hidden in god mode (default start mode)
         this._player = this.buildPlayer();
+        this._player.visible = (this.cameraMode !== 'god');
+        if (this._sky) this._sky.visible = (this.cameraMode !== 'god');
         this.scene.add(this._player);
         this.syncPlayer();
 
@@ -998,12 +1000,14 @@ export class Renderer3D {
             sky.renderOrder = -1; // Render before everything else
             this.scene.add(sky);
             this._sky = sky;
+            // Start hidden if in god mode (sky horizon looks washed out top-down)
+            sky.visible = (this.cameraMode !== 'god');
 
             const skyUniforms = sky.material.uniforms;
-            skyUniforms['turbidity'].value = 4;        // clearer, bluer sky
-            skyUniforms['rayleigh'].value = 3;          // more scattering = deeper blue
-            skyUniforms['mieCoefficient'].value = 0.003;
-            skyUniforms['mieDirectionalG'].value = 0.85;
+            skyUniforms['turbidity'].value = 2;        // cleaner sky, less horizon haze
+            skyUniforms['rayleigh'].value = 1.5;        // moderate scattering
+            skyUniforms['mieCoefficient'].value = 0.005;
+            skyUniforms['mieDirectionalG'].value = 0.8;
 
             // Initial sun position (will be updated by day/night cycle)
             this._updateSkyForTime(12); // noon
@@ -2345,17 +2349,36 @@ export class Renderer3D {
 
     buildPlayer() {
         const group = new THREE.Group();
-        const mat = new THREE.MeshStandardMaterial({ color: 0x2a2a2a, roughness: 0.6, metalness: 0.1 });
+        // Scale player to ~0.5 units tall so buildings (0.7-2.1) look proportional
+        const s = 0.45;
 
-        const body = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, 0.8, 10), mat);
-        body.castShadow = true;
-        body.position.y = 0.55 + 0.12;
-        group.add(body);
+        // Jacket / torso — dark hoodie look
+        const torsoMat = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.75, metalness: 0.05 });
+        const torso = new THREE.Mesh(new THREE.CylinderGeometry(0.16 * s, 0.19 * s, 0.55 * s, 10), torsoMat);
+        torso.castShadow = true;
+        torso.position.y = 0.37 * s + 0.05;
+        group.add(torso);
 
-        const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 12, 12), new THREE.MeshStandardMaterial({ color: 0xf2c7a3, roughness: 0.5 }));
+        // Legs — slightly lighter
+        const legMat = new THREE.MeshStandardMaterial({ color: 0x222233, roughness: 0.7 });
+        const legs = new THREE.Mesh(new THREE.CylinderGeometry(0.14 * s, 0.12 * s, 0.45 * s, 8), legMat);
+        legs.castShadow = true;
+        legs.position.y = 0.22 * s + 0.05;
+        group.add(legs);
+
+        // Head — small, proportional
+        const headMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.55 });
+        const head = new THREE.Mesh(new THREE.SphereGeometry(0.10 * s, 10, 8), headMat);
         head.castShadow = true;
-        head.position.y = 1.1 + 0.12;
+        head.position.y = 0.72 * s + 0.05;
         group.add(head);
+
+        // Cap / hood brim
+        const capMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.8 });
+        const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.12 * s, 0.11 * s, 0.06 * s, 10), capMat);
+        cap.castShadow = true;
+        cap.position.y = 0.79 * s + 0.05;
+        group.add(cap);
 
         return group;
     }
@@ -2854,18 +2877,18 @@ export class Renderer3D {
 
         // --- Fog density adapts to weather ---
         if (this.scene.fog) {
-            let targetDensity = 0.0012; // default
-            if (isFog) targetDensity = 0.004 + intensity * 0.006;
-            else if (isRain) targetDensity = 0.0018 + intensity * 0.002;
-            else if (isSnow) targetDensity = 0.0020 + intensity * 0.003;
+            let targetDensity = 0.006; // default — tighter fog to hide tile edges
+            if (isFog) targetDensity = 0.010 + intensity * 0.008;
+            else if (isRain) targetDensity = 0.007 + intensity * 0.003;
+            else if (isSnow) targetDensity = 0.008 + intensity * 0.004;
             this.scene.fog.density = THREE.MathUtils.lerp(this.scene.fog.density, targetDensity, 0.05);
             // Fog color shifts for weather mood
             if (isFog) {
-                this.scene.fog.color.lerp(new THREE.Color(0xc0c8d0), 0.03);
+                this.scene.fog.color.lerp(new THREE.Color(0x9aacb8), 0.03);
             } else if (isRain || isStorm) {
-                this.scene.fog.color.lerp(new THREE.Color(0x8899aa), 0.03);
+                this.scene.fog.color.lerp(new THREE.Color(0x556677), 0.03);
             } else {
-                this.scene.fog.color.lerp(new THREE.Color(0xa8d8ea), 0.02);
+                this.scene.fog.color.lerp(new THREE.Color(0x7ab0d0), 0.02);
             }
         }
 
@@ -3247,10 +3270,10 @@ export class Renderer3D {
     // -----------------------------------------------------------------------
 
     static SEASON_PALETTES = {
-        spring: { sky: 0xb9d6ff, fog: 0xc8e0ff, fogDensity: 0.0001, ambient: 0xffffff,  sun: 0xfff5e0 },
-        summer: { sky: 0x87ceeb, fog: 0x87ceeb, fogDensity: 0.00005,ambient: 0xfff5e0,  sun: 0xffd87a },
-        autumn: { sky: 0xd4a08c, fog: 0xe8c09a, fogDensity: 0.00015,ambient: 0xffd090,  sun: 0xffa040 },
-        winter: { sky: 0xc0d4e8, fog: 0xd0dde8, fogDensity: 0.00025,ambient: 0xd0e0ff,  sun: 0xffffff },
+        spring: { sky: 0x5a9ac6, fog: 0x6aadcc, fogDensity: 0.005,  ambient: 0xffffff,  sun: 0xfff5e0 },
+        summer: { sky: 0x4a90b8, fog: 0x5aa0c0, fogDensity: 0.004,  ambient: 0xfff5e0,  sun: 0xffd87a },
+        autumn: { sky: 0x8a7060, fog: 0x9a8878, fogDensity: 0.006,  ambient: 0xffd090,  sun: 0xffa040 },
+        winter: { sky: 0x7088a0, fog: 0x8098ac, fogDensity: 0.007,  ambient: 0xd0e0ff,  sun: 0xffffff },
     };
 
     _applySeasonalColors(season) {
@@ -3422,10 +3445,19 @@ export class Renderer3D {
     // Set camera mode with smooth transition
     setCameraMode(mode) {
         if (mode === this.cameraMode) return;
-        
+
         this.cameraMode = mode;
         this.cameraModeTarget = (mode === 'god') ? 1 : 0;
-        
+
+        // Hide player model in god mode (no avatar needed for city builder view)
+        if (this._player) {
+            this._player.visible = (mode !== 'god');
+        }
+        // Hide sky sphere in god mode — horizon haze looks washed out from top-down view
+        if (this._sky) {
+            this._sky.visible = (mode !== 'god');
+        }
+
         // Update mode indicator UI if available
         if (this.game.ui && this.game.ui.modeIndicator) {
             this.game.ui.modeIndicator.setMode(mode);
@@ -3569,7 +3601,7 @@ export class Renderer3D {
         // Sync fog density from weather system — overrides seasonal base (6B)
         const wfx = this.game?.weatherSystem?.currentEffects;
         if (this.scene.fog && wfx) {
-            this.scene.fog.density = wfx.fogDensity ?? (this._seasonFogDensity ?? 0.0001);
+            this.scene.fog.density = wfx.fogDensity ?? (this._seasonFogDensity ?? 0.005);
             if (wfx.ambientColor != null) {
                 if (this.scene.background) {
                     this.scene.background.setHex(wfx.ambientColor);

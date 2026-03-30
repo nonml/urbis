@@ -279,8 +279,8 @@ export const WEATHER_TYPES = {
         description: 'Pleasant weather',
         visibility: 1.0,
         citizenSpeedModifier: 1.0,
-        ambientColor: 0xffffff,
-        fogDensity: 0.0001
+        ambientColor: null,         // don't override sky — let season palette handle it
+        fogDensity: 0.005
     },
     [WEATHER_RAIN]: {
         name: 'Rain',
@@ -288,8 +288,8 @@ export const WEATHER_TYPES = {
         description: 'Light rain',
         visibility: 0.7,
         citizenSpeedModifier: 0.9,
-        ambientColor: 0x8899aa,
-        fogDensity: 0.002
+        ambientColor: 0x556677,
+        fogDensity: 0.007
     },
     [WEATHER_STORM]: {
         name: 'Storm',
@@ -297,8 +297,8 @@ export const WEATHER_TYPES = {
         description: 'Heavy storm',
         visibility: 0.5,
         citizenSpeedModifier: 0.7,
-        ambientColor: 0x445566,
-        fogDensity: 0.005
+        ambientColor: 0x334455,
+        fogDensity: 0.012
     },
     [WEATHER_FOG]: {
         name: 'Fog',
@@ -306,8 +306,8 @@ export const WEATHER_TYPES = {
         description: 'Dense fog',
         visibility: 0.3,
         citizenSpeedModifier: 0.8,
-        ambientColor: 0x999999,
-        fogDensity: 0.01
+        ambientColor: 0x778888,
+        fogDensity: 0.018
     },
     [WEATHER_SNOW]: {
         name: 'Snow',
@@ -315,8 +315,8 @@ export const WEATHER_TYPES = {
         description: 'Snowy conditions',
         visibility: 0.6,
         citizenSpeedModifier: 0.75,
-        ambientColor: 0xaabbcc,
-        fogDensity: 0.003
+        ambientColor: 0x8899aa,
+        fogDensity: 0.008
     }
 };
 

@@ -73,8 +73,8 @@ export class WeatherSystem {
         this.currentEffects = {
             visibility: 1.0,
             speedModifier: 1.0,
-            ambientColor: 0xffffff,
-            fogDensity: 0.0001
+            ambientColor: null,
+            fogDensity: 0.005
         };
         
         // Seasonal temperature modifiers
@@ -275,19 +275,22 @@ export class WeatherSystem {
             this.currentEffects = {
                 visibility: 1.0,
                 speedModifier: 1.0,
-                ambientColor: 0xffffff,
-                fogDensity: 0.0001
+                ambientColor: null,
+                fogDensity: 0.005
             };
             return;
         }
-        
+
         const intensity = this.state.intensity;
-        
+        // Base fog density + intensity scaling (never below base level)
+        const baseFog = 0.005;
+        const weatherFog = weatherConfig.fogDensity ?? baseFog;
+
         this.currentEffects = {
             visibility: weatherConfig.visibility,
             speedModifier: weatherConfig.citizenSpeedModifier,
             ambientColor: weatherConfig.ambientColor,
-            fogDensity: weatherConfig.fogDensity * intensity,
+            fogDensity: baseFog + (weatherFog - baseFog) * intensity,
             rawConfig: weatherConfig
         };
     }
