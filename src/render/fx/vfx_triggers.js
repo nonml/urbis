@@ -160,6 +160,14 @@ export const VFX_CONFIG = {
     UI_ERROR: {
         shake: { intensity: 5, duration: 200 },
         text: { color: VFX_COLORS.FAILURE, duration: 2000 }
+    },
+
+    // Combat events
+    PLAYER_FIRED_WEAPON: {
+        muzzleFlash: { color: 0xffdd44, count: 6, speed: 80 },
+        tracer: { color: 0xffff88, duration: 150 },
+        hit: { color: 0xff6644, count: 10, speed: 60 },
+        shake: { intensity: 2, duration: 100 },  // light recoil shake
     }
 };
 
@@ -187,6 +195,7 @@ export class VFXTriggerManager {
         this._onPlayerBuiltBuilding = this._onPlayerBuiltBuilding.bind(this);
         this._onPlayerEnteredDistrict = this._onPlayerEnteredDistrict.bind(this);
         this._onPlayerInteract = this._onPlayerInteract.bind(this);
+        this._onPlayerFiredWeapon = this._onPlayerFiredWeapon.bind(this);
         
         // Crisis events
         this._onCrisisStarted = this._onCrisisStarted.bind(this);
@@ -243,7 +252,8 @@ export class VFXTriggerManager {
         eventBus.on(EVENT_TYPES.PLAYER_BUILT_BUILDING, this._onPlayerBuiltBuilding);
         eventBus.on(EVENT_TYPES.PLAYER_ENTERED_DISTRICT, this._onPlayerEnteredDistrict);
         eventBus.on(EVENT_TYPES.PLAYER_INTERACT, this._onPlayerInteract);
-        
+        eventBus.on(EVENT_TYPES.PLAYER_FIRED_WEAPON, this._onPlayerFiredWeapon);
+
         // Crisis events
         eventBus.on(EVENT_TYPES.CRISIS_STARTED, this._onCrisisStarted);
         eventBus.on(EVENT_TYPES.CRISIS_ESCALATED, this._onCrisisEscalated);
@@ -298,6 +308,7 @@ export class VFXTriggerManager {
         eventBus.off(EVENT_TYPES.PLAYER_BUILT_BUILDING, this._onPlayerBuiltBuilding);
         eventBus.off(EVENT_TYPES.PLAYER_ENTERED_DISTRICT, this._onPlayerEnteredDistrict);
         eventBus.off(EVENT_TYPES.PLAYER_INTERACT, this._onPlayerInteract);
+        eventBus.off(EVENT_TYPES.PLAYER_FIRED_WEAPON, this._onPlayerFiredWeapon);
         eventBus.off(EVENT_TYPES.CRISIS_STARTED, this._onCrisisStarted);
         eventBus.off(EVENT_TYPES.CRISIS_ESCALATED, this._onCrisisEscalated);
         eventBus.off(EVENT_TYPES.CRISIS_RESOLVED, this._onCrisisResolved);
@@ -402,6 +413,57 @@ export class VFXTriggerManager {
             VFX_COLORS.INFO, 400);
     }
     
+    // ==================== Combat Event Handlers ====================
+
+    _onPlayerFiredWeapon(data) {
+        if (!this.enabled) return;
+        const config = VFX_CONFIG.PLAYER_FIRED_WEAPON;
+        const pos = this._tileToWorldPosition(data.x, data.y);
+        if (!pos) return;
+
+        const weapon = data.weapon;
+        const isMelee = weapon === 'fist' || weapon === 'bat';
+
+        // Muzzle flash burst at player position (ranged only)
+        if (!isMelee && config.muzzleFlash) {
+            this.fxSystem.showParticleBurst(pos.x, pos.y + 1.2, pos.z,
+                config.muzzleFlash.color, config.muzzleFlash.count, config.muzzleFlash.speed);
+        }
+
+        // Camera recoil shake (ranged only, light)
+        if (!isMelee && config.shake) {
+            // Scale shake by weapon type
+            const mult = weapon === 'shotgun' ? 2.5 : weapon === 'smg' ? 0.5 : 1;
+            this.fxSystem.shakeCamera(config.shake.intensity * mult, config.shake.duration);
+        }
+
+        // Hit particle burst at each hit target position
+        if (data.hit && data.hits && config.hit) {
+            for (const h of data.hits) {
+                const hitPos = this._tileToWorldPosition(h.x, h.y);
+                if (hitPos) {
+                    this.fxSystem.showParticleBurst(hitPos.x, hitPos.y + 0.8, hitPos.z,
+                        config.hit.color, config.hit.count, config.hit.speed);
+                    // Damage floating text
+                    this.fxSystem.showFloatingText(hitPos.x, hitPos.y + 1.5, hitPos.z,
+                        'HIT', 0xff4444, 800);
+                }
+            }
+        }
+
+        // Melee hit effects
+        if (isMelee && data.hit && data.hits) {
+            for (const h of data.hits) {
+                const hitPos = this._tileToWorldPosition(h.x, h.y);
+                if (hitPos) {
+                    this.fxSystem.showParticleBurst(hitPos.x, hitPos.y + 0.8, hitPos.z,
+                        0xffaa44, 8, 50);
+                    this.fxSystem.shakeCamera(3, 120);
+                }
+            }
+        }
+    }
+
     // ==================== Crisis Event Handlers ====================
     
     _onCrisisStarted(data) {

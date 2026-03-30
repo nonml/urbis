@@ -133,11 +133,6 @@ export class CombatSystem {
             this._muzzleFlashTimer = 80;
         }
 
-        // Emit gunshot event for NPC reactions
-        try {
-            eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, { x: px, y: py, weapon: this.currentWeapon });
-        } catch {}
-
         // Find targets — multiple pellets for shotgun, single for others
         const range = this.weapon.range;
         const dx = targetX - px;
@@ -211,6 +206,16 @@ export class CombatSystem {
                 hits.push(bestHit);
             }
         }
+
+        // Emit weapon fired event with hit results for VFX + NPC reactions
+        try {
+            eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, {
+                x: px, y: py, weapon: this.currentWeapon,
+                hit: hits.length > 0,
+                hits: hits.map(h => ({ x: h.x ?? 0, y: h.y ?? 0 })),
+                targetX, targetY
+            });
+        } catch {}
 
         if (hits.length > 0) {
             return { hit: true, target: hits[0], allHits: hits, pelletCount: pellets };
