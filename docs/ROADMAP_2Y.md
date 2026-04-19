@@ -1,6 +1,6 @@
 # Noctune — 2-Year Autonomous Development Manual (2026-04 → 2028-04)
 
-> **You are reading your own operating manual.** If you are a local 27B-class LLM spawned by the agent runner, this file plus [CHECKLIST_2Y.md](CHECKLIST_2Y.md) are your primary inputs. Every rule here is binding unless the human operator overrides it in a queue entry.
+> **You are reading your own operating manual.** If you are a local World-class LLM spawned by the agent runner, this file plus [CHECKLIST_2Y.md](CHECKLIST_2Y.md) are your primary inputs. Every rule here is binding unless the human operator overrides it in a queue entry.
 
 This document defines:
 
@@ -20,7 +20,7 @@ The **checklist** is the tracking artifact. This **manual** is the rulebook. Kee
 
 ### 1. Identity and Scope
 
-You are the **Noctune build agent**. A local 27B-class model (Gemma-3 27B, Mistral-Small 3, Qwen2.5-Coder 32B, or equivalent) served by Ollama or llama.cpp over HTTP. You run continuously and periodically ship versioned releases of a Three.js / Vite city-builder + open-world action game that lives in `c:\Users\nonta\Desktop\game`.
+You are the **Noctune build agent**. A local World-class model (Gemma-3 27B, Mistral-Small 3, Qwen2.5-Coder 32B, or equivalent) served by Ollama or llama.cpp over HTTP. You run continuously and periodically ship versioned releases of a Three.js / Vite city-builder + open-world action game that lives in `c:\Users\nonta\Desktop\game`.
 
 **In scope:** every path under this project directory.
 **Out of scope:** everything outside it. Never touch `C:\Users\nonta\` subtrees other than `.claude/projects/c--Users-nonta-Desktop-game/memory/` (auto-memory) and this repo. Never kill processes you did not start. Never write Windows registry or environment variables.
@@ -147,7 +147,7 @@ Why: <one or two sentences; reference task id>
 Task: <queue entry id>
 Checklist: <checklist item id(s) ticked, comma-separated>
 
-Co-Authored-By: local-agent-27b <agent@noctune.local>
+Co-Authored-By: local-agent-World <agent@noctune.local>
 ```
 
 Valid `<type>`: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`, `content`, `hud`.
@@ -289,242 +289,96 @@ Without an explicit queue task referencing the path, never modify:
 
 ## Part III — Autonomous Pipeline
 
-The pipeline is the spine of the whole operation. You build it first (Q1) and you are allowed to improve it continuously via `chore(agent)` tasks.
+**Roo Code is the runner.** There is no separate Node process. When you type `go`, Roo reads `.roo/rules/`, picks a task from `tools/agent/queue.json`, edits files natively, runs gate commands via its terminal tool, commits, and loops. No wiring needed.
 
 ### 3.1 Directory Layout
 
 ```
 tools/agent/
-├── runner.mjs              main loop — see §3.2
 ├── queue.json              the backlog (array of task objects)
-├── state.json              cross-session state (current task, phase)
-├── gate.mjs                quality gate — see §3.3
-├── critic.mjs              screenshot + diff critic — see §3.4
-├── release.mjs             cuts versions and publishes — see §3.5
-├── curator.mjs             promotes tasks to READY, splits too-big items
-├── prompts/
-│   ├── bugfix.md
-│   ├── feature.md
-│   ├── content.md
-│   ├── hud.md
-│   ├── perf.md
-│   ├── test.md
-│   ├── refactor.md
-│   └── critic.md
+├── state.json              cross-session state {phase, current_id}
+├── prompts/                reference prompt skeletons (Roo reads on complex tasks)
+│   ├── bugfix.md, feature.md, content.md, hud.md
+│   ├── perf.md, test.md, refactor.md, critic.md, curator.md
 ├── schemas/
-│   ├── task.schema.json
+│   ├── task.schema.json    task object shape
 │   └── changelog.schema.json
-├── templates/
-│   ├── content_building.json
-│   ├── content_vehicle.json
-│   ├── content_weapon.json
-│   ├── content_quest.json
-│   └── content_npc_archetype.json
-├── baselines/              reference screenshots (PNG)
-├── pending_changes/        CHANGELOG snippets awaiting release
-├── logs/                   one markdown per invocation
-└── dashboard.html          static dashboard, rebuilt by runner
+├── templates/              content-generation schemas (populated Q5+)
+│   └── (content_building, content_vehicle, content_weapon, content_quest, content_npc)
+├── baselines/              reference screenshots (PNG) for visual regression
+├── pending_changes/        CHANGELOG snippets — one .md per shipped task
+├── logs/                   Roo session transcripts (gitignored)
+├── incidents/              halt files — Roo writes here when escalating
+└── approvals/              operator approval files — qN.json per quarter
 ```
 
-### 3.2 `runner.mjs` Pseudocode
+### 3.2 How Roo Executes a Task
 
-```js
-// Inputs: none (reads env for MODEL_URL, MODEL_NAME)
-// Outputs: exit code 0 on clean sleep, 1 on fatal
+Roo's `.roo/rules/` files are loaded on every message and define the full loop. The summary:
 
-import { readQueue, writeQueue, readState, writeState } from './queue_io.mjs';
-import { readFileSync } from 'node:fs';
-import { spawnSync } from 'node:child_process';
-
-const MODEL_URL = process.env.MODEL_URL || 'http://localhost:11434';
-const MODEL_NAME = process.env.MODEL_NAME || 'gemma3:27b';
-const MAX_RETRIES = 2;
-const GATE_TIMEOUT_MS = 180_000;
-
-async function main() {
-  const state = readState();
-  const queue = readQueue();
-
-  const task = state.phase === 'in_progress'
-    ? queue.find(t => t.id === state.current_id)
-    : pickNextReady(queue);
-
-  if (!task) return runMaintenance();
-
-  logStart(task);
-  const files = loadContext(task);           // only files_allowed + files_reference
-  const prompt = renderPrompt(task, files);  // < task.max_tokens_context
-  const diff = await callModel(prompt);      // Ollama /api/generate
-
-  if (!isValidUnifiedDiff(diff)) return abort(task, 'invalid_diff');
-
-  applyDiff(diff);                           // git apply --3way
-
-  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    const gate = runGate();
-    if (gate.ok) break;
-    if (attempt === MAX_RETRIES) return rollback(task, 'gate_failed', gate.stderr);
-    const fix = await callModel(renderFixPrompt(task, gate.stderr));
-    applyDiff(fix);
-  }
-
-  const crit = runCritic(task);
-  if (crit.severity === 'block') return rollback(task, 'critic_blocked', crit.notes);
-
-  writeChangelogSnippet(task, diff);
-  gitCommit(task);
-  tickChecklist(task.checklist_items);
-  clearState();
-  rebuildDashboard();
-}
 ```
+1. Read queue.json + state.json
+2. Pick highest-priority READY task (or resume in_progress)
+3. Read files_allowed + files_reference  ← context budget ≤ 24k tokens
+4. Edit files natively (Roo apply_diff or write_file)
+5. Run gate commands (Roo execute_command)
+6. If gate fails: fix + retry up to 2×, else revert + set needs_rework
+7. Tick checklist, write changelog snippet, git commit
+8. Update queue.json status → "done", go to step 1
+```
+
+See `.roo/rules/01-noctune-agent.md` for the binding 10-step per-task protocol.  
+See `.roo/rules/02-loop-protocol.md` for the session-level loop.
 
 ### 3.3 The Gate
 
 Sequential, fail-fast. Each stage timeouts at 60s unless noted. Total budget 180s.
 
-| # | Stage                       | Command                                      | Fail if                    |
-|---|-----------------------------|----------------------------------------------|----------------------------|
-| 1 | lint                        | `npm run lint:basic`                         | exit ≠ 0                   |
-| 2 | no-math-random              | `npm run check:no-math-random`               | exit ≠ 0                   |
-| 3 | content validate            | `npm run validate`                           | exit ≠ 0                   |
-| 4 | smoke                       | `npm test`                                   | exit ≠ 0                   |
-| 5 | targeted playwright         | `npx playwright test --grep "@smoke"`        | any fail                   |
-| 6 | screenshot capture          | `node scripts/capture_screenshot.mjs`        | missing file               |
-| 7 | screenshot diff             | `node tools/agent/critic.mjs --diff-only`    | diff > threshold per view  |
-| 8 | bundle size                 | `node tools/agent/gate.mjs --bundle-check`   | > previous + 2%            |
+Roo runs these commands sequentially after each edit. All must exit 0.
 
-**Thresholds:**
-- screenshot diff default: 0.5% pixels changed for unmodified views; up to 100% for the intentionally-changed view (task declares it).
-- bundle size: tracked in `tools/agent/baselines/bundle.json`, updated only by `perf` or `chore` tasks.
+| # | Command                           | Fail if   |
+|---|-----------------------------------|-----------|
+| 1 | `npm run lint:basic`              | exit ≠ 0  |
+| 2 | `npm run check:no-math-random`    | exit ≠ 0  |
+| 3 | `npm run validate`                | exit ≠ 0  |
+| 4 | `npm test`                        | exit ≠ 0  |
 
-**Gate failure is not a retry-loop of the whole task.** The runner sends *only* the failure stderr + the current diff back to the model with prompt `prompts/fix.md`. Two attempts max.
+On failure: fix and retry. Max 2 retries. Still failing → revert, set `needs_rework`.
+
+Full Playwright (`npm run test:e2e`) runs weekly only — too slow for every task.
 
 ### 3.4 The Critic
 
-Second-pass review, modeled on a harsh Steam reviewer. Runs after gate passes.
+After the gate passes, do a self-review as a harsh Steam reviewer before committing:
 
-Inputs: the applied diff, the intentionally-changed screenshots, the task's `acceptance` lines.
+- Are all acceptance items in the task actually satisfied?
+- Does the code follow Part I §5 conventions?
+- Any obvious logic errors, missing edge cases, or performance traps?
 
-Output JSON:
+If you find a blocker: revert, set task to `needs_rework`, write a note in the task's `last_error` field. Move on.
 
-```json
-{
-  "severity": "pass" | "warn" | "block",
-  "findings": [
-    { "kind": "visual" | "ux" | "correctness" | "style", "note": "...", "severity": "..." }
-  ],
-  "verdict_one_line": "..."
-}
-```
+### 3.5 Release
 
-Rules:
-- `block` → revert the commit, file becomes `needs_rework`.
-- `warn` → commit allowed, findings written into task metadata for next curator pass.
-- `pass` → clean ship.
+Release is triggered manually by the operator, not automatically by Roo.
 
-The critic runs on the same local 27B by default. In Q5+ it may be upgraded to a multimodal local model (e.g. Qwen2-VL 7B) so that screenshot understanding is real rather than caption-based.
+When the operator approves a release (creates `tools/agent/approvals/qN.json`), Roo:
 
-### 3.5 Release Job
-
-Runs on schedule, not on demand. Reads `tools/agent/pending_changes/` and cuts versions:
-
-| Trigger       | Channel | Action                                                 |
-|---------------|---------|--------------------------------------------------------|
-| every night   | nightly | tag `nightly-YYYYMMDD`, build Electron, archive artifact |
-| Sunday 02:00  | weekly  | tag `0.Q.M.patch-rc`, run full Playwright              |
-| biweekly      | patch   | promote latest green weekly to `0.Q.M.patch`           |
-| monthly       | minor   | if milestone checklist complete, bump M                |
-| quarterly     | major   | if quarter exit criteria met, bump Q                   |
-
-Release job owns:
-- Writing `src/version.js`
-- Appending CHANGELOG from `pending_changes/` (then clearing it)
-- Pushing tags (the only `git push` allowed)
-- Triggering Electron / Tauri build
-- Writing a `docs/release_notes/<version>.md`
+1. Bumps `src/version.js`
+2. Aggregates `tools/agent/pending_changes/` into `CHANGELOG.md` then clears the folder
+3. Writes `docs/release_notes/<version>.md`
+4. Commits and tags — `git tag 0.Q.M.0`
+5. The operator pushes the tag manually (`git push --tags`)
 
 ### 3.6 Curator
 
-Runs independently of the runner, typically daily.
+When the queue runs low, Roo curates by:
 
-Responsibilities:
-- Expand tasks whose `needs_split` flag is set.
-- Re-prioritize by quarter theme.
-- Move `needs_rework` tasks back to READY once the blocker is addressed.
-- Prune `done` tasks older than 30 days from `queue.json` (they stay in the log).
-- Generate content-quarter tasks from templates (Q5 onward).
+- Splitting tasks marked `needs_split` into ≤300 LOC subtasks
+- Promoting `needs_rework` tasks back to READY after fixing the blocker
+- Adding the next quarter's tasks when the current quarter is done
+- Dropping `done` entries older than 30 days from `queue.json`
 
-The curator may itself be a 27B invocation with a different prompt (`prompts/curator.md`). It never applies code changes — only mutates `queue.json`.
-
-### 3.7 Prompt Templates (skeleton)
-
-`prompts/feature.md`:
-
-```
-You are the Noctune build agent. Execute the task below under the rules of
-docs/ROADMAP_2Y.md Part I §2–§7.
-
-Task: {{task.slice}}
-Files you may edit: {{task.files_allowed}}
-Files for reference: {{task.files_reference}}
-Acceptance:
-{{#each task.acceptance}}- {{this}}
-{{/each}}
-
-Current file contents follow. Output a single unified diff. No prose, no
-backticks, no commentary. If this task cannot be completed within the file
-budget, output exactly: ABORT_NEEDS_SPLIT
-
-=== FILES ===
-{{files_content}}
-```
-
-Every prompt template ends with the same contract: unified diff or a named
-abort sentinel. Parsing is rigid. Free-form replies are rejected and retried
-once with the reminder prefixed.
-
-### 3.8 Model Invocation
-
-Ollama HTTP example (adapt to llama.cpp server if preferred):
-
-```
-POST http://localhost:11434/api/generate
-{
-  "model": "gemma3:27b",
-  "prompt": "<rendered template>",
-  "stream": false,
-  "options": {
-    "temperature": 0.15,
-    "top_p": 0.9,
-    "num_ctx": 24576,
-    "num_predict": 4096,
-    "stop": ["\n=== END_DIFF ===\n", "ABORT_NEEDS_SPLIT\n"]
-  }
-}
-```
-
-Notes for 27B operation:
-- Keep `num_ctx` ≤ 24k. Degradation past that is severe on 27B.
-- `temperature` 0.15 for code tasks, 0.5 for content generation, 0.8 for quest flavor text.
-- Always send a system prompt anchoring the manual. Never rely on the model remembering rules across calls.
-- Stream=false for deterministic logging. Runner logs full prompt + full response.
-
-### 3.9 Observability
-
-`tools/agent/dashboard.html` is a static page rebuilt after every commit. It shows:
-
-- Task throughput (7d / 30d)
-- Revert rate (blocker rate from critic)
-- Average slice size (LOC / task)
-- Gate stage failure histogram
-- Screenshot diff heatmap per baseline view
-- Days since last green weekly
-- Milestone progress from CHECKLIST_2Y.md
-- Bundle size trend
-- Top 10 READY tasks
-
-The dashboard is your mirror. The human checks it weekly.
+This happens as a `chore(agent)` task, not inline during code work.
 
 ---
 
@@ -537,27 +391,26 @@ Each quarter has: **theme**, **entry criteria** (must be true before starting), 
 **Theme:** Make the agent loop safe and boring.
 
 **Entry criteria:**
-- Existing repo green on `main` for 3 consecutive nightly builds.
-- Operator has confirmed the 27B model is available at `MODEL_URL`.
+- Roo Code configured: provider = llama.cpp, context ≤ 24k, auto-approve on file ops + allowed commands.
+- `tools/agent/queue.json` seeded with Q1.B–Q1.J tasks.
+- `npm test` passes on main.
 
-**Milestone:** 14 consecutive nightly builds succeed without human fixes.
+**Milestone:** 14 consecutive Roo-driven task cycles complete without human intervention.
 
 **Exit criteria:**
-- Queue, runner, gate, critic, release, curator all present in `tools/agent/`.
+- `tools/agent/queue.json` and `state.json` are the live source of truth — Roo reads/writes them every cycle.
+- Playwright smoke suite covers ≥ 15 scenarios and all pass.
+- Screenshot baselines captured for ≥ 15 views.
 - `docs/CHECKLIST_2Y.md` ticked through the Q1 section.
-- Dashboard renders.
-- Visual regression baseline exists for ≥ 15 views.
 
 **Backlog highlights:** (full list in CHECKLIST_2Y.md)
-- Queue schema + IO
-- Runner with the state machine in §2
-- Gate stages 1–8
-- Text-only critic (multimodal upgrade deferred to Q5)
+- Queue schema + IO (operator confirms task format works with Roo reads)
 - Playwright smoke suite: load, spawn, drive, fire, hack, build, save, load, reload
-- Screenshot diff via pixelmatch
-- Dashboard scaffold
+- Screenshot baselines for all key views
+- Dashboard scaffold (static HTML Roo writes and the operator checks weekly)
 
-**Risks:** pipeline bugs revert real work → mitigate by shipping no gameplay changes this quarter.
+**Risks:** Roo drifts or halts on edge cases → mitigate by shipping no gameplay changes this quarter.
+
 
 **Rollback plan:** if pipeline not green by week 10, pause the gameplay quarters, extend Q1 until stable. Do not compress later quarters.
 

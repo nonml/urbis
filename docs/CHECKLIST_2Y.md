@@ -37,22 +37,13 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 - [x] `q1-state-resume` state-machine resume after mid-task crash (test forces kill)
 - [ ] `q1-state-timeout` state-machine timeout if `in_progress` > 30 min (clears state)
 
-### Q1.C — Runner
+### Q1.C — Roo Code Setup (operator does once, not coded)
 
-- [x] `q1-runner-boot` implement BOOT phase (reads manual + queue + state + git status)
-- [x] `q1-runner-triage` implement TRIAGE (resume vs pick vs maintenance)
-- [ ] `q1-runner-plan` implement PLAN (loads context, writes 5-line plan)
-- [ ] `q1-runner-execute` implement EXECUTE (prompt → diff → apply → gate)
-- [ ] `q1-runner-commit` implement COMMIT (stage allowed files only, template msg)
-- [ ] `q1-runner-sleep` implement SLEEP (transcript, exit)
-- [ ] `q1-runner-retry` retries on gate fail, max 2
-- [ ] `q1-runner-abort-conflict` abort cleanly on git conflict
-- [ ] `q1-runner-ollama` Ollama HTTP client with timeout, streaming disabled
-- [ ] `q1-runner-context-budget` enforce `num_ctx` ≤ 24k, reject if prompt overflows
-- [ ] `q1-runner-diff-applier` unified-diff applier with `git apply --3way`
-- [ ] `q1-runner-invalid-diff` detect and retry on invalid diff
-- [ ] `q1-runner-abort-sentinel` handle `ABORT_NEEDS_SPLIT`
-- [ ] `q1-runner-logs` write a markdown transcript per invocation
+- [ ] `q1-roo-provider` Roo Code configured: provider = llama.cpp, endpoint correct
+- [ ] `q1-roo-context` context window set to 24k tokens in Roo settings
+- [ ] `q1-roo-autoapprove` auto-approve ON for: read, write, `npm run lint:basic`, `npm run check:no-math-random`, `npm run validate`, `npm test`, `git status/diff/log/add/commit`, `node scripts/*.mjs`
+- [ ] `q1-roo-rules-load` confirm `.roo/rules/*.md` loads on every session (send "go", see `[boot]` line)
+- [ ] `q1-roo-first-cycle` first autonomous task cycle completes end-to-end (pick → edit → gate → commit)
 
 ### Q1.D — Gate
 
