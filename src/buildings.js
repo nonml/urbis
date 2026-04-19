@@ -20,31 +20,46 @@ import { BUILDING_EXTENDED } from './buildings_extended.js';
 // ---------------------------------------------------------------------------
 const ADJACENCY_RULES = [
     // --- Supply chains ---
-    { source: 'farm',         neighbor: 'market',        radius: 5,  multiply: { food: 1.3  }, label: 'Market Supply Route'  },
-    { source: 'farm',         neighbor: 'warehouse',     radius: 4,  multiply: { food: 1.2  }, label: 'Farm Storage'          },
-    { source: 'lumber-mill',  neighbor: 'warehouse',     radius: 4,  multiply: { wood: 1.2  }, label: 'Lumber Storage'        },
+    { source: 'farm',         neighbor: 'market',        radius: 5,  multiply: { food: 1.3  },
+      label: 'Market Supply Route'  },
+    { source: 'farm',         neighbor: 'warehouse',     radius: 4,  multiply: { food: 1.2  },
+      label: 'Farm Storage'          },
+    { source: 'lumber-mill',  neighbor: 'warehouse',     radius: 4,  multiply: { wood: 1.2  },
+      label: 'Lumber Storage'        },
 
     // --- Trade hubs (market boosted by transport infrastructure) ---
-    { source: 'market',       neighbor: 'port',          radius: 8,  multiply: { gold: 1.3  }, label: 'Port Trade'            },
-    { source: 'market',       neighbor: 'airport',       radius: 10, multiply: { gold: 1.25 }, label: 'Airport Commerce'      },
+    { source: 'market',       neighbor: 'port',          radius: 8,  multiply: { gold: 1.3  },
+      label: 'Port Trade'            },
+    { source: 'market',       neighbor: 'airport',       radius: 10, multiply: { gold: 1.25 },
+      label: 'Airport Commerce'      },
 
     // --- Commercial clustering ---
-    { source: 'market',       neighbor: 'market',        radius: 3,  multiply: { gold: 1.1  }, label: 'Commercial District'   },
-    { source: 'market',       neighbor: 'shopping-mall', radius: 5,  multiply: { gold: 1.15 }, label: 'Retail Hub'            },
-    { source: 'market',       neighbor: 'stadium',       radius: 6,  multiply: { gold: 1.15 }, label: 'Stadium Footfall'      },
+    { source: 'market',       neighbor: 'market',        radius: 3,  multiply: { gold: 1.1  },
+      label: 'Commercial District'   },
+    { source: 'market',       neighbor: 'shopping-mall', radius: 5,  multiply: { gold: 1.15 },
+      label: 'Retail Hub'            },
+    { source: 'market',       neighbor: 'stadium',       radius: 6,  multiply: { gold: 1.15 },
+      label: 'Stadium Footfall'      },
 
     // --- Quality-of-life bonuses for housing ---
-    { source: 'house',        neighbor: 'park',          radius: 4,  multiply: { gold: 1.15 }, label: 'Green Space'           },
-    { source: 'house',        neighbor: 'hospital',      radius: 6,  multiply: { gold: 1.1  }, label: 'Healthcare Access'     },
+    { source: 'house',        neighbor: 'park',          radius: 4,  multiply: { gold: 1.15 },
+      label: 'Green Space'           },
+    { source: 'house',        neighbor: 'hospital',      radius: 6,  multiply: { gold: 1.1  },
+      label: 'Healthcare Access'     },
 
     // --- Knowledge clusters ---
-    { source: 'university',   neighbor: 'research-lab',  radius: 6,  multiply: { gold: 1.25 }, label: 'Research Cluster'      },
-    { source: 'research-lab', neighbor: 'university',    radius: 6,  multiply: { gold: 1.25 }, label: 'Research Cluster'      },
-    { source: 'library',      neighbor: 'university',    radius: 5,  multiply: { gold: 1.2  }, label: 'Education Hub'         },
+    { source: 'university',   neighbor: 'research-lab',  radius: 6,  multiply: { gold: 1.25 },
+      label: 'Research Cluster'      },
+    { source: 'research-lab', neighbor: 'university',    radius: 6,  multiply: { gold: 1.25 },
+      label: 'Research Cluster'      },
+    { source: 'library',      neighbor: 'university',    radius: 5,  multiply: { gold: 1.2  },
+      label: 'Education Hub'         },
 
     // --- Pollution / negative adjacency ---
-    { source: 'house',        neighbor: 'lumber-mill',   radius: 3,  multiply: { gold: 0.9  }, label: 'Mill Pollution'        },
-    { source: 'house',        neighbor: 'barracks',      radius: 3,  multiply: { gold: 0.85 }, label: 'Military Noise'        },
+    { source: 'house',        neighbor: 'lumber-mill',   radius: 3,  multiply: { gold: 0.9  },
+      label: 'Mill Pollution'        },
+    { source: 'house',        neighbor: 'barracks',      radius: 3,  multiply: { gold: 0.85 },
+      label: 'Military Noise'        },
 ];
 
 // Condition points lost per tick when city is running a gold deficit.

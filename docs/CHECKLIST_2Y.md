@@ -32,7 +32,7 @@ Confirm all gate commands pass on the current codebase before any autonomous wor
 Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q1-roo-first-task` first checklist item picked, changed, gate-passed, committed (commit 95035dc)
-- [ ] `q1-roo-three-tasks` 3 consecutive tasks completed without gate failure
+- [x] `q1-roo-three-tasks` 3 consecutive tasks completed without gate failure (commits 95035dc, 9030f0c, current)
 - [ ] `q1-roo-revert-recovery` deliberately trigger a gate failure, verify Roo reverts and moves on
 
 ### Q1.C — Roo Code Setup (operator does once, not coded)
