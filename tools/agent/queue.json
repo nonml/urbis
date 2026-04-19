@@ -147,7 +147,7 @@
     "title": "implement TRIAGE phase of runner state machine",
     "description": "Implement the TRIAGE phase: resume in-progress task or pick highest-priority READY or run maintenance.",
     "priority": 90,
-    "status": "READY",
+    "status": "done",
     "files_allowed": ["tools/agent/runner.mjs"],
     "files_reference": ["tools/agent/queue.json", "tools/agent/state.json"],
     "acceptance": [
@@ -161,7 +161,8 @@
     "max_files": 1,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-18T12:00:00Z"
+    "updated_at": "2026-04-19T16:00:00Z",
+    "head": "f434cfd"
   },
   {
     "id": "q1c-runner-plan",

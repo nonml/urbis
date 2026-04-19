@@ -53,6 +53,25 @@ export function boot() {
   return inputs;
 }
 
+/**
+ * TRIAGE phase: decide which task to run.
+ * Returns { task, mode } where mode is 'resume', 'pick', or 'maintenance'.
+ */
+export function triage(queue, state) {
+  // 1. Resume in_progress task if present
+  if (state.phase === 'in_progress' && state.current_id) {
+    const task = queue.find((t) => t.id === state.current_id);
+    if (task) return { task, mode: 'resume' };
+  }
+
+  // 2. Pick highest-priority READY task
+  const picked = pickNextReady(queue);
+  if (picked) return { task: picked, mode: 'pick' };
+
+  // 3. No task available — maintenance mode
+  return { task: null, mode: 'maintenance' };
+}
+
 function logTranscript(task, entries) {
   if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true });
   const path = join(LOGS_DIR, `${ts()}-${task?.id || 'maintenance'}.md`);

@@ -40,7 +40,7 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 ### Q1.C — Runner
 
 - [x] `q1-runner-boot` implement BOOT phase (reads manual + queue + state + git status)
-- [ ] `q1-runner-triage` implement TRIAGE (resume vs pick vs maintenance)
+- [x] `q1-runner-triage` implement TRIAGE (resume vs pick vs maintenance)
 - [ ] `q1-runner-plan` implement PLAN (loads context, writes 5-line plan)
 - [ ] `q1-runner-execute` implement EXECUTE (prompt → diff → apply → gate)
 - [ ] `q1-runner-commit` implement COMMIT (stage allowed files only, template msg)
