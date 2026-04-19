@@ -1,20 +1,24 @@
-# Model Tuning Notes (llama.cpp server)
+# Context and Craft Notes
 
-You are a local model served by llama.cpp. Operate within these limits.
+## Context budget (hard limit)
 
-## Context budget
+Keep each task's total context (files you load) under **64k tokens**. If the files exceed this, pick the most relevant files and note what you skipped.
 
-Keep each task's total context (files_allowed + files_reference) under **24k tokens**. If it overflows, mark the task `needs_split` and move on — do not try to compress or summarize the files.
+## How to approach a task well
 
-## Behaviour rules
+**Start with the data, not the logic.** This codebase is data-first. Before writing a function, define the data structure it operates on. Look at how similar structures are already defined (`WEAPONS`, `VEHICLE_TYPES`, `GROWTH_STAGE`).
 
-- Never invent imports. If a path doesn't exist, fail the task rather than creating a stub.
-- Never stub tests as `expect(true).toBe(true)`. A missing test beats a fake one.
-- Resist refactoring code outside your task scope — the next task can clean it up.
-- When unsure about a Three.js / Rapier API, check `node_modules/<pkg>` before using it.
-- Re-read the relevant section of `docs/ROADMAP_2Y.md` at the start of each task.
+**Look at one existing example before writing anything new.** Adding a weapon? Read the `pistol` entry. Adding a hack? Read `hackTrafficLights`. Adding a test? Read one passing spec. Copy the shape, change the values.
 
-## Server config (user's llama.cpp setup)
+**The simplest correct solution wins.** A 20-line addition that slots into an existing pattern beats a 150-line "clean architecture" rewrite every time. The codebase has momentum. Work with it, not against it.
 
-- Endpoint: `http://localhost:8080` (llama.cpp default) — or whatever is configured in Roo Code settings.
-- Roo Code handles all model calls. These notes are for self-discipline, not wiring.
+**Taste test before committing.** Player-facing changes: mentally walk through the user experience. Is the feedback instant? Is the effect visible? Does it feel satisfying or mechanical?
+
+## Common failure modes to avoid
+
+- **Importing `three` into `src/sim/`** — breaks the architecture boundary. Check before saving.
+- **Using `Math.random()`** — fails CI immediately. Use `rngStreams.<stream>.next()`.
+- **Large rewrites** — scope creep kills quality. Touch only what the task specifies.
+- **Inventing APIs** — if you're not sure a method exists, read the file first. Don't guess.
+- **Forgetting the tick** — new simulation systems that aren't called from `game.tickOnce()` are dead code. Wire it up.
+- **DOM mutations in sim code** — sim is pure logic. If you find yourself touching `document` in `src/sim/`, stop.

@@ -1,4 +1,4 @@
-# Noctune — 2-Year Progress Checklist
+# 2-Year Progress Checklist
 
 Companion to [ROADMAP_2Y.md](ROADMAP_2Y.md). **This is the tickable tracker.** Every completed task ticks one or more boxes below via the commit's `Checklist:` trailer. Each item ID follows `q<N>-<area>-<slug>`; commits reference it so the dashboard can reconcile.
 
@@ -15,73 +15,33 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 
 ## Q1 — Foundations for Autonomous Operation (2026-04 → 2026-06)
 
-**Goal:** Make the autonomous loop safe, boring, and self-recovering. Ship no gameplay changes this quarter. Every box below is pipeline infra.
+**Goal:** Establish a green baseline. Gate commands pass, Roo completes tasks end-to-end, and the Playwright smoke suite is written.
 
-### Q1.A — Agent Directory and Schemas
+### Q1.A — Gate Health
 
-- [x] `q1-agent-dir` create `tools/agent/` directory with README describing each subfile
-- [x] `q1-agent-taskschema` write `tools/agent/schemas/task.schema.json` per ROADMAP §I.3
-- [x] `q1-agent-changelogschema` write `tools/agent/schemas/changelog.schema.json`
-- [x] `q1-agent-stateschema` write `tools/agent/schemas/state.schema.json`
-- [x] `q1-agent-prompts-dir` create `tools/agent/prompts/` with one template per task type
-- [x] `q1-agent-templates-dir` create empty `tools/agent/templates/` placeholders for Q5 content types
-- [x] `q1-agent-baselines-dir` create `tools/agent/baselines/` with .gitkeep
-- [x] `q1-agent-logs-dir` create `tools/agent/logs/` with gitignore for old logs
-- [x] `q1-agent-pending-dir` create `tools/agent/pending_changes/` with gitignore
+Confirm all gate commands pass on the current codebase before any autonomous work begins.
 
-### Q1.B — Queue and State IO
+- [ ] `q1-gate-lint` `npm run lint:basic` exits 0
+- [ ] `q1-gate-mathrandom` `npm run check:no-math-random` exits 0
+- [ ] `q1-gate-validate` `npm run validate` exits 0
+- [ ] `q1-gate-tests` `npm test` exits 0 (all unit tests green)
+- [ ] `q1-gate-all-clean` all 4 gate commands pass in a single sequential run
 
-- [x] `q1-queue-schema-tests` unit tests for queue read/write/round-trip
-- [ ] `q1-queue-seed` seed `queue.json` with Q1 tasks listed in this checklist
-- [x] `q1-queue-priority-sort` ensure picker returns highest-priority READY first
-- [x] `q1-state-resume` state-machine resume after mid-task crash (test forces kill)
-- [ ] `q1-state-timeout` state-machine timeout if `in_progress` > 30 min (clears state)
+### Q1.B — Roo First Cycle
+
+Verify the autonomous Roo loop works end-to-end.
+
+- [ ] `q1-roo-first-task` first checklist item picked, changed, gate-passed, committed
+- [ ] `q1-roo-three-tasks` 3 consecutive tasks completed without gate failure
+- [ ] `q1-roo-revert-recovery` deliberately trigger a gate failure, verify Roo reverts and moves on
 
 ### Q1.C — Roo Code Setup (operator does once, not coded)
 
 - [ ] `q1-roo-provider` Roo Code configured: provider = llama.cpp, endpoint correct
-- [ ] `q1-roo-context` context window set to 24k tokens in Roo settings
+- [ ] `q1-roo-context` context window set to 64k tokens in Roo settings
 - [ ] `q1-roo-autoapprove` auto-approve ON for: read, write, `npm run lint:basic`, `npm run check:no-math-random`, `npm run validate`, `npm test`, `git status/diff/log/add/commit`, `node scripts/*.mjs`
 - [ ] `q1-roo-rules-load` confirm `.roo/rules/*.md` loads on every session (send "go", see `[boot]` line)
 - [ ] `q1-roo-first-cycle` first autonomous task cycle completes end-to-end (pick → edit → gate → commit)
-
-### Q1.D — Gate
-
-- [ ] `q1-gate-lint` stage 1: `npm run lint:basic`
-- [ ] `q1-gate-mathrandom` stage 2: `npm run check:no-math-random`
-- [ ] `q1-gate-validate` stage 3: `npm run validate`
-- [ ] `q1-gate-smoke` stage 4: `npm test`
-- [ ] `q1-gate-playwright-smoke` stage 5: `playwright test --grep @smoke` (≤ 90s)
-- [ ] `q1-gate-screenshot-capture` stage 6: run capture scripts, fail on missing file
-- [ ] `q1-gate-screenshot-diff` stage 7: pixelmatch diff per baseline
-- [ ] `q1-gate-bundle-size` stage 8: bundle size vs baseline (+2% tolerance)
-- [ ] `q1-gate-timeout-60s` per-stage timeout 60s, hard-kill
-- [ ] `q1-gate-report` JSON report consumed by critic and dashboard
-
-### Q1.E — Critic
-
-- [ ] `q1-critic-text-only` Q1 critic uses text model only (no vision)
-- [ ] `q1-critic-schema` critic emits `{severity, findings, verdict_one_line}`
-- [ ] `q1-critic-revert-on-block` runner reverts on `severity: block`
-- [ ] `q1-critic-prompt` `prompts/critic.md` Steam-reviewer-style
-- [ ] `q1-critic-logs` critic findings appended to transcript
-
-### Q1.F — Release Job
-
-- [ ] `q1-release-nightly` nightly tag + Electron build + artifact archive
-- [ ] `q1-release-weekly` Sunday tag + full Playwright
-- [ ] `q1-release-version-js` bump `src/version.js` automatically
-- [ ] `q1-release-changelog` aggregate `pending_changes/` into `CHANGELOG.md`
-- [ ] `q1-release-release-notes` write `docs/release_notes/<version>.md`
-- [ ] `q1-release-push-tag` only the release job may `git push --tags`
-
-### Q1.G — Curator
-
-- [ ] `q1-curator-daily-run` scheduled script, runs independently
-- [ ] `q1-curator-split-toobig` auto-split tasks flagged `needs_split`
-- [ ] `q1-curator-reprioritize` re-rank by quarter theme
-- [ ] `q1-curator-rework-promote` move `needs_rework` back to READY when unblocked
-- [ ] `q1-curator-prune-done` drop `done` tasks older than 30d
 
 ### Q1.H — Playwright Smoke Suite (acceptance baseline for the gate)
 
@@ -134,9 +94,8 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 
 ### Q1 — Definition of Done
 
-- [ ] 14 consecutive nightly builds green
+- [ ] All 4 gate commands green on current codebase
 - [ ] All Q1.A–Q1.J items ticked
-- [ ] Operator approval file `tools/agent/approvals/q1.json` exists with `approved: true`
 - [ ] Tag `0.1.0.0` pushed
 
 ---

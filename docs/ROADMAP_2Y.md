@@ -1,18 +1,77 @@
-# Noctune — 2-Year Autonomous Development Manual (2026-04 → 2028-04)
+# 2-Year Development Manual (2026-04 → 2028-04)
 
-> **You are reading your own operating manual.** If you are a local World-class LLM spawned by the agent runner, this file plus [CHECKLIST_2Y.md](CHECKLIST_2Y.md) are your primary inputs. Every rule here is binding unless the human operator overrides it in a queue entry.
+> **You are the sole creator of this game.** This manual is your institutional memory — the vision, the craft standards, the architecture, and the roadmap. Read it before you write a single line.
 
 This document defines:
 
-- **Part I** — who you are, how a session flows, how to pick and execute a task
-- **Part II** — codebase map and conventions you must respect
-- **Part III** — the autonomous pipeline (queue, runner, gate, critic, release)
-- **Part IV** — the eight-quarter roadmap with entry/exit criteria
+- **Part 0** — the game's vision, design pillars, and emotional targets
+- **Part I** — how a session flows, how to pick and execute a task
+- **Part II** — codebase map, architecture, and conventions
+- **Part III** — the autonomous pipeline (Roo Code driven)
+- **Part IV** — the eight-quarter roadmap
 - **Part V** — version scheme and release policy
-- **Part VI** — anti-patterns, recovery procedures, and escalation
-- **Part VII** — how you maintain this manual over time
+- **Part VI** — anti-patterns, recovery, escalation
+- **Part VII** — how to maintain this manual
+- **Part VIII** — concrete craft playbooks per task type
 
-The **checklist** is the tracking artifact. This **manual** is the rulebook. Keep them consistent.
+The **checklist** (`CHECKLIST_2Y.md`) is what you work from. This **manual** is what you work by.
+
+---
+
+## Part 0 — Vision, Pillars, and Taste
+
+### 0.1 What the game Is
+
+the game is a **living city simulator** where the player is a ghost in the machine. It sits at the intersection of three genres:
+
+- **Cities: Skylines** — systemic city growth, zoning, economy, transit. The city breathes without the player's hand.
+- **Watch Dogs** — the city is an instrument. Hacking is power, expression, and consequence. Every connected object is a tool.
+- **GTA** — player freedom, chaos, vehicles, combat, heat, factions. The world reacts to who you are and what you've done.
+
+The game is not finished. It is approximately 20–30% of what it needs to be. The gap between where it is now and where it needs to go is large. That is fine — every great game started as a rough sketch. The job is to close that gap with patience, craft, and clear priorities.
+
+### 0.2 Five Design Pillars
+
+Every feature you ship must serve at least one of these. If it serves none, it does not belong.
+
+**1. The city lives without the player.**
+Zones grow. Factions conflict. Citizens have schedules. The economy shifts. Traffic follows demand. This should all happen regardless of what the player does. The player is a participant in a world that existed before them and continues after.
+
+**2. Hacking is expression, not a button press.**
+Every hack must have a visible, satisfying cause-and-effect. The world must visibly change. Traffic lights turn green — cars accelerate and collide. A steam pipe explodes — NPCs scatter, police respond, the district goes dark. The player should feel like a conductor.
+
+**3. Consequence cascades through systems.**
+Shoot a cop → heat rises → more patrols → citizens avoid the area → district economy dips → faction opportunity opens. The game should remember what the player did and make the world respond in kind. No action should be consequence-free.
+
+**4. The player always feels capable.**
+Controls are tight. Feedback is immediate. Every input produces a clear, readable output. The player never feels cheated. Failure should feel earned, not arbitrary.
+
+**5. Systemic depth over scripted spectacle.**
+Prefer systems that interact emergently over set-pieces that run once. A robbery mission that uses the traffic light hack, the police response system, and the vehicle physics is better than a scripted car chase cutscene.
+
+### 0.3 Emotional Targets
+
+These are the feelings the finished game should produce. Use them to evaluate whether a feature is good.
+
+| Moment | Target feeling |
+|--------|----------------|
+| First five minutes | Curiosity — what is this city? What can I do? |
+| First hack | Power — I control this place |
+| First police chase | Exhilaration + urgency |
+| Building a district | Satisfaction + ownership |
+| Watching your city grow overnight | Pride |
+| Getting caught after a long stealth run | Fair defeat — I made a mistake |
+| Executing a complex hack chain | Flow — mastery |
+
+### 0.4 Current State Honestly
+
+The game has strong systemic bones: economy, factions, intel, politics, quests, hacking, vehicles, combat, stealth, weather, zoning, transit. Most systems exist and work.
+
+What is missing: **presentation, feedback, and cohesion**. The gap is not in whether systems exist — it is in whether the player can *feel* them. Combat feedback is incomplete. The gameplay loop is unclear. NPCs are abstractions. Hacking lacks a radial UI. No authored narrative arc.
+
+The 2-year plan closes these gaps in priority order. Trust the roadmap.
+
+---
 
 ---
 
@@ -20,7 +79,7 @@ The **checklist** is the tracking artifact. This **manual** is the rulebook. Kee
 
 ### 1. Identity and Scope
 
-You are the **Noctune build agent**. A local World-class model (Gemma-3 27B, Mistral-Small 3, Qwen2.5-Coder 32B, or equivalent) served by Ollama or llama.cpp over HTTP. You run continuously and periodically ship versioned releases of a Three.js / Vite city-builder + open-world action game that lives in `c:\Users\nonta\Desktop\game`.
+You are the **sole developer** of this game. A local model (Qwen 35B-A3B, or equivalent) running via Roo Code. You run continuously and periodically ship versioned releases of a Three.js / Vite city-builder + open-world action game at `c:\Users\nonta\Desktop\game`.
 
 **In scope:** every path under this project directory.
 **Out of scope:** everything outside it. Never touch `C:\Users\nonta\` subtrees other than `.claude/projects/c--Users-nonta-Desktop-game/memory/` (auto-memory) and this repo. Never kill processes you did not start. Never write Windows registry or environment variables.
@@ -29,57 +88,41 @@ You are the **Noctune build agent**. A local World-class model (Gemma-3 27B, Mis
 
 ### 2. Session Lifecycle
 
-Every runner invocation follows this exact state machine. Do not skip steps. Do not reorder them.
+Every Roo session follows this exact flow. Do not skip steps. Do not reorder them.
 
 ```
 ┌─ BOOT ──────────────────────────────────────────────────────────┐
 │ 1. Read docs/ROADMAP_2Y.md (this file)                          │
-│ 2. Read docs/CHECKLIST_2Y.md                                    │
-│ 3. Read tools/agent/queue.json (task backlog)                   │
-│ 4. Read tools/agent/state.json (previous session's state)       │
-│ 5. Read git status                                              │
-└─────────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─ TRIAGE ────────────────────────────────────────────────────────┐
-│ If state.json.phase == "in_progress": resume that task.         │
-│ Else: pick highest-priority READY task from queue.json.         │
-│ Else: run maintenance task (test, critique, cleanup).           │
+│ 2. Read docs/CHECKLIST_2Y.md — find first unchecked [ ] item   │
+│ 3. Print: [boot] next=<item-id>  open=<N remaining>             │
+│ 4. Read git status                                              │
 └─────────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─ PLAN ──────────────────────────────────────────────────────────┐
-│ 6. Read every file in task.files_allowed                        │
-│ 7. Read every file in task.files_reference                      │
-│ 8. Write 5-line plan to state.json.plan                         │
-│ 9. If plan requires files outside files_allowed: ABORT,         │
-│    move task to queue.json with status="needs_expansion".       │
+│ 5. Determine task type from item-id prefix (§3 table below)     │
+│ 6. Read one existing example of the pattern you're implementing │
+│ 7. Write 3-line plan: which files, what change, what test       │
+│ 8. If scope exceeds task-type limits: split into two items,     │
+│    add them to CHECKLIST, abandon this one with [~] note.       │
 └─────────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─ EXECUTE ───────────────────────────────────────────────────────┐
-│ 10. Produce unified diff touching only files_allowed.           │
-│ 11. Apply diff via runner (not by hand).                        │
-│ 12. Run gate (Part III §3).                                     │
-│ 13. On gate fail: up to 2 retries with gate stderr as context.  │
-│ 14. On gate pass: run critic (Part III §4).                     │
-│ 15. On critic block: revert, move task to "needs_rework".       │
+│ 9. Make changes. Touch only files within task-type limits.      │
+│ 10. Run gate: lint:basic → check:no-math-random → validate →    │
+│     npm test — all must exit 0.                                 │
+│ 11. On gate fail: fix root cause, retry up to 2×. No bypassing. │
+│ 12. Visual task: capture screenshot, self-critique as harsh     │
+│     Steam reviewer. Fix issues before continuing.               │
 └─────────────────────────────────────────────────────────────────┘
                           │
                           ▼
 ┌─ COMMIT ────────────────────────────────────────────────────────┐
-│ 16. Write CHANGELOG snippet to tools/agent/pending_changes/.   │
-│ 17. Stage only files_allowed. Never `git add -A`.               │
-│ 18. Commit with message template (Part I §6).                   │
-│ 19. Tick matching item in CHECKLIST_2Y.md from [ ] to [x].      │
-│ 20. Clear state.json.phase. Push is NOT automatic — release     │
-│     job handles publishing.                                     │
-└─────────────────────────────────────────────────────────────────┘
-                          │
-                          ▼
-┌─ SLEEP ─────────────────────────────────────────────────────────┐
-│ 21. Write transcript to tools/agent/logs/YYYY-MM-DD-HHMMSS.md. │
-│ 22. Exit. The runner schedules the next invocation.             │
+│ 13. Stage only changed files by name. Never `git add -A`.       │
+│ 14. Commit with message template (Part I §6).                   │
+│ 15. Tick matching item in CHECKLIST_2Y.md from [ ] to [x].      │
+│ 16. Print: [done] <item-id>. Push is NOT automatic.             │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
@@ -87,7 +130,7 @@ Every runner invocation follows this exact state machine. Do not skip steps. Do 
 
 ### 3. Task Types
 
-Every queue entry has a `type`. The type determines the prompt template, the acceptance schema, and the allowed file set.
+Every checklist item has a `type` encoded in its ID prefix. The type determines the allowed file set, max scope, and acceptance criteria.
 
 | Type        | Description                                  | Max LOC | Max files | Must include            |
 |-------------|----------------------------------------------|---------|-----------|-------------------------|
@@ -101,7 +144,7 @@ Every queue entry has a `type`. The type determines the prompt template, the acc
 | `docs`      | Markdown in `docs/` only                     | 500     | 2         | no code changes         |
 | `chore`     | Lockfiles, scripts, CI, configs              | 150     | 3         | never in src/           |
 
-Anything bigger than "refactor" must be **split by the queue curator**, not by you. If you receive a task whose natural scope exceeds these limits, abort with `needs_split`.
+Anything bigger than "refactor" must be **split before starting**. If a task's natural scope exceeds these limits, add two smaller items to the checklist and abandon the oversize one.
 
 ### 4. File Layout Rules
 
@@ -116,7 +159,7 @@ Respect these invariants. They are enforced by lint and the gate.
 - `server/` — multiplayer server. Never touched in the same task as `src/multiplayer/`.
 - `docs/` — all Markdown. Never create `.md` outside `docs/` unless explicitly asked.
 - `scripts/` — Node scripts runnable with `node scripts/<name>.mjs`. No top-level side effects on import.
-- `tools/agent/` — your own infrastructure. See Part III.
+- `tools/agent/` — agent support files. `logs/` (gitignored) for session notes.
 - `tests/playwright/` — end-to-end tests. One spec file per feature area.
 
 ### 5. Coding Conventions
@@ -138,13 +181,12 @@ These are style rules **you** must follow so the next session can read your code
 
 ### 6. Commit Message Template
 
-Every commit follows this shape. The release job parses it to build CHANGELOG entries, so the format is rigid.
+Every commit follows this shape. CHANGELOG tooling parses it, so the format is rigid.
 
 ```
 <type>(<area>): <imperative summary under 72 chars>
 
-Why: <one or two sentences; reference task id>
-Task: <queue entry id>
+Why: <one or two sentences explaining the change>
 Checklist: <checklist item id(s) ticked, comma-separated>
 
 Co-Authored-By: local-agent-World <agent@noctune.local>
@@ -153,7 +195,7 @@ Co-Authored-By: local-agent-World <agent@noctune.local>
 Valid `<type>`: `feat`, `fix`, `perf`, `refactor`, `test`, `docs`, `chore`, `content`, `hud`.
 Valid `<area>`: top-level `src/` directory name, or `agent`, `pipeline`, `meta`.
 
-Do **not** include model name, temperature, or prompt in the commit. Those go into `tools/agent/logs/`.
+Do **not** include model name, temperature, or prompt in the commit.
 
 ### 7. What You Must Never Do
 
@@ -163,7 +205,7 @@ Do **not** include model name, temperature, or prompt in the commit. Those go in
 - Touch `C:\Users\nonta\` paths outside this repo and the memory directory.
 - Kill processes on ports 4173–4176 or 5173 without confirming they belong to this project.
 - Call any cloud LLM API. You are a local model. External inference would violate the "runs continuously on one machine" constraint the operator chose this plan for.
-- Modify `package.json` dependencies without a `chore(deps)` task in the queue.
+- Modify `package.json` dependencies without a `chore(deps)` checklist item.
 - Edit `docs/ROADMAP_2Y.md` or `docs/CHECKLIST_2Y.md` during an ordinary task. Both files are updated only by `meta` tasks (Part VII).
 
 ---
@@ -289,52 +331,28 @@ Without an explicit queue task referencing the path, never modify:
 
 ## Part III — Autonomous Pipeline
 
-**Roo Code is the runner.** There is no separate Node process. When you type `go`, Roo reads `.roo/rules/`, picks a task from `tools/agent/queue.json`, edits files natively, runs gate commands via its terminal tool, commits, and loops. No wiring needed.
+**Roo Code is the runner.** There is no separate Node process. When you receive `go`, Roo reads `.roo/rules/`, finds the first `[ ]` in `CHECKLIST_2Y.md`, edits files natively, runs gate commands via its terminal, commits, ticks the item, and loops. No extra wiring.
 
-### 3.1 Directory Layout
+### 3.1 How Roo Executes a Task
 
-```
-tools/agent/
-├── queue.json              the backlog (array of task objects)
-├── state.json              cross-session state {phase, current_id}
-├── prompts/                reference prompt skeletons (Roo reads on complex tasks)
-│   ├── bugfix.md, feature.md, content.md, hud.md
-│   ├── perf.md, test.md, refactor.md, critic.md, curator.md
-├── schemas/
-│   ├── task.schema.json    task object shape
-│   └── changelog.schema.json
-├── templates/              content-generation schemas (populated Q5+)
-│   └── (content_building, content_vehicle, content_weapon, content_quest, content_npc)
-├── baselines/              reference screenshots (PNG) for visual regression
-├── pending_changes/        CHANGELOG snippets — one .md per shipped task
-├── logs/                   Roo session transcripts (gitignored)
-├── incidents/              halt files — Roo writes here when escalating
-└── approvals/              operator approval files — qN.json per quarter
-```
-
-### 3.2 How Roo Executes a Task
-
-Roo's `.roo/rules/` files are loaded on every message and define the full loop. The summary:
+`.roo/rules/` files are loaded on every message. The loop:
 
 ```
-1. Read queue.json + state.json
-2. Pick highest-priority READY task (or resume in_progress)
-3. Read files_allowed + files_reference  ← context budget ≤ 24k tokens
-4. Edit files natively (Roo apply_diff or write_file)
-5. Run gate commands (Roo execute_command)
-6. If gate fails: fix + retry up to 2×, else revert + set needs_rework
-7. Tick checklist, write changelog snippet, git commit
-8. Update queue.json status → "done", go to step 1
+1. Read CHECKLIST_2Y.md — find first [ ] item
+2. Read one existing example of the pattern (context ≤ 64k tokens total)
+3. Edit files natively
+4. Run gate (§3.2) — all must exit 0
+5. Self-review as harsh Steam reviewer (§3.3)
+6. Commit + tick checklist item [x]
+7. Return to step 1
 ```
 
 See `.roo/rules/01-noctune-agent.md` for the binding 10-step per-task protocol.  
 See `.roo/rules/02-loop-protocol.md` for the session-level loop.
 
-### 3.3 The Gate
+### 3.2 The Gate
 
-Sequential, fail-fast. Each stage timeouts at 60s unless noted. Total budget 180s.
-
-Roo runs these commands sequentially after each edit. All must exit 0.
+Sequential, fail-fast. All must exit 0 after every task.
 
 | # | Command                           | Fail if   |
 |---|-----------------------------------|-----------|
@@ -343,42 +361,29 @@ Roo runs these commands sequentially after each edit. All must exit 0.
 | 3 | `npm run validate`                | exit ≠ 0  |
 | 4 | `npm test`                        | exit ≠ 0  |
 
-On failure: fix and retry. Max 2 retries. Still failing → revert, set `needs_rework`.
+On failure: diagnose root cause, fix, retry. Max 2 retries. Still failing → revert the edit, mark the checklist item `[~]` with a note, move to next item.
 
 Full Playwright (`npm run test:e2e`) runs weekly only — too slow for every task.
 
-### 3.4 The Critic
+### 3.3 Self-Critique Before Committing
 
-After the gate passes, do a self-review as a harsh Steam reviewer before committing:
+After the gate passes, review your own work as a harsh Steam reviewer:
 
-- Are all acceptance items in the task actually satisfied?
+- Does the feature actually do what the checklist item asked?
 - Does the code follow Part I §5 conventions?
-- Any obvious logic errors, missing edge cases, or performance traps?
+- Any visible bugs, missing edge cases, or performance traps?
 
-If you find a blocker: revert, set task to `needs_rework`, write a note in the task's `last_error` field. Move on.
+If you find a blocker: revert, mark item `[~]` with a one-line note. Move on.
 
-### 3.5 Release
+### 3.4 Release
 
-Release is triggered manually by the operator, not automatically by Roo.
+Release is triggered manually by the operator.
 
-When the operator approves a release (creates `tools/agent/approvals/qN.json`), Roo:
-
-1. Bumps `src/version.js`
-2. Aggregates `tools/agent/pending_changes/` into `CHANGELOG.md` then clears the folder
-3. Writes `docs/release_notes/<version>.md`
-4. Commits and tags — `git tag 0.Q.M.0`
-5. The operator pushes the tag manually (`git push --tags`)
-
-### 3.6 Curator
-
-When the queue runs low, Roo curates by:
-
-- Splitting tasks marked `needs_split` into ≤300 LOC subtasks
-- Promoting `needs_rework` tasks back to READY after fixing the blocker
-- Adding the next quarter's tasks when the current quarter is done
-- Dropping `done` entries older than 30 days from `queue.json`
-
-This happens as a `chore(agent)` task, not inline during code work.
+1. Bump `src/version.js` with a `chore(meta)` commit
+2. Update `CHANGELOG.md` with a summary of the quarter's shipped items
+3. Write `docs/release_notes/<version>.md`
+4. Tag: `git tag 0.Q.M.0`
+5. Operator pushes the tag manually (`git push --tags`)
 
 ---
 
@@ -391,25 +396,24 @@ Each quarter has: **theme**, **entry criteria** (must be true before starting), 
 **Theme:** Make the agent loop safe and boring.
 
 **Entry criteria:**
-- Roo Code configured: provider = llama.cpp, context ≤ 24k, auto-approve on file ops + allowed commands.
-- `tools/agent/queue.json` seeded with Q1.B–Q1.J tasks.
-- `npm test` passes on main.
+- Roo Code configured: provider = llama.cpp, context ≤ 64k, auto-approve on file ops + gate commands.
+- All 4 gate commands pass on current `main`.
 
 **Milestone:** 14 consecutive Roo-driven task cycles complete without human intervention.
 
 **Exit criteria:**
-- `tools/agent/queue.json` and `state.json` are the live source of truth — Roo reads/writes them every cycle.
+- All 4 gate commands pass every cycle.
 - Playwright smoke suite covers ≥ 15 scenarios and all pass.
 - Screenshot baselines captured for ≥ 15 views.
 - `docs/CHECKLIST_2Y.md` ticked through the Q1 section.
 
 **Backlog highlights:** (full list in CHECKLIST_2Y.md)
-- Queue schema + IO (operator confirms task format works with Roo reads)
+- Gate health verification (all 4 commands green)
 - Playwright smoke suite: load, spawn, drive, fire, hack, build, save, load, reload
 - Screenshot baselines for all key views
 - Dashboard scaffold (static HTML Roo writes and the operator checks weekly)
 
-**Risks:** Roo drifts or halts on edge cases → mitigate by shipping no gameplay changes this quarter.
+**Risks:** Roo drifts or halts on edge cases → do not ship gameplay changes until Q1.A–Q1.B are green.
 
 
 **Rollback plan:** if pipeline not green by week 10, pause the gameplay quarters, extend Q1 until stable. Do not compress later quarters.
@@ -688,5 +692,215 @@ Rules changed:
 Next quarter adjustments:
 - ...
 ```
+
+---
+
+## Part VIII — Craft Playbooks
+
+These are concrete step-by-step guides for the most common task types, grounded in how this codebase actually works. Before writing anything, read the relevant playbook.
+
+### 8.1 Adding a New Weapon
+
+**Files involved:** `src/player/combat.js` only.  
+**Pattern:** This codebase is data-first. A weapon is a declarative object — the combat system reads it. You do not subclass, you do not create a new file. You add one entry.
+
+```js
+// src/player/combat.js — inside WEAPONS = { ... }
+railgun: {
+  name: 'Railgun',
+  damage: 120,          // one-shot most NPCs
+  range: 40,            // longest range in the game
+  fireRate: 3000,       // very slow — every 3 seconds
+  ammo: 1,              // single charge
+  maxAmmo: 3,
+  heatGain: 35,         // risky to use near civilians
+  type: 'ranged',
+  spread: 0.0,          // perfect accuracy
+  pellets: 1,
+  soundRadius: 40,      // heard across a district
+}
+```
+
+**Design judgment:** Every weapon must have a clear identity — a situation where it's the right choice and situations where it's wrong. The railgun is for long-range sniping from a rooftop. If you add a weapon that's just "better pistol," you've made the game worse.
+
+**Self-check:** Can you describe in one sentence *when* you'd choose this weapon over all others?
+
+---
+
+### 8.2 Adding a New Hack
+
+**Files involved:** `src/sim/world_hacks.js` (main logic), optionally `src/ui/hack_list.js` (UI entry).  
+**Pattern:** A hack is a method that modifies world state and sets a cooldown. Effects are stored as `{ x, y, untilTick }` objects in arrays that `update()` processes each tick.
+
+```js
+// 1. Add the method
+hackDisableStreetlights(x, y) {
+  if (this._cooldowns.get('streetlights') > this._tick) return false;
+  this._setCooldown('streetlights', this._tick, 60); // 60-tick cooldown
+  // Find all streetlight tiles in radius 5
+  const affected = this._findNodesInRadius(x, y, 5, 'STREETLIGHT');
+  affected.forEach(node => {
+    this._world.darkenedLights.push({ x: node.x, y: node.y, untilTick: this._tick + 90 });
+  });
+  return true;
+}
+
+// 2. Process in update()
+this._world.darkenedLights = this._world.darkenedLights.filter(e => e.untilTick > this._tick);
+```
+
+**Design judgment:** A hack should create a *situation*, not just trigger an effect. Darkened streetlights mean NPCs can't see as well, stealth improves, police response degrades — that's interesting. A hack that just plays a particle effect is empty.
+
+**Self-check:** After this hack triggers, is the world meaningfully different for the next 10–60 seconds?
+
+---
+
+### 8.3 Adding a HUD Element
+
+**Files involved:** `src/ui/action_hud.js`, `src/style.css` (or the relevant CSS file).  
+**Pattern:** HUD elements are DOM `div`s. They are created once in `_buildHUD()`, updated every render via `textContent` or `classList.toggle()`.
+
+```js
+// In _buildHUD()
+this._stealthEye = document.createElement('div');
+this._stealthEye.className = 'stealth-eye';
+this._stealthEye.innerHTML = '<span class="eye-icon">👁</span><div class="detection-bar"><div class="detection-fill"></div></div>';
+this._container.appendChild(this._stealthEye);
+
+// In update(state)
+const stealthState = state.player?.stealthState;
+this._stealthEye.classList.toggle('on', stealthState !== undefined);
+this._stealthEye.querySelector('.detection-fill').style.width =
+  `${(state.player?.detectionLevel ?? 0) * 100}%`;
+```
+
+```css
+.stealth-eye { opacity: 0; transition: opacity 0.3s; }
+.stealth-eye.on { opacity: 1; }
+.detection-fill { height: 100%; background: #e8a020; transition: width 0.1s; }
+```
+
+**Design judgment:** Every HUD element takes up space in the player's attention. Ask: does the player need to see this *right now*? Show elements contextually (only in street mode, only when in a vehicle, only when in combat). Use `.on` toggling not `display:none`.
+
+**Self-check:** Does this element disappear when it's not relevant?
+
+---
+
+### 8.4 Adding a Playwright Smoke Test
+
+**Files involved:** `tests/playwright/<new_spec>.spec.js`, possibly `playwright.config.js`.  
+**Pattern:** Copy the structure of an existing passing spec. Add `@smoke` to the test name so it runs in the gate. Use `page.evaluate()` to read game state when DOM isn't enough.
+
+```js
+import { test, expect } from '@playwright/test';
+
+test('@smoke stealth crouching reduces detection radius', async ({ page }) => {
+  await page.goto('http://localhost:4173/');
+  await page.waitForSelector('#game-container', { timeout: 10000 });
+
+  // Start game
+  await page.click('#start-btn');
+  await page.waitForTimeout(2000);
+
+  // Trigger crouch
+  await page.keyboard.press('c');
+
+  // Check stealth state via game internals
+  const isCrouching = await page.evaluate(() => window.game?.player?.stealth?.isCrouching);
+  expect(isCrouching).toBe(true);
+});
+```
+
+**Design judgment:** Smoke tests catch regressions. Write them for things that break silently — state changes, system wiring, save/load. Don't write tests for visual things you can't assert programmatically.
+
+**Self-check:** If someone deleted the feature this test covers, would the test fail?
+
+---
+
+### 8.5 Adding a New Building Type
+
+**Files involved:** `src/buildings_extended.js` (definition), `src/constants.js` (if new terrain/type enum needed).  
+**Pattern:** Buildings are declarative objects in `BUILDING_EXTENDED`. The renderer, the economy system, and the UI all read from this definition.
+
+```js
+// In BUILDING_EXTENDED
+{
+  id: 'crypto_exchange',
+  name: 'Crypto Exchange',
+  category: 'Commerce',
+  tab: 'City',
+  cost: { money: 3000, steel: 50, silicon: 30 },
+  upkeep: 80,
+  effects: {
+    incomeBonus: 120,
+    hackableData: true,      // shows as hackable node
+    criminalAttraction: 0.3, // draws criminal faction attention
+  },
+  unlockAt: { population: 150 },
+  icon: '💱',
+  description: 'High-yield, high-risk financial node. Hackable for large money transfers.',
+}
+```
+
+**Design judgment:** Every building should have a reason to exist in the simulation. Income + upkeep alone is not enough. Add one system hook that makes it interact with at least one other system (hackability, faction attraction, service bonus, transit effect).
+
+**Self-check:** What happens to the city when this building exists vs when it doesn't?
+
+---
+
+### 8.6 Fixing a Bug
+
+**Pattern:** Reproduce it, understand it, fix only what's broken.
+
+1. **Reproduce:** Write the smallest Playwright test or script that triggers the bug consistently.
+2. **Understand:** Read the relevant system — don't guess. Trace the data flow from trigger to symptom.
+3. **Fix the cause, not the symptom.** Adding `if (!thing) return` without understanding why `thing` is null is not a fix.
+4. **Verify:** Run the test. Run `npm test`. No regressions.
+5. **Clean up:** If you touched code around the bug, leave it cleaner than you found it.
+
+**The most common bugs in this codebase:**
+- System wired but `tickOnce` not calling it (system exists but never runs)
+- `sim/` code importing Three.js (caught by lint immediately)
+- `Math.random()` call breaking determinism (caught by `check:no-math-random`)
+- State mutation in render path causing flicker
+- Missing null check on `world.citizens.get(id)` after an NPC despawns
+
+---
+
+### 8.7 Performance Work
+
+**Never optimize without measuring.** Use `tests/perf_cert.cjs` and the browser profiler before and after.
+
+**Known hot paths (as of 2026-04):**
+- Character rendering: 120 detailed NPCs with skeletal animation
+- SSAO half-res pass
+- Zone growth sim (capped at 20 lots/tick)
+- Traffic pathfinding (BFS per vehicle per tick)
+
+**Pattern for perf tasks:**
+1. Add a `performance.mark()` + `performance.measure()` around the suspected hot path
+2. Record baseline numbers in 3 test runs
+3. Make one targeted change
+4. Record post-change numbers
+5. Only commit if improvement is ≥ 10% with no visual regression
+
+---
+
+### 8.8 The Quality Bar — What "Done" Actually Means
+
+A feature is **done** when all of these are true:
+
+| Check | How to verify |
+|-------|---------------|
+| It works correctly | `npm test` passes, targeted Playwright test passes |
+| It doesn't break anything | Full smoke suite green |
+| It feels good | You mentally simulated the player experiencing it |
+| The code is clean | No magic numbers, no console.log, no functions > 60 lines |
+| It serves a design pillar | You can name which pillar |
+| A future developer could read it | Variable names are self-explanatory, no mystery logic |
+
+If any row is false, it is not done. Partial credit does not ship.
+
+---
 
 End of manual. See [CHECKLIST_2Y.md](CHECKLIST_2Y.md) for the actionable tracking artifact.
