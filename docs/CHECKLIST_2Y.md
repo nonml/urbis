@@ -40,12 +40,12 @@ Verify the autonomous Roo loop works end-to-end.
 - [ ] `q1-roo-provider` Roo Code configured: provider = llama.cpp, endpoint correct
 - [ ] `q1-roo-context` context window set to 64k tokens in Roo settings
 - [ ] `q1-roo-autoapprove` auto-approve ON for: read, write, `npm run lint:basic`, `npm run check:no-math-random`, `npm run validate`, `npm test`, `git status/diff/log/add/commit`, `node scripts/*.mjs`
-- [ ] `q1-roo-rules-load` confirm `.roo/rules/*.md` loads on every session (send "go", see `[boot]` line)
-- [ ] `q1-roo-first-cycle` first autonomous task cycle completes end-to-end (pick → edit → gate → commit)
+- [x] `q1-roo-rules-load` confirm `.roo/rules/*.md` loads on every session (send "go", see `[boot]` line)
+- [x] `q1-roo-first-cycle` first autonomous task cycle completes end-to-end (pick → edit → gate → commit) — 4 tasks completed
 
 ### Q1.H — Playwright Smoke Suite (acceptance baseline for the gate)
 
-- [ ] `q1-pw-load-game` game loads and reaches main menu < 10s
+- [x] `q1-pw-load-game` game loads and reaches main menu < 10s
 - [ ] `q1-pw-new-game` start new game, player spawns, HUD renders
 - [ ] `q1-pw-walk` WASD moves the player ≥ 5 tiles
 - [ ] `q1-pw-drive` enter a car, drive 50m, exit
