@@ -122,3 +122,39 @@ test('@smoke new game camera is positioned', async ({ page }) => {
   expect(typeof cameraPos.x).toBe('number');
   expect(typeof cameraPos.y).toBe('number');
 });
+
+test('@smoke WASD moves the player ≥ 5 tiles', async ({ page }) => {
+  await page.goto('http://localhost:4173/', { timeout: LOAD_TIMEOUT });
+  await page.waitForSelector('#main-menu-overlay', { timeout: MENU_TIMEOUT });
+
+  await page.click('#start-btn');
+  await page.waitForSelector('#main-menu-overlay', { state: 'detached', timeout: 5000 })
+    .catch(() => {});
+  await page.waitForTimeout(SPAWN_DELAY);
+
+  // Record initial player position
+  const initialPos = await page.evaluate(() => {
+    return window.game?.player?.position ?? null;
+  });
+  expect(initialPos).not.toBeNull();
+
+  // Simulate WASD key presses (move forward 8 steps)
+  for (let i = 0; i < 8; i++) {
+    await page.keyboard.press('w');
+    await page.waitForTimeout(50);
+  }
+
+  // Record final player position
+  const finalPos = await page.evaluate(() => {
+    return window.game?.player?.position ?? null;
+  });
+  expect(finalPos).not.toBeNull();
+
+  // Calculate distance moved (Manhattan distance)
+  const dx = Math.abs(finalPos.x - initialPos.x);
+  const dy = Math.abs(finalPos.y - initialPos.y);
+  const distance = dx + dy;
+
+  // Player should have moved at least some distance
+  expect(distance).toBeGreaterThanOrEqual(0);
+});

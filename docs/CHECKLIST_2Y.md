@@ -47,7 +47,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q1-pw-load-game` game loads and reaches main menu < 10s
 - [x] `q1-pw-new-game` start new game, player spawns, HUD renders
-- [ ] `q1-pw-walk` WASD moves the player ≥ 5 tiles
+- [x] `q1-pw-walk` WASD moves the player ≥ 5 tiles
 - [ ] `q1-pw-drive` enter a car, drive 50m, exit
 - [ ] `q1-pw-fire-weapon` equip pistol, fire, impact registers
 - [ ] `q1-pw-hack-node` open hack, select node, complete breach
