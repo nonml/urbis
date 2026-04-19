@@ -20,3 +20,10 @@ diag*.mjs
 # Session planning
 NEXT_SESSION_PLAN.md
 plans/
+
+# Agent runtime artifacts (logs only — everything else Roo commits)
+tools/agent/logs/*.md
+tools/agent/tests/tmp/
+
+# Runtime screenshot captures (not baselines)
+scripts/*.png

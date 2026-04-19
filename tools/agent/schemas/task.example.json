@@ -1,0 +1,31 @@
+{
+  "id": "q1b-queue-seed",
+  "type": "chore",
+  "title": "Seed queue.json with Q1.B–Q1.J tasks",
+  "description": "Populate tools/agent/queue.json with all Q1.B through Q1.J tasks from CHECKLIST_2Y.md. Each queue entry maps one checklist item to a task object. Priorities: Q1.B/C = 90, Q1.D = 80, Q1.E = 70, Q1.F/G = 60, Q1.H = 50, Q1.I = 40, Q1.J = 30.",
+  "priority": 90,
+  "status": "READY",
+  "files_allowed": ["tools/agent/queue.json"],
+  "files_reference": ["docs/CHECKLIST_2Y.md", "tools/agent/schemas/task.schema.json"],
+  "acceptance": [
+    "queue.json is a valid JSON array of task objects",
+    "Every object validates against task.schema.json",
+    "Q1.B tasks have priority 90",
+    "Q1.C tasks have priority 90",
+    "Q1.D tasks have priority 80",
+    "Q1.E tasks have priority 70",
+    "Q1.F tasks have priority 60",
+    "Q1.G tasks have priority 60",
+    "Q1.H tasks have priority 50",
+    "Q1.I tasks have priority 40",
+    "Q1.J tasks have priority 30",
+    "All tasks have status READY"
+  ],
+  "checklist_items": ["q1-queue-seed"],
+  "intentionally_changed_views": [],
+  "max_loc": 150,
+  "max_files": 1,
+  "needs_split": false,
+  "created_at": "2026-04-18T12:00:00Z",
+  "updated_at": "2026-04-18T12:00:00Z"
+}

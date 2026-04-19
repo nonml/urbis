@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "tools/agent/schemas/state.schema.json",
+  "title": "Noctune Agent State",
+  "description": "Cross-session state persisted by the runner. Read at BOOT, written at each phase transition.",
+  "type": "object",
+  "required": ["phase", "current_id"],
+  "properties": {
+    "phase": {
+      "type": "string",
+      "enum": ["idle", "in_progress"],
+      "description": "Current session phase. 'idle' means no task is running."
+    },
+    "current_id": {
+      "type": ["string", "null"],
+      "description": "ID of the task currently being executed, or null if idle."
+    },
+    "plan": {
+      "type": ["string", "null"],
+      "description": "5-line plan written during PLAN phase. Null if not yet planned."
+    },
+    "started_at": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO 8601 timestamp when the task started. Used for timeout detection."
+    },
+    "retry_count": {
+      "type": "integer",
+      "description": "Number of gate retry attempts consumed for the current task.",
+      "minimum": 0,
+      "default": 0
+    }
+  },
+  "additionalProperties": false
+}

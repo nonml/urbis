@@ -1,0 +1,7 @@
+{
+  "type": "chore",
+  "area": "agent",
+  "summary": "bootstrap Q1.A — agent dir, schemas, queue seed",
+  "details": "Created tools/agent/ directory with README, schemas (task, changelog, state), prompt templates, template placeholders, baseline/log/pending/incident/approval directories, queue.json seeded with Q1.B–Q1.J tasks, and state.json. Updated .gitignore for agent runtime artifacts. Ticked all Q1.A checklist items.",
+  "task": "q1a-bootstrap"
+}
