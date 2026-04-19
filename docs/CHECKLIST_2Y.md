@@ -34,7 +34,7 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 - [x] `q1-queue-schema-tests` unit tests for queue read/write/round-trip
 - [ ] `q1-queue-seed` seed `queue.json` with Q1 tasks listed in this checklist
 - [x] `q1-queue-priority-sort` ensure picker returns highest-priority READY first
-- [ ] `q1-state-resume` state-machine resume after mid-task crash (test forces kill)
+- [x] `q1-state-resume` state-machine resume after mid-task crash (test forces kill)
 - [ ] `q1-state-timeout` state-machine timeout if `in_progress` > 30 min (clears state)
 
 ### Q1.C — Runner

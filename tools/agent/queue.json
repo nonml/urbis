@@ -70,8 +70,8 @@
     "max_files": 1,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-19T10:38:00Z",
-    "head": "c00254b"
+    "updated_at": "2026-04-19T10:47:00Z",
+    "head": "0134577"
   },
   {
     "id": "q1b-state-resume",
@@ -79,7 +79,7 @@
     "title": "state-machine resume after mid-task crash",
     "description": "Write a test that forces a kill mid-task and verifies the runner resumes the same task on next invocation.",
     "priority": 90,
-    "status": "READY",
+    "status": "done",
     "files_allowed": ["tools/agent/state.json", "tools/agent/runner.mjs"],
     "files_reference": ["tools/agent/schemas/state.schema.json"],
     "acceptance": [
@@ -93,7 +93,8 @@
     "max_files": 2,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-18T12:00:00Z"
+    "updated_at": "2026-04-19T10:57:00Z",
+    "head": "PLACEHOLDER_SHA"
   },
   {
     "id": "q1b-state-timeout",
