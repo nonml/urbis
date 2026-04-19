@@ -46,7 +46,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q1.H — Playwright Smoke Suite (acceptance baseline for the gate)
 
 - [x] `q1-pw-load-game` game loads and reaches main menu < 10s
-- [ ] `q1-pw-new-game` start new game, player spawns, HUD renders
+- [x] `q1-pw-new-game` start new game, player spawns, HUD renders
 - [ ] `q1-pw-walk` WASD moves the player ≥ 5 tiles
 - [ ] `q1-pw-drive` enter a car, drive 50m, exit
 - [ ] `q1-pw-fire-weapon` equip pistol, fire, impact registers
