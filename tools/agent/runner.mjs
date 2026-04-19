@@ -1,0 +1,171 @@
+import { readQueue, writeQueue, readState, writeState, pickNextReady, updateTask } from './queue_io.mjs';
+import { runGate, formatGateError } from './gate.mjs';
+import { renderPrompt, renderFixPrompt } from './prompt_render.mjs';
+import { callModel, modelInfo } from './ollama.mjs';
+import { extractDiff, applyDiff, revertWorkingTree, assertDiffWithinAllowed, gitCommit, currentHead } from './diff.mjs';
+import { tickChecklistItems } from './checklist.mjs';
+import { writeFileSync, mkdirSync, existsSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const LOGS_DIR = join(HERE, 'logs');
+const PENDING_DIR = join(HERE, 'pending_changes');
+const MAX_RETRIES = 2;
+
+function ts() { return new Date().toISOString().replace(/[:.]/g, '-'); }
+
+function logTranscript(task, entries) {
+  if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true });
+  const path = join(LOGS_DIR, `${ts()}-${task?.id || 'maintenance'}.md`);
+  writeFileSync(path, entries.map((e) => `## ${e.phase}\n${e.body}\n`).join('\n'));
+  return path;
+}
+
+function writeChangelogSnippet(task, diffLen) {
+  if (!existsSync(PENDING_DIR)) mkdirSync(PENDING_DIR, { recursive: true });
+  const snippet = `type: ${task.type}
+area: ${task.area || 'agent'}
+summary: ${task.title}
+task: ${task.id}
+loc_changed: ${diffLen}
+`;
+  writeFileSync(join(PENDING_DIR, `${task.id}.md`), snippet);
+}
+
+function commitMessage(task, tickedIds) {
+  return `${task.type}(${task.area || 'agent'}): ${task.title}
+
+Why: ${task.description || task.title}
+Task: ${task.id}
+Checklist: ${tickedIds.join(', ') || '(none)'}
+
+Co-Authored-By: local-agent-27b <agent@noctune.local>`;
+}
+
+export async function runOnce() {
+  const transcript = [{ phase: 'boot', body: JSON.stringify(modelInfo(), null, 2) }];
+  let queue = readQueue();
+  let state = readState();
+
+  let task = state.phase === 'in_progress'
+    ? queue.find((t) => t.id === state.current_id)
+    : pickNextReady(queue);
+
+  if (!task) {
+    transcript.push({ phase: 'idle', body: 'no READY tasks — sleeping' });
+    logTranscript(null, transcript);
+    return { status: 'idle' };
+  }
+
+  transcript.push({ phase: 'triage', body: `picked ${task.id} (priority ${task.priority})` });
+  writeState({ phase: 'in_progress', current_id: task.id, plan: null, started_at: new Date().toISOString(), retry_count: 0 });
+  queue = updateTask(queue, task.id, { status: 'in_progress' });
+  writeQueue(queue);
+
+  let prompt;
+  try {
+    prompt = renderPrompt(task);
+  } catch (e) {
+    queue = updateTask(queue, task.id, { status: 'needs_split', last_error: e.message });
+    writeQueue(queue);
+    writeState({ phase: 'idle', current_id: null, plan: null, started_at: null, retry_count: 0 });
+    transcript.push({ phase: 'abort', body: `needs_split: ${e.message}` });
+    logTranscript(task, transcript);
+    return { status: 'needs_split', task: task.id };
+  }
+
+  transcript.push({ phase: 'prompt', body: prompt.slice(0, 2000) + (prompt.length > 2000 ? '\n... [truncated]' : '') });
+  const headBefore = currentHead();
+
+  let lastDiff = '';
+  let gate;
+  let attempt = 0;
+  let applied = false;
+
+  for (; attempt <= MAX_RETRIES; attempt++) {
+    const modelOut = await callModel(attempt === 0 ? prompt : renderFixPrompt(task, formatGateError(gate), lastDiff));
+    transcript.push({ phase: `model-attempt-${attempt}`, body: modelOut.slice(0, 4000) });
+
+    const ex = extractDiff(modelOut);
+    if (ex.abort) {
+      queue = updateTask(queue, task.id, { status: 'needs_split', last_error: 'model ABORT_NEEDS_SPLIT' });
+      writeQueue(queue);
+      writeState({ phase: 'idle', current_id: null, plan: null, started_at: null, retry_count: 0 });
+      transcript.push({ phase: 'abort', body: 'ABORT_NEEDS_SPLIT' });
+      logTranscript(task, transcript);
+      return { status: 'needs_split', task: task.id };
+    }
+    if (ex.error) {
+      transcript.push({ phase: 'bad-diff', body: `${ex.error}: ${ex.raw}` });
+      continue;
+    }
+
+    try {
+      assertDiffWithinAllowed(ex.diff, task.files_allowed || []);
+    } catch (e) {
+      transcript.push({ phase: 'out-of-bounds', body: e.message });
+      continue;
+    }
+
+    const ap = applyDiff(ex.diff);
+    if (!ap.ok) {
+      transcript.push({ phase: 'apply-fail', body: ap.error });
+      continue;
+    }
+
+    lastDiff = ex.diff;
+    applied = true;
+    gate = runGate();
+    transcript.push({ phase: `gate-attempt-${attempt}`, body: gate.ok ? 'PASS' : formatGateError(gate) });
+
+    if (gate.ok) break;
+    revertWorkingTree();
+  }
+
+  if (!applied || !gate?.ok) {
+    revertWorkingTree();
+    queue = updateTask(queue, task.id, { status: 'needs_rework', last_error: 'gate failed after retries' });
+    writeQueue(queue);
+    writeState({ phase: 'idle', current_id: null, plan: null, started_at: null, retry_count: 0 });
+    transcript.push({ phase: 'revert', body: 'all attempts exhausted' });
+    logTranscript(task, transcript);
+    return { status: 'needs_rework', task: task.id };
+  }
+
+  const diffLen = lastDiff.split('\n').length;
+  writeChangelogSnippet(task, diffLen);
+  const tickedIds = tickChecklistItems(task.checklist_items || []);
+
+  const filesToCommit = [...(task.files_allowed || []), `tools/agent/pending_changes/${task.id}.md`];
+  if (tickedIds.length) filesToCommit.push('docs/CHECKLIST_2Y.md');
+
+  try {
+    gitCommit(commitMessage(task, tickedIds), filesToCommit);
+  } catch (e) {
+    revertWorkingTree();
+    queue = updateTask(queue, task.id, { status: 'needs_rework', last_error: `commit failed: ${e.message}` });
+    writeQueue(queue);
+    writeState({ phase: 'idle', current_id: null, plan: null, started_at: null, retry_count: 0 });
+    transcript.push({ phase: 'commit-fail', body: e.message });
+    logTranscript(task, transcript);
+    return { status: 'needs_rework', task: task.id };
+  }
+
+  queue = updateTask(queue, task.id, { status: 'done', head: currentHead() });
+  writeQueue(queue);
+  writeState({ phase: 'idle', current_id: null, plan: null, started_at: null, retry_count: 0 });
+  transcript.push({ phase: 'commit', body: `HEAD ${headBefore} -> ${currentHead()}; ticked: ${tickedIds.join(', ')}` });
+  logTranscript(task, transcript);
+  return { status: 'done', task: task.id, ticked: tickedIds };
+}
+
+if (import.meta.url === `file://${process.argv[1].replace(/\\/g, '/')}`) {
+  runOnce().then((r) => {
+    console.log('runOnce result:', r);
+    process.exit(0);
+  }).catch((e) => {
+    console.error('runner error:', e);
+    process.exit(1);
+  });
+}
