@@ -1,7 +1,0 @@
-{
-  "phase": "in_progress",
-  "current_id": "q1b-queue-seed",
-  "plan": "1. Read CHECKLIST_2Y.md for Q1.B–Q1.J task list\n2. Map each checklist item to a task object\n3. Assign priorities per ROADMAP spec\n4. Write queue.json\n5. Validate against task.schema.json",
-  "started_at": "2026-04-18T12:30:00Z",
-  "retry_count": 0
-}
