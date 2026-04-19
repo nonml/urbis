@@ -90,8 +90,8 @@ export const DEFAULT_LIGHTING_CONFIG = {
  * @param {Object} config - Configuration options
  * @returns {LightingManager} The lighting manager instance
  */
-export function createLightingManager(scene, renderer, config = {}) {
-    return new LightingManager(scene, renderer, config);
+export function createLightingManager(scene, renderer, config = {}, rng) {
+    return new LightingManager(scene, renderer, config, rng);
 }
 
 /**
@@ -99,10 +99,11 @@ export function createLightingManager(scene, renderer, config = {}) {
  * Handles lighting presets, transitions, and fog effects
  */
 export class LightingManager {
-    constructor(scene, renderer, config = {}) {
+    constructor(scene, renderer, config = {}, rng) {
         this.scene = scene;
         this.renderer = renderer;
         this.config = { ...DEFAULT_LIGHTING_CONFIG, ...config };
+        this._rng = rng || null;
         
         // Current lighting state
         this.currentPhase = 'night';
@@ -149,9 +150,9 @@ export class LightingManager {
             
             for (let i = 0; i < starCount * 3; i += 3) {
                 // Distribute stars in a hemisphere above the scene
-                const theta = Math.random() * Math.PI * 2;
-                const phi = Math.random() * Math.PI / 2;
-                const radius = 100 + Math.random() * 50;
+                const theta = (this._rng?.next() ?? 0.5) * Math.PI * 2;
+                const phi = (this._rng?.next() ?? 0.5) * Math.PI / 2;
+                const radius = 100 + (this._rng?.next() ?? 0.5) * 50;
                 
                 positions[i] = radius * Math.sin(phi) * Math.cos(theta);
                 positions[i + 1] = radius * Math.cos(phi);

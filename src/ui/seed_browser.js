@@ -50,7 +50,7 @@ export class SeedBrowserUI {
     }
 
     handleNewSeed() {
-        const seed = this.game?.rng?.int?.(1, 2147483647) ?? Math.floor(Math.random() * 2147483647);
+        const seed = this.game?.rng?.int?.(1, 2147483647) ?? Math.floor(this.game.rng.next() * 2147483647);
         this.game.restart?.({ seed });
         this.hide();
     }

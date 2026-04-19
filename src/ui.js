@@ -850,7 +850,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                             const am = this.audioManager;
                             if (am?.context && am.isInitialized) {
                                 if (!this._vehicleAudio) {
-                                    this._vehicleAudio = new VehicleAudio(am.context, am.masterGain);
+                                    this._vehicleAudio = new VehicleAudio(am.context, am.masterGain, this.game.rng);
                                 }
                                 this._vehicleAudio.start();
                             }

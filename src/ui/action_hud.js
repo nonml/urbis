@@ -734,7 +734,7 @@ export class ActionHUD {
                 nameEl.textContent = name;
                 const rows = card.querySelectorAll('.ahud-profile-row');
                 const occupation = c.occupation || c.job || 'Unemployed';
-                const income = c.income ?? Math.floor(1000 + Math.random() * 5000);
+                const income = c.income ?? Math.floor(1000 + this.game.rng.next() * 5000);
                 const incomeClass = income > 4000 ? 'high' : income > 2000 ? 'mid' : 'low';
                 const happiness = c.happiness ?? 50;
 

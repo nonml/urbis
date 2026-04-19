@@ -2464,10 +2464,10 @@ export class Renderer3D {
         this._citizenAnimTimes = [];
         for (let i = 0; i < n; i++) {
             this._citizenAnimTimes.push({
-                phase: Math.random() * Math.PI * 2,
-                speed: 2 + Math.random() * 2,
-                amplitude: 0.03 + Math.random() * 0.02,
-                wobblePhase: Math.random() * Math.PI * 2,
+                phase: rand01() * Math.PI * 2,
+                speed: 2 + rand01() * 2,
+                amplitude: 0.03 + rand01() * 0.02,
+                wobblePhase: rand01() * Math.PI * 2,
             });
         }
 
@@ -2901,10 +2901,10 @@ export class Renderer3D {
             if (!this._rainGroup) {
                 const positions = new Float32Array(RAIN_COUNT * 6); // line segments: start+end per drop
                 for (let i = 0; i < RAIN_COUNT; i++) {
-                    const bx = (Math.random() - 0.5) * 40;
-                    const by = Math.random() * 12;
-                    const bz = (Math.random() - 0.5) * 40;
-                    const streakLen = 0.15 + Math.random() * 0.2;
+                    const bx = (rand01() - 0.5) * 40;
+                    const by = rand01() * 12;
+                    const bz = (rand01() - 0.5) * 40;
+                    const streakLen = 0.15 + rand01() * 0.2;
                     const j = i * 6;
                     positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
                     positions[j + 3] = bx; positions[j + 4] = by - streakLen; positions[j + 5] = bz;
@@ -2920,7 +2920,7 @@ export class Renderer3D {
                 this._rainGroup = new THREE.LineSegments(geom, mat);
                 this._rainDrops = positions;
                 this._rainStreakLens = new Float32Array(RAIN_COUNT);
-                for (let i = 0; i < RAIN_COUNT; i++) this._rainStreakLens[i] = 0.15 + Math.random() * 0.2;
+                for (let i = 0; i < RAIN_COUNT; i++) this._rainStreakLens[i] = 0.15 + rand01() * 0.2;
                 this.scene.add(this._rainGroup);
             }
 
@@ -2941,9 +2941,9 @@ export class Renderer3D {
                 positions[j + 2] += windZ;
                 positions[j + 5] += windZ;
                 if (positions[j + 4] < 0) {
-                    const bx = (Math.random() - 0.5) * 40;
-                    const by = 10 + Math.random() * 3;
-                    const bz = (Math.random() - 0.5) * 40;
+                    const bx = (rand01() - 0.5) * 40;
+                    const by = 10 + rand01() * 3;
+                    const bz = (rand01() - 0.5) * 40;
                     const len = this._rainStreakLens[i];
                     positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
                     positions[j + 3] = bx; positions[j + 4] = by - len; positions[j + 5] = bz;
@@ -2959,9 +2959,9 @@ export class Renderer3D {
             if (!this._snowGroup) {
                 const positions = new Float32Array(SNOW_COUNT * 3);
                 for (let i = 0; i < SNOW_COUNT; i++) {
-                    positions[i * 3] = (Math.random() - 0.5) * 40;
-                    positions[i * 3 + 1] = Math.random() * 12;
-                    positions[i * 3 + 2] = (Math.random() - 0.5) * 40;
+                    positions[i * 3] = (rand01() - 0.5) * 40;
+                    positions[i * 3 + 1] = rand01() * 12;
+                    positions[i * 3 + 2] = (rand01() - 0.5) * 40;
                 }
                 const geom = new THREE.BufferGeometry();
                 geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
@@ -2990,9 +2990,9 @@ export class Renderer3D {
                 positions[j + 1] -= fallSpeed;
                 positions[j + 2] += Math.cos(t + i * 1.1) * 0.003 + Math.sin(windDir) * windSpeed * 0.005;
                 if (positions[j + 1] < 0) {
-                    positions[j] = (Math.random() - 0.5) * 40;
-                    positions[j + 1] = 10 + Math.random() * 3;
-                    positions[j + 2] = (Math.random() - 0.5) * 40;
+                    positions[j] = (rand01() - 0.5) * 40;
+                    positions[j + 1] = 10 + rand01() * 3;
+                    positions[j + 2] = (rand01() - 0.5) * 40;
                 }
             }
             this._snowGroup.geometry.attributes.position.needsUpdate = true;
@@ -3004,10 +3004,10 @@ export class Renderer3D {
             if (!this._lightningTimer) this._lightningTimer = 5000;
             this._lightningTimer -= dt;
             if (this._lightningTimer <= 0) {
-                this._lightningTimer = 2000 + Math.random() * 7000;
+                this._lightningTimer = 2000 + rand01() * 7000;
                 this._lightningFlash = 250;
                 // Screen shake for close strikes
-                if (Math.random() < 0.4) {
+                if (rand01() < 0.4) {
                     this.shakeCamera(0.8, 400);
                 }
             }
@@ -3251,9 +3251,9 @@ export class Renderer3D {
                 const currentShake = this.shakeIntensity * this.shakeDecay;
                 
                 // Generate random shake offset with severity-based intensity
-                this.shakeOffset.x = (Math.random() - 0.5) * currentShake;
-                this.shakeOffset.y = (Math.random() - 0.5) * currentShake * 0.5; // Less vertical shake
-                this.shakeOffset.z = (Math.random() - 0.5) * currentShake;
+                this.shakeOffset.x = (rand01() - 0.5) * currentShake;
+                this.shakeOffset.y = (rand01() - 0.5) * currentShake * 0.5; // Less vertical shake
+                this.shakeOffset.z = (rand01() - 0.5) * currentShake;
             }
         } else {
             this.shakeOffset.set(0, 0, 0);

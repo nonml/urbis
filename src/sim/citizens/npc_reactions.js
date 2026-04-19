@@ -119,7 +119,7 @@ export class NPCReactionSystem {
             }
 
             // Report to police (adds heat)
-            if (!reaction.reported && reaction.state === 'fleeing' && Math.random() < REPORT_CHANCE) {
+            if (!reaction.reported && reaction.state === 'fleeing' && this.game.rng.next() < REPORT_CHANCE) {
                 reaction.reported = true;
                 if (this.game.heatSystem) {
                     this.game.heatSystem.addHeat(3);

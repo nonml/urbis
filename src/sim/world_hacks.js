@@ -331,8 +331,8 @@ export class WorldHackEffects {
         const profile = {
             name: citizen.name || `Citizen #${citizenId}`,
             occupation: citizen.job || citizen.occupation || 'Unemployed',
-            income: citizen.income ?? Math.floor(Math.random() * 5000) + 1000,
-            criminalRecord: citizen.criminalRecord || (Math.random() < 0.15 ? 'Petty theft' : 'None'),
+            income: citizen.income ?? Math.floor(this.game.rng.next() * 5000) + 1000,
+            criminalRecord: citizen.criminalRecord || (this.game.rng.next() < 0.15 ? 'Petty theft' : 'None'),
             faction: citizen.faction || 'citizens',
             happiness: citizen.happiness ?? 50,
             traits: citizen.traits || [],
@@ -357,7 +357,7 @@ export class WorldHackEffects {
         const citizen = citizens.find(c => c.id === citizenId);
         if (!citizen) return { ok: false, reason: 'Citizen not found' };
 
-        const stolen = Math.floor(Math.random() * 200) + 50;
+        const stolen = Math.floor(this.game.rng.next() * 200) + 50;
         this.game.state.resources.gold += stolen;
         if (this.game.heatSystem) this.game.heatSystem.addHeat(10);
         this.game.ui?.showMessage?.(`Stole $${stolen} from ${citizen.name || 'citizen'}`, 'success');

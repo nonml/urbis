@@ -4,9 +4,10 @@
  */
 
 export class VehicleAudio {
-    constructor(audioContext, masterGain) {
+    constructor(audioContext, masterGain, rng) {
         this.ctx = audioContext;
         this.masterGain = masterGain;
+        this.rng = rng || null;
         this._running = false;
 
         // Engine nodes
@@ -67,8 +68,9 @@ export class VehicleAudio {
         const bufferSize = this.ctx.sampleRate * 2;
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
+        const rngNext = this.rng ? () => this.rng.next() : undefined;
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = Math.random() * 2 - 1;
+            data[i] = (rngNext ? rngNext() : (Math.random?.() ?? 0.5)) * 2 - 1;
         }
 
         this._tireNoise = this.ctx.createBufferSource();
@@ -182,8 +184,10 @@ export class VehicleAudio {
         const bufferSize = Math.floor(this.ctx.sampleRate * 0.15);
         const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
         const data = buffer.getChannelData(0);
+        const rngNext = this.rng ? () => this.rng.next() : undefined;
         for (let i = 0; i < bufferSize; i++) {
-            data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+            const rand = rngNext ? rngNext() : (Math.random?.() ?? 0.5);
+            data[i] = (rand * 2 - 1) * (1 - i / bufferSize);
         }
 
         const source = this.ctx.createBufferSource();

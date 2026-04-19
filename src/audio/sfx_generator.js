@@ -6,9 +6,10 @@
 import { SFX, SFX_PARAMS } from '../constants.js';
 
 export class SFXGenerator {
-    constructor(audioContext, masterGainNode) {
+    constructor(audioContext, masterGainNode, rng) {
         this.context = audioContext;
         this.masterGain = masterGainNode || null;
+        this.rng = rng || null;
         this.internalGain = null;
         this._init();
     }
@@ -64,8 +65,8 @@ export class SFXGenerator {
         // Base frequency with optional pitch variation
         const baseFreq = params.frequency;
         const pitchVar = params.pitchVariation || 0;
-        // NOTE: Math.random() is intentional here for audio synthesis - adds natural pitch variation
-        const actualFreq = baseFreq * (1 + (Math.random() * 2 - 1) * pitchVar);
+        const rngVal = this.rng ? this.rng.next() : (Math.random?.() ?? 0.5);
+        const actualFreq = baseFreq * (1 + (rngVal * 2 - 1) * pitchVar);
         
         osc.frequency.setValueAtTime(actualFreq, time);
         
@@ -131,21 +132,21 @@ export class SFXGenerator {
         
         // Generate noise based on type
         const noiseType = params.noiseType || 'white';
-        // NOTE: Math.random() is intentional here for audio synthesis - generates noise buffers
+        const rngNext = this.rng ? () => this.rng.next() : undefined;
         for (let i = 0; i < bufferSize; i++) {
+            const rand = rngNext ? rngNext() : (Math.random?.() ?? 0.5);
             if (noiseType === 'white') {
-                data[i] = (Math.random() * 2 - 1);
+                data[i] = (rand * 2 - 1);
             } else if (noiseType === 'pink') {
                 // Simple pink noise approximation
-                const white = Math.random() * 2 - 1;
-                data[i] = (lastPink + white) / 2;
+                data[i] = (lastPink + rand) / 2;
                 lastPink = data[i];
                 data[i] *= 1.01; // Normalize
             } else if (noiseType === 'burst') {
                 // Burst noise that decays
-                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                data[i] = (rand * 2 - 1) * (1 - i / bufferSize);
             } else {
-                data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+                data[i] = (rand * 2 - 1) * (1 - i / bufferSize);
             }
         }
         
@@ -290,9 +291,9 @@ let lastPink = 0;
  * Singleton accessor
  */
 let _instance = null;
-export function createSFXGenerator(audioContext, masterGainNode = null) {
+export function createSFXGenerator(audioContext, masterGainNode = null, rng) {
     if (!_instance && audioContext) {
-        _instance = new SFXGenerator(audioContext, masterGainNode);
+        _instance = new SFXGenerator(audioContext, masterGainNode, rng);
     }
     return _instance;
 }

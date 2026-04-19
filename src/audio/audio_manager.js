@@ -132,7 +132,7 @@ export class AudioManager {
             this.mixer = createAudioMixer(this.context, this.masterGain);
 
             // Initialize procedural SFX generator
-            this.sfxGenerator = createSFXGenerator(this.context, this.uiGain);
+            this.sfxGenerator = createSFXGenerator(this.context, this.uiGain, this.game.rng);
 
         } catch (e) {
             console.warn('Audio initialization failed:', e);

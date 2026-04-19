@@ -143,8 +143,8 @@ function checkTODOs(file, content) {
  * Check for Math.random() usage
  */
 function checkMathRandom(file, content) {
-    // Skip dev files
-    if (file.includes('/dev/') || file.includes('/test/')) {
+    // Skip dev/test files (handle both Unix and Windows path separators)
+    if (file.includes('/dev/') || file.includes('\\dev\\') || file.includes('/test/') || file.includes('\\test\\')) {
         return;
     }
 

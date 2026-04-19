@@ -115,7 +115,7 @@ export class GrowthSimulator {
                 }
             } else if (lot.stage === GROWTH_STAGE.CONSTRUCTION) {
                 // Construction takes 5-10 ticks
-                if (lot.ticksInStage > 5 + Math.floor(Math.random() * 5)) {
+                if (lot.ticksInStage > 5 + Math.floor(this.game.rng.next() * 5)) {
                     lot.stage = GROWTH_STAGE.SMALL;
                     lot.ticksInStage = 0;
                     // Spawn building
@@ -180,7 +180,7 @@ export class GrowthSimulator {
             type: buildingType,
             x,
             y,
-            rotation: Math.floor(Math.random() * 4),
+            rotation: Math.floor(this.game.rng.next() * 4),
         });
 
         if (result?.ok && result.building) {

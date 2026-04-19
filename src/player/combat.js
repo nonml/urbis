@@ -148,7 +148,7 @@ export class CombatSystem {
 
         for (let p = 0; p < pellets; p++) {
             // Apply random spread per pellet
-            const angle = baseAngle + (Math.random() - 0.5) * spread;
+            const angle = baseAngle + (this.game.rng.next() - 0.5) * spread;
             const aimX = Math.sin(angle);
             const aimY = -Math.cos(angle);
 

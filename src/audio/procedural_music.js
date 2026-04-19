@@ -205,7 +205,7 @@ export class ProceduralMusicEngine {
         new Tone.Sequence((time) => {
             if (!this.running) return;
             // Skip some notes for breathing room
-            if (Math.random() < 0.55) { melStep++; return; } // sparser for breathing room
+            if (this.game?.rng?.next() < 0.55) { melStep++; return; } // sparser for breathing room
             const degree = melPattern[melStep % melPattern.length];
             const octave = melStep < 8 ? 1 : 2;
             const freq = noteInScale(degree, octave, this._currentScale);

@@ -172,7 +172,7 @@ export class HackNetwork {
         // Initialize pulse times
         this.pulseTimes.clear();
         this.nodes.forEach((_, i) => {
-            this.pulseTimes.set(i, Math.random() * Math.PI * 2);
+            this.pulseTimes.set(i, this.game.rng.next() * Math.PI * 2);
         });
         
         // Center camera
@@ -200,7 +200,7 @@ export class HackNetwork {
         const angleStep = (Math.PI * 2) / Math.max(1, n);
         
         this.nodes.forEach((node, i) => {
-            const angle = i * angleStep + (Math.random() - 0.5) * 0.3;
+            const angle = i * angleStep + (this.game.rng.next() - 0.5) * 0.3;
             node.x = Math.cos(angle) * radius;
             node.y = Math.sin(angle) * radius;
         });
@@ -521,7 +521,7 @@ export class HackNetwork {
                     const rival = game.state.rival;
                     if (rival) {
                         game.intelSystem?.generateEntry?.('rival_location', {
-                            text: `Rival network traced to sector ${Math.floor(Math.random() * 9) + 1}`,
+                            text: `Rival network traced to sector ${Math.floor(game.rng.next() * 9) + 1}`,
                             source: 'cctv_tap', tier: 2,
                         });
                     }
@@ -547,7 +547,7 @@ export class HackNetwork {
                 label: '💾 Data Exfil',
                 description: 'Extracts financial data — gain 25-80 gold',
                 apply: (game) => {
-                    const bonus = 25 + Math.floor(Math.random() * 56);
+                    const bonus = 25 + Math.floor(game.rng.next() * 56);
                     game.resources?.add?.({ gold: bonus });
                     if (game.ui) game.ui.showMessage(`💾 Exfiltrated data sold for +${bonus} gold`, 'success');
                 }
