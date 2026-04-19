@@ -19,19 +19,19 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 
 ### Q1.A — Agent Directory and Schemas
 
-- [ ] `q1-agent-dir` create `tools/agent/` directory with README describing each subfile
-- [ ] `q1-agent-taskschema` write `tools/agent/schemas/task.schema.json` per ROADMAP §I.3
-- [ ] `q1-agent-changelogschema` write `tools/agent/schemas/changelog.schema.json`
-- [ ] `q1-agent-stateschema` write `tools/agent/schemas/state.schema.json`
-- [ ] `q1-agent-prompts-dir` create `tools/agent/prompts/` with one template per task type
-- [ ] `q1-agent-templates-dir` create empty `tools/agent/templates/` placeholders for Q5 content types
-- [ ] `q1-agent-baselines-dir` create `tools/agent/baselines/` with .gitkeep
-- [ ] `q1-agent-logs-dir` create `tools/agent/logs/` with gitignore for old logs
-- [ ] `q1-agent-pending-dir` create `tools/agent/pending_changes/` with gitignore
+- [x] `q1-agent-dir` create `tools/agent/` directory with README describing each subfile
+- [x] `q1-agent-taskschema` write `tools/agent/schemas/task.schema.json` per ROADMAP §I.3
+- [x] `q1-agent-changelogschema` write `tools/agent/schemas/changelog.schema.json`
+- [x] `q1-agent-stateschema` write `tools/agent/schemas/state.schema.json`
+- [x] `q1-agent-prompts-dir` create `tools/agent/prompts/` with one template per task type
+- [x] `q1-agent-templates-dir` create empty `tools/agent/templates/` placeholders for Q5 content types
+- [x] `q1-agent-baselines-dir` create `tools/agent/baselines/` with .gitkeep
+- [x] `q1-agent-logs-dir` create `tools/agent/logs/` with gitignore for old logs
+- [x] `q1-agent-pending-dir` create `tools/agent/pending_changes/` with gitignore
 
 ### Q1.B — Queue and State IO
 
-- [ ] `q1-queue-schema-tests` unit tests for queue read/write/round-trip
+- [x] `q1-queue-schema-tests` unit tests for queue read/write/round-trip
 - [ ] `q1-queue-seed` seed `queue.json` with Q1 tasks listed in this checklist
 - [ ] `q1-queue-priority-sort` ensure picker returns highest-priority READY first
 - [ ] `q1-state-resume` state-machine resume after mid-task crash (test forces kill)
