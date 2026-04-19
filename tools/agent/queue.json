@@ -94,7 +94,7 @@
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
     "updated_at": "2026-04-19T10:57:00Z",
-    "head": "PLACEHOLDER_SHA"
+    "head": "d26aa85"
   },
   {
     "id": "q1b-state-timeout",
@@ -102,7 +102,7 @@
     "title": "state-machine timeout if in_progress > 30 min",
     "description": "Write a test verifying the runner clears state if in_progress exceeds 30 minutes.",
     "priority": 90,
-    "status": "READY",
+    "status": "needs_split",
     "files_allowed": ["tools/agent/runner.mjs"],
     "files_reference": ["tools/agent/schemas/state.schema.json"],
     "acceptance": [
@@ -114,9 +114,9 @@
     "intentionally_changed_views": [],
     "max_loc": 100,
     "max_files": 1,
-    "needs_split": false,
+    "needs_split": true,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-18T12:00:00Z"
+    "updated_at": "2026-04-19T11:06:00Z"
   },
   {
     "id": "q1c-runner-boot",
@@ -124,7 +124,7 @@
     "title": "implement BOOT phase of runner state machine",
     "description": "Implement the BOOT phase: read manual, checklist, queue, state, and git status.",
     "priority": 90,
-    "status": "READY",
+    "status": "done",
     "files_allowed": ["tools/agent/runner.mjs"],
     "files_reference": ["docs/ROADMAP_2Y.md", "docs/CHECKLIST_2Y.md"],
     "acceptance": [
@@ -138,7 +138,8 @@
     "max_files": 1,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-18T12:00:00Z"
+    "updated_at": "2026-04-19T11:12:00Z",
+    "head": "d26aa85"
   },
   {
     "id": "q1c-runner-triage",

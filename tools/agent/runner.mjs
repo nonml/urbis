@@ -13,7 +13,45 @@ const LOGS_DIR = join(HERE, 'logs');
 const PENDING_DIR = join(HERE, 'pending_changes');
 const MAX_RETRIES = 2;
 
+// BOOT inputs
+const MANUAL_PATH = join(HERE, '..', '..', 'docs', 'ROADMAP_2Y.md');
+const CHECKLIST_PATH = join(HERE, '..', '..', 'docs', 'CHECKLIST_2Y.md');
+
 function ts() { return new Date().toISOString().replace(/[:.]/g, '-'); }
+
+/**
+ * BOOT phase: read manual, checklist, queue, state, and git status.
+ * Throws if any required file is missing.
+ * Returns an object with all five inputs and their sizes.
+ */
+export function boot() {
+  const inputs = {};
+
+  // 1. Read manual (ROADMAP_2Y.md)
+  if (!existsSync(MANUAL_PATH)) {
+    throw new Error(`BOOT failed: manual not found at ${MANUAL_PATH}`);
+  }
+  inputs.manual = readFileSync(MANUAL_PATH, 'utf8');
+  inputs.manual_size = inputs.manual.length;
+
+  // 2. Read checklist (CHECKLIST_2Y.md)
+  if (!existsSync(CHECKLIST_PATH)) {
+    throw new Error(`BOOT failed: checklist not found at ${CHECKLIST_PATH}`);
+  }
+  inputs.checklist = readFileSync(CHECKLIST_PATH, 'utf8');
+  inputs.checklist_size = inputs.checklist.length;
+
+  // 3. Read queue (queue.json)
+  inputs.queue = readQueue();
+
+  // 4. Read state (state.json)
+  inputs.state = readState();
+
+  // 5. Read git status (current HEAD)
+  inputs.git_head = currentHead();
+
+  return inputs;
+}
 
 function logTranscript(task, entries) {
   if (!existsSync(LOGS_DIR)) mkdirSync(LOGS_DIR, { recursive: true });
@@ -40,7 +78,7 @@ Why: ${task.description || task.title}
 Task: ${task.id}
 Checklist: ${tickedIds.join(', ') || '(none)'}
 
-Co-Authored-By: local-agent-27b <agent@noctune.local>`;
+Co-Authored-By: local-agent-World <agent@noctune.local>`;
 }
 
 export async function runOnce() {
