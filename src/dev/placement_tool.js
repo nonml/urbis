@@ -225,7 +225,7 @@ export class PlacementTool {
      * Generate unique ID
      */
     generateId(prefix) {
-        const suffix = (this.rng?.next() ?? Math.random()).toString(36).substring(2, 8);
+        const suffix = (this.rng?.next() ?? this.game.rngStreams.sim.next()).toString(36).substring(2, 8);
         return `${prefix}_${suffix}`;
     }
 

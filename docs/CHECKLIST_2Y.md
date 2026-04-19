@@ -21,11 +21,11 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 
 Confirm all gate commands pass on the current codebase before any autonomous work begins.
 
-- [ ] `q1-gate-lint` `npm run lint:basic` exits 0
-- [ ] `q1-gate-mathrandom` `npm run check:no-math-random` exits 0
-- [ ] `q1-gate-validate` `npm run validate` exits 0
-- [ ] `q1-gate-tests` `npm test` exits 0 (all unit tests green)
-- [ ] `q1-gate-all-clean` all 4 gate commands pass in a single sequential run
+- [x] `q1-gate-lint` `npm run lint:basic` exits 0
+- [x] `q1-gate-mathrandom` `npm run check:no-math-random` exits 0
+- [x] `q1-gate-validate` `npm run validate` exits 0
+- [x] `q1-gate-tests` `npm test` exits 0 (all unit tests green)
+- [x] `q1-gate-all-clean` all 4 gate commands pass in a single sequential run
 
 ### Q1.B — Roo First Cycle
 
