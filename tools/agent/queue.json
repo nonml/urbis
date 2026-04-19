@@ -19,8 +19,8 @@
     "max_files": 2,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-19T10:04:00Z",
-    "head": "PLACEHOLDER_SHA"
+    "updated_at": "2026-04-19T10:36:00Z",
+    "head": "c00254b"
   },
   {
     "id": "q1b-queue-seed",
@@ -56,7 +56,7 @@
     "title": "ensure picker returns highest-priority READY first",
     "description": "Write a test verifying the queue picker function returns the highest-priority READY task first.",
     "priority": 90,
-    "status": "READY",
+    "status": "done",
     "files_allowed": ["tools/agent/queue_io.mjs"],
     "files_reference": ["tools/agent/queue.json", "tools/agent/schemas/task.schema.json"],
     "acceptance": [
@@ -70,7 +70,8 @@
     "max_files": 1,
     "needs_split": false,
     "created_at": "2026-04-18T12:00:00Z",
-    "updated_at": "2026-04-18T12:00:00Z"
+    "updated_at": "2026-04-19T10:38:00Z",
+    "head": "c00254b"
   },
   {
     "id": "q1b-state-resume",
