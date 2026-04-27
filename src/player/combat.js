@@ -76,6 +76,7 @@ export class CombatSystem {
         this.game = game;
         this.currentWeapon = 'fist';
         this.ammo = { pistol: 12 };
+        this.reserve = { pistol: 48, shotgun: 24, smg: 90 };
         this._lastFireTime = 0;
         this._muzzleFlash = false;
         this._muzzleFlashTimer = 0;
@@ -258,11 +259,10 @@ export class CombatSystem {
         }
     }
 
-    /**
-     * Get current ammo count for HUD
-     */
     getAmmoDisplay() {
-        if (this.weapon.ammo === Infinity) return '\u221E'; // infinity symbol
-        return this.ammo[this.currentWeapon] || 0;
+        if (this.weapon.ammo === Infinity) return '∞';
+        const clip = this.ammo[this.currentWeapon] || 0;
+        const res = this.reserve[this.currentWeapon] || 0;
+        return `${clip} / ${res}`;
     }
 }
