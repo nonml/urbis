@@ -479,6 +479,8 @@ export class VFXTriggerManager {
                         this.fxSystem.showFloatingText(hitPos.x, hitPos.y + 1.5, hitPos.z,
                             `-${dmg}`, 0xff4444, 800);
                     }
+                    // Blood decal quad at NPC feet
+                    this.fxSystem.spawnDecal(hitPos.x, 0.02, hitPos.z, 0x880000, 5000);
                 }
             }
         }
@@ -491,6 +493,7 @@ export class VFXTriggerManager {
                     this.fxSystem.showParticleBurst(hitPos.x, hitPos.y + 0.8, hitPos.z,
                         0xffaa44, 8, 50);
                     this.fxSystem.shakeCamera(3, 120);
+                    this.fxSystem.spawnDecal(hitPos.x, 0.02, hitPos.z, 0x880000, 5000);
                 }
             }
         }

@@ -2480,6 +2480,42 @@ export class Renderer3D {
         }
     }
 
+    _renderDecals() {
+        const decals = this.fxSystem?.getDecals();
+        if (!decals?.length) {
+            if (this._decalMeshes?.length) {
+                for (const m of this._decalMeshes) m.visible = false;
+            }
+            return;
+        }
+        if (!this._decalMeshes) this._decalMeshes = [];
+        if (!this._decalGeo) {
+            this._decalGeo = new THREE.PlaneGeometry(0.15, 0.15);
+            this._decalGeo.rotateX(-Math.PI / 2);
+        }
+        for (let i = 0; i < decals.length; i++) {
+            let mesh = this._decalMeshes[i];
+            if (!mesh) {
+                const mat = new THREE.MeshBasicMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    side: THREE.DoubleSide,
+                });
+                mesh = new THREE.Mesh(this._decalGeo, mat);
+                this._decalMeshes.push(mesh);
+                this.scene.add(mesh);
+            }
+            const d = decals[i];
+            mesh.position.set(d.x, d.y, d.z);
+            mesh.material.color.setHex(d.color);
+            mesh.material.opacity = 1 - (d.life / d.duration);
+            mesh.visible = true;
+        }
+        for (let i = decals.length; i < this._decalMeshes.length; i++) {
+            this._decalMeshes[i].visible = false;
+        }
+    }
+
     markBuildingsDirty() {
         this._buildingsDirty = true;
     }
@@ -3693,6 +3729,7 @@ export class Renderer3D {
         if (this.fxSystem) {
             this.fxSystem.update();
             this._renderTracers();
+            this._renderDecals();
         }
         
         // Update building spawn flashes (1D)

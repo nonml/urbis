@@ -124,7 +124,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-cb-crosshair` dynamic crosshair sized by spread
 - [x] `q2-cb-hitmarker` 100ms X marker on confirmed hit
 - [x] `q2-cb-damage-numbers` togglable floating numbers
-- [ ] `q2-cb-blood-decal-lite` small decal on NPC hit (quad mesh)
+- [x] `q2-cb-blood-decal-lite` small decal on NPC hit (quad mesh)
 - [ ] `q2-cb-recoil-shake-tuning` per-weapon shake curve
 - [ ] `q2-cb-ammo-hud` ammo count + reserve in HUD
 - [ ] `q2-cb-reload-anim` basic reload animation + time gate

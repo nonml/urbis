@@ -300,6 +300,9 @@ export class FXSystem {
         // Tracers (bullet trails)
         this._tracers = [];
 
+        // Decals (blood splats, etc.)
+        this._decals = [];
+
         // Screen shake
         this.screenShake = new ScreenShake(this.config.screenShake);
         
@@ -440,6 +443,15 @@ export class FXSystem {
         }
     }
 
+    spawnDecal(x, y, z, color, duration) {
+        if (!this.enabled || this.reducedMotion) return;
+        this._decals.push({ x, y, z, color: color || 0x880000, duration: duration || 5000, life: 0 });
+    }
+
+    getDecals() {
+        return this._decals;
+    }
+
     showTracer(sx, sy, sz, ex, ey, ez, color, duration, length) {
         if (!this.enabled || this.reducedMotion) return;
         this._tracers.push({
@@ -503,6 +515,10 @@ export class FXSystem {
         // Update tracers
         for (const t of this._tracers) t.life += dt;
         this._tracers = this._tracers.filter(t => t.life < t.duration);
+
+        // Update decals
+        for (const d of this._decals) d.life += dt;
+        this._decals = this._decals.filter(d => d.life < d.duration);
 
         // Update screen shake
         this.screenShake.update(dt);
