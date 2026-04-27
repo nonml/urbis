@@ -2381,6 +2381,21 @@ export class Renderer3D {
         cap.position.y = 0.79 * s + 0.05;
         group.add(cap);
 
+        // Muzzle flash billboard quad
+        const flashMat = new THREE.MeshBasicMaterial({
+            color: 0xffdd44,
+            transparent: true,
+            opacity: 0.9,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+        });
+        const flashGeo = new THREE.PlaneGeometry(0.15, 0.15);
+        this._muzzleFlashMesh = new THREE.Mesh(flashGeo, flashMat);
+        this._muzzleFlashMesh.position.set(0.12 * s, 0.42 * s + 0.05, -0.18 * s);
+        this._muzzleFlashMesh.visible = false;
+        group.add(this._muzzleFlashMesh);
+
         return group;
     }
 
@@ -2390,6 +2405,15 @@ export class Renderer3D {
         const wx = (p.wx ?? (p.x + 0.5)) - this._mapHalfW;
         const wz = (p.wz ?? (p.y + 0.5)) - this._mapHalfH;
         if (this._player) this._player.position.set(wx, 0.12, wz);
+
+        // Muzzle flash billboard
+        if (this._muzzleFlashMesh) {
+            const flash = this.game.combat?._muzzleFlash === true;
+            this._muzzleFlashMesh.visible = flash;
+            if (flash && this.camera) {
+                this._muzzleFlashMesh.quaternion.copy(this.camera.quaternion);
+            }
+        }
 
         // Move shadow cameras to follow player so shadows stay sharp nearby
         if (this.sunLight?.shadow) {

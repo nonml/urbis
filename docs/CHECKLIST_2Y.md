@@ -118,7 +118,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2.B — Combat Visual Feedback
 
-- [ ] `q2-cb-muzzle-flash-mesh` quad-billboard mesh attached to barrel
+- [x] `q2-cb-muzzle-flash-mesh` quad-billboard mesh attached to barrel
 - [ ] `q2-cb-muzzle-flash-light` brief point-light on fire
 - [ ] `q2-cb-tracer-polish` tracer length/speed tuned per weapon
 - [ ] `q2-cb-crosshair` dynamic crosshair sized by spread
