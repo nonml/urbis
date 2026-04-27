@@ -44,6 +44,16 @@ const TUTORIAL_STEPS = [
         autoAdvance: true
     },
     {
+        id: 'tutorial_complete',
+        title: 'Tutorial Complete',
+        description: 'You know the basics! An objective will appear shortly.',
+        kind: 'outcome',
+        outcomes: [{
+            label: 'Begin',
+            effect: ['gains_clue:tutorial_finished']
+        }]
+    },
+    {
         id: 'move_camera',
         title: 'Explore the City',
         description: 'Use right-click drag to rotate the camera and find a good spot to build.',
@@ -363,6 +373,15 @@ export class TutorialManager {
                 if (Math.sqrt(ddx * ddx + ddz * ddz) >= DRIVE_DISTANCE_THRESHOLD) {
                     this.completeStep();
                 }
+                break;
+            }
+            case 'tutorial_complete': {
+                this.isFirstTime = false;
+                if (this.game?.state?.tutorial) {
+                    this.game.state.tutorial.isFirstRun = false;
+                }
+                this.completeStep();
+                eventBus.emit('tutorial_finished', {});
                 break;
             }
             case 'move_camera':

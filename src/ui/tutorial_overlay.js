@@ -58,6 +58,17 @@ export const TUTORIAL_STEPS = {
             return tm?.completedSteps?.includes('hack_first_node');
         }
     },
+    TUTORIAL_COMPLETE: {
+        id: 'tutorial_complete',
+        title: 'Tutorial Complete!',
+        content: 'You know how to move, drive, and hack. An objective will appear shortly — good luck out there.',
+        target: null,
+        position: 'center',
+        skipable: false,
+        autoAdvance: true,
+        advanceDelay: 4000,
+        isComplete: false
+    },
     WELCOME: {
         id: 'welcome',
         title: 'Welcome to City Builder!',
