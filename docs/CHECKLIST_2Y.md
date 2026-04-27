@@ -139,7 +139,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2.D — Vehicle UX
 
-- [ ] `q2-vh-enter-prompt` "press F to enter" when in range
+- [x] `q2-vh-enter-prompt` "press F to enter" when in range
 - [ ] `q2-vh-enter-fade` 300ms fade on enter/exit
 - [ ] `q2-vh-exit-side` player exits on same side as door faced
 - [ ] `q2-vh-speedo-units` toggle mph/kph in settings
