@@ -472,9 +472,13 @@ export class VFXTriggerManager {
                 if (hitPos) {
                     this.fxSystem.showParticleBurst(hitPos.x, hitPos.y + 0.8, hitPos.z,
                         config.hit.color, config.hit.count, config.hit.speed);
-                    // Damage floating text
-                    this.fxSystem.showFloatingText(hitPos.x, hitPos.y + 1.5, hitPos.z,
-                        'HIT', 0xff4444, 800);
+                    // Damage floating numbers (togglable)
+                    const showNums = this.game?.ui?.settings?.get('showDamageNumbers') !== false;
+                    if (showNums) {
+                        const dmg = data.damage ?? 0;
+                        this.fxSystem.showFloatingText(hitPos.x, hitPos.y + 1.5, hitPos.z,
+                            `-${dmg}`, 0xff4444, 800);
+                    }
                 }
             }
         }

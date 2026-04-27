@@ -223,6 +223,7 @@ export class CombatSystem {
             eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, {
                 x: px, y: py, weapon: this.currentWeapon,
                 hit: hits.length > 0,
+                damage: this.weapon.damage,
                 hits: hits.map(h => ({ x: h.x ?? 0, y: h.y ?? 0 })),
                 targetX, targetY
             });
