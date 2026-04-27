@@ -50,16 +50,16 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q1-pw-walk` WASD moves the player ≥ 5 tiles
 - [x] `q1-pw-drive` enter a car, drive 50m, exit
 - [x] `q1-pw-fire-weapon` equip pistol, fire, impact registers
-- [ ] `q1-pw-hack-node` open hack, select node, complete breach
-- [ ] `q1-pw-build-road` god mode, place road tile
-- [ ] `q1-pw-build-building` god mode, place a residential building
-- [ ] `q1-pw-save` save to slot 1
-- [ ] `q1-pw-load` load slot 1 from menu
-- [ ] `q1-pw-reload` page reload preserves save continuity
-- [ ] `q1-pw-weather-rain` toggle rain, verify effect visible
-- [ ] `q1-pw-daynight-sweep` force night, force day, verify lighting
-- [ ] `q1-pw-minimap-open` open/close minimap
-- [ ] `q1-pw-pause` pause menu opens and closes
+- [x] `q1-pw-hack-node` open hack, select node, complete breach
+- [x] `q1-pw-build-road` god mode, place road tile
+- [x] `q1-pw-build-building` god mode, place a residential building
+- [x] `q1-pw-save` save to slot 1
+- [x] `q1-pw-load` load slot 1 from menu
+- [x] `q1-pw-reload` page reload preserves save continuity
+- [x] `q1-pw-weather-rain` toggle rain, verify effect visible
+- [x] `q1-pw-daynight-sweep` force night, force day, verify lighting
+- [x] `q1-pw-minimap-open` open/close minimap
+- [x] `q1-pw-pause` pause menu opens and closes
 
 ### Q1.I — Screenshot Baselines
 
