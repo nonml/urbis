@@ -86,6 +86,17 @@ export class CombatSystem {
     }
 
     /**
+     * Switch to a specific weapon by key
+     * @param {string} key - Weapon key from WEAPONS
+     */
+    setWeapon(key) {
+        if (WEAPONS[key]) {
+            this.currentWeapon = key;
+            this.game.ui?.showMessage?.(`Equipped: ${this.weapon.name}`, 'normal');
+        }
+    }
+
+    /**
      * Switch to next weapon
      */
     cycleWeapon() {
