@@ -171,8 +171,6 @@ export class TutorialOverlay {
         
         // Show first step
         this.showStep();
-        
-        console.log('[Tutorial] Started');
     }
 
     /**
@@ -512,11 +510,12 @@ export class TutorialOverlay {
         this.isActive = false;
         this.destroy();
         
-        // Mark tutorial as completed in localStorage
-        localStorage.setItem('tutorial_completed', 'true');
-        localStorage.setItem('tutorial_completed_at', Date.now().toString());
-        
-        console.log('[Tutorial] Completed');
+        if (this.game?.state?.tutorial) {
+            this.game.state.tutorial.isFirstRun = false;
+        }
+        if (this.game?.tutorialManager) {
+            this.game.tutorialManager.isFirstTime = false;
+        }
         
         if (this.onComplete) {
             this.onComplete();
@@ -573,11 +572,11 @@ export class TutorialOverlay {
     /**
      * Check if tutorial should be shown
      */
-    static shouldShowTutorial() {
-        const showSetting = localStorage.getItem('game_settings_show_tutorial');
-        if (showSetting !== 'true') return false;
-        const completed = localStorage.getItem('tutorial_completed');
-        return completed !== 'true';
+    static shouldShowTutorial(game) {
+        if (game?.state?.tutorial) {
+            return game.state.tutorial.isFirstRun === true;
+        }
+        return false;
     }
 
     /**

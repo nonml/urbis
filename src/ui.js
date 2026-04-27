@@ -535,7 +535,7 @@ export class UIManager {
      * Initialize tutorial if player hasn't completed it
      */
     initTutorial() {
-        if (TutorialOverlay.shouldShowTutorial()) {
+        if (TutorialOverlay.shouldShowTutorial(this.game)) {
             this.tutorial.onComplete = () => {
                 this.showMessage('Tutorial complete! Build your city!', 'success');
             };
