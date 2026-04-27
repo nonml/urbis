@@ -19,6 +19,19 @@ export const TUTORIAL_STEPS = {
             return tm?.completedSteps?.includes('walk');
         }
     },
+    INTERACT_VEHICLE: {
+        id: 'interact_vehicle',
+        title: 'Enter a Vehicle',
+        content: 'Walk near a vehicle and press F to hop in.',
+        target: null,
+        position: 'center',
+        skipable: true,
+        autoAdvance: true,
+        advanceCondition: (game) => {
+            const tm = game?.tutorialManager;
+            return tm?.completedSteps?.includes('interact_vehicle');
+        }
+    },
     WELCOME: {
         id: 'welcome',
         title: 'Welcome to City Builder!',
