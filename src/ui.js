@@ -838,16 +838,17 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 const vc = this.game.vehicleController;
                 if (vc) {
                     if (vc.isDriving) {
+                        this.actionHud?.showVehicleFade();
                         vc.exitVehicle();
                         if (this.renderer3d?._player) this.renderer3d._player.visible = true;
                         this.renderer3d?.syncPlayer();
-                        // Stop vehicle audio
                         this._vehicleAudio?.stop();
                     } else {
                         const px = this.game.player.wx ?? this.game.player.x;
                         const py = this.game.player.wz ?? this.game.player.y;
                         const result = vc.enterVehicle(px, py);
                         if (result.ok) {
+                            this.actionHud?.showVehicleFade();
                             if (this.renderer3d?._player) this.renderer3d._player.visible = false;
                             // Start vehicle audio
                             const am = this.audioManager;

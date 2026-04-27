@@ -95,6 +95,7 @@ export class ActionHUD {
                     <line x1="17" y1="3" x2="3" y2="17" stroke="white" stroke-width="2"/>
                 </svg>
             </div>
+            <div class="ahud-veh-fade" id="ahud-veh-fade"></div>
             <div class="ahud-flash" id="ahud-flash"></div>
             <div class="ahud-death" id="ahud-death">
                 <div class="ahud-death-line"></div>
@@ -367,6 +368,17 @@ export class ActionHUD {
                 }
                 .ahud-hitmarker.on { opacity: 1; }
 
+                /* ── Vehicle Enter/Exit Fade ── */
+                .ahud-veh-fade {
+                    position: absolute;
+                    inset: 0;
+                    background: black;
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.15s ease-in;
+                }
+                .ahud-veh-fade.on { opacity: 1; transition: opacity 0.15s ease-in; }
+
                 /* ── Damage Flash ── */
                 .ahud-flash {
                     position: absolute;
@@ -530,6 +542,14 @@ export class ActionHUD {
         }
 
         anchor.appendChild(this._el);
+    }
+
+    showVehicleFade() {
+        const el = this._el?.querySelector('#ahud-veh-fade');
+        if (!el) return;
+        el.classList.add('on');
+        clearTimeout(this._vehFadeTimer);
+        this._vehFadeTimer = setTimeout(() => el.classList.remove('on'), 300);
     }
 
     showHitmarker() {
