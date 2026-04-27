@@ -96,7 +96,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] All 4 gate commands green on current codebase
 - [x] All Q1.A–Q1.J items ticked
-- [ ] Tag `0.1.0.0` pushed
+- [x] Tag `0.1.0.0` created
 
 ---
 
