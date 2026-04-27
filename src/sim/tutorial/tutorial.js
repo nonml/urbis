@@ -36,6 +36,14 @@ const TUTORIAL_STEPS = [
         autoAdvance: true
     },
     {
+        id: 'hack_first_node',
+        title: 'Hack a Node',
+        description: 'Press Q near a hackable node to breach it.',
+        kind: 'trigger',
+        trigger: 'node_hacked',
+        autoAdvance: true
+    },
+    {
         id: 'move_camera',
         title: 'Explore the City',
         description: 'Use right-click drag to rotate the camera and find a good spot to build.',
@@ -178,6 +186,11 @@ export class TutorialManager {
             this._driveStartZ = this.game.state.player.wz;
         };
 
+        this.hackNodeHandler = () => {
+            if (!this.activeQuest || this.completedSteps.includes('hack_first_node')) return;
+            this.game.questEngine.handleAnomaly('node_hacked', {});
+        };
+
         this.questCompleteHandler = (data) => {
             if (this.activeQuest && data.questId === this.activeQuest.id) {
                 if (data.outcome === 'success') {
@@ -188,6 +201,7 @@ export class TutorialManager {
 
         eventBus.on('player_moved', this.playerMoveHandler, this);
         eventBus.on('player_entered_vehicle', this.vehicleEnterHandler, this);
+        eventBus.on('player_hacked_node', this.hackNodeHandler, this);
         eventBus.on('player_built_building', this.houseBuildHandler, this);
         eventBus.on('player_built_building', this.jobBuildHandler, this);
         eventBus.on('crisis_resolved', this.crisisHandler, this);
@@ -429,6 +443,7 @@ export class TutorialManager {
     destroy() {
         if (this.playerMoveHandler) eventBus.off('player_moved', this.playerMoveHandler);
         if (this.vehicleEnterHandler) eventBus.off('player_entered_vehicle', this.vehicleEnterHandler);
+        if (this.hackNodeHandler) eventBus.off('player_hacked_node', this.hackNodeHandler);
         if (this.houseBuildHandler) eventBus.off('player_built_building', this.houseBuildHandler);
         if (this.jobBuildHandler) eventBus.off('player_built_building', this.jobBuildHandler);
         if (this.crisisHandler) eventBus.off('crisis_resolved', this.crisisHandler);

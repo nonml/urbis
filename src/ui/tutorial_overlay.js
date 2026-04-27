@@ -45,6 +45,19 @@ export const TUTORIAL_STEPS = {
             return tm?.completedSteps?.includes('drive_to_marker');
         }
     },
+    HACK_FIRST_NODE: {
+        id: 'hack_first_node',
+        title: 'Hack a Node',
+        content: 'Press Q near a hackable node to start a breach minigame.',
+        target: null,
+        position: 'center',
+        skipable: true,
+        autoAdvance: true,
+        advanceCondition: (game) => {
+            const tm = game?.tutorialManager;
+            return tm?.completedSteps?.includes('hack_first_node');
+        }
+    },
     WELCOME: {
         id: 'welcome',
         title: 'Welcome to City Builder!',
