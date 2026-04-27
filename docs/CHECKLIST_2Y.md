@@ -106,7 +106,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2.A — First-Run Tutorial and Objectives
 
-- [ ] `q2-tut-firstrun-flag` `src/sim/tutorial/` writes a first-run flag in save
+- [x] `q2-tut-firstrun-flag` `src/sim/tutorial/` writes a first-run flag in save
 - [ ] `q2-tut-overlay-hook` `tutorial_overlay.js` picks up flag and shows step 1
 - [ ] `q2-tut-step-walk` step 1: "use WASD to move"
 - [ ] `q2-tut-step-interact` step 2: "press F to enter vehicle"

@@ -1371,6 +1371,8 @@ export class Game {
             campaign: this.campaign?.serialize(),
             // Weather and particle systems
             weatherSystem: this.weatherSystem?.serialize(),
+            // Q2: Tutorial first-run flag + progress
+            tutorial: this.tutorialManager?.serialize() ?? this.state.tutorial,
         };
 
         try {
@@ -1693,6 +1695,11 @@ export class Game {
             // Weather and particle systems
             if (data.weatherSystem) {
                 this.weatherSystem?.deserialize(data.weatherSystem);
+            }
+
+            // Q2: Restore tutorial first-run flag + progress
+            if (data.tutorial) {
+                this.tutorialManager?.deserialize(data.tutorial);
             }
 
             this.ui.showMessage('Game loaded!', 'success');

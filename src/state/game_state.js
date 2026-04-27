@@ -170,6 +170,11 @@ export function createNewGameState(options = {}) {
                 endState: null
             }
         },
+        tutorial: {
+            isFirstRun: true,
+            currentStepIndex: 0,
+            completedSteps: [],
+        },
         difficulty: DIFFICULTY.NORMAL,
     };
 }

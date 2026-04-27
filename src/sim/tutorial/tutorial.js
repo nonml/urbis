@@ -222,7 +222,6 @@ export class TutorialManager {
         this.isFirstTime = false;
         this.completedSteps = this.steps.map(s => s.id);
         this.currentStepIndex = this.steps.length;
-        localStorage.setItem('tutorial_completed', 'true');
 
         if (this.activeQuest) {
             // Complete all steps
@@ -263,7 +262,6 @@ export class TutorialManager {
         if (this.activeQuest) {
             this.game.questEngine.activeQuests = this.game.questEngine.activeQuests.filter(q => q.id !== 'tutorial');
         }
-        localStorage.removeItem('tutorial_completed');
     }
 
     /**
@@ -331,6 +329,21 @@ export class TutorialManager {
         if (this.game.resources.day > 0 && this.game.resources.day % 5 === 0) {
             this.checkStepCompletion();
         }
+    }
+
+    serialize() {
+        return {
+            isFirstRun: this.isFirstTime,
+            currentStepIndex: this.currentStepIndex,
+            completedSteps: [...this.completedSteps],
+        };
+    }
+
+    deserialize(data) {
+        if (!data) return;
+        this.isFirstTime = data.isFirstRun !== false;
+        this.currentStepIndex = data.currentStepIndex || 0;
+        this.completedSteps = data.completedSteps || [];
     }
 
     /**
