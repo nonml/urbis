@@ -936,7 +936,10 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             }
             if (e.key === 'Escape') {
                 // Close various panels in priority order
-                if (this._smartphoneOverlay && !this._smartphoneOverlay.classList.contains('hidden')) {
+                if (this.tutorial?.isActive) {
+                    this.tutorial.complete();
+                    this.game.tutorialManager?.skip();
+                } else if (this._smartphoneOverlay && !this._smartphoneOverlay.classList.contains('hidden')) {
                     this._smartphoneOverlay.classList.add('hidden');
                 } else if (this._pauseOverlay && !this._pauseOverlay.classList.contains('hidden')) {
                     this._pauseOverlay.classList.add('hidden');
