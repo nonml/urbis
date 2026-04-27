@@ -297,6 +297,9 @@ export class FXSystem {
         this.activeProgressRings = [];
         this.activeHighlightPulses = [];
         
+        // Tracers (bullet trails)
+        this._tracers = [];
+
         // Screen shake
         this.screenShake = new ScreenShake(this.config.screenShake);
         
@@ -437,6 +440,21 @@ export class FXSystem {
         }
     }
 
+    showTracer(sx, sy, sz, ex, ey, ez, color, duration, length) {
+        if (!this.enabled || this.reducedMotion) return;
+        this._tracers.push({
+            sx, sy, sz, ex, ey, ez,
+            color: color || 0xffff88,
+            duration: duration || 120,
+            length: length || 0.6,
+            life: 0,
+        });
+    }
+
+    getTracers() {
+        return this._tracers;
+    }
+
     /**
      * Update all VFX
      */
@@ -481,6 +499,10 @@ export class FXSystem {
             }
             return stillActive;
         });
+
+        // Update tracers
+        for (const t of this._tracers) t.life += dt;
+        this._tracers = this._tracers.filter(t => t.life < t.duration);
 
         // Update screen shake
         this.screenShake.update(dt);

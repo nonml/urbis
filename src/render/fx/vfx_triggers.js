@@ -165,9 +165,14 @@ export const VFX_CONFIG = {
     // Combat events
     PLAYER_FIRED_WEAPON: {
         muzzleFlash: { color: 0xffdd44, count: 6, speed: 80 },
-        tracer: { color: 0xffff88, duration: 150 },
+        tracer: {
+            pistol:  { color: 0xffff88, duration: 100, length: 0.5 },
+            shotgun: { color: 0xffcc44, duration: 80,  length: 0.3 },
+            smg:     { color: 0xffff88, duration: 60,  length: 0.4 },
+            sniper:  { color: 0xaaddff, duration: 180, length: 1.2 },
+        },
         hit: { color: 0xff6644, count: 10, speed: 60 },
-        shake: { intensity: 2, duration: 100 },  // light recoil shake
+        shake: { intensity: 2, duration: 100 },
     }
 };
 
@@ -428,6 +433,24 @@ export class VFXTriggerManager {
         if (!isMelee && config.muzzleFlash) {
             this.fxSystem.showParticleBurst(pos.x, pos.y + 1.2, pos.z,
                 config.muzzleFlash.color, config.muzzleFlash.count, config.muzzleFlash.speed);
+        }
+
+        // Tracer from barrel to target (ranged only)
+        if (!isMelee && config.tracer) {
+            const tc = config.tracer[weapon] || config.tracer.pistol;
+            const targets = (data.hit && data.hits?.length)
+                ? data.hits
+                : [{ x: data.targetX, y: data.targetY }];
+            for (const t of targets) {
+                const tPos = this._tileToWorldPosition(t.x, t.y);
+                if (tPos) {
+                    this.fxSystem.showTracer(
+                        pos.x, pos.y + 1.2, pos.z,
+                        tPos.x, tPos.y + 0.8, tPos.z,
+                        tc.color, tc.duration, tc.length
+                    );
+                }
+            }
         }
 
         // Camera recoil shake (ranged only, light)

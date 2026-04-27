@@ -2436,6 +2436,50 @@ export class Renderer3D {
         }
     }
 
+    _renderTracers() {
+        const tracers = this.fxSystem?.getTracers();
+        if (!tracers?.length) {
+            if (this._tracerLines?.length) {
+                for (const l of this._tracerLines) l.visible = false;
+            }
+            return;
+        }
+        if (!this._tracerLines) this._tracerLines = [];
+        for (let i = 0; i < tracers.length; i++) {
+            let line = this._tracerLines[i];
+            if (!line) {
+                const geo = new THREE.BufferGeometry();
+                geo.setAttribute('position', new THREE.Float32BufferAttribute([0, 0, 0, 0, 0, 0], 3));
+                const mat = new THREE.LineBasicMaterial({
+                    transparent: true,
+                    depthWrite: false,
+                    blending: THREE.AdditiveBlending,
+                });
+                line = new THREE.Line(geo, mat);
+                this._tracerLines.push(line);
+                this.scene.add(line);
+            }
+            const t = tracers[i];
+            const progress = t.life / t.duration;
+            const positions = line.geometry.attributes.position.array;
+            const headT = Math.min(1, progress * 3);
+            const tailT = Math.max(0, headT - t.length);
+            positions[0] = t.sx + (t.ex - t.sx) * tailT;
+            positions[1] = t.sy + (t.ey - t.sy) * tailT;
+            positions[2] = t.sz + (t.ez - t.sz) * tailT;
+            positions[3] = t.sx + (t.ex - t.sx) * headT;
+            positions[4] = t.sy + (t.ey - t.sy) * headT;
+            positions[5] = t.sz + (t.ez - t.sz) * headT;
+            line.geometry.attributes.position.needsUpdate = true;
+            line.material.color.setHex(t.color);
+            line.material.opacity = 1 - progress;
+            line.visible = true;
+        }
+        for (let i = tracers.length; i < this._tracerLines.length; i++) {
+            this._tracerLines[i].visible = false;
+        }
+    }
+
     markBuildingsDirty() {
         this._buildingsDirty = true;
     }
@@ -3648,6 +3692,7 @@ export class Renderer3D {
         this.updateVFX();
         if (this.fxSystem) {
             this.fxSystem.update();
+            this._renderTracers();
         }
         
         // Update building spawn flashes (1D)
