@@ -109,6 +109,7 @@ export class Renderer3D {
         this.game = game;
         this.canvas = canvas;
         this._THREE = THREE; // expose for external consumers (action_hud profiler)
+        this.testMode = navigator.webdriver || new URLSearchParams(window.location.search).has('testMode');
 
         // Scene
         this.scene = new THREE.Scene();
@@ -194,8 +195,8 @@ export class Renderer3D {
 
         // Renderer
         this.renderer = new THREE.WebGLRenderer({ canvas: this.canvas, antialias: false });
-        this.renderer.setPixelRatio(Math.min(1.5, window.devicePixelRatio || 1));
-        this.renderer.shadowMap.enabled = true;
+        this.renderer.setPixelRatio(this.testMode ? 1 : Math.min(1.5, window.devicePixelRatio || 1));
+        this.renderer.shadowMap.enabled = !this.testMode;
         this.renderer.shadowMap.type = THREE.PCFShadowMap;
         this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
         this.renderer.toneMappingExposure = 1.3;
@@ -396,8 +397,8 @@ export class Renderer3D {
         window.addEventListener('resize', () => this.resize());
         window.addEventListener('wheel', (e) => this.handleWheel(e));
 
-        // Init sky + post-processing immediately so sky is visible from frame 1
-        this._initPostProcessing();
+        // Init sky + post-processing (skipped in test mode to save CPU)
+        if (!this.testMode) this._initPostProcessing();
         // Async: load Kenney GLB models + terrain textures, then rebuild once ready
         this._preloadAssets();
     }
@@ -2892,7 +2893,8 @@ export class Renderer3D {
             }
         }
 
-        // Skip particle updates when weather is clear
+        // Skip particle updates when weather is clear or in test mode
+        if (this.testMode) return;
         if (!isRain && !isFog && !isStorm && !isSnow && this._wetness < 0.01) return;
 
         // --- Rain particle system (streaks with wind) ---

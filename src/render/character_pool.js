@@ -25,8 +25,9 @@ import {
 
 let THREE = null;
 
-const MAX_DETAILED_CHARACTERS = 120;
-const NEAR_DISTANCE = 25; // tiles
+const _testMode = typeof window !== 'undefined' && (navigator.webdriver || new URLSearchParams(window.location.search).has('testMode'));
+const MAX_DETAILED_CHARACTERS = _testMode ? 10 : 120;
+const NEAR_DISTANCE = _testMode ? 10 : 25;
 
 export class CharacterPool {
     /**
