@@ -830,6 +830,9 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 this.game.combat.currentWeapon = 'pistol';
                 this.showMessage('Equipped: Pistol', 'normal');
             }
+            if (e.key.toLowerCase() === 'r' && this.game.combat) {
+                this.game.combat.reload();
+            }
             if (e.key.toLowerCase() === 'f') {
                 e.preventDefault();
                 const vc = this.game.vehicleController;

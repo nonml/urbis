@@ -80,6 +80,9 @@ export class CombatSystem {
         this._lastFireTime = 0;
         this._muzzleFlash = false;
         this._muzzleFlashTimer = 0;
+        this._reloading = false;
+        this._reloadTimer = 0;
+        this._reloadDuration = 0;
     }
 
     get weapon() {
@@ -114,6 +117,7 @@ export class CombatSystem {
      * @returns {{ hit: boolean, target?: object }}
      */
     fire(targetX, targetY) {
+        if (this._reloading) return { hit: false };
         const now = performance.now();
         if (now - this._lastFireTime < this.weapon.fireRate) return { hit: false };
 
@@ -241,6 +245,42 @@ export class CombatSystem {
      * @param {string} weapon - Weapon key
      * @param {number} amount - Rounds to add
      */
+    reload() {
+        if (this._reloading) return;
+        if (this.weapon.ammo === Infinity) return;
+        const key = this.currentWeapon;
+        const clipMax = this.weapon.ammo;
+        const current = this.ammo[key] || 0;
+        const res = this.reserve[key] || 0;
+        if (current >= clipMax || res <= 0) return;
+
+        this._reloading = true;
+        this._reloadDuration = this.weapon.type === 'ranged' ? (this.weapon.fireRate * 3) : 500;
+        this._reloadTimer = this._reloadDuration;
+        this.game.ui?.showMessage?.('Reloading...', 'normal');
+    }
+
+    _finishReload() {
+        const key = this.currentWeapon;
+        const clipMax = this.weapon.ammo;
+        const current = this.ammo[key] || 0;
+        const res = this.reserve[key] || 0;
+        const needed = clipMax - current;
+        const transfer = Math.min(needed, res);
+        this.ammo[key] = current + transfer;
+        this.reserve[key] = res - transfer;
+        this._reloading = false;
+    }
+
+    get isReloading() {
+        return this._reloading;
+    }
+
+    get reloadProgress() {
+        if (!this._reloading || this._reloadDuration <= 0) return 0;
+        return 1 - (this._reloadTimer / this._reloadDuration);
+    }
+
     addAmmo(weapon, amount) {
         const max = WEAPONS[weapon]?.maxAmmo || 60;
         this.ammo[weapon] = Math.min(max, (this.ammo[weapon] || 0) + amount);
@@ -255,6 +295,12 @@ export class CombatSystem {
             this._muzzleFlashTimer -= dt;
             if (this._muzzleFlashTimer <= 0) {
                 this._muzzleFlash = false;
+            }
+        }
+        if (this._reloading && this._reloadTimer > 0) {
+            this._reloadTimer -= dt;
+            if (this._reloadTimer <= 0) {
+                this._finishReload();
             }
         }
     }
