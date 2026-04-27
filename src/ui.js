@@ -864,9 +864,15 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             }
             if (e.key.toLowerCase() === 'h') {
                 e.preventDefault();
-                this.hackScanVisible = !this.hackScanVisible;
-                this.hackList.setVisible(this.hackScanVisible);
-                this.showMessage(`Hack scan: ${this.hackScanVisible ? 'on' : 'off'}`, 'normal');
+                const vcH = this.game.vehicleController;
+                if (vcH?.isDriving) {
+                    vcH.honk();
+                    this.audioManager?.sfxGenerator?.play?.('honk');
+                } else {
+                    this.hackScanVisible = !this.hackScanVisible;
+                    this.hackList.setVisible(this.hackScanVisible);
+                    this.showMessage(`Hack scan: ${this.hackScanVisible ? 'on' : 'off'}`, 'normal');
+                }
             }
             if (e.key.toLowerCase() === 'q') {
                 if (this.selectedBuilding) {

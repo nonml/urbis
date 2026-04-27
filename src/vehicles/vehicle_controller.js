@@ -174,6 +174,17 @@ export class VehicleController {
      * Set input state from WASD keys
      * @param {Object} input - { throttle: 0-1, brake: 0-1, steer: -1 to 1 }
      */
+    honk() {
+        if (!this.isDriving) return;
+        this._honking = true;
+        clearTimeout(this._honkTimer);
+        this._honkTimer = setTimeout(() => { this._honking = false; }, 400);
+    }
+
+    get isHonking() {
+        return this._honking || false;
+    }
+
     setInput(input) {
         this.input = input;
     }
