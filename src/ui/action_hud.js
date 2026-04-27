@@ -59,6 +59,13 @@ export class ActionHUD {
                     <span class="ahud-hp-num" id="ahud-hp-num">100</span>
                 </div>
             </div>
+            <div class="ahud-stealth-eye" id="ahud-stealth-eye">
+                <svg viewBox="0 0 24 16" width="24" height="16">
+                    <ellipse cx="12" cy="8" rx="10" ry="6" fill="none" stroke="white" stroke-width="1.5"/>
+                    <circle cx="12" cy="8" r="3" fill="white"/>
+                </svg>
+                <span class="ahud-stealth-label" id="ahud-stealth-label"></span>
+            </div>
             <div class="ahud-weapon-box" id="ahud-weapon-box">
                 <div class="ahud-weapon-name" id="ahud-wname"></div>
                 <div class="ahud-weapon-ammo" id="ahud-wammo"></div>
@@ -276,6 +283,31 @@ export class ActionHUD {
                     background: #4caf50;
                     transition: width 0.3s, background 0.3s;
                 }
+
+                /* ── Stealth Eye ── below vitals */
+                .ahud-stealth-eye {
+                    position: absolute;
+                    bottom: 80px;
+                    left: 14px;
+                    display: flex;
+                    align-items: center;
+                    gap: 6px;
+                    padding: 4px 8px;
+                    background: rgba(0,0,0,0.5);
+                    border-radius: 4px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                    font-size: 11px;
+                    color: #ccc;
+                }
+                .ahud-stealth-eye.on { opacity: 1; }
+                .ahud-stealth-eye.hidden svg { opacity: 0.3; }
+                .ahud-stealth-eye.low svg { opacity: 0.6; }
+                .ahud-stealth-eye.exposed svg { opacity: 1; }
+                .ahud-stealth-eye.exposed svg ellipse { stroke: #f44; }
+                .ahud-stealth-eye.exposed svg circle { fill: #f44; }
+                .ahud-stealth-eye.low svg ellipse { stroke: #fa0; }
+                .ahud-stealth-eye.low svg circle { fill: #fa0; }
 
                 /* ── Crosshair ── center of viewport */
                 .ahud-crosshair {
@@ -525,6 +557,22 @@ export class ActionHUD {
                 const a = this._el.querySelector('#ahud-wammo');
                 if (n) n.textContent = name;
                 if (a) a.textContent = ammo;
+            }
+        }
+
+        // Stealth eye indicator
+        const eye = this._el.querySelector('#ahud-stealth-eye');
+        if (eye) {
+            const st = this.game.stealth;
+            const showEye = this.game.mode === 'street' && st;
+            eye.classList.toggle('on', showEye);
+            if (showEye) {
+                const vis = st.visibility;
+                eye.classList.toggle('hidden', vis === 'hidden');
+                eye.classList.toggle('low', vis === 'low_profile');
+                eye.classList.toggle('exposed', vis === 'exposed');
+                const label = eye.querySelector('#ahud-stealth-label');
+                if (label) label.textContent = vis === 'hidden' ? 'Hidden' : vis === 'low_profile' ? 'Low Profile' : 'Exposed';
             }
         }
 
