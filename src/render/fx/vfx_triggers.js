@@ -172,7 +172,14 @@ export const VFX_CONFIG = {
             sniper:  { color: 0xaaddff, duration: 180, length: 1.2 },
         },
         hit: { color: 0xff6644, count: 10, speed: 60 },
-        shake: { intensity: 2, duration: 100 },
+        shake: {
+            pistol:  { intensity: 2,   duration: 80  },
+            shotgun: { intensity: 5,   duration: 150 },
+            smg:     { intensity: 1,   duration: 50  },
+            sniper:  { intensity: 6,   duration: 200 },
+            fist:    { intensity: 3,   duration: 120 },
+            bat:     { intensity: 4,   duration: 140 },
+        },
     }
 };
 
@@ -453,11 +460,10 @@ export class VFXTriggerManager {
             }
         }
 
-        // Camera recoil shake (ranged only, light)
-        if (!isMelee && config.shake) {
-            // Scale shake by weapon type
-            const mult = weapon === 'shotgun' ? 2.5 : weapon === 'smg' ? 0.5 : 1;
-            this.fxSystem.shakeCamera(config.shake.intensity * mult, config.shake.duration);
+        // Camera recoil shake (per-weapon tuning)
+        if (config.shake) {
+            const sc = config.shake[weapon] || config.shake.pistol;
+            this.fxSystem.shakeCamera(sc.intensity, sc.duration);
         }
 
         // Hitmarker on confirmed hit
@@ -492,7 +498,8 @@ export class VFXTriggerManager {
                 if (hitPos) {
                     this.fxSystem.showParticleBurst(hitPos.x, hitPos.y + 0.8, hitPos.z,
                         0xffaa44, 8, 50);
-                    this.fxSystem.shakeCamera(3, 120);
+                    const msc = config.shake?.[weapon] || { intensity: 3, duration: 120 };
+                    this.fxSystem.shakeCamera(msc.intensity, msc.duration);
                     this.fxSystem.spawnDecal(hitPos.x, 0.02, hitPos.z, 0x880000, 5000);
                 }
             }
