@@ -68,6 +68,7 @@ export class ActionHUD {
                 <div class="ahud-detection-bar" id="ahud-detection-bar">
                     <div class="ahud-detection-fill" id="ahud-detection-fill"></div>
                 </div>
+                <span class="ahud-noise-ping" id="ahud-noise-ping"></span>
             </div>
             <div class="ahud-weapon-box" id="ahud-weapon-box">
                 <div class="ahud-weapon-name" id="ahud-wname"></div>
@@ -317,6 +318,23 @@ export class ActionHUD {
                     background: rgba(255,255,255,0.15);
                     border-radius: 2px;
                     overflow: hidden;
+                }
+                .ahud-noise-ping {
+                    display: inline-block;
+                    width: 8px;
+                    height: 8px;
+                    border-radius: 50%;
+                    background: rgba(255,170,0,0.6);
+                    opacity: 0;
+                    transition: opacity 0.1s;
+                }
+                .ahud-noise-ping.on {
+                    opacity: 1;
+                    animation: noisePulse 0.4s ease-out;
+                }
+                @keyframes noisePulse {
+                    0% { transform: scale(0.5); opacity: 1; }
+                    100% { transform: scale(1.5); opacity: 0; }
                 }
                 .ahud-detection-fill {
                     height: 100%;
@@ -595,6 +613,12 @@ export class ActionHUD {
                     const det = st.detectionLevel;
                     fill.style.width = `${det * 100}%`;
                     fill.style.background = det > 0.7 ? '#f44' : det > 0.3 ? '#fa0' : '#4a4';
+                }
+                const noise = eye.querySelector('#ahud-noise-ping');
+                if (noise) {
+                    const isMoving = player._isMoving || false;
+                    const makingNoise = isMoving && !st.isCrouching;
+                    noise.classList.toggle('on', makingNoise);
                 }
             }
         }
