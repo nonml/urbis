@@ -2396,6 +2396,20 @@ export class Renderer3D {
         this._muzzleFlashMesh.visible = false;
         group.add(this._muzzleFlashMesh);
 
+        // Visibility ring (stealth detection radius)
+        const ringGeo = new THREE.RingGeometry(0.95, 1.0, 32);
+        ringGeo.rotateX(-Math.PI / 2);
+        const ringMat = new THREE.MeshBasicMaterial({
+            color: 0x44aaff,
+            transparent: true,
+            opacity: 0.25,
+            side: THREE.DoubleSide,
+            depthWrite: false,
+        });
+        this._visibilityRing = new THREE.Mesh(ringGeo, ringMat);
+        this._visibilityRing.visible = false;
+        group.add(this._visibilityRing);
+
         // Muzzle flash point light
         this._muzzleFlashLight = new THREE.PointLight(0xffdd44, 0, 3, 2);
         this._muzzleFlashLight.position.copy(this._muzzleFlashMesh.position);
@@ -2420,6 +2434,20 @@ export class Renderer3D {
             }
             if (this._muzzleFlashLight) {
                 this._muzzleFlashLight.intensity = flash ? 2.5 : 0;
+            }
+        }
+
+        // Visibility ring (stealth detection radius)
+        if (this._visibilityRing) {
+            const st = this.game.stealth;
+            const showRing = st && this.game.mode === 'street';
+            this._visibilityRing.visible = showRing;
+            if (showRing) {
+                const radius = st.getDetectionRadius() * 0.1;
+                this._visibilityRing.scale.set(radius, radius, radius);
+                const vis = st.visibility;
+                const c = vis === 'hidden' ? 0x44ff44 : vis === 'low_profile' ? 0xffaa00 : 0xff4444;
+                this._visibilityRing.material.color.setHex(c);
             }
         }
 
