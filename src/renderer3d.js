@@ -2396,6 +2396,11 @@ export class Renderer3D {
         this._muzzleFlashMesh.visible = false;
         group.add(this._muzzleFlashMesh);
 
+        // Muzzle flash point light
+        this._muzzleFlashLight = new THREE.PointLight(0xffdd44, 0, 3, 2);
+        this._muzzleFlashLight.position.copy(this._muzzleFlashMesh.position);
+        group.add(this._muzzleFlashLight);
+
         return group;
     }
 
@@ -2412,6 +2417,9 @@ export class Renderer3D {
             this._muzzleFlashMesh.visible = flash;
             if (flash && this.camera) {
                 this._muzzleFlashMesh.quaternion.copy(this.camera.quaternion);
+            }
+            if (this._muzzleFlashLight) {
+                this._muzzleFlashLight.intensity = flash ? 2.5 : 0;
             }
         }
 
