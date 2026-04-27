@@ -6,6 +6,19 @@
  * Tutorial step definition
  */
 export const TUTORIAL_STEPS = {
+    WALK: {
+        id: 'walk',
+        title: 'Move Around',
+        content: 'Use WASD to move your character. Explore the area around you.',
+        target: null,
+        position: 'center',
+        skipable: true,
+        autoAdvance: true,
+        advanceCondition: (game) => {
+            const tm = game?.tutorialManager;
+            return tm?.completedSteps?.includes('walk');
+        }
+    },
     WELCOME: {
         id: 'welcome',
         title: 'Welcome to City Builder!',

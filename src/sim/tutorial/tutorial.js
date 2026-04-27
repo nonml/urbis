@@ -7,13 +7,23 @@ import { createInteractable, INTERACTABLE_TYPES } from '../interactables.js';
 import { eventBus } from '../events.js';
 
 // Tutorial steps
+const WALK_DISTANCE_THRESHOLD = 5;
+
 const TUTORIAL_STEPS = [
+    {
+        id: 'walk',
+        title: 'Move Around',
+        description: 'Use WASD to move your character.',
+        kind: 'trigger',
+        trigger: 'walk_complete',
+        autoAdvance: true
+    },
     {
         id: 'move_camera',
         title: 'Explore the City',
         description: 'Use right-click drag to rotate the camera and find a good spot to build.',
         kind: 'go_to',
-        targetX: null, // Will be resolved at runtime
+        targetX: null,
         targetY: null,
         autoAdvance: 600
     },
@@ -80,6 +90,8 @@ export class TutorialManager {
         this.completedSteps = [];
         this.activeQuest = null;
         this.isFirstTime = true;
+        this._spawnX = null;
+        this._spawnY = null;
         this.setupEventListeners();
     }
 
@@ -128,6 +140,16 @@ export class TutorialManager {
             }
         };
 
+        this.playerMoveHandler = (data) => {
+            if (!this.activeQuest || this.completedSteps.includes('walk')) return;
+            if (this._spawnX === null) return;
+            const dx = data.x - this._spawnX;
+            const dy = data.y - this._spawnY;
+            if (Math.sqrt(dx * dx + dy * dy) >= WALK_DISTANCE_THRESHOLD) {
+                this.game.questEngine.handleAnomaly('walk_complete', {});
+            }
+        };
+
         this.questCompleteHandler = (data) => {
             if (this.activeQuest && data.questId === this.activeQuest.id) {
                 if (data.outcome === 'success') {
@@ -136,6 +158,7 @@ export class TutorialManager {
             }
         };
 
+        eventBus.on('player_moved', this.playerMoveHandler, this);
         eventBus.on('player_built_building', this.houseBuildHandler, this);
         eventBus.on('player_built_building', this.jobBuildHandler, this);
         eventBus.on('crisis_resolved', this.crisisHandler, this);
@@ -163,6 +186,8 @@ export class TutorialManager {
         this.isFirstTime = false;
         this.currentStepIndex = 0;
         this.completedSteps = [];
+        this._spawnX = this.game.state.player.wx;
+        this._spawnY = this.game.state.player.wz;
 
         // Create tutorial quest
         const tutorialQuest = {
@@ -273,8 +298,18 @@ export class TutorialManager {
 
         // Check for auto-advancing conditions
         switch (step.id) {
+            case 'walk': {
+                if (this._spawnX === null) break;
+                const px = this.game.state.player.wx;
+                const py = this.game.state.player.wz;
+                const dx = px - this._spawnX;
+                const dy = py - this._spawnY;
+                if (Math.sqrt(dx * dx + dy * dy) >= WALK_DISTANCE_THRESHOLD) {
+                    this.completeStep();
+                }
+                break;
+            }
             case 'move_camera':
-                // Camera movement is tracked by the renderer
                 break;
             case 'place_house':
                 // Triggered by house build handler
@@ -350,6 +385,7 @@ export class TutorialManager {
      * Cleanup
      */
     destroy() {
+        if (this.playerMoveHandler) eventBus.off('player_moved', this.playerMoveHandler);
         if (this.houseBuildHandler) eventBus.off('player_built_building', this.houseBuildHandler);
         if (this.jobBuildHandler) eventBus.off('player_built_building', this.jobBuildHandler);
         if (this.crisisHandler) eventBus.off('crisis_resolved', this.crisisHandler);
