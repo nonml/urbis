@@ -102,6 +102,11 @@ export class ActionHUD {
                 <div class="ahud-death-text">WASTED</div>
                 <div class="ahud-death-line"></div>
             </div>
+            <div class="ahud-demand" id="ahud-demand">
+                <div class="ahud-demand-row"><span class="ahud-demand-label">R</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-r" style="background:#4caf50"></div></div></div>
+                <div class="ahud-demand-row"><span class="ahud-demand-label">C</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-c" style="background:#2196f3"></div></div></div>
+                <div class="ahud-demand-row"><span class="ahud-demand-label">I</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-i" style="background:#ff9800"></div></div></div>
+            </div>
             <div class="ahud-prompt" id="ahud-prompt"></div>
             <div class="ahud-profiler" id="ahud-profiler"></div>
             <div class="ahud-hint" id="ahud-hint"></div>
@@ -368,6 +373,43 @@ export class ActionHUD {
                 }
                 .ahud-hitmarker.on { opacity: 1; }
 
+                /* ── Demand Bars (God Mode) ── */
+                .ahud-demand {
+                    position: absolute;
+                    top: 50px;
+                    left: 14px;
+                    display: flex;
+                    flex-direction: column;
+                    gap: 3px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                }
+                .ahud-demand.on { opacity: 1; }
+                .ahud-demand-row {
+                    display: flex;
+                    align-items: center;
+                    gap: 4px;
+                }
+                .ahud-demand-label {
+                    font-size: 10px;
+                    font-weight: bold;
+                    color: #ccc;
+                    width: 10px;
+                }
+                .ahud-demand-track {
+                    width: 60px;
+                    height: 6px;
+                    background: rgba(255,255,255,0.1);
+                    border-radius: 3px;
+                    overflow: hidden;
+                }
+                .ahud-demand-fill {
+                    height: 100%;
+                    width: 50%;
+                    border-radius: 3px;
+                    transition: width 0.3s;
+                }
+
                 /* ── Vehicle Enter/Exit Fade ── */
                 .ahud-veh-fade {
                     position: absolute;
@@ -612,6 +654,22 @@ export class ActionHUD {
                 const a = this._el.querySelector('#ahud-wammo');
                 if (n) n.textContent = name;
                 if (a) a.textContent = ammo;
+            }
+        }
+
+        // Demand bars (god mode only)
+        const demandEl = this._el.querySelector('#ahud-demand');
+        if (demandEl) {
+            const isGod = this.game.mode === 'god';
+            demandEl.classList.toggle('on', isGod);
+            if (isGod) {
+                const d = state.economy?.demand || {};
+                const r = this._el.querySelector('#ahud-dem-r');
+                const c = this._el.querySelector('#ahud-dem-c');
+                const ind = this._el.querySelector('#ahud-dem-i');
+                if (r) r.style.width = `${(d.residential ?? 0.5) * 100}%`;
+                if (c) c.style.width = `${(d.commercial ?? 0.5) * 100}%`;
+                if (ind) ind.style.width = `${(d.industrial ?? 0.5) * 100}%`;
             }
         }
 
