@@ -81,21 +81,21 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q1.J — Dashboard
 
-- [ ] `q1-dash-scaffold` static HTML + JSON input
-- [ ] `q1-dash-throughput` tasks/week widget
-- [ ] `q1-dash-revert-rate` revert rate widget
-- [ ] `q1-dash-slice-size` avg LOC per task
-- [ ] `q1-dash-stage-histogram` gate stage failure counts
-- [ ] `q1-dash-screenshot-heatmap` per-view diff heatmap
-- [ ] `q1-dash-green-streak` days since last green weekly
-- [ ] `q1-dash-milestone-bar` milestone progress from this file
-- [ ] `q1-dash-bundle-trend` bundle size line chart
-- [ ] `q1-dash-top-ready` top 10 READY tasks with priorities
+- [x] `q1-dash-scaffold` static HTML + JSON input
+- [x] `q1-dash-throughput` tasks/week widget
+- [x] `q1-dash-revert-rate` revert rate widget
+- [x] `q1-dash-slice-size` avg LOC per task
+- [x] `q1-dash-stage-histogram` gate stage failure counts
+- [x] `q1-dash-screenshot-heatmap` per-view diff heatmap
+- [x] `q1-dash-green-streak` days since last green weekly
+- [x] `q1-dash-milestone-bar` milestone progress from this file
+- [x] `q1-dash-bundle-trend` bundle size line chart
+- [x] `q1-dash-top-ready` top 10 READY tasks with priorities
 
 ### Q1 — Definition of Done
 
-- [ ] All 4 gate commands green on current codebase
-- [ ] All Q1.A–Q1.J items ticked
+- [x] All 4 gate commands green on current codebase
+- [x] All Q1.A–Q1.J items ticked
 - [ ] Tag `0.1.0.0` pushed
 
 ---
