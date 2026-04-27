@@ -78,6 +78,12 @@ export class ActionHUD {
                     <circle cx="12" cy="12" r="1.5" fill="white" opacity="0.5"/>
                 </svg>
             </div>
+            <div class="ahud-hitmarker" id="ahud-hitmarker">
+                <svg viewBox="0 0 20 20" width="20" height="20">
+                    <line x1="3" y1="3" x2="17" y2="17" stroke="white" stroke-width="2"/>
+                    <line x1="17" y1="3" x2="3" y2="17" stroke="white" stroke-width="2"/>
+                </svg>
+            </div>
             <div class="ahud-flash" id="ahud-flash"></div>
             <div class="ahud-death" id="ahud-death">
                 <div class="ahud-death-line"></div>
@@ -282,6 +288,18 @@ export class ActionHUD {
                 }
                 .ahud-crosshair.on { opacity: 1; }
 
+                /* ── Hitmarker ── brief X on confirmed hit */
+                .ahud-hitmarker {
+                    position: absolute;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    opacity: 0;
+                    pointer-events: none;
+                    transition: opacity 0.05s;
+                }
+                .ahud-hitmarker.on { opacity: 1; }
+
                 /* ── Damage Flash ── */
                 .ahud-flash {
                     position: absolute;
@@ -445,6 +463,14 @@ export class ActionHUD {
         }
 
         anchor.appendChild(this._el);
+    }
+
+    showHitmarker() {
+        const el = this._el?.querySelector('#ahud-hitmarker');
+        if (!el) return;
+        el.classList.add('on');
+        clearTimeout(this._hitmarkerTimer);
+        this._hitmarkerTimer = setTimeout(() => el.classList.remove('on'), 100);
     }
 
     update() {

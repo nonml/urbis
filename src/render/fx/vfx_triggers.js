@@ -460,6 +460,11 @@ export class VFXTriggerManager {
             this.fxSystem.shakeCamera(config.shake.intensity * mult, config.shake.duration);
         }
 
+        // Hitmarker on confirmed hit
+        if (data.hit && this.game?.ui?.actionHud) {
+            this.game.ui.actionHud.showHitmarker();
+        }
+
         // Hit particle burst at each hit target position
         if (data.hit && data.hits && config.hit) {
             for (const h of data.hits) {
