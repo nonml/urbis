@@ -110,7 +110,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-tut-overlay-hook` `tutorial_overlay.js` picks up flag and shows step 1
 - [x] `q2-tut-step-walk` step 1: "use WASD to move"
 - [x] `q2-tut-step-interact` step 2: "press F to enter vehicle"
-- [ ] `q2-tut-step-drive` step 3: drive to marker
+- [x] `q2-tut-step-drive` step 3: drive to marker
 - [ ] `q2-tut-step-hack` step 4: "press Q to hack this node"
 - [ ] `q2-tut-step-objective` step 5: completes and hands off to main objective
 - [ ] `q2-tut-skip-button` player can skip with ESC

@@ -8,6 +8,7 @@ import { eventBus } from '../events.js';
 
 // Tutorial steps
 const WALK_DISTANCE_THRESHOLD = 5;
+const DRIVE_DISTANCE_THRESHOLD = 50;
 
 const TUTORIAL_STEPS = [
     {
@@ -24,6 +25,14 @@ const TUTORIAL_STEPS = [
         description: 'Walk near a vehicle and press F to enter it.',
         kind: 'trigger',
         trigger: 'vehicle_entered',
+        autoAdvance: true
+    },
+    {
+        id: 'drive_to_marker',
+        title: 'Drive Around',
+        description: 'Drive the vehicle to explore the city.',
+        kind: 'trigger',
+        trigger: 'drive_complete',
         autoAdvance: true
     },
     {
@@ -100,6 +109,8 @@ export class TutorialManager {
         this.isFirstTime = true;
         this._spawnX = null;
         this._spawnY = null;
+        this._driveStartX = null;
+        this._driveStartZ = null;
         this.setupEventListeners();
     }
 
@@ -159,8 +170,12 @@ export class TutorialManager {
         };
 
         this.vehicleEnterHandler = () => {
-            if (!this.activeQuest || this.completedSteps.includes('interact_vehicle')) return;
-            this.game.questEngine.handleAnomaly('vehicle_entered', {});
+            if (!this.activeQuest) return;
+            if (!this.completedSteps.includes('interact_vehicle')) {
+                this.game.questEngine.handleAnomaly('vehicle_entered', {});
+            }
+            this._driveStartX = this.game.state.player.wx;
+            this._driveStartZ = this.game.state.player.wz;
         };
 
         this.questCompleteHandler = (data) => {
@@ -319,6 +334,19 @@ export class TutorialManager {
                 const dx = px - this._spawnX;
                 const dy = py - this._spawnY;
                 if (Math.sqrt(dx * dx + dy * dy) >= WALK_DISTANCE_THRESHOLD) {
+                    this.completeStep();
+                }
+                break;
+            }
+            case 'drive_to_marker': {
+                if (this._driveStartX === null) break;
+                const vc = this.game.vehicleController;
+                if (!vc?.isDriving) break;
+                const vx = this.game.state.player.wx;
+                const vz = this.game.state.player.wz;
+                const ddx = vx - this._driveStartX;
+                const ddz = vz - this._driveStartZ;
+                if (Math.sqrt(ddx * ddx + ddz * ddz) >= DRIVE_DISTANCE_THRESHOLD) {
                     this.completeStep();
                 }
                 break;

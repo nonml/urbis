@@ -32,6 +32,19 @@ export const TUTORIAL_STEPS = {
             return tm?.completedSteps?.includes('interact_vehicle');
         }
     },
+    DRIVE_TO_MARKER: {
+        id: 'drive_to_marker',
+        title: 'Drive Around',
+        content: 'Use WASD to drive the vehicle and explore the city streets.',
+        target: null,
+        position: 'center',
+        skipable: true,
+        autoAdvance: true,
+        advanceCondition: (game) => {
+            const tm = game?.tutorialManager;
+            return tm?.completedSteps?.includes('drive_to_marker');
+        }
+    },
     WELCOME: {
         id: 'welcome',
         title: 'Welcome to City Builder!',
