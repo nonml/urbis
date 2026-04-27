@@ -37,9 +37,9 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q1.C — Roo Code Setup (operator does once, not coded)
 
-- [ ] `q1-roo-provider` Roo Code configured: provider = llama.cpp, endpoint correct
-- [ ] `q1-roo-context` context window set to 64k tokens in Roo settings
-- [ ] `q1-roo-autoapprove` auto-approve ON for: read, write, `npm run lint:basic`, `npm run check:no-math-random`, `npm run validate`, `npm test`, `git status/diff/log/add/commit`, `node scripts/*.mjs`
+- ~~[~]~~ `q1-roo-provider` Roo Code deprecated — using Claude Code instead
+- ~~[~]~~ `q1-roo-context` Roo Code deprecated — using Claude Code instead
+- ~~[~]~~ `q1-roo-autoapprove` Roo Code deprecated — using Claude Code instead
 - [x] `q1-roo-rules-load` confirm `.roo/rules/*.md` loads on every session (send "go", see `[boot]` line)
 - [x] `q1-roo-first-cycle` first autonomous task cycle completes end-to-end (pick → edit → gate → commit) — 4 tasks completed
 
@@ -63,21 +63,21 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q1.I — Screenshot Baselines
 
-- [ ] `q1-ss-main-menu` baseline captured
-- [ ] `q1-ss-new-game-spawn` baseline
-- [ ] `q1-ss-street-noon` baseline
-- [ ] `q1-ss-street-night` baseline
-- [ ] `q1-ss-rain` baseline
-- [ ] `q1-ss-hack-overlay` baseline
-- [ ] `q1-ss-god-mode-empty` baseline
-- [ ] `q1-ss-god-mode-built` baseline
-- [ ] `q1-ss-vehicle-hud` baseline
-- [ ] `q1-ss-minimap` baseline
-- [ ] `q1-ss-pause` baseline
-- [ ] `q1-ss-breach-minigame` baseline
-- [ ] `q1-ss-case-file` baseline
-- [ ] `q1-ss-codex` baseline
-- [ ] `q1-ss-victory-screen` baseline
+- [x] `q1-ss-main-menu` baseline captured
+- [x] `q1-ss-new-game-spawn` baseline
+- [x] `q1-ss-street-noon` baseline
+- [x] `q1-ss-street-night` baseline
+- [x] `q1-ss-rain` baseline
+- [x] `q1-ss-hack-overlay` baseline
+- [x] `q1-ss-god-mode-empty` baseline
+- [x] `q1-ss-god-mode-built` baseline
+- [x] `q1-ss-vehicle-hud` baseline
+- [x] `q1-ss-minimap` baseline
+- [x] `q1-ss-pause` baseline
+- [x] `q1-ss-breach-minigame` baseline
+- [x] `q1-ss-case-file` baseline
+- [x] `q1-ss-codex` baseline
+- [x] `q1-ss-victory-screen` baseline
 
 ### Q1.J — Dashboard
 
