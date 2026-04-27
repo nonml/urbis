@@ -62,6 +62,16 @@ export class VehicleController {
                 }
             }
             if (bestVehicle) {
+                // Carjack: if vehicle has an NPC driver, eject them
+                const wasOccupied = bestVehicle.driverId && bestVehicle.driverId !== 'player';
+                if (wasOccupied) {
+                    bestVehicle._ejectedNPC = bestVehicle.driverId;
+                    if (this.game.heatSystem) {
+                        this.game.heatSystem.addHeat(15);
+                    }
+                    this.game.ui?.showMessage?.('Carjacked!', 'warning');
+                }
+
                 // Convert traffic vehicle to drivable — stop its AI pathing
                 bestVehicle._playerDriven = true;
                 bestVehicle._savedPath = bestVehicle.path;
