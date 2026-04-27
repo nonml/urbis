@@ -730,10 +730,15 @@ export class ActionHUD {
         if (speedo) {
             if (vc?.isDriving) {
                 speedo.classList.add('on');
-                const spd = vc.getSpeedKmh();
-                if (spd !== this._cache.spd) {
-                    this._cache.spd = spd;
+                const useMph = this.game.ui?.settings?.get('speedUnit') === 'mph';
+                const rawSpd = vc.getSpeedKmh();
+                const spd = useMph ? Math.round(rawSpd * 0.621371) : rawSpd;
+                const spdKey = spd + (useMph ? 'm' : 'k');
+                if (spdKey !== this._cache.spd) {
+                    this._cache.spd = spdKey;
                     this._el.querySelector('#ahud-speedo-num').textContent = spd;
+                    const unitEl = this._el.querySelector('.ahud-speedo-unit');
+                    if (unitEl) unitEl.textContent = useMph ? 'mph' : 'km/h';
                 }
                 // Vehicle type name
                 const typeName = vc.getTypeName();
