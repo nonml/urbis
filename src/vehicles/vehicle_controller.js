@@ -152,11 +152,14 @@ export class VehicleController {
 
         vehicle.driverId = null;
 
-        // Place player next to the vehicle
-        this.game.state.player.wx = exitX + 1.5;
-        this.game.state.player.wz = exitY;
-        this.game.state.player.x = Math.floor(exitX + 1.5);
-        this.game.state.player.y = Math.floor(exitY);
+        // Place player to the left side of the vehicle (driver door side)
+        const headingRad = ((vehicle.heading ?? 0) * Math.PI) / 180;
+        const sideX = exitX + Math.cos(headingRad + Math.PI / 2) * 1.5;
+        const sideZ = exitY + Math.sin(headingRad + Math.PI / 2) * 1.5;
+        this.game.state.player.wx = sideX;
+        this.game.state.player.wz = sideZ;
+        this.game.state.player.x = Math.floor(sideX);
+        this.game.state.player.y = Math.floor(sideZ);
 
         this.activeVehicleId = null;
         this.activeVehicleSource = null;
