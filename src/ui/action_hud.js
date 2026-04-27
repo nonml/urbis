@@ -502,11 +502,34 @@ export class ActionHUD {
             }
         }
 
-        // Crosshair — show in street mode when not driving
+        // Crosshair — show in street mode when not driving, size by spread
         const crosshair = this._el.querySelector('#ahud-crosshair');
         if (crosshair) {
             const show = this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead;
             crosshair.classList.toggle('on', show);
+            if (show) {
+                const spread = combat?.weapon?.spread ?? 0;
+                const gap = 4 + spread * 1.2;
+                const size = 24 + spread * 3;
+                const half = size / 2;
+                const svg = crosshair.querySelector('svg');
+                if (svg) {
+                    svg.setAttribute('width', size);
+                    svg.setAttribute('height', size);
+                    svg.setAttribute('viewBox', `0 0 ${size} ${size}`);
+                    const lines = svg.querySelectorAll('line');
+                    if (lines.length >= 4) {
+                        lines[0].setAttribute('x1', half); lines[0].setAttribute('y1', 2);
+                        lines[0].setAttribute('x2', half); lines[0].setAttribute('y2', half - gap);
+                        lines[1].setAttribute('x1', half); lines[1].setAttribute('y1', half + gap);
+                        lines[1].setAttribute('x2', half); lines[1].setAttribute('y2', size - 2);
+                        lines[2].setAttribute('x1', 2);    lines[2].setAttribute('y1', half);
+                        lines[2].setAttribute('x2', half - gap); lines[2].setAttribute('y2', half);
+                        lines[3].setAttribute('x1', half + gap); lines[3].setAttribute('y1', half);
+                        lines[3].setAttribute('x2', size - 2);  lines[3].setAttribute('y2', half);
+                    }
+                }
+            }
         }
 
         // Vehicle proximity prompt

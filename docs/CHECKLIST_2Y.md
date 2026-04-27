@@ -121,7 +121,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-cb-muzzle-flash-mesh` quad-billboard mesh attached to barrel
 - [x] `q2-cb-muzzle-flash-light` brief point-light on fire
 - [x] `q2-cb-tracer-polish` tracer length/speed tuned per weapon
-- [ ] `q2-cb-crosshair` dynamic crosshair sized by spread
+- [x] `q2-cb-crosshair` dynamic crosshair sized by spread
 - [ ] `q2-cb-hitmarker` 100ms X marker on confirmed hit
 - [ ] `q2-cb-damage-numbers` togglable floating numbers
 - [ ] `q2-cb-blood-decal-lite` small decal on NPC hit (quad mesh)
