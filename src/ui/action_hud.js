@@ -661,6 +661,16 @@ export class ActionHUD {
                         }
                     }
                 }
+                // If no other prompt, check for stealth takedown
+                if (!promptText && this.game.stealth) {
+                    const citizens = this.game.citizens?.citizens || [];
+                    for (const c of citizens) {
+                        if (this.game.stealth.canStealthKill(c.x, c.y, c.facing)) {
+                            promptText = '<kbd>E</kbd> Stealth Takedown';
+                            break;
+                        }
+                    }
+                }
             }
             const showPrompt = promptText.length > 0;
             if (showPrompt !== this._cache.promptVisible || promptText !== this._cache.promptText) {

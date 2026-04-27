@@ -134,7 +134,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-st-eye-icon` eye-icon HUD wired to `src/player/stealth.js` state
 - [x] `q2-st-visibility-ring` optional visibility ring around player
 - [x] `q2-st-detection-bar` filling bar when NPC is suspecting
-- [ ] `q2-st-takedown-prompt` "press E" prompt when behind unaware NPC
+- [x] `q2-st-takedown-prompt` "press E" prompt when behind unaware NPC
 - [ ] `q2-st-noise-indicator` noise ping on footsteps in stealth
 
 ### Q2.D — Vehicle UX
