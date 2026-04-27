@@ -65,6 +65,9 @@ export class ActionHUD {
                     <circle cx="12" cy="8" r="3" fill="white"/>
                 </svg>
                 <span class="ahud-stealth-label" id="ahud-stealth-label"></span>
+                <div class="ahud-detection-bar" id="ahud-detection-bar">
+                    <div class="ahud-detection-fill" id="ahud-detection-fill"></div>
+                </div>
             </div>
             <div class="ahud-weapon-box" id="ahud-weapon-box">
                 <div class="ahud-weapon-name" id="ahud-wname"></div>
@@ -308,6 +311,20 @@ export class ActionHUD {
                 .ahud-stealth-eye.exposed svg circle { fill: #f44; }
                 .ahud-stealth-eye.low svg ellipse { stroke: #fa0; }
                 .ahud-stealth-eye.low svg circle { fill: #fa0; }
+                .ahud-detection-bar {
+                    width: 60px;
+                    height: 4px;
+                    background: rgba(255,255,255,0.15);
+                    border-radius: 2px;
+                    overflow: hidden;
+                }
+                .ahud-detection-fill {
+                    height: 100%;
+                    width: 0%;
+                    background: #fa0;
+                    border-radius: 2px;
+                    transition: width 0.15s, background 0.3s;
+                }
 
                 /* ── Crosshair ── center of viewport */
                 .ahud-crosshair {
@@ -573,6 +590,12 @@ export class ActionHUD {
                 eye.classList.toggle('exposed', vis === 'exposed');
                 const label = eye.querySelector('#ahud-stealth-label');
                 if (label) label.textContent = vis === 'hidden' ? 'Hidden' : vis === 'low_profile' ? 'Low Profile' : 'Exposed';
+                const fill = eye.querySelector('#ahud-detection-fill');
+                if (fill) {
+                    const det = st.detectionLevel;
+                    fill.style.width = `${det * 100}%`;
+                    fill.style.background = det > 0.7 ? '#f44' : det > 0.3 ? '#fa0' : '#4a4';
+                }
             }
         }
 
