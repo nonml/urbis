@@ -294,7 +294,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] All Q4.A–Q4.E items ticked
 - [x] End-of-year-1 review recorded in `docs/retros/2027-03.md`
 - [x] Operator approval file `q4.json`
-- [ ] Tag `0.4.0.0`
+- [x] Tag `0.4.0.0`
 
 ---
 
