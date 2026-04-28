@@ -74,6 +74,12 @@ export class RapierPhysicsWorld {
         return { x: r.x, y: r.y, z: r.z, w: r.w };
     }
 
+    applyImpulse(id, impulse) {
+        const body = this._bodies.get(id);
+        if (!body) return;
+        body.applyImpulse(impulse, true);
+    }
+
     removeBody(id) {
         const body = this._bodies.get(id);
         if (!body || !this._world) return;

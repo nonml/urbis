@@ -1232,7 +1232,48 @@ function runPhysicsPropTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => {
+function runTrashcanKickTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[34] Physics Props — Trashcan Kick');
+            const { RapierPhysicsWorld, RAPIER: R } = rwMod;
+            const { PhysicsPropManager, PROP_TYPES } = propMod;
+            const RR = rwMod.RAPIER;
+
+            assert(PROP_TYPES.trashcan !== undefined, 'trashcan type defined');
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rng = { next: () => 0.5 };
+            const pm = new PhysicsPropManager(pw, rng);
+
+            const groundDesc = RR.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+            const ground = pw.createRigidBody(groundDesc);
+            pw.createCollider(RR.ColliderDesc.cuboid(50, 0.1, 50), ground);
+
+            const can = pm.spawn('trashcan', 0, 1, 0);
+            assert(can !== null, 'Trashcan spawns');
+
+            for (let i = 0; i < 60; i++) pw.step();
+            const posRest = pm.getPosition(can.id);
+
+            pm.applyImpulse(can.id, { x: 5, y: 2, z: 0 });
+            for (let i = 0; i < 30; i++) pw.step();
+            const posKicked = pm.getPosition(can.id);
+
+            assert(posKicked.x > posRest.x + 0.1, 'Trashcan rolls when kicked');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Trashcan kick test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

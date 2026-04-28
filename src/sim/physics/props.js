@@ -101,6 +101,12 @@ export class PhysicsPropManager {
         }
     }
 
+    applyImpulse(id, impulse) {
+        const prop = this._props.get(id);
+        if (!prop) return;
+        this._physics.applyImpulse(prop.bodyId, impulse);
+    }
+
     getPosition(id) {
         const prop = this._props.get(id);
         if (!prop) return null;
