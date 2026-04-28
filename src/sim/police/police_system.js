@@ -23,6 +23,8 @@ export class PoliceSystem {
         this.units = [];
         this.lastSpawnTick = 0;
         this.pursuitMode = false;
+        this._lastRoadblockTick = 0;
+        this._roadblockCount = 0;
     }
 
     /**
@@ -144,6 +146,10 @@ export class PoliceSystem {
             }
         }
 
+        if (responseLevel === 'pursuit' && tick - this._lastRoadblockTick > 60) {
+            this._spawnRoadblock(tick);
+        }
+
         // Update each unit
         for (const unit of this.units) {
             this.updateUnit(unit, tick);
@@ -159,9 +165,29 @@ export class PoliceSystem {
         });
     }
 
-    /**
-     * Update a single police unit
-     */
+    _spawnRoadblock(tick) {
+        this._lastRoadblockTick = tick;
+        this._roadblockCount++;
+        const px = this.game.state.player.x;
+        const py = this.game.state.player.y;
+        const angle = this.game.rng.int(0, 359) * Math.PI / 180;
+        const dist = 20 + this.game.rng.int(0, 10);
+        const cx = Math.round(px + Math.cos(angle) * dist);
+        const cy = Math.round(py + Math.sin(angle) * dist);
+        const perpAngle = angle + Math.PI / 2;
+        for (let i = -1; i <= 1; i++) {
+            const ox = Math.round(cx + Math.cos(perpAngle) * i * 3);
+            const oy = Math.round(cy + Math.sin(perpAngle) * i * 3);
+            const unit = this.spawnUnit({
+                x: ox,
+                y: oy,
+                heading: (angle * 180 / Math.PI + 90) % 360,
+            });
+            unit.state = 'roadblock';
+            unit.speed = 0;
+        }
+    }
+
     updateUnit(unit, tick) {
         const playerX = this.game.state.player.x;
         const playerY = this.game.state.player.y;
@@ -209,6 +235,16 @@ export class PoliceSystem {
                 unit.lastKnownY = playerY;
                 unit.searchProgress = 0;
             }
+        }
+
+        if (unit.state === 'roadblock') {
+            unit.speed = 0;
+            if (dist <= 8) {
+                unit.state = 'pursuit';
+                unit.targetX = playerX;
+                unit.targetY = playerY;
+            }
+            return;
         }
 
         if (unit.state === 'search') {
