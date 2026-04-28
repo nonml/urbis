@@ -32,6 +32,8 @@ import { validateBuildingDefinition } from '../src/content/buildings/schema.js';
 import { generateBuilding, generateBatch } from '../src/content/buildings/generator.js';
 import { validateVehicleDefinition } from '../src/content/vehicles/schema.js';
 import { generateVehicle, generateBatch as generateVehicleBatch } from '../src/content/vehicles/generator.js';
+import { validateWeaponDefinition } from '../src/content/weapons/schema.js';
+import { generateWeapon, generateBatch as generateWeaponBatch } from '../src/content/weapons/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
@@ -1965,8 +1967,58 @@ function testVehicleTemplateSchema() {
     }
 }
 
+function testWeaponTemplateSchema() {
+    console.log('\n[51] Weapon Template Schema + Generator + Validator');
+    try {
+        const valid = {
+            id: 'test_gun', name: 'Test Gun', type: 'ranged',
+            damage: 20, range: 15, fireRate: 300, ammo: 12, maxAmmo: 60,
+            heatGain: 10, spread: 0.5, pellets: 1, soundRadius: 12,
+            recoilGain: 1.0, recoilMax: 4.0, recoilRecovery: 2.0,
+            adsFov: 50, adsSpreadMul: 0.4,
+        };
+        let r = validateWeaponDefinition(valid);
+        assert(r.valid, 'Valid weapon passes validation');
+
+        r = validateWeaponDefinition({});
+        assert(!r.valid, 'Empty object fails');
+
+        r = validateWeaponDefinition({ ...valid, damage: 0 });
+        assert(!r.valid, 'Zero damage rejected');
+
+        r = validateWeaponDefinition({ ...valid, ammo: 100, maxAmmo: 50 });
+        assert(!r.valid, 'ammo > maxAmmo rejected');
+
+        r = validateWeaponDefinition({ ...valid, type: 'laser' });
+        assert(!r.valid, 'Invalid type rejected');
+
+        const melee = {
+            id: 'test_bat', name: 'Bat', type: 'melee',
+            damage: 20, range: 2, fireRate: 600, heatGain: 5,
+        };
+        r = validateWeaponDefinition(melee);
+        assert(r.valid, 'Melee weapon valid without ammo fields');
+
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const gen = generateWeapon(mockRng, { type: 'ranged' });
+        assert(gen.type === 'ranged', 'Generator respects type option');
+        r = validateWeaponDefinition(gen);
+        assert(r.valid, 'Generated weapon passes validation');
+
+        const batch = generateWeaponBatch(mockRng, 10);
+        assert(batch.length === 10, 'Batch correct count');
+        const allValid = batch.every(w => validateWeaponDefinition(w).valid);
+        assert(allValid, 'All generated weapons valid');
+    } catch (e) {
+        console.log(`  ✗ Weapon template test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
+testWeaponTemplateSchema();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
