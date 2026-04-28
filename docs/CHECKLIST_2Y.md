@@ -312,9 +312,9 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q5.B — Low-Priority Content Queue
 
-- [ ] `q5-cq-autofill` curator tops up content queue when milestone queue empty
-- [ ] `q5-cq-ratelimit` ≤ 5 content tasks/day
-- [ ] `q5-cq-quality-floor` validator rejects low-score content automatically
+- [x] `q5-cq-autofill` curator tops up content queue when milestone queue empty
+- [x] `q5-cq-ratelimit` ≤ 5 content tasks/day
+- [x] `q5-cq-quality-floor` validator rejects low-score content automatically
 
 ### Q5.C — Content Goals
 

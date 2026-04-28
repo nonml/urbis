@@ -35,6 +35,7 @@ import { generateVehicle, generateBatch as generateVehicleBatch } from '../src/c
 import { validateWeaponDefinition } from '../src/content/weapons/schema.js';
 import { generateWeapon, generateBatch as generateWeaponBatch } from '../src/content/weapons/generator.js';
 import { generateQuest, generateBatch as generateQuestBatch } from '../src/content/quests/generator.js';
+import { ContentQueue } from '../src/content/queue.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
@@ -2083,11 +2084,55 @@ function testNPCTemplateSchema() {
     }
 }
 
+function testContentQueue() {
+    console.log('\n[54] Content Queue — Autofill, Rate-Limit, Quality Floor');
+    try {
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const cq = new ContentQueue();
+
+        const added = cq.autofill(mockRng, { milestoneEmpty: true, target: 5 });
+        assert(added > 0, 'Autofill adds content tasks');
+        assert(cq.pending.length > 0, 'Pending queue non-empty after autofill');
+        assert(cq.pending.every(t => t.score >= 0.5), 'All pending items meet quality floor');
+
+        const noAdd = cq.autofill(mockRng, { milestoneEmpty: false });
+        assert(noAdd === 0, 'Autofill does nothing when milestone queue not empty');
+
+        assert(cq.canProcess('day1'), 'Can process on day 1');
+        let processed = 0;
+        while (cq.canProcess('day1') && cq.pending.length > 0) {
+            const task = cq.processNext('day1');
+            if (task) processed++;
+        }
+        assert(processed <= 5, 'Rate limit: max 5 tasks per day');
+        assert(cq.dailyCount <= 5, 'Daily count respects limit');
+
+        cq.autofill(mockRng, { milestoneEmpty: true, target: 10 });
+        assert(!cq.canProcess('day1'), 'Cannot exceed daily limit on same day');
+        assert(cq.canProcess('day2'), 'New day resets counter');
+
+        const stats = cq.getStats();
+        assert(stats.maxPerDay === 5, 'Max per day is 5');
+        assert(stats.qualityFloor === 0.5, 'Quality floor is 0.5');
+        assert(typeof stats.completed === 'number', 'Stats tracks completed');
+
+        const data = cq.serialize();
+        const cq2 = new ContentQueue();
+        cq2.deserialize(data);
+        assert(cq2.completed.length === cq.completed.length, 'Serialization round-trips');
+    } catch (e) {
+        console.log(`  ✗ Content queue test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
 testWeaponTemplateSchema();
 testQuestTemplateGenerator();
 testNPCTemplateSchema();
+testContentQueue();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
