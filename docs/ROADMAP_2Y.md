@@ -8,7 +8,7 @@ This document defines:
 - **Part I** — how a session flows, how to pick and execute a task
 - **Part II** — codebase map, architecture, and conventions
 - **Part III** — the autonomous pipeline (Roo Code driven)
-- **Part IV** — the eight-quarter roadmap
+- **Part IV** — the fourteen-quarter roadmap (originally eight; extended after the 2026-04-28 pace recalibration)
 - **Part V** — version scheme and release policy
 - **Part VI** — anti-patterns, recovery, escalation
 - **Part VII** — how to maintain this manual
@@ -67,9 +67,11 @@ These are the feelings the finished game should produce. Use them to evaluate wh
 
 The game has strong systemic bones: economy, factions, intel, politics, quests, hacking, vehicles, combat, stealth, weather, zoning, transit. Most systems exist and work.
 
-What is missing: **presentation, feedback, and cohesion**. The gap is not in whether systems exist — it is in whether the player can *feel* them. Combat feedback is incomplete. The gameplay loop is unclear. NPCs are abstractions. Hacking lacks a radial UI. No authored narrative arc.
+The original 2-year plan was sized for a single human contributor. Actual throughput under autonomous operation has been roughly **1 quarter every 4–5 days**, ~20× the original budget. As of 2026-04-28: **Q1–Q5 are complete and tagged, Q6 is one definition-of-done check away from tag**, and the systemic foundations the original plan deferred to year 2 are already shipped.
 
-The 2-year plan closes these gaps in priority order. Trust the roadmap.
+What this changes: the gaps that matter now are **fidelity, performance, and depth**, not feature breadth. Materials are inconsistent. The renderer leans on 2018-era post (FXAA, basic SSAO, no TAA, no CSM, no SSR, no volumetrics, no GI). Draw calls and per-frame allocations have not been audited at scale. NPC density and verticality are conservative because the renderer can't carry more.
+
+The roadmap has been **extended** to absorb that headroom: Q7–Q8 ship the original narrative + 1.0 polish targets on the new compressed cadence, then **Q9–Q14** are net-new — two graphics passes, two optimization passes, a city-depth pass, and a final 1.0 launch quarter. Trust the new shape; do not re-pad earlier quarters.
 
 ---
 
@@ -387,9 +389,40 @@ Release is triggered manually by the operator.
 
 ---
 
-## Part IV — Eight-Quarter Roadmap
+## Part IV — Fourteen-Quarter Roadmap
 
 Each quarter has: **theme**, **entry criteria** (must be true before starting), **exit criteria** (must be true to tag the quarter), **milestone** (the one thing that defines success), **content backlog** (LLM chews on between milestone tasks), **risks**, and **rollback plan** if the quarter slips.
+
+### Pace Note (2026-04-28 recalibration)
+
+The original Part IV was eight quarters across 2026-04 → 2028-04, sized for human-paced solo development. Autonomous operation is running at roughly **20× that budget** (one quarter every 4–5 days). Rather than declare the plan finished early and float, the timeline was **extended in place**: dates for Q1–Q8 are recalibrated to actual cadence, and **six new quarters (Q9–Q14)** were added covering graphics fidelity, optimization, world depth, and the genuine 1.0 launch.
+
+Recalibrated calendar (target dates, not commitments):
+
+| Q  | Theme                                | Original window           | Actual / planned window     | Tag       |
+|----|--------------------------------------|---------------------------|-----------------------------|-----------|
+| Q1 | Foundations for autonomous operation | 2026-04 → 2026-06         | 2026-04-01 → 2026-04-04 ✅  | `0.1.0.0` |
+| Q2 | Playability pass 1                   | 2026-07 → 2026-09         | 2026-04-05 → 2026-04-09 ✅  | `0.2.0.0` |
+| Q3 | Physics + interiors lite             | 2026-10 → 2026-12         | 2026-04-10 → 2026-04-15 ✅  | `0.3.0.0` |
+| Q4 | Combat & AI depth                    | 2027-01 → 2027-03         | 2026-04-16 → 2026-04-19 ✅  | `0.4.0.0` |
+| Q5 | Content engine                       | 2027-04 → 2027-06         | 2026-04-20 → 2026-04-23 ✅  | `0.5.0.0` |
+| Q6 | Hacking depth                        | 2027-07 → 2027-09         | 2026-04-24 → 2026-04-29     | `0.6.0.0` |
+| Q7 | Narrative & audio                    | 2027-10 → 2027-12         | 2026-04-30 → 2026-05-15     | `0.7.0.0` |
+| Q8 | Playability pass 2 (was "1.0 RC")    | 2028-01 → 2028-04         | 2026-05-16 → 2026-06-05     | `0.8.0.0` |
+| Q9 | **Graphics pass 1 — modern rendering**   | —                     | 2026-06-06 → 2026-08-01     | `0.9.0.0` |
+| Q10| **Graphics pass 2 — surfaces & detail**  | —                     | 2026-08-02 → 2026-09-30     | `0.10.0.0`|
+| Q11| **Optimization pass 1 — render pipeline**| —                     | 2026-10-01 → 2026-11-30     | `0.11.0.0`|
+| Q12| **Optimization pass 2 — memory & streaming**| —                  | 2026-12-01 → 2027-01-31     | `0.12.0.0`|
+| Q13| **Living city depth — verticality, density** | —                 | 2027-02-01 → 2027-05-31     | `0.13.0.0`|
+| Q14| **1.0 RC, external playtest, launch**| —                         | 2027-06-01 → 2027-12-31     | `1.0.0`   |
+
+The "2-year manual" name is preserved for git/operator continuity even though the calendar now stretches ~21 months from start. If actual pace stays at 4–5 days per quarter, Q14 lands much earlier and post-1.0 content (DLC, modding API, localization) becomes Q15+. Do not re-plan that yet.
+
+**Re-baselining rules.**
+- Q1–Q6 sections below show **original windows** for archival reasons. Their entry/exit criteria were already met; do not re-litigate.
+- Q7+ sections use the new windows.
+- A quarter is "in flight" once any of its `[ ]` items is `[~]`. Until then it's "queued".
+- The exit criteria, milestone, and tag for any past quarter are frozen. Only the dates were changed.
 
 ### Q1 — Foundations for Autonomous Operation (2026-04 → 2026-06)
 
@@ -509,7 +542,7 @@ Each quarter has: **theme**, **entry criteria** (must be true before starting), 
 
 **Tag:** `0.6.0.0`.
 
-### Q7 — Narrative & Audio (2027-10 → 2027-12)
+### Q7 — Narrative & Audio (2026-04-30 → 2026-05-15)
 
 **Theme:** It feels like a game, not a tech demo.
 
@@ -526,22 +559,171 @@ Each quarter has: **theme**, **entry criteria** (must be true before starting), 
 
 **Tag:** `0.7.0.0`.
 
-### Q8 — Polish, Perf, 1.0 RC (2028-01 → 2028-04)
+### Q8 — Playability Pass 2 (2026-05-16 → 2026-06-05)
 
-**Theme:** Ship a version people would actually play for 10 hours.
+**Theme:** Re-walk the player loop end-to-end with everything Q1–Q7 added.
 
-**Entry criteria:** Q7 exit met; operator + ≥ 3 external playtesters lined up.
+**Entry criteria:** Q7 exit met. Narrative arc shippable.
 
-**Milestone:** External testers complete a 2-hour session without hard crash or softlock.
+**Milestone:** A blind playtester completes the 6-mission arc + at least one zero-gunfire stealth-hack mission in one sitting (≤ 3h, no hard crash, no softlock).
 
 **Exit criteria:**
-- Perf pass: frustum culling audited, LOD tuned, draw calls reduced ≥ 20%, GC audited.
-- Accessibility: rebindable keys, subtitles, colorblind palettes, camera shake toggle, reduced-motion.
-- Save migration tests cover every minor version since 0.1.
-- Steam depot upload works end-to-end; achievements plumbed; cloud saves tested.
-- Post-launch patch pipeline rehearsed.
+- Tutorial path validated against every weapon, hack, and vehicle added since Q2.
+- Difficulty pass: combat, stealth, and economy curves smoothed (no spikes, no flat sections).
+- Quest validator covers every mission in the arc plus 5 generated side-quests.
+- Save format frozen at `schemaVersion = 8`; migrations from `0.1.x` → `0.8.x` tested.
+- Crash budget: zero uncaught errors across a 3-hour scripted Playwright playthrough.
+- Bundle size growth ≤ 10% versus `0.7.0.0` (post-narrative bloat checked).
 
-**Tag:** `1.0.0-rc.1` mid-quarter, `1.0.0` end of April 2028.
+**Tag:** `0.8.0.0`. **This is not 1.0 anymore** — 1.0 moves to Q14, after the graphics, optimization, and depth quarters.
+
+### Q9 — Graphics Pass 1: Modern Rendering Foundation (2026-06-06 → 2026-08-01)
+
+**Theme:** The frame buffer should look like 2026, not 2018.
+
+**Entry criteria:** Q8 exit met. Perf harness baseline captured at `0.8.0.0` for every reference scene — every Q9 task must compare against that baseline, not against itself.
+
+**Milestone:** Side-by-side screenshots of `street-noon`, `street-night`, `rain`, and `interior-shop` versus the `0.8.0.0` baseline are unmistakably better in materials, shadows, and lighting — and the perf harness shows ≤ 15% frame-time regression on the reference GPU at the new "Quality" preset (and zero regression at the new "Performance" preset, which becomes the default).
+
+**Exit criteria:**
+- **Material audit:** every shipped mesh uses `MeshStandardMaterial` or `MeshPhysicalMaterial` with declared `roughness`, `metalness`, and (where appropriate) `clearcoat`. No `MeshLambert`, no `MeshPhong`, no `MeshBasic` outside HUD/sky billboards.
+- **HDR pipeline:** `WebGLRenderer.toneMapping = ACESFilmicToneMapping`, `outputColorSpace = SRGBColorSpace`, render targets are `HalfFloatType` end-to-end. No double gamma.
+- **Cascaded shadow maps:** 3-cascade CSM replaces the single `DirectionalLight.shadow` map, with per-cascade resolution budget and a soft PCF or PCSS filter.
+- **Volumetric fog/lighting:** raymarched, half-res, sun-lit volumetrics that respond to weather density and night street-light cones.
+- **Screen-space reflections (SSR):** stochastic SSR pass on wet roads, water, and metal materials, with a cheap fallback to env-probe reflections when SSR misses.
+- **Bloom upgrade:** multi-mip thresholded bloom replacing the single-pass `UnrealBloomPass` parameters; per-scene exposure target.
+- **Color grading LUT:** per-time-of-day LUT (dawn / day / dusk / night) blended by the day-night system, plus weather tint overlay.
+- **Sky upgrade:** sun and moon disc with proper aerial perspective; star field visible at low light pollution; lightning flash is a proper exposure spike, not an alpha overlay.
+- **Skylight env probe:** scene captures a low-res cube every N seconds for image-based lighting on metals and glass.
+- Quality presets: `low / medium / high / ultra` defined; auto-detect picks based on first-frame timing.
+- New screenshot baselines for all Q1.I views at the new default ("Performance") preset.
+
+**Risks:** Three.js `three/addons` doesn't ship CSM or volumetrics out of the box — both will need bespoke shader passes. Budget one full task per pass for shader iteration. If browser GPU memory caps hit on a reference scene, drop the cube probe resolution before dropping shadow cascades.
+
+**Tag:** `0.9.0.0`.
+
+### Q10 — Graphics Pass 2: Surfaces, Detail, Atmosphere (2026-08-02 → 2026-09-30)
+
+**Theme:** The world has texture, history, and weight. Surfaces tell stories.
+
+**Entry criteria:** Q9 exit met. Material audit at 100%. Performance preset still on-budget.
+
+**Milestone:** Walk a single block at noon, then in rain, then at night, and the city looks like three different places — not the same scene with different fog colors.
+
+**Exit criteria:**
+- **Decal system:** projected decals for puddles, oil stains, blood, scorch marks, posters, graffiti, tire skids, bullet impacts. Cap of N per chunk, LRU evicted.
+- **Wet road shader:** per-tile wetness map driven by weather + drainage; proper Fresnel + roughness modulation; puddle decals receive SSR.
+- **Vegetation system:** trees with vertex-shader wind sway, grass billboards (1 draw call per chunk via `InstancedMesh`), seasonal color tint, leaf-fall particles.
+- **Water upgrade:** real-time planar reflections on canals/harbor, depth-based color absorption, surface foam at obstacles, caustics at shallow depths, wake from boats.
+- **GPU particles:** rain/snow/sparks/smoke moved off CPU; transform feedback or compute-emulated; 50× the current count for the same frame budget.
+- **TAA replaces FXAA:** temporal jitter, history reprojection, neighborhood clamp; FXAA stays as a fallback for "Performance" preset.
+- **GTAO replaces SSAO:** ground-truth ambient occlusion at half-res with separable bilateral blur; SSAO retained as fallback.
+- **Realtime GI:** light probe grid + irradiance volumes baked at chunk-load, dynamic-light deltas applied per frame. SDFGI or VXGI is out-of-scope for v1 — defer to post-1.0.
+- **Subsurface scattering (lite):** wrap-shading on skin/foliage; cheap, no separable filter.
+- **Anisotropic specular:** for road, hair, brushed metal vehicle paint.
+- **Per-district art direction:** docks (greenish overcast), industrial (smoggy), suburbs (warm), old-town (saturated). Confirmed via screenshot diff.
+- New screenshot baselines for all four district variants.
+
+**Risks:** TAA ghosting on fast-moving NPCs and tracers; budget a tuning task per artifact class. Decal counts scale with combat duration — cap and prune aggressively.
+
+**Tag:** `0.10.0.0`.
+
+### Q11 — Optimization Pass 1: Render Pipeline (2026-10-01 → 2026-11-30)
+
+**Theme:** 60 fps at "High" preset on a midrange laptop GPU. No exceptions.
+
+**Entry criteria:** Q10 exit met. Perf harness shows where every millisecond goes.
+
+**Milestone:** Reference scene `medium+120-NPCs+rain+night` runs ≥ 60 fps at "High" on the reference GPU, with a sustained 16 ms frame budget split documented per pass.
+
+**Exit criteria:**
+- **WebGPU evaluation:** spike branch tested on Chromium-stable; decision recorded — go / wait-for-three / no. If go, port the easy wins (compute particles, GPU culling) and leave the rest for Q12.
+- **GPU-driven culling:** Hi-Z occlusion + frustum culling for buildings, vehicles, NPCs, and props. CPU does coarse cull, GPU does the fine pass.
+- **Mesh LOD system:** 4-tier LODs (LOD0 hero, LOD1 mid, LOD2 silhouette, LOD3 imposter) for buildings, vehicles, characters. Imposters generated at build time.
+- **Instancing audit:** every mesh duplicated more than 8× across a scene moves to `InstancedMesh` or `BatchedMesh`. New CI check counts non-instanced duplicates.
+- **Texture atlas + array textures:** material count cut ≥ 50% by atlasing per category.
+- **Uber-shader audit:** shader permutation count audited; defines collapsed where they branch on flags vs. types.
+- **Dynamic resolution scaling (DRS):** when frame time exceeds budget, render at 0.85× for one frame, ramp back; bounded by user-set min.
+- **Render graph:** explicit pass ordering with dependency tracking; no implicit `renderTarget` mutation across passes.
+- **Draw-call budget:** ≤ 2000 draws on `medium+120-NPCs`, ≤ 3000 on `large+200-NPCs`. CI fails on exceedance.
+- **VRS (variable rate shading):** opt-in for "Performance" preset on supported hardware; sky and out-of-focus regions render at 2×2.
+- New `tools/agent/baselines/perf.json` schema includes per-pass timings, not just frame time.
+
+**Risks:** WebGPU still maturing in Three.js; budget the spike to 5 days, not the full quarter. GPU culling needs scene authoring discipline — every new system added in Q9–Q10 must register its meshes for culling before Q11 audit, or it gets flagged.
+
+**Tag:** `0.11.0.0`.
+
+### Q12 — Optimization Pass 2: Memory, CPU, Streaming (2026-12-01 → 2027-01-31)
+
+**Theme:** The game stays smooth across long sessions, big maps, and slow disks.
+
+**Entry criteria:** Q11 exit met. Render-side budgets locked. Profile shifts to CPU and memory.
+
+**Milestone:** A 4-hour continuous session on the reference machine has flat memory usage (no upward drift), zero stalls > 33 ms after the first 30 seconds, and bundle initial-load < 2 MB gzipped.
+
+**Exit criteria:**
+- **Web Workers** for: pathfinding (already partial), NPC scheduling, faction sim tick, audio mixing, save serialization, and the asset decoder pool.
+- **Asset streaming:** chunked load with LRU eviction; world chunks request and release on the streaming worker, never on the main thread.
+- **Asset compression:** all textures shipped as KTX2 (Basis ETC1S/UASTC); all geometry via meshopt or Draco. Build-time only; runtime decode in the asset worker.
+- **Audio compression:** Opus pipeline; per-stream bitrate budget; music lazy-loaded per district.
+- **GC audit:** zero per-frame allocations in the tick loop, the render loop, and the input-handling path. CI check via heap-sampling smoke.
+- **Object pool audit:** vehicles, NPCs, projectiles, particles, decals, ragdolls, FX. Pool capacity and high-water tracked per pool, surfaced in dev HUD.
+- **Memory budget enforcement:** soft cap 2 GB on medium, 4 GB on huge. Streaming evicts earliest-LRU when 80% reached. Hard cap throws a recoverable error to the operator.
+- **Bundle initial JS:** ≤ 2 MB gzipped via dynamic imports; `vite.config.js` `manualChunks` audited; everything that's not first-frame critical is lazy.
+- **Save format:** msgpack (cbor-x or msgpackr); 100h synthetic save loads in < 5 s and round-trips deterministically.
+- **Save migration speed:** no migration takes longer than 1 s per minor version step on the synthetic save.
+- **Dev memory HUD:** per-pool counts, GC events/sec, JS heap size, GPU memory estimate.
+
+**Risks:** Worker boundaries leak structured-clone overhead — measure before assuming a copy is free. KTX2 toolchain on Windows may need pre-built binaries; budget a chore task for the Basis toolchain install.
+
+**Tag:** `0.12.0.0`.
+
+### Q13 — Living City Depth (2027-02-01 → 2027-05-31)
+
+**Theme:** With render and memory headroom recovered, spend it on density and verticality. The city stops being a flat board.
+
+**Entry criteria:** Q12 exit met. Perf headroom ≥ 30% at "High" preset on the reference GPU.
+
+**Milestone:** A peak-hour rooftop chase across three skybridges, through one interior, and into a subway tunnel runs at 60 fps with 200+ visible NPCs and 80+ vehicles in view, no streaming hitches.
+
+**Exit criteria:**
+- **Rooftop traversal:** parkour-lite climb/jump on tagged rooftop edges; player can reach any rooftop labeled "accessible" in metadata.
+- **Skybridges:** procedural skybridge spans connecting tall buildings in dense districts; nav-mesh bakes them; NPCs use them.
+- **Underground:** sewer + parking-garage + subway tunnel layers, with seamless entry from world.
+- **Interior expansion:** 10 hand-authored interior templates (was 3) covering shops, safehouses, offices, clubs, warehouses, subway stations.
+- **Crowd density:** 200+ visible NPCs at peak (was 120). LOD tiers used aggressively; behavior fidelity drops with distance.
+- **Traffic density:** 80+ vehicles on visible roads (was conservative); spawner respects district zoning + time of day.
+- **Vertical hacking:** camera-to-camera traversal works through windows; profiler reaches NPCs across floors.
+- **Districts:** 8 distinct flavors (was 4); the four new ones are entertainment, government, transit-hub, waterfront-residential.
+- **Photo mode upgrade:** depth of field, focal pull, free-cam roll, time-scrub.
+- **Save schema bump for new world strata:** rooftop, underground, and interior coords coexist in one save.
+- **Perf re-baseline:** every reference scene re-captured at the new density.
+
+**Risks:** Density expansion is the single biggest perf pressure release valve and the biggest regression risk; treat every density bump as a perf task. Save schema migration for vertical world is non-trivial — sequence it before any new mission content lands.
+
+**Tag:** `0.13.0.0`.
+
+### Q14 — 1.0 RC, External Playtest, Launch (2027-06-01 → 2027-12-31)
+
+**Theme:** Ship a game people play for 10 hours, give to a friend, and don't apologize for.
+
+**Entry criteria:** Q13 exit met. Operator + ≥ 3 external playtesters lined up. No P0 bugs open. Crash budget at zero across the scripted 3-hour playthrough.
+
+**Milestone:** External testers complete a 2-hour blind session without hard crash, softlock, or "what am I supposed to be doing" moments, and at least 2 of them return for a second session unprompted.
+
+**Exit criteria:**
+- **Final perf pass:** frustum-culling re-audited after Q13 density work; LOD thresholds re-tuned; draw calls ≤ 3000 on `large+200-NPCs+rain`; GC clean across 4-hour session.
+- **Final shader cost audit:** SSAO/GTAO half-res, bloom mips, volumetrics step count — all cost-budgeted per preset.
+- **Accessibility complete:** rebindable keys (everything), subtitles (size, speaker labels), 3 colorblind palettes, camera-shake toggle, reduced-motion mode, hold-vs-tap interact toggle, audio mixer per channel.
+- **Save migration matrix:** every minor version `0.1.x` → `0.13.x` → `1.0` covered by a Playwright round-trip; 100h synthetic save round-trips clean.
+- **Steam pipeline:** depot upload end-to-end; ≥ 30 achievements defined and trigger-tested; cloud saves tested across two installs; Steam Workshop wired for mods.
+- **External playtest complete:** ≥ 3 testers, ≥ 2 sessions each; logs aggregated in `docs/playtests/`; zero hard crashes; zero softlocks; retrospective in `docs/retros/`.
+- **Patch pipeline rehearsed:** at least one `1.0.0-rc.N → 1.0.0-rc.N+1` cycle executed end-to-end before tagging final.
+- **Localization scaffold:** all UI strings extracted to a single i18n catalog; English is the only shipped language but the pipeline works for at least one second language as a smoke test.
+- **Mod API documentation:** `docs/MODDING.md` published; one example mod ships in `assets/mods/example/`.
+- **Release notes:** `docs/release_notes/1.0.0.md` complete and honest.
+
+**Tags:** `1.0.0-rc.1` mid-quarter; up to two patch RCs allowed; `1.0.0` end of December 2027 (target — slip to early 2028 acceptable).
 
 ---
 
@@ -551,11 +733,13 @@ Each quarter has: **theme**, **entry criteria** (must be true before starting), 
 
 `0.Q.M.patch` during pre-1.0, then `1.MAJOR.MINOR.PATCH` semver after.
 
-- `Q` = quarter number (0–8 during this plan)
+- `Q` = quarter number (0–14 during this extended plan)
 - `M` = milestone index within the quarter (resets each quarter)
 - `patch` = biweekly patch index within the minor
 
-Examples: `0.1.0.0` end of Q1; `0.4.2.3` = Q4 second milestone, third patch.
+Examples: `0.1.0.0` end of Q1; `0.4.2.3` = Q4 second milestone, third patch; `0.10.0.0` end of Q10 (not "0.1.0.0" — leading zeros are not stripped, the field is the integer quarter index).
+
+Quarter-to-tag mapping (canonical): Q1 → `0.1`, Q2 → `0.2`, …, Q9 → `0.9`, Q10 → `0.10`, Q11 → `0.11`, Q12 → `0.12`, Q13 → `0.13`, Q14 → `1.0`.
 
 ### 5.2 Promotion Rules
 
