@@ -258,7 +258,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q4.B — Behavior Tree Rewrite
 
 - [x] `q4-bt-library` tiny BT library in `src/sim/agents/bt.js`
-- [ ] `q4-bt-ambient` ambient (walk, chat) behavior
+- [x] `q4-bt-ambient` ambient (walk, chat) behavior
 - [ ] `q4-bt-alerted` alerted behavior with search pattern
 - [ ] `q4-bt-engaged` engaged behavior with cover + fire
 - [ ] `q4-bt-flee` flee behavior with panic radius

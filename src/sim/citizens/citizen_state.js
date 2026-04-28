@@ -80,7 +80,13 @@ export function ensureCitizenState(citizen, map = null) {
             lastY: citizen.y,
             stuckTicks: 0,
             lodTier: 'near',
+            chatTimer: 0,
+            chatPartnerId: null,
         };
+    }
+    if (citizen._sim.chatTimer === undefined) {
+        citizen._sim.chatTimer = 0;
+        citizen._sim.chatPartnerId = null;
     }
     citizen.needs.food = clamp01(citizen.needs.food);
     citizen.needs.rest = clamp01(citizen.needs.rest);

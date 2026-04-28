@@ -1,6 +1,7 @@
 // @ts-check
 /// <reference path="../../types/game.d.ts" />
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
+import { tickAmbient } from '../agents/bt_ambient.js';
 
 export class CitizenSim {
     constructor(game) {
@@ -70,38 +71,7 @@ export class CitizenSim {
     }
 
     updateMovement(citizen, timeOfDay, tier, tick) {
-        if (tier === 'far' && (tick % 4 !== 0)) return;
-        if (tier === 'mid' && (tick % 2 !== 0)) return;
-        const result = this.game.scheduleManager.updateCitizenSchedule(
-            citizen,
-            { map: this.game.map, buildings: this.game.buildings },
-            timeOfDay
-        );
-
-        if (citizen.x === citizen._sim.lastX && citizen.y === citizen._sim.lastY) {
-            citizen._sim.stuckTicks++;
-        } else {
-            citizen._sim.stuckTicks = 0;
-        }
-        citizen._sim.lastX = citizen.x;
-        citizen._sim.lastY = citizen.y;
-
-        // Anti-oscillation fallback.
-        if (!result.moved && citizen._sim.stuckTicks > 6) {
-            const dirs = [
-                { x: 1, y: 0 }, { x: -1, y: 0 }, { x: 0, y: 1 }, { x: 0, y: -1 },
-            ];
-            for (const dir of dirs) {
-                const nx = citizen.x + dir.x;
-                const ny = citizen.y + dir.y;
-                if (this.game.scheduleManager.isWalkable(nx, ny)) {
-                    citizen.x = nx;
-                    citizen.y = ny;
-                    citizen._sim.stuckTicks = 0;
-                    break;
-                }
-            }
-        }
+        tickAmbient(citizen, this.game, timeOfDay, tick, tier);
     }
 
     updateRelationships(citizen, tier, tick) {
