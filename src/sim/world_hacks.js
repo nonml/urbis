@@ -19,6 +19,8 @@ export class WorldHackEffects {
         this._raisedBarriers = [];    // { x, y, untilTick }
         // Environmental explosions
         this._explosions = [];         // { x, y, radius, tick }
+        // Steam pipe bursts — lingering zone
+        this._steamBursts = [];        // { x, y, radius, untilTick }
         // Quick-hack cooldowns per category
         this._cooldowns = new Map();   // hackType -> untilTick
     }
@@ -63,6 +65,18 @@ export class WorldHackEffects {
         this._trafficLightChaos = this._trafficLightChaos.filter(t => tick < t.untilTick);
         this._raisedBarriers = this._raisedBarriers.filter(b => tick < b.untilTick);
         this._explosions = this._explosions.filter(e => tick - e.tick < 10);
+        this._steamBursts = this._steamBursts.filter(s => tick < s.untilTick);
+
+        for (const steam of this._steamBursts) {
+            const citizens = this.game.citizens?.citizens || [];
+            for (const c of citizens) {
+                const dx = (c.x ?? 0) - steam.x;
+                const dy = (c.y ?? 0) - steam.y;
+                if (dx * dx + dy * dy < steam.radius * steam.radius) {
+                    c.health = (c.health ?? 100) - 3;
+                }
+            }
+        }
 
         // Barrier enforcement: keep blocking vehicles each tick
         for (const barrier of this._raisedBarriers) {
@@ -381,10 +395,28 @@ export class WorldHackEffects {
             trafficLightChaos: this._trafficLightChaos.filter(t => tick < t.untilTick),
             raisedBarriers: this._raisedBarriers.filter(b => tick < b.untilTick),
             recentExplosions: this._explosions.filter(e => tick - e.tick < 5),
+            steamBursts: this._steamBursts.filter(s => tick < s.untilTick),
         };
     }
 
     // ── Internal helpers ──
+
+    hackSteamPipe(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('steam_pipe', tick)) {
+            return { ok: false, reason: 'On cooldown' };
+        }
+        this._steamBursts.push({ x, y, radius: 5, untilTick: tick + 20 });
+        this._setCooldown('steam_pipe', tick, 45);
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(8);
+        this.game.ui?.showMessage?.('Steam pipe burst!', 'warning');
+        try {
+            eventBus.emit(EVENT_TYPES.HACK_SUCCESS, {
+                type: 'steam_pipe', x, y,
+            });
+        } catch {}
+        return { ok: true };
+    }
 
     _buildRelationsGraph(citizenId) {
         const sg = this.game.socialGraph;

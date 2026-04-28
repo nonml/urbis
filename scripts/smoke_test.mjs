@@ -2442,6 +2442,37 @@ function testProfilerScheduleVis() {
 }
 
 testProfilerScheduleVis();
+
+function testHackSteamPipe() {
+    console.log('\n[66] Hack Chain — steam pipe burst');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 111111, mode: 'standard' });
+        game.init();
+
+        const result = game.worldHacks.hackSteamPipe(10, 10);
+        assert(result.ok, 'Steam pipe hack succeeds');
+
+        const effects = game.worldHacks.getActiveEffects();
+        assert(effects.steamBursts.length === 1, 'One active steam burst');
+        assert(effects.steamBursts[0].radius === 5, 'Burst radius is 5');
+
+        const result2 = game.worldHacks.hackSteamPipe(15, 15);
+        assert(!result2.ok, 'Second hack blocked by cooldown');
+
+        game.runTicks(50);
+        const effects2 = game.worldHacks.getActiveEffects();
+        assert(effects2.steamBursts.length === 0, 'Steam burst expired');
+
+        const result3 = game.worldHacks.hackSteamPipe(20, 20);
+        assert(result3.ok, 'Hack succeeds after cooldown');
+    } catch (e) {
+        console.log(`  ✗ Steam pipe test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackSteamPipe();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

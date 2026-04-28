@@ -26,6 +26,7 @@ import { AnomalyDetectors } from './sim/anomalies/detectors.js';
 import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { InteractableManager } from './sim/interactables.js';
 import { CameraNetwork } from './sim/camera_network.js';
+import { WorldHackEffects } from './sim/world_hacks.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { QuestEngine } from './sim/quests/quest_engine.js';
 import { CaseManager } from './sim/cases/case_manager.js';
@@ -142,6 +143,7 @@ export class Game {
         this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
         this.interactables.game = this;
         this.cameraNetwork = new CameraNetwork(this);
+        this.worldHacks = new WorldHackEffects(this);
         this.heatSystem = new HeatSystem(this);
         this.heatSystem.setHeat(this.state.player.heat || 0);
         this.content = { quests: [] };
@@ -686,6 +688,7 @@ export class Game {
                 this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
                 this.interactables.game = this;
                 this.cameraNetwork = new CameraNetwork(this);
+                this.worldHacks = new WorldHackEffects(this);
                 this.heatSystem = new HeatSystem(this);
                 this.questEngine = new QuestEngine(this);
                 this.caseManager = new CaseManager(this);
