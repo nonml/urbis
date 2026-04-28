@@ -183,7 +183,7 @@ export class InteractableManager {
             // Decide if this should be a physical node
             const usePhysical = physicalPlaced < physicalCount &&
                                 this.rng.float(0, 1) < 0.3;
-            
+
             const typeKeys = usePhysical ? physicalTypeKeys : regularTypeKeys;
             const typeKey = typeKeys[this.rng.int(0, typeKeys.length - 1)];
 
@@ -195,12 +195,44 @@ export class InteractableManager {
             );
             interactable.manager = this;
             this.interactables.push(interactable);
-            
+
             if (usePhysical) {
                 physicalPlaced++;
             }
             nodeId++;
         }
+
+        // Third pass: extra CCTV_POLE cameras for camera network density
+        const existingCams = this.interactables.filter(n => n.type === 'CCTV_POLE').length;
+        const targetCams = Math.max(existingCams, Math.floor(count * 0.6));
+        let extraAttempts = 0;
+        while (this._countType('CCTV_POLE') < targetCams && extraAttempts < 80) {
+            extraAttempts++;
+            const x = this.rng.int(1, this.width - 2);
+            const y = this.rng.int(1, this.height - 2);
+            const tile = map.grid[y]?.[x];
+            if (tile === 0) continue;
+            const roadIdx = map.roadMap ? map.roadMap[y * this.width + x] : 0;
+            if (roadIdx > 0) continue;
+            if (this.interactables.some(n => n.x === x && n.y === y)) continue;
+            const cam = createInteractable(
+                x, y,
+                map.getDistrictAt(x, y),
+                'CCTV_POLE',
+                this.seed + 5000 + nodeId
+            );
+            cam.manager = this;
+            this.interactables.push(cam);
+            nodeId++;
+        }
+    }
+
+    _countType(typeKey) {
+        let c = 0;
+        for (const n of this.interactables) {
+            if (n.type === typeKey) c++;
+        }
+        return c;
     }
 
     /**

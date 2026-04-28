@@ -25,6 +25,7 @@ import { JobsManager } from './sim/economy/jobs.js';
 import { AnomalyDetectors } from './sim/anomalies/detectors.js';
 import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { InteractableManager } from './sim/interactables.js';
+import { CameraNetwork } from './sim/camera_network.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { QuestEngine } from './sim/quests/quest_engine.js';
 import { CaseManager } from './sim/cases/case_manager.js';
@@ -140,6 +141,7 @@ export class Game {
         this.anomalyDetectors = new AnomalyDetectors(this);
         this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
         this.interactables.game = this;
+        this.cameraNetwork = new CameraNetwork(this);
         this.heatSystem = new HeatSystem(this);
         this.heatSystem.setHeat(this.state.player.heat || 0);
         this.content = { quests: [] };
@@ -215,6 +217,7 @@ export class Game {
         this.ui.setPlayerTile(startX, startY);
 
         this.interactables.generate(this.map);
+        this.cameraNetwork.markDirty();
         if ((this.state.cases?.active || []).length === 0) {
             this.caseManager.spawnCase('missing_person');
             this.caseManager.spawnCase('corruption');
@@ -682,6 +685,7 @@ export class Game {
                 this.anomalyDetectors = new AnomalyDetectors(this);
                 this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
                 this.interactables.game = this;
+                this.cameraNetwork = new CameraNetwork(this);
                 this.heatSystem = new HeatSystem(this);
                 this.questEngine = new QuestEngine(this);
                 this.caseManager = new CaseManager(this);
@@ -812,6 +816,7 @@ export class Game {
             this.state.world = data.world || this.state.world || { anomalies: [], factionEncounters: [] };
             this.state.world.factionEncounters = this.state.world.factionEncounters || [];
             this.interactables.generate(this.map);
+        this.cameraNetwork.markDirty();
             this.heatSystem.setHeat(this.state.player.heat ?? 0);
             this.caseManager = new CaseManager(this);
             this.evidenceSystem = new EvidenceSystem(this);

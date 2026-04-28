@@ -40,6 +40,7 @@ import { getContentStats } from '../src/content/registry.js';
 import { generateDistricts } from '../src/gen/districts.js';
 import { VisionModel } from '../src/content/critic/vision_model.js';
 import { ScreenshotCritic } from '../src/content/critic/screenshot_critic.js';
+import { CameraNetwork } from '../src/sim/camera_network.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
@@ -2211,6 +2212,48 @@ async function testMultimodalCritic() {
     }
 }
 
+function testCameraNetworkTagging() {
+    console.log('\n[58] Camera Network — tagging CCTV nodes');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 606060, mode: 'standard' });
+        game.init();
+        const cn = game.cameraNetwork;
+        assert(cn !== undefined, 'CameraNetwork exists on game');
+
+        const cams = cn.cameras;
+        assert(cams.length > 0, `Cameras tagged: ${cams.length}`);
+
+        const first = cams[0];
+        assert(first._cam !== undefined, 'Camera has _cam metadata');
+        assert(typeof first._cam.facing === 'number', 'Has facing angle');
+        assert(first._cam.viewAngle > 0, 'Has positive view angle');
+        assert(first._cam.viewRange > 0, 'Has positive view range');
+        assert(first._cam.networkId !== undefined, 'Has networkId');
+
+        const nearby = cn.getNearbyCameras(first.x, first.y, 999);
+        assert(nearby.length === cams.length, 'getNearbyCameras returns all within large radius');
+
+        const byDist = cn.getCamerasInDistrict(first._cam.networkId);
+        assert(byDist.length > 0, 'getCamerasInDistrict returns cameras');
+
+        const saved = cn.serialize();
+        assert(saved.cameras.length === cams.length, 'Serialize captures all cameras');
+
+        cn.deserialize(saved);
+        cn.markDirty();
+        const restored = cn.cameras;
+        assert(restored.length === cams.length, 'Deserialize restores camera count');
+
+        const r = restored.find(c => c.id === first.id);
+        assert(r._cam.facing === first._cam.facing, 'Facing angle survives save/load');
+    } catch (e) {
+        console.log(`  ✗ Camera network tagging test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraNetworkTagging();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

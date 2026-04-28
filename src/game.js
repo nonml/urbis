@@ -86,6 +86,7 @@ import { CombatSystem } from './player/combat.js';
 import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
+import { CameraNetwork } from './sim/camera_network.js';
 import { WaveEncounter } from './sim/encounters/wave_encounter.js';
 import { checkVehicleExplosion, getExplosionTargets, EXPLOSION_DAMAGE } from './vehicles/vehicle_state.js';
 import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
@@ -356,6 +357,7 @@ export class Game {
 
         // World hack effects (blackout, traffic freeze, CCTV disable)
         this.worldHacks = new WorldHackEffects(this);
+        this.cameraNetwork = new CameraNetwork(this);
         this.waveEncounter = new WaveEncounter(this);
 
         // Weather and particle systems
@@ -477,6 +479,7 @@ export class Game {
 
         // Generate interactables (hacking nodes)
         this.interactables.generate(this.map);
+        this.cameraNetwork.markDirty();
         this.ui.showMessage('Hacking nodes installed across the city!', 'normal');
         if ((this.state.cases?.active || []).length === 0) {
             this.caseManager.spawnCase('missing_person');
@@ -853,6 +856,7 @@ export class Game {
 
         // World hack effects (blackout, traffic freeze, CCTV disable)
         this.worldHacks.update(this.state.time.tick);
+        this.cameraNetwork.update(this.state.time.tick);
 
         // 8b. Quest engine update
         this.questEngine.update();
@@ -1413,6 +1417,8 @@ export class Game {
             tutorial: this.tutorialManager?.serialize() ?? this.state.tutorial,
             // Q3: Physics state
             physics: this.physics?.serialize(),
+            // Q6: Camera network
+            cameraNetwork: this.cameraNetwork?.serialize(),
         };
 
         try {
@@ -1483,6 +1489,7 @@ export class Game {
                 this.heatSystem = new HeatSystem(this);
                 this.interactables = new InteractableManager(this.map.width, this.map.height, this.state.meta.seed);
                 this.interactables.game = this;
+                this.cameraNetwork = new CameraNetwork(this);
                 this.caseManager = new CaseManager(this);
                 this.evidenceSystem = new EvidenceSystem(this);
                 this.factionSystem = new FactionSystem(this);
@@ -1745,6 +1752,12 @@ export class Game {
             // Q3: Restore physics state
             if (data.physics) {
                 this.physics?.deserialize(data.physics);
+            }
+
+            // Q6: Restore camera network
+            this.cameraNetwork.markDirty();
+            if (data.cameraNetwork) {
+                this.cameraNetwork.deserialize(data.cameraNetwork);
             }
 
             this.ui.showMessage('Game loaded!', 'success');
