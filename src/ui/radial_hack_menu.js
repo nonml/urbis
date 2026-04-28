@@ -137,6 +137,38 @@ export class RadialHackMenu {
         return opt;
     }
 
+    selectByNumber(num) {
+        const idx = num - 1;
+        if (idx < 0 || idx >= this._options.length) return null;
+        this._selectedIndex = idx;
+        this._updateSelection();
+        return this.confirm();
+    }
+
+    handleKey(key) {
+        if (!this._visible) return null;
+        if (key === 'ArrowRight' || key === 'ArrowDown') {
+            this.selectNext();
+            return 'navigate';
+        }
+        if (key === 'ArrowLeft' || key === 'ArrowUp') {
+            this.selectPrev();
+            return 'navigate';
+        }
+        if (key === 'Enter' || key === ' ') {
+            return this.confirm();
+        }
+        if (key === 'Escape') {
+            this.close();
+            return 'close';
+        }
+        const num = parseInt(key, 10);
+        if (num >= 1 && num <= 9) {
+            return this.selectByNumber(num);
+        }
+        return null;
+    }
+
     _getOptionsForTarget(target) {
         if (!target) return [];
         const actions = [];
@@ -181,7 +213,7 @@ export class RadialHackMenu {
             seg.className = 'rhm-segment';
             if (i === this._selectedIndex) seg.classList.add('selected');
             if (opt.onCooldown) seg.classList.add('cooldown');
-            seg.textContent = opt.label;
+            seg.textContent = `${i + 1}. ${opt.label}`;
             seg.style.transform = `translate(${x}px, ${y}px)`;
             this._el.appendChild(seg);
         }
