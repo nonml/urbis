@@ -261,7 +261,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q4-bt-ambient` ambient (walk, chat) behavior
 - [x] `q4-bt-alerted` alerted behavior with search pattern
 - [x] `q4-bt-engaged` engaged behavior with cover + fire
-- [ ] `q4-bt-flee` flee behavior with panic radius
+- [x] `q4-bt-flee` flee behavior with panic radius
 - [ ] `q4-bt-callbackup` call-for-backup action (spawns reinforcements)
 - [ ] `q4-bt-surrender` surrender state after heavy damage
 

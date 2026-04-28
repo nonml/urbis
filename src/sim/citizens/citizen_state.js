@@ -95,6 +95,12 @@ export function ensureCitizenState(citizen, map = null) {
         citizen._sim.alertTargetX = 0;
         citizen._sim.alertTargetY = 0;
     }
+    if (citizen._sim.fleeTimer === undefined) {
+        citizen._sim.fleeTimer = 0;
+        citizen._sim.fleeTargetX = 0;
+        citizen._sim.fleeTargetY = 0;
+        citizen._sim.fleeReported = false;
+    }
     if (citizen._sim.engState === undefined) {
         citizen._sim.engState = null;
         citizen._sim.engCover = null;

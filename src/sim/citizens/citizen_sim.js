@@ -4,6 +4,7 @@ import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citize
 import { tickAmbient } from '../agents/bt_ambient.js';
 import { tickAlerted, isAlerted, flushDisturbances, initAlertedSystem } from '../agents/bt_alerted.js';
 import { tickEngaged, isEngaged, flushEngagedHits, initEngagedSystem } from '../agents/bt_engaged.js';
+import { tickFleeTree, isFleeing, flushFleeEvents, initFleeSystem } from '../agents/bt_flee.js';
 
 export class CitizenSim {
     constructor(game) {
@@ -76,6 +77,10 @@ export class CitizenSim {
     updateMovement(citizen, timeOfDay, tier, tick) {
         if (isEngaged(citizen)) {
             tickEngaged(citizen, this.game, tick);
+            return;
+        }
+        if (isFleeing(citizen)) {
+            tickFleeTree(citizen, this.game, tick);
             return;
         }
         if (isAlerted(citizen)) {
@@ -157,8 +162,10 @@ export class CitizenSim {
         if (!this._alertedInited) {
             initAlertedSystem();
             initEngagedSystem();
+            initFleeSystem();
             this._alertedInited = true;
         }
+        flushFleeEvents(citizens, tick);
         flushDisturbances(citizens, tick);
         flushEngagedHits(citizens, this.game);
         this.enforceCitizenCap();
