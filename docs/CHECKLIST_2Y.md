@@ -407,7 +407,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q7-tts-voicebank` 6 archetype voices banked
 - [x] `q7-tts-line-cache` generated lines cached by hash
 - [x] `q7-tts-subtitle-sync` subtitle timing per phoneme
-- [ ] `q7-tts-ducking` music ducks under dialogue
+- [x] `q7-tts-ducking` music ducks under dialogue
 
 ### Q7.C — Radio
 

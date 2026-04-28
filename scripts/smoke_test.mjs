@@ -3219,6 +3219,69 @@ async function testTTSSubtitleSync() {
 
 await testTTSSubtitleSync();
 
+import { DialogueDucker } from '../src/audio/tts/ducker.js';
+
+function testTTSDucker() {
+    console.log('\n[84] TTS — music ducks under dialogue');
+    try {
+        const d = new DialogueDucker({ duckLevel: 0.25, fadeInMs: 200, fadeOutMs: 400 });
+        assert(d.gain === 1, 'Idle gain is 1');
+        assert(!d.isDucking, 'Idle: not ducking');
+
+        d.push(2000);
+        d.update(0);
+        assert(approxEq(d.gain, 1), 'At t=0: gain still 1 (start of fade-in)');
+        assert(d.isDucking, 'Ducking starts immediately on push');
+
+        d.update(100);
+        assert(approxEq(d.gain, 0.625), `At t=100: mid fade-in, gain=0.625 (got ${d.gain})`);
+
+        d.update(100);
+        assert(approxEq(d.gain, 0.25), `At t=200: fade-in done, gain=duckLevel (got ${d.gain})`);
+
+        d.update(1000);
+        assert(approxEq(d.gain, 0.25), 'During hold: gain stays at duck level');
+
+        d.update(500);
+        assert(d.gain > 0.25 && d.gain < 1, `Mid fade-out: gain rising (got ${d.gain})`);
+
+        d.update(400);
+        assert(d.gain === 1, 'After end: gain returns to 1');
+        assert(!d.isDucking, 'After end: not ducking');
+
+        const d2 = new DialogueDucker();
+        d2.push(1000);
+        d2.update(500);
+        const midGain = d2.gain;
+        d2.push(2000);
+        d2.update(0);
+        assert(d2.gain === midGain, 'Push during active duck does not jump gain');
+        d2.update(2000);
+        assert(d2.gain > 0.25, 'Extended duck still ramps back up at the new end');
+
+        const d3 = new DialogueDucker({ duckLevel: 0.5, fadeInMs: 100, fadeOutMs: 100 });
+        d3.push(50);
+        d3.update(50);
+        assert(d3.gain >= 0.5 && d3.gain < 1, 'Short duration honors min envelope (fadeIn+fadeOut)');
+        d3.update(200);
+        assert(d3.gain === 1, 'Short-duration duck completes its envelope and resets');
+
+        const d4 = new DialogueDucker();
+        d4.push(-100);
+        d4.update(0);
+        assert(d4.gain === 1, 'Negative duration is ignored');
+
+        d4.update(-10);
+        assert(d4.gain === 1, 'Negative dt is ignored');
+    } catch (e) {
+        console.log(`  ✗ TTS ducker test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testTTSDucker();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
