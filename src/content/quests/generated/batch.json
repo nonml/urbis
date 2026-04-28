@@ -1,0 +1,762 @@
+[
+  {
+    "id": "gen_corruption_178",
+    "type": "subcase",
+    "title": "Corruption Trail #178",
+    "description": "Suspicious activity at the waterfront district.",
+    "tags": [
+      "corruption",
+      "waterfront",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "An informant reaches out.",
+        "id": "gen_corruption_178_step_0"
+      },
+      {
+        "kind": "hack_node",
+        "text": "Hack a terminal to get intel.",
+        "id": "gen_corruption_178_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Meet the contact.",
+        "targetX": 30,
+        "targetY": 40,
+        "id": "gen_corruption_178_step_2"
+      },
+      {
+        "kind": "choice",
+        "text": "Decide what to do.",
+        "choices": [
+          {
+            "id": "confront",
+            "label": "Confront directly"
+          },
+          {
+            "id": "stealth",
+            "label": "Approach stealthily"
+          }
+        ],
+        "id": "gen_corruption_178_step_3"
+      },
+      {
+        "kind": "outcome",
+        "text": "Situation resolved.",
+        "id": "gen_corruption_178_step_4"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      },
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      }
+    ]
+  },
+  {
+    "id": "gen_blackmail_747",
+    "type": "subcase",
+    "title": "Blackmail Plot #747",
+    "description": "Someone has leverage on the old-town district.",
+    "tags": [
+      "blackmail",
+      "old-town",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Strange signals detected.",
+        "id": "gen_blackmail_747_step_0"
+      },
+      {
+        "kind": "interact",
+        "text": "Talk to a local witness.",
+        "id": "gen_blackmail_747_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Follow the lead.",
+        "targetX": 60,
+        "targetY": 35,
+        "id": "gen_blackmail_747_step_2"
+      },
+      {
+        "kind": "investigate",
+        "text": "Examine the scene.",
+        "id": "gen_blackmail_747_step_3"
+      },
+      {
+        "kind": "spawn_clue",
+        "text": "A key clue emerges.",
+        "id": "gen_blackmail_747_step_4"
+      },
+      {
+        "kind": "outcome",
+        "text": "Mystery solved.",
+        "id": "gen_blackmail_747_step_5"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "modify_heat",
+        "delta": -10
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_517",
+    "type": "subcase",
+    "title": "Smuggling Ring #517",
+    "description": "Contraband moving through the suburbs district.",
+    "tags": [
+      "smuggling",
+      "suburbs",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_smuggling_517_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_smuggling_517_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_smuggling_517_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_smuggling_517_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "set_flag",
+        "flag": "quest_complete",
+        "value": true
+      },
+      {
+        "type": "set_flag",
+        "flag": "quest_complete",
+        "value": true
+      },
+      {
+        "type": "modify_heat",
+        "delta": -10
+      }
+    ]
+  },
+  {
+    "id": "gen_extortion_447",
+    "type": "casefile",
+    "title": "Extortion Scheme #447",
+    "description": "Someone is shaking down the old-town district.",
+    "tags": [
+      "extortion",
+      "old-town",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Strange signals detected.",
+        "id": "gen_extortion_447_step_0"
+      },
+      {
+        "kind": "interact",
+        "text": "Talk to a local witness.",
+        "id": "gen_extortion_447_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Follow the lead.",
+        "targetX": 60,
+        "targetY": 35,
+        "id": "gen_extortion_447_step_2"
+      },
+      {
+        "kind": "investigate",
+        "text": "Examine the scene.",
+        "id": "gen_extortion_447_step_3"
+      },
+      {
+        "kind": "spawn_clue",
+        "text": "A key clue emerges.",
+        "id": "gen_extortion_447_step_4"
+      },
+      {
+        "kind": "outcome",
+        "text": "Mystery solved.",
+        "id": "gen_extortion_447_step_5"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      }
+    ]
+  },
+  {
+    "id": "gen_sabotage_861",
+    "type": "casefile",
+    "title": "Infrastructure Sabotage #861",
+    "description": "Systems failing at the old-town district.",
+    "tags": [
+      "sabotage",
+      "old-town",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_sabotage_861_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_sabotage_861_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_sabotage_861_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_sabotage_861_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      }
+    ]
+  },
+  {
+    "id": "gen_heist_853",
+    "type": "storylet",
+    "title": "The Heist #853",
+    "description": "A break-in planned at the waterfront district.",
+    "tags": [
+      "heist",
+      "waterfront",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_heist_853_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_heist_853_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_heist_853_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_heist_853_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 100
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_105",
+    "type": "storylet",
+    "title": "Smuggling Ring #105",
+    "description": "Contraband moving through the waterfront district.",
+    "tags": [
+      "smuggling",
+      "waterfront",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_smuggling_105_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_smuggling_105_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_smuggling_105_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_smuggling_105_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_854",
+    "type": "storylet",
+    "title": "Smuggling Ring #854",
+    "description": "Contraband moving through the industrial district.",
+    "tags": [
+      "smuggling",
+      "industrial",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_smuggling_854_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_smuggling_854_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_smuggling_854_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_smuggling_854_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      },
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_359",
+    "type": "subcase",
+    "title": "Smuggling Ring #359",
+    "description": "Contraband moving through the suburbs district.",
+    "tags": [
+      "smuggling",
+      "suburbs",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_smuggling_359_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_smuggling_359_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_smuggling_359_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_smuggling_359_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "modify_heat",
+        "delta": -10
+      }
+    ]
+  },
+  {
+    "id": "gen_blackmail_239",
+    "type": "casefile",
+    "title": "Blackmail Plot #239",
+    "description": "Someone has leverage on the downtown district.",
+    "tags": [
+      "blackmail",
+      "downtown",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_blackmail_239_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_blackmail_239_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_blackmail_239_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_blackmail_239_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      },
+      {
+        "type": "set_flag",
+        "flag": "quest_complete",
+        "value": true
+      }
+    ]
+  },
+  {
+    "id": "gen_corruption_667",
+    "type": "storylet",
+    "title": "Corruption Trail #667",
+    "description": "Suspicious activity at the downtown district.",
+    "tags": [
+      "corruption",
+      "downtown",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_corruption_667_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_corruption_667_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_corruption_667_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_corruption_667_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "modify_heat",
+        "delta": -10
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_844",
+    "type": "subcase",
+    "title": "Smuggling Ring #844",
+    "description": "Contraband moving through the waterfront district.",
+    "tags": [
+      "smuggling",
+      "waterfront",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "An informant reaches out.",
+        "id": "gen_smuggling_844_step_0"
+      },
+      {
+        "kind": "hack_node",
+        "text": "Hack a terminal to get intel.",
+        "id": "gen_smuggling_844_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Meet the contact.",
+        "targetX": 30,
+        "targetY": 40,
+        "id": "gen_smuggling_844_step_2"
+      },
+      {
+        "kind": "choice",
+        "text": "Decide what to do.",
+        "choices": [
+          {
+            "id": "confront",
+            "label": "Confront directly"
+          },
+          {
+            "id": "stealth",
+            "label": "Approach stealthily"
+          }
+        ],
+        "id": "gen_smuggling_844_step_3"
+      },
+      {
+        "kind": "outcome",
+        "text": "Situation resolved.",
+        "id": "gen_smuggling_844_step_4"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      }
+    ]
+  },
+  {
+    "id": "gen_smuggling_544",
+    "type": "storylet",
+    "title": "Smuggling Ring #544",
+    "description": "Contraband moving through the downtown district.",
+    "tags": [
+      "smuggling",
+      "downtown",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "An informant reaches out.",
+        "id": "gen_smuggling_544_step_0"
+      },
+      {
+        "kind": "hack_node",
+        "text": "Hack a terminal to get intel.",
+        "id": "gen_smuggling_544_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Meet the contact.",
+        "targetX": 30,
+        "targetY": 40,
+        "id": "gen_smuggling_544_step_2"
+      },
+      {
+        "kind": "choice",
+        "text": "Decide what to do.",
+        "choices": [
+          {
+            "id": "confront",
+            "label": "Confront directly"
+          },
+          {
+            "id": "stealth",
+            "label": "Approach stealthily"
+          }
+        ],
+        "id": "gen_smuggling_544_step_3"
+      },
+      {
+        "kind": "outcome",
+        "text": "Situation resolved.",
+        "id": "gen_smuggling_544_step_4"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      },
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      }
+    ]
+  },
+  {
+    "id": "gen_extortion_892",
+    "type": "casefile",
+    "title": "Extortion Scheme #892",
+    "description": "Someone is shaking down the suburbs district.",
+    "tags": [
+      "extortion",
+      "suburbs",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Strange signals detected.",
+        "id": "gen_extortion_892_step_0"
+      },
+      {
+        "kind": "interact",
+        "text": "Talk to a local witness.",
+        "id": "gen_extortion_892_step_1"
+      },
+      {
+        "kind": "go_to",
+        "text": "Follow the lead.",
+        "targetX": 60,
+        "targetY": 35,
+        "id": "gen_extortion_892_step_2"
+      },
+      {
+        "kind": "investigate",
+        "text": "Examine the scene.",
+        "id": "gen_extortion_892_step_3"
+      },
+      {
+        "kind": "spawn_clue",
+        "text": "A key clue emerges.",
+        "id": "gen_extortion_892_step_4"
+      },
+      {
+        "kind": "outcome",
+        "text": "Mystery solved.",
+        "id": "gen_extortion_892_step_5"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "modify_heat",
+        "delta": -10
+      }
+    ]
+  },
+  {
+    "id": "gen_missing_478",
+    "type": "casefile",
+    "title": "Missing Person #478",
+    "description": "A citizen vanished from the old-town district.",
+    "tags": [
+      "missing",
+      "old-town",
+      "generated"
+    ],
+    "steps": [
+      {
+        "kind": "trigger",
+        "text": "Report received — investigate the area.",
+        "id": "gen_missing_478_step_0"
+      },
+      {
+        "kind": "go_to",
+        "text": "Head to the location.",
+        "targetX": 50,
+        "targetY": 50,
+        "id": "gen_missing_478_step_1"
+      },
+      {
+        "kind": "investigate",
+        "text": "Search for evidence.",
+        "id": "gen_missing_478_step_2"
+      },
+      {
+        "kind": "outcome",
+        "text": "Case resolved.",
+        "id": "gen_missing_478_step_3"
+      }
+    ],
+    "rewards": [
+      {
+        "type": "add_resource",
+        "resource": "gold",
+        "amount": 50
+      },
+      {
+        "type": "rep_delta",
+        "faction": "citizens",
+        "delta": 5
+      }
+    ]
+  }
+]

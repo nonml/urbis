@@ -318,10 +318,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q5.C — Content Goals
 
-- [ ] `q5-goal-buildings-50` 50 new buildings merged
-- [ ] `q5-goal-vehicles-30` 30 new vehicles merged
-- [ ] `q5-goal-npc-20` 20 archetypes merged
-- [ ] `q5-goal-quests-15` 15 quests merged
+- [x] `q5-goal-buildings-50` 50 new buildings merged
+- [x] `q5-goal-vehicles-30` 30 new vehicles merged
+- [x] `q5-goal-npc-20` 20 archetypes merged
+- [x] `q5-goal-quests-15` 15 quests merged
 
 ### Q5.D — District Variants
 

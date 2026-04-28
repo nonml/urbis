@@ -36,6 +36,7 @@ import { validateWeaponDefinition } from '../src/content/weapons/schema.js';
 import { generateWeapon, generateBatch as generateWeaponBatch } from '../src/content/weapons/generator.js';
 import { generateQuest, generateBatch as generateQuestBatch } from '../src/content/quests/generator.js';
 import { ContentQueue } from '../src/content/queue.js';
+import { getContentStats } from '../src/content/registry.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
@@ -2127,12 +2128,28 @@ function testContentQueue() {
     }
 }
 
+function testContentGoals() {
+    console.log('\n[55] Content Goals — Q5.C Counts');
+    try {
+        const stats = getContentStats();
+        assert(stats.buildings >= 50, `Buildings >= 50 (got ${stats.buildings})`);
+        assert(stats.vehicles >= 30, `Vehicles >= 30 (got ${stats.vehicles})`);
+        assert(stats.npcs >= 20, `NPCs >= 20 (got ${stats.npcs})`);
+        assert(stats.quests >= 15, `Quests >= 15 (got ${stats.quests})`);
+    } catch (e) {
+        console.log(`  ✗ Content goals test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
 testWeaponTemplateSchema();
 testQuestTemplateGenerator();
 testNPCTemplateSchema();
 testContentQueue();
+testContentGoals();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {

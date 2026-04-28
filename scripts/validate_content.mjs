@@ -276,6 +276,7 @@ function collectFiles(dir, pattern = null) {
     for (const item of items) {
         const fullPath = path.join(dir, item);
         if (fs.statSync(fullPath).isDirectory()) {
+            if (item === 'generated') continue;
             files.push(...collectFiles(fullPath, pattern));
         } else if (!pattern || item.endsWith(pattern)) {
             files.push(fullPath);
