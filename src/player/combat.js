@@ -9,13 +9,16 @@ export const WEAPONS = {
     fist: {
         name: 'Fists',
         damage: 10,
-        range: 2,       // tiles
-        fireRate: 500,   // ms between attacks
+        range: 2,
+        fireRate: 500,
         ammo: Infinity,
         heatGain: 5,
         type: 'melee',
         spread: 0,
         pellets: 1,
+        recoilGain: 0,
+        recoilMax: 0,
+        recoilRecovery: 0,
     },
     bat: {
         name: 'Baseball Bat',
@@ -28,39 +31,48 @@ export const WEAPONS = {
         spread: 0,
         pellets: 1,
         knockback: 1.5,
+        recoilGain: 0,
+        recoilMax: 0,
+        recoilRecovery: 0,
     },
     pistol: {
         name: 'Pistol',
         damage: 25,
-        range: 15,       // tiles
-        fireRate: 300,    // ms between shots
+        range: 15,
+        fireRate: 300,
         ammo: 12,
         maxAmmo: 60,
         heatGain: 15,
         type: 'ranged',
-        spread: 0.5,     // degrees of random spread
+        spread: 0.5,
         pellets: 1,
         soundRadius: 12,
+        recoilGain: 1.2,
+        recoilMax: 4.0,
+        recoilRecovery: 3.0,
     },
     shotgun: {
         name: 'Shotgun',
-        damage: 12,       // per pellet
+        damage: 12,
         range: 8,
         fireRate: 800,
         ammo: 6,
         maxAmmo: 30,
         heatGain: 20,
         type: 'ranged',
-        spread: 8,        // wide cone
-        pellets: 6,       // 6 pellets per shot
+        spread: 8,
+        pellets: 6,
         knockback: 2.0,
         soundRadius: 18,
+        recoilGain: 3.5,
+        recoilMax: 8.0,
+        recoilRecovery: 5.0,
     },
     smg: {
         name: 'SMG',
         damage: 12,
         range: 12,
-        fireRate: 80,     // very fast
+        fireRate: 80,
         ammo: 30,
         maxAmmo: 120,
         heatGain: 8,
@@ -68,6 +80,9 @@ export const WEAPONS = {
         spread: 3,
         pellets: 1,
         soundRadius: 14,
+        recoilGain: 0.8,
+        recoilMax: 6.0,
+        recoilRecovery: 2.0,
     },
 };
 
@@ -83,6 +98,7 @@ export class CombatSystem {
         this._reloading = false;
         this._reloadTimer = 0;
         this._reloadDuration = 0;
+        this._recoilLevel = 0;
     }
 
     get weapon() {
@@ -158,8 +174,9 @@ export class CombatSystem {
         if (dist > range && this.weapon.type === 'melee') return { hit: false };
 
         const pellets = this.weapon.pellets || 1;
-        const spread = (this.weapon.spread || 0) * (Math.PI / 180);
-        const baseAngle = Math.atan2(dx, -dy); // aim direction angle
+        const baseSpread = (this.weapon.spread || 0) + this._recoilLevel;
+        const spread = baseSpread * (Math.PI / 180);
+        const baseAngle = Math.atan2(dx, -dy);
         const hits = [];
 
         for (let p = 0; p < pellets; p++) {
@@ -234,6 +251,10 @@ export class CombatSystem {
             });
         } catch {}
 
+        const rg = this.weapon.recoilGain || 0;
+        const rm = this.weapon.recoilMax || 0;
+        this._recoilLevel = Math.min(rm, this._recoilLevel + rg);
+
         if (hits.length > 0) {
             return { hit: true, target: hits[0], allHits: hits, pelletCount: pellets };
         }
@@ -297,12 +318,20 @@ export class CombatSystem {
                 this._muzzleFlash = false;
             }
         }
+        if (this._recoilLevel > 0) {
+            const recovery = (this.weapon.recoilRecovery || 2.0) * (dt / 1000);
+            this._recoilLevel = Math.max(0, this._recoilLevel - recovery);
+        }
         if (this._reloading && this._reloadTimer > 0) {
             this._reloadTimer -= dt;
             if (this._reloadTimer <= 0) {
                 this._finishReload();
             }
         }
+    }
+
+    get recoilLevel() {
+        return this._recoilLevel;
     }
 
     getAmmoDisplay() {
