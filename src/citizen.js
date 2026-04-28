@@ -38,6 +38,23 @@ export class Citizen {
             dusk: 'home',
         };
         this.relationshipEdges = [];
+        this.secret = this._generateSecret();
+    }
+
+    _generateSecret() {
+        const secrets = [
+            'Has a hidden bank account offshore',
+            'Former corporate spy',
+            'Owes money to the Yakuza',
+            'Underground data broker',
+            'Witness in a federal case',
+            'Runs an illegal gambling ring',
+            'Has a fake identity',
+            'Blackmailing a city official',
+            'Smuggles contraband on weekends',
+            'Double agent for a rival faction',
+        ];
+        return secrets[Math.floor(this.rng.next() * secrets.length)];
     }
 
     generatePersonality() {

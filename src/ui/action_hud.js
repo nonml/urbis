@@ -534,6 +534,14 @@ export class ActionHUD {
                 .ahud-profile-income.high { color: #2ecc71; }
                 .ahud-profile-income.mid { color: #f1c40f; }
                 .ahud-profile-income.low { color: #e74c3c; }
+                .ahud-profile-secret {
+                    font-size: 9px;
+                    color: #ff4081;
+                    font-style: italic;
+                    margin-top: 2px;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                }
 
                 /* ── Contextual Hints ── */
                 .ahud-hint {
@@ -983,7 +991,7 @@ export class ActionHUD {
         while (container.childElementCount < show.length) {
             const card = document.createElement('div');
             card.className = 'ahud-profile-card';
-            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span class="ahud-profile-age"></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div>';
+            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span class="ahud-profile-age"></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div><div class="ahud-profile-secret"></div>';
             container.appendChild(card);
         }
 
@@ -1027,6 +1035,13 @@ export class ActionHUD {
                 rows[0].children[1].className = 'ahud-profile-income ' + incomeClass;
                 rows[1].children[0].textContent = c.faction || 'citizens';
                 rows[1].children[1].textContent = happiness + '% happy';
+            }
+
+            const secretEl = card.querySelector('.ahud-profile-secret');
+            if (secretEl) {
+                const isClose = show[i].dist < 16;
+                secretEl.textContent = isClose && c.secret ? c.secret : '';
+                secretEl.style.opacity = isClose ? '1' : '0';
             }
         }
     }
