@@ -4290,6 +4290,35 @@ export class Renderer3D {
     }
 
     _buildSubwayProps() {
+        const platformMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.85 });
+        const platform = new THREE.Mesh(new THREE.BoxGeometry(8, 0.3, 3), platformMat);
+        platform.position.set(0, 0.15, -2);
+        platform.receiveShadow = true;
+        this._interiorGroup.add(platform);
+
+        const trackMat = new THREE.MeshStandardMaterial({ color: 0x333333, metalness: 0.6, roughness: 0.4 });
+        const rail1 = new THREE.Mesh(new THREE.BoxGeometry(10, 0.05, 0.06), trackMat);
+        rail1.position.set(0, 0.025, 2);
+        this._interiorGroup.add(rail1);
+        const rail2 = new THREE.Mesh(new THREE.BoxGeometry(10, 0.05, 0.06), trackMat);
+        rail2.position.set(0, 0.025, 3);
+        this._interiorGroup.add(rail2);
+
+        const pillarMat = new THREE.MeshStandardMaterial({ color: 0x777777, roughness: 0.6 });
+        const pillarGeo = new THREE.CylinderGeometry(0.15, 0.15, 3, 8);
+        for (let i = -3; i <= 3; i += 3) {
+            const p = new THREE.Mesh(pillarGeo, pillarMat);
+            p.position.set(i, 1.5, -0.5);
+            p.castShadow = true;
+            this._interiorGroup.add(p);
+        }
+
+        const strip = new THREE.PointLight(0xccddff, 0.6, 10);
+        strip.position.set(0, 2.8, 0);
+        this._interiorGroup.add(strip);
+        const warn = new THREE.PointLight(0xffaa00, 0.3, 5);
+        warn.position.set(-4, 2.5, -2);
+        this._interiorGroup.add(warn);
     }
 
     /**
