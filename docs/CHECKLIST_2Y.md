@@ -277,7 +277,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q4-po-roadblock` patrol cars form a roadblock at high heat
 - [x] `q4-po-helicopter` spotlight helicopter at wanted 3+
-- [ ] `q4-po-spikestrips` roadblock deploys spikes
+- [x] `q4-po-spikestrips` roadblock deploys spikes
 - [ ] `q4-po-dispatch-chat` radio barks via subtitles
 
 ### Q4.E — Vehicle Damage Model

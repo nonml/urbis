@@ -27,6 +27,7 @@ export class PoliceSystem {
         this._lastRoadblockTick = 0;
         this._roadblockCount = 0;
         this._heliActive = false;
+        this._spikeStrips = [];
     }
 
     /**
@@ -158,6 +159,8 @@ export class PoliceSystem {
             this._despawnHelicopter();
         }
 
+        this._checkSpikeStrips();
+
         // Update each unit
         for (const unit of this.units) {
             this.updateUnit(unit, tick);
@@ -171,6 +174,29 @@ export class PoliceSystem {
             }
             return true;
         });
+    }
+
+    _checkSpikeStrips() {
+        const vc = this.game.vehicleController;
+        if (!vc?.isDriving) return;
+        const veh = vc.getActiveVehicle();
+        if (!veh || veh.speed < 2) return;
+        const px = this.game.state.player.wx ?? this.game.state.player.x;
+        const py = this.game.state.player.wz ?? this.game.state.player.y;
+        for (const strip of this._spikeStrips) {
+            if (!strip.active) continue;
+            const dx = px - strip.x;
+            const dy = py - strip.y;
+            if (Math.abs(dx) + Math.abs(dy) <= strip.radius) {
+                strip.active = false;
+                veh.speed *= 0.2;
+                veh.health = (veh.health ?? 100) - 30;
+                veh._tiresBlown = true;
+                this.game.playerHealth?.takeDamage(5, 'spike_strip');
+                this.game.ui?.showMessage?.('Spike strip! Tires blown!', 'crisis');
+            }
+        }
+        this._spikeStrips = this._spikeStrips.filter(s => s.active);
     }
 
     _spawnHelicopter() {
@@ -221,6 +247,9 @@ export class PoliceSystem {
             unit.state = 'roadblock';
             unit.speed = 0;
         }
+        this._spikeStrips.push({
+            x: cx, y: cy, radius: 4, active: true, spawnTick: tick
+        });
     }
 
     updateUnit(unit, tick) {
