@@ -140,6 +140,24 @@ export class Ragdoll {
         this._physics.applyImpulse(bodyId, impulse);
     }
 
+    applyExplosiveKnockback(epicenter, force) {
+        if (!this._alive) return;
+        for (const name of ['hip', 'chest', 'head']) {
+            const pos = this._physics.getBodyPosition(this.bones[name]);
+            if (!pos) continue;
+            const dx = pos.x - epicenter.x;
+            const dy = pos.y - epicenter.y;
+            const dz = pos.z - epicenter.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz) || 0.1;
+            const scale = force / (dist * dist + 1);
+            this._physics.applyImpulse(this.bones[name], {
+                x: (dx / dist) * scale,
+                y: (dy / dist) * scale + force * 0.3,
+                z: (dz / dist) * scale,
+            });
+        }
+    }
+
     destroy() {
         if (!this._alive) return;
         for (const name of ['head', 'chest', 'hip']) {

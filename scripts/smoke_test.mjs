@@ -1550,7 +1550,40 @@ function runRagdollBlendOutTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => {
+function runRagdollKnockbackTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/ragdoll.js'),
+    ]).then(([rwMod, ragMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[42] Ragdoll — Explosive Knockback');
+            const { RapierPhysicsWorld } = rwMod;
+            const { Ragdoll } = ragMod;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rag = new Ragdoll(pw, 5, 2, 0);
+
+            rag.activate(0);
+            rag.update(5);
+
+            const posBefore = rag.getPositions();
+            rag.applyExplosiveKnockback({ x: 3, y: 1, z: 0 }, 30);
+            for (let i = 0; i < 30; i++) pw.step();
+            const posAfter = rag.getPositions();
+
+            assert(posAfter.hip.x > posBefore.hip.x, 'Hip pushed away from explosion');
+            assert(posAfter.chest.x > posBefore.chest.x, 'Chest pushed away');
+            assert(posAfter.head.y > posBefore.head.y || posAfter.head.x > posBefore.head.x, 'Head launched');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Ragdoll knockback test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
