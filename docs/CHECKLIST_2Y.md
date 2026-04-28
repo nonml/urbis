@@ -159,7 +159,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-pr-float-panel` panel floats above nearest NPC
 - [x] `q2-pr-fields-basic` name, age, income, job
 - [x] `q2-pr-fields-secret` hidden secret requires deeper hack
-- [ ] `q2-pr-fields-relations` top 3 relations
+- [x] `q2-pr-fields-relations` top 3 relations
 - [x] `q2-pr-lod-cull` only detailed NPCs get profiler data
 
 ### Q2.G — Perf Harness

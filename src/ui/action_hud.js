@@ -534,6 +534,15 @@ export class ActionHUD {
                 .ahud-profile-income.high { color: #2ecc71; }
                 .ahud-profile-income.mid { color: #f1c40f; }
                 .ahud-profile-income.low { color: #e74c3c; }
+                .ahud-profile-relations {
+                    font-size: 9px;
+                    color: rgba(0,255,255,0.6);
+                    margin-top: 2px;
+                    white-space: nowrap;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    max-width: 160px;
+                }
                 .ahud-profile-secret {
                     font-size: 9px;
                     color: #ff4081;
@@ -991,7 +1000,7 @@ export class ActionHUD {
         while (container.childElementCount < show.length) {
             const card = document.createElement('div');
             card.className = 'ahud-profile-card';
-            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span class="ahud-profile-age"></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div><div class="ahud-profile-secret"></div>';
+            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span class="ahud-profile-age"></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div><div class="ahud-profile-relations"></div><div class="ahud-profile-secret"></div>';
             container.appendChild(card);
         }
 
@@ -1035,6 +1044,24 @@ export class ActionHUD {
                 rows[0].children[1].className = 'ahud-profile-income ' + incomeClass;
                 rows[1].children[0].textContent = c.faction || 'citizens';
                 rows[1].children[1].textContent = happiness + '% happy';
+            }
+
+            const relEl = card.querySelector('.ahud-profile-relations');
+            if (relEl) {
+                const rels = c.relationships || {};
+                const entries = Object.entries(rels)
+                    .sort((a, b) => (b[1].value ?? 0) - (a[1].value ?? 0))
+                    .slice(0, 3);
+                if (entries.length > 0) {
+                    const allCitizens = this.game.citizens?.citizens || [];
+                    relEl.textContent = entries.map(([id, r]) => {
+                        const other = allCitizens.find(ci => ci.id === Number(id));
+                        const label = other?.name || `#${id}`;
+                        return `${r.type ?? '?'}: ${label}`;
+                    }).join(' · ');
+                } else {
+                    relEl.textContent = '';
+                }
             }
 
             const secretEl = card.querySelector('.ahud-profile-secret');
