@@ -11,12 +11,18 @@ const JOINT_LIMITS = {
     chestHead: { minAngle: -0.5, maxAngle: 0.5 },
 };
 
+const BLEND_IN_TICKS = 5;
+const BLEND_OUT_TICKS = 45;
+
 export class Ragdoll {
     constructor(physics, x, y, z) {
         this._physics = physics;
         this.bones = {};
         this.joints = [];
         this._alive = false;
+        this._activeTick = -1;
+        this._restTick = -1;
+        this._state = 'idle';
         if (!isRapierReady() || !physics.ready) return;
         this._build(x, y, z);
     }
@@ -84,6 +90,48 @@ export class Ragdoll {
             chest: this._physics.getBodyRotation(this.bones.chest),
             head: this._physics.getBodyRotation(this.bones.head),
         };
+    }
+
+    activate(tick) {
+        if (!this._alive) return;
+        this._activeTick = tick;
+        this._state = 'blending_in';
+    }
+
+    beginRest(tick) {
+        if (this._state !== 'active') return;
+        this._restTick = tick;
+        this._state = 'blending_out';
+    }
+
+    update(tick) {
+        if (this._state === 'blending_in') {
+            if (tick - this._activeTick >= BLEND_IN_TICKS) {
+                this._state = 'active';
+            }
+        } else if (this._state === 'blending_out') {
+            if (tick - this._restTick >= BLEND_OUT_TICKS) {
+                this._state = 'rest';
+            }
+        }
+    }
+
+    blendFactor(tick) {
+        if (this._state === 'idle') return 0;
+        if (this._state === 'blending_in') {
+            const elapsed = tick - this._activeTick;
+            return Math.min(1, elapsed / BLEND_IN_TICKS);
+        }
+        if (this._state === 'active') return 1;
+        if (this._state === 'blending_out') {
+            const elapsed = tick - this._restTick;
+            return Math.max(0, 1 - elapsed / BLEND_OUT_TICKS);
+        }
+        return 0;
+    }
+
+    get state() {
+        return this._state;
     }
 
     applyImpulse(boneName, impulse) {

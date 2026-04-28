@@ -1483,7 +1483,40 @@ function runRagdoll3BoneTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => {
+function runRagdollBlendInTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/ragdoll.js'),
+    ]).then(([rwMod, ragMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[40] Ragdoll — Blend-In Within 150ms');
+            const { RapierPhysicsWorld } = rwMod;
+            const { Ragdoll } = ragMod;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rag = new Ragdoll(pw, 0, 3, 0);
+
+            assert(rag.state === 'idle', 'Starts idle');
+            assert(rag.blendFactor(0) === 0, 'Blend factor 0 when idle');
+
+            rag.activate(10);
+            assert(rag.state === 'blending_in', 'State is blending_in after activate');
+            assert(rag.blendFactor(10) === 0, 'Blend 0 at activation tick');
+            assert(rag.blendFactor(12) > 0, 'Blend > 0 partway through');
+
+            rag.update(15);
+            assert(rag.state === 'active', 'Fully active after 5 ticks (166ms)');
+            assert(rag.blendFactor(15) === 1, 'Blend factor 1.0 when active');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Ragdoll blend-in test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
