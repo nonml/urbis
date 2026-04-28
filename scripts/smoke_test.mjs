@@ -1155,7 +1155,44 @@ function runRapierPoolTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => {
+function runRapierSaveLoadTest() {
+    return import('../src/sim/physics/rapier_world.js').then(mod => {
+        const { RapierPhysicsWorld, initRapier, RAPIER: R2 } = mod;
+        return initRapier().then(() => {
+            console.log('\n[32] Rapier Physics Save/Load');
+            const pw = new RapierPhysicsWorld({ poolCap: 16 });
+            const R = mod.RAPIER;
+
+            const desc = R.RigidBodyDesc.dynamic().setTranslation(3, 10, -2);
+            const id = pw.createRigidBody(desc);
+            pw.createCollider(R.ColliderDesc.ball(0.5), id);
+
+            for (let i = 0; i < 60; i++) pw.step();
+
+            const pos1 = pw.getBodyPosition(id);
+            const snap = pw.serialize();
+            assert(snap !== null, 'Serialize produces data');
+            assert(snap.bodies.length === 1, 'Serialized body count matches');
+
+            const pw2 = new RapierPhysicsWorld({ poolCap: 16 });
+            pw2.deserialize(snap);
+            const pos2 = pw2.getBodyPosition(snap.bodies[0].id);
+            assert(pos2 !== null, 'Deserialized body exists');
+            const dx = Math.abs(pos1.x - pos2.x);
+            const dy = Math.abs(pos1.y - pos2.y);
+            const dz = Math.abs(pos1.z - pos2.z);
+            assert(dx < 0.01 && dy < 0.01 && dz < 0.01, 'Position survives save/load');
+
+            pw.destroy();
+            pw2.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Rapier save/load test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

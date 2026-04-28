@@ -1380,6 +1380,8 @@ export class Game {
             weatherSystem: this.weatherSystem?.serialize(),
             // Q2: Tutorial first-run flag + progress
             tutorial: this.tutorialManager?.serialize() ?? this.state.tutorial,
+            // Q3: Physics state
+            physics: this.physics?.serialize(),
         };
 
         try {
@@ -1707,6 +1709,11 @@ export class Game {
             // Q2: Restore tutorial first-run flag + progress
             if (data.tutorial) {
                 this.tutorialManager?.deserialize(data.tutorial);
+            }
+
+            // Q3: Restore physics state
+            if (data.physics) {
+                this.physics?.deserialize(data.physics);
             }
 
             this.ui.showMessage('Game loaded!', 'success');

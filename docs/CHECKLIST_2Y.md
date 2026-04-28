@@ -196,7 +196,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q3-rp-world-step` fixed-step integration hooked into `game_loop.js`
 - [x] `q3-rp-determinism-test` identical seeds → identical prop positions after 1000 steps
 - [x] `q3-rp-pool` rigid-body pool with cap and recycle
-- [ ] `q3-rp-save-load` physics state survives save/load
+- [x] `q3-rp-save-load` physics state survives save/load
 
 ### Q3.B — Physics Props
 

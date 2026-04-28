@@ -98,6 +98,51 @@ export class RapierPhysicsWorld {
         return this._bodies.size;
     }
 
+    serialize() {
+        if (!this._world) return null;
+        const bodies = [];
+        for (const [id, body] of this._bodies) {
+            const t = body.translation();
+            const r = body.rotation();
+            const v = body.linvel();
+            const w = body.angvel();
+            const bt = body.bodyType();
+            bodies.push({
+                id, bt,
+                t: [t.x, t.y, t.z],
+                r: [r.x, r.y, r.z, r.w],
+                v: [v.x, v.y, v.z],
+                w: [w.x, w.y, w.z],
+            });
+        }
+        return { bodies, order: [...this._order], nextId: this._nextId };
+    }
+
+    deserialize(data) {
+        if (!data || !this._world) return;
+        for (const id of [...this._bodies.keys()]) {
+            this.removeBody(id);
+        }
+        for (const entry of data.bodies) {
+            let desc;
+            if (entry.bt === RAPIER.RigidBodyType.Fixed) {
+                desc = RAPIER.RigidBodyDesc.fixed();
+            } else if (entry.bt === RAPIER.RigidBodyType.KinematicPositionBased) {
+                desc = RAPIER.RigidBodyDesc.kinematicPositionBased();
+            } else {
+                desc = RAPIER.RigidBodyDesc.dynamic();
+            }
+            desc.setTranslation(entry.t[0], entry.t[1], entry.t[2]);
+            desc.setRotation({ x: entry.r[0], y: entry.r[1], z: entry.r[2], w: entry.r[3] });
+            desc.setLinvel(entry.v[0], entry.v[1], entry.v[2]);
+            desc.setAngvel({ x: entry.w[0], y: entry.w[1], z: entry.w[2] });
+            const body = this._world.createRigidBody(desc);
+            this._bodies.set(entry.id, body);
+        }
+        this._order = data.order ? [...data.order] : [];
+        this._nextId = data.nextId ?? this._nextId;
+    }
+
     destroy() {
         if (!this._world) return;
         this._bodies.clear();
