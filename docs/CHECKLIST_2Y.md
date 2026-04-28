@@ -13,7 +13,7 @@ Legend: `[ ]` open · `[~]` in progress · `[x]` done · `[!]` blocked (explain 
 
 ---
 
-## Q1 — Foundations for Autonomous Operation (2026-04 → 2026-06)
+## Q1 — Foundations for Autonomous Operation (2026-04-01 → 2026-04-04 ✅)
 
 **Goal:** Establish a green baseline. Gate commands pass, Roo completes tasks end-to-end, and the Playwright smoke suite is written.
 
@@ -100,7 +100,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q2 — Playability Pass 1 (2026-07 → 2026-09)
+## Q2 — Playability Pass 1 (2026-04-05 → 2026-04-09 ✅)
 
 **Goal:** Close the "still not playable" gaps — tutorial, combat feedback, stealth HUD, vehicle UX, demand bars, profiler overlay, perf harness. Target a clean 15-min unguided playtest.
 
@@ -186,7 +186,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q3 — Physics + Interiors Lite (2026-10 → 2026-12)
+## Q3 — Physics + Interiors Lite (2026-04-10 → 2026-04-15 ✅)
 
 **Goal:** Rigid-body props, first ragdoll, breakable glass, 3 interior templates, determinism preserved.
 
@@ -243,7 +243,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q4 — Combat & AI Depth (2027-01 → 2027-03)
+## Q4 — Combat & AI Depth (2026-04-16 → 2026-04-19 ✅)
 
 **Goal:** Enemies with cover, behavior tree, weapon tier-2, upgraded police, vehicle damage model.
 
@@ -298,7 +298,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q5 — Content Engine (2027-04 → 2027-06)
+## Q5 — Content Engine (2026-04-20 → 2026-04-23 ✅)
 
 **Goal:** The agent authors 50 buildings, 30 vehicles, 20 NPC archetypes, 15 missions — all passing validator.
 
@@ -345,7 +345,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q6 — Hacking Depth (2027-07 → 2027-09)
+## Q6 — Hacking Depth (2026-04-24 → 2026-04-29)
 
 **Goal:** The city is a weapon. Stealth mission completable with zero gunfire.
 
@@ -390,7 +390,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q7 — Narrative & Audio (2027-10 → 2027-12)
+## Q7 — Narrative & Audio (2026-04-30 → 2026-05-15)
 
 **Goal:** A 6-mission authored arc with TTS voice, cinematic cameras, radio with DJ banter.
 
@@ -442,59 +442,483 @@ Verify the autonomous Roo loop works end-to-end.
 
 ---
 
-## Q8 — Polish, Perf, 1.0 RC (2028-01 → 2028-04)
+## Q8 — Playability Pass 2 (2026-05-16 → 2026-06-05)
 
-**Goal:** Ship a game people would play for 10 hours.
+**Goal:** Re-walk the player loop end-to-end with everything Q1–Q7 added. A blind playtester completes the 6-mission arc and one zero-gunfire stealth-hack mission in a single sitting, no crash, no softlock.
 
-### Q8.A — Perf Pass
+### Q8.A — Tutorial Re-Validation
 
-- [ ] `q8-pf-frustum-audit` verify frustum culling on all instanced meshes
-- [ ] `q8-pf-lod-tune` LOD thresholds tuned per category
-- [ ] `q8-pf-drawcall-reduce` ≥ 20% draw-call reduction vs Q7
-- [ ] `q8-pf-gc-audit` eliminate per-frame allocations in hot loops
-- [ ] `q8-pf-shader-cost` shader cost audit (SSAO half-res, bloom mips)
+- [ ] `q8-tu-weapon-coverage` tutorial path covers every weapon added since Q2 (sniper, weapon-wheel, ADS)
+- [ ] `q8-tu-hack-coverage` tutorial path covers radial hack menu, camera traversal, hack chains, combat hacks
+- [ ] `q8-tu-vehicle-coverage` tutorial path covers carjack, ADS-from-vehicle, vehicle damage stages
+- [ ] `q8-tu-narrative-handoff` tutorial cleanly hands off to mission-1 of the Q7 arc
+- [ ] `q8-tu-skip-still-works` ESC-skip path still produces a viable first-run state
 
-### Q8.B — Accessibility
+### Q8.B — Difficulty Curve Pass
 
-- [ ] `q8-ac-rebind-complete` all actions rebindable
-- [ ] `q8-ac-subtitle-size` multi-size subtitle
-- [ ] `q8-ac-colorblind-palettes` 3 colorblind palettes
-- [ ] `q8-ac-shake-toggle` camera shake toggle
-- [ ] `q8-ac-reduced-motion` reduced-motion mode
-- [ ] `q8-ac-hold-vs-tap` toggle hold vs tap for interacts
+- [ ] `q8-df-combat-curve` combat difficulty smoothed (no spike at heat 3, no flat at heat 5+)
+- [ ] `q8-df-stealth-curve` stealth detection curve smoothed across day/night and crowd density
+- [ ] `q8-df-economy-curve` early-game money pressure verified; mid-game plateau filled with a goal
+- [ ] `q8-df-mission-difficulty` Q7 arc missions playtested in order; difficulty rises monotonically
 
-### Q8.C — Save Migration
+### Q8.C — Quest Validator Coverage
 
-- [ ] `q8-sm-matrix` migration matrix covering 0.1.x → 0.7.x → 1.0
-- [ ] `q8-sm-tests` Playwright round-trip per migration
-- [ ] `q8-sm-100h-save` synthetic 100-hour save round-trips cleanly
+- [ ] `q8-qv-arc-coverage` validator green on all 6 missions of the Q7 arc
+- [ ] `q8-qv-sidequest-5` 5 generated side-quests pass validator and are completable
+- [ ] `q8-qv-fail-modes` validator catches softlock-prone quest shapes (unreachable goal, dead-end branch)
 
-### Q8.D — Steam Pipeline
+### Q8.D — Save Format Freeze (`schemaVersion = 8`)
 
-- [ ] `q8-st-depot-upload` depot upload works end-to-end
-- [ ] `q8-st-achievements` ≥ 20 achievements defined and trigger-tested
-- [ ] `q8-st-cloudsaves` cloud saves tested across two installs
-- [ ] `q8-st-beta-branch` `0.7.x` on beta branch; `1.0` on default
+- [ ] `q8-sf-schema-bump` `schemaVersion` bumped to 8 with migration from 7
+- [ ] `q8-sf-migration-tests` Playwright round-trip from `0.1.x` → `0.8.0.0` saves
+- [ ] `q8-sf-shape-frozen` `docs/SAVE_SCHEMA.md` written and matches code
 
-### Q8.E — External Playtest
+### Q8.E — Crash Budget
 
-- [ ] `q8-pt-testers-invited` 3 external testers signed up
-- [ ] `q8-pt-session-logs` session logs aggregated into `docs/playtests/`
-- [ ] `q8-pt-no-hardcrash` no hard crash in any session
-- [ ] `q8-pt-no-softlock` no softlock in any session
-- [ ] `q8-pt-retrospective` post-playtest retrospective in `docs/retros/`
-
-### Q8.F — Launch
-
-- [ ] `q8-ln-rc1` tag `1.0.0-rc.1`
-- [ ] `q8-ln-rc-patch` ≤ 2 patch RCs allowed
-- [ ] `q8-ln-1-0-0` tag `1.0.0` end of April 2028
-- [ ] `q8-ln-post-mortem` launch post-mortem in `docs/retros/2028-04.md`
+- [ ] `q8-cb-3h-playthrough` scripted Playwright playthrough runs 3 hours headless with zero uncaught errors
+- [ ] `q8-cb-error-handler` global error handler captures and reports unhandled rejections
+- [ ] `q8-cb-bundle-growth` bundle size growth ≤ 10% versus `0.7.0.0`
 
 ### Q8 — Definition of Done
 
-- [ ] External 2-hour sessions completed without hard crash or softlock
+- [ ] Blind playtest (≤ 3h) completes arc + one zero-gunfire mission, no crash, no softlock
+- [ ] All Q8.A–Q8.E items ticked
 - [ ] Operator approval `q8.json`
+- [ ] Tag `0.8.0.0`
+
+---
+
+## Q9 — Graphics Pass 1: Modern Rendering Foundation (2026-06-06 → 2026-08-01)
+
+**Goal:** The frame buffer should look like 2026, not 2018. PBR everywhere, HDR pipeline, CSM shadows, volumetrics, SSR, LUT grading, env probes.
+
+### Q9.A — Material Audit (PBR Everywhere)
+
+- [ ] `q9-mat-audit-script` `scripts/audit_materials.mjs` lists every non-PBR material in `src/`
+- [ ] `q9-mat-vehicles-pbr` all vehicle meshes use `MeshStandardMaterial`/`MeshPhysicalMaterial` with declared roughness/metalness
+- [ ] `q9-mat-buildings-pbr` all building meshes converted to PBR
+- [ ] `q9-mat-characters-pbr` character + clothing materials converted to PBR (subsurface flag where appropriate)
+- [ ] `q9-mat-props-pbr` props (cones, signs, trash, chairs, crates) converted
+- [ ] `q9-mat-ci-check` CI fails on new non-PBR material in non-HUD/non-sky paths
+
+### Q9.B — HDR Pipeline
+
+- [ ] `q9-hdr-renderer-config` `WebGLRenderer.toneMapping = ACESFilmicToneMapping`, `outputColorSpace = SRGBColorSpace`
+- [ ] `q9-hdr-render-targets` `EffectComposer` render targets switched to `HalfFloatType`
+- [ ] `q9-hdr-no-double-gamma` audit verifies no manual sRGB conversion downstream of tone mapping
+- [ ] `q9-hdr-exposure-target` per-scene exposure target driven by day/night system
+
+### Q9.C — Cascaded Shadow Maps
+
+- [ ] `q9-csm-3-cascade` 3-cascade CSM replaces `DirectionalLight.shadow`
+- [ ] `q9-csm-pcf-soft` soft PCF (or PCSS) filter; tunable per preset
+- [ ] `q9-csm-perf-budget` shadow-map resolution budgets per preset; CI gate on shadow draw count
+- [ ] `q9-csm-stable-cascades` cascade frustums stable under camera motion (no shadow swim)
+
+### Q9.D — Volumetric Fog & Lighting
+
+- [ ] `q9-vol-raymarch-pass` half-res raymarched volumetric pass
+- [ ] `q9-vol-sun-shafts` sun shafts visible at low sun angles (dawn/dusk)
+- [ ] `q9-vol-streetlight-cones` night street-light cones receive volumetrics
+- [ ] `q9-vol-weather-density` density modulated by weather system (fog, storm, rain)
+
+### Q9.E — Screen-Space Reflections
+
+- [ ] `q9-ssr-stochastic` stochastic SSR pass with temporal accumulation
+- [ ] `q9-ssr-wet-roads` wet-road materials request SSR; dry roads do not
+- [ ] `q9-ssr-fallback` env-probe fallback when SSR rays miss
+- [ ] `q9-ssr-perf-toggle` SSR off on "Performance" preset, on at "High" and above
+
+### Q9.F — Bloom, LUT, Sky, Env Probe
+
+- [ ] `q9-bloom-multi-mip` multi-mip thresholded bloom replaces single-pass UnrealBloom params
+- [ ] `q9-lut-system` per-time-of-day LUT (dawn/day/dusk/night) blended by day/night
+- [ ] `q9-lut-weather-tint` weather tint overlay on LUT
+- [ ] `q9-sky-disc` sun and moon disc render at correct angular size
+- [ ] `q9-sky-stars` star field visible at low light pollution
+- [ ] `q9-sky-lightning-exposure` lightning flash is a true exposure spike, not alpha overlay
+- [ ] `q9-env-probe` periodic env cube capture for IBL on metals/glass
+
+### Q9.G — Quality Presets
+
+- [ ] `q9-qp-define` `low / medium / high / ultra` presets defined in `src/render/presets.js`
+- [ ] `q9-qp-autodetect` first-frame timing picks default preset
+- [ ] `q9-qp-settings-ui` in-game settings UI exposes preset and individual toggles
+- [ ] `q9-qp-perf-baseline` perf harness captures per-preset numbers in `tools/agent/baselines/perf.json`
+- [ ] `q9-qp-screenshot-baselines` Q1.I baselines re-captured at "Performance" preset
+
+### Q9 — Definition of Done
+
+- [ ] Side-by-side screenshots of `street-noon` / `street-night` / `rain` / `interior-shop` vs `0.8.0.0` baseline are clearly better
+- [ ] Perf harness shows ≤ 15% regression on "High", 0% regression on "Performance" (new default)
+- [ ] All Q9.A–Q9.G items ticked
+- [ ] Operator approval `q9.json`
+- [ ] Tag `0.9.0.0`
+
+---
+
+## Q10 — Graphics Pass 2: Surfaces, Detail, Atmosphere (2026-08-02 → 2026-09-30)
+
+**Goal:** The world has texture, history, weight. Surfaces tell stories. Three different times of day = three different places.
+
+### Q10.A — Decal System
+
+- [ ] `q10-de-projector` projected decal system (deferred or projector-mesh)
+- [ ] `q10-de-puddles` rain produces puddle decals on flat low ground
+- [ ] `q10-de-grime` per-district grime decals on aged buildings
+- [ ] `q10-de-blood` combat blood decals with weather-driven fade
+- [ ] `q10-de-scorch` explosion scorch marks
+- [ ] `q10-de-posters` per-district poster decals on tagged walls
+- [ ] `q10-de-graffiti` graffiti decals on tagged walls (faction-tagged)
+- [ ] `q10-de-tire-skids` vehicle tire skid decals
+- [ ] `q10-de-bullet-impacts` bullet impact decals on hard surfaces
+- [ ] `q10-de-cap-lru` per-chunk decal cap with LRU eviction
+
+### Q10.B — Wet Road Shader
+
+- [ ] `q10-wr-wetness-map` per-tile wetness map, weather + drainage driven
+- [ ] `q10-wr-fresnel` proper Fresnel + roughness modulation
+- [ ] `q10-wr-puddle-ssr` puddle decals receive SSR
+
+### Q10.C — Vegetation
+
+- [ ] `q10-vg-tree-wind` tree vertex-shader wind sway
+- [ ] `q10-vg-grass-instanced` grass billboards via `InstancedMesh`, 1 draw per chunk
+- [ ] `q10-vg-seasonal-tint` seasonal color tint (driven by in-game date if implemented, else flat)
+- [ ] `q10-vg-leaf-fall` leaf-fall particles in autumn districts
+
+### Q10.D — Water Upgrade
+
+- [ ] `q10-wt-planar-reflections` real-time planar reflections on canals/harbor
+- [ ] `q10-wt-depth-color` depth-based color absorption
+- [ ] `q10-wt-foam` surface foam at obstacles
+- [ ] `q10-wt-caustics` caustics at shallow depths
+- [ ] `q10-wt-boat-wake` wake from moving boats
+
+### Q10.E — GPU Particles
+
+- [ ] `q10-gp-rain-snow` rain/snow on GPU (transform feedback or compute-emulated)
+- [ ] `q10-gp-sparks-smoke` sparks/smoke on GPU
+- [ ] `q10-gp-50x` 50× count-budget headroom at same frame cost vs current CPU particles
+
+### Q10.F — TAA, GTAO, Anisotropy, Subsurface
+
+- [ ] `q10-aa-taa` TAA with temporal jitter, history reprojection, neighborhood clamp
+- [ ] `q10-aa-fxaa-fallback` FXAA retained for "Performance" preset
+- [ ] `q10-ao-gtao` GTAO replaces SSAO at "High" and above (separable bilateral blur)
+- [ ] `q10-ao-ssao-fallback` SSAO retained for lower presets
+- [ ] `q10-sh-anisotropic` anisotropic specular for road, hair, brushed-metal vehicle paint
+- [ ] `q10-sh-subsurface` wrap-shading SSS for skin/foliage
+
+### Q10.G — Realtime GI (Probe Grid)
+
+- [ ] `q10-gi-probe-grid` light probe grid placed per chunk
+- [ ] `q10-gi-irradiance-volumes` baked irradiance volumes loaded at chunk-load
+- [ ] `q10-gi-dynamic-deltas` dynamic-light deltas applied per frame
+
+### Q10.H — Per-District Art Direction
+
+- [ ] `q10-ad-docks` greenish-overcast tint + wet/grime bias for docks
+- [ ] `q10-ad-industrial` smoggy haze + scorch/oil decal bias
+- [ ] `q10-ad-suburbs` warm tint + lawn vegetation bias
+- [ ] `q10-ad-oldtown` saturated tint + poster/graffiti density bias
+- [ ] `q10-ad-screenshot-baselines` 4 district screenshot baselines re-captured
+
+### Q10 — Definition of Done
+
+- [ ] One block at noon / rain / night looks like three different places
+- [ ] Perf harness still on-budget at "High" preset
+- [ ] All Q10.A–Q10.H items ticked
+- [ ] Operator approval `q10.json`
+- [ ] Tag `0.10.0.0`
+
+---
+
+## Q11 — Optimization Pass 1: Render Pipeline (2026-10-01 → 2026-11-30)
+
+**Goal:** 60 fps at "High" preset on a midrange laptop GPU. Reference scene `medium+120-NPCs+rain+night` runs ≥ 60 fps with documented per-pass budget.
+
+### Q11.A — WebGPU Evaluation
+
+- [ ] `q11-wg-spike-branch` spike branch tested on Chromium-stable
+- [ ] `q11-wg-decision` go / wait / no decision recorded in `docs/retros/2026-10-webgpu.md`
+- [ ] `q11-wg-easy-wins` if go: GPU compute particles + GPU culling ported
+
+### Q11.B — GPU-Driven Culling
+
+- [ ] `q11-cu-frustum-gpu` GPU frustum culling for buildings, vehicles, NPCs, props
+- [ ] `q11-cu-hiz-occlusion` Hi-Z occlusion buffer for fine occlusion pass
+- [ ] `q11-cu-coarse-cpu` CPU coarse cull stays for top-level chunk gating
+
+### Q11.C — Mesh LOD
+
+- [ ] `q11-lod-buildings` 4-tier LODs (LOD0/1/2/imposter) for buildings
+- [ ] `q11-lod-vehicles` 4-tier LODs for vehicles
+- [ ] `q11-lod-characters` 4-tier LODs for characters
+- [ ] `q11-lod-imposters-baked` build-time imposter generation
+- [ ] `q11-lod-thresholds` per-category LOD distance thresholds tuned
+
+### Q11.D — Instancing & Atlasing
+
+- [ ] `q11-in-audit` audit script lists meshes duplicated > 8× without instancing
+- [ ] `q11-in-instancedmesh-pass` move duplicates to `InstancedMesh` / `BatchedMesh`
+- [ ] `q11-in-ci-check` CI fails on new non-instanced duplicates
+- [ ] `q11-tx-atlas-buildings` building texture atlas
+- [ ] `q11-tx-atlas-vehicles` vehicle texture atlas
+- [ ] `q11-tx-array-decals` decal atlas via array texture
+
+### Q11.E — Shaders & Render Graph
+
+- [ ] `q11-sh-uber-audit` shader permutation count audited; flag-defines collapsed
+- [ ] `q11-rg-explicit-ordering` render graph with explicit pass ordering + dependency tracking
+- [ ] `q11-rg-no-implicit-mut` audit verifies no implicit `renderTarget` mutation across passes
+
+### Q11.F — Dynamic Resolution & VRS
+
+- [ ] `q11-drs-impl` dynamic resolution scaling with min-bound user setting
+- [ ] `q11-drs-budget-driven` triggers when frame time exceeds budget for N frames
+- [ ] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
+- [ ] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
+
+### Q11.G — Draw-Call & Per-Pass Budget
+
+- [ ] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
+- [ ] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
+- [ ] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
+- [ ] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
+
+### Q11 — Definition of Done
+
+- [ ] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
+- [ ] All Q11.A–Q11.G items ticked
+- [ ] Operator approval `q11.json`
+- [ ] Tag `0.11.0.0`
+
+---
+
+## Q12 — Optimization Pass 2: Memory, CPU, Streaming (2026-12-01 → 2027-01-31)
+
+**Goal:** 4-hour continuous session, flat memory, zero stalls > 33 ms after warmup, initial JS bundle < 2 MB gzipped.
+
+### Q12.A — Web Workers
+
+- [ ] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
+- [ ] `q12-wk-schedule-worker` NPC scheduling on worker
+- [ ] `q12-wk-faction-worker` faction sim tick on worker
+- [ ] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
+- [ ] `q12-wk-save-worker` save serialization on worker
+- [ ] `q12-wk-asset-decoder` asset decoder pool on worker
+
+### Q12.B — Asset Streaming
+
+- [ ] `q12-st-chunked-load` chunked load with LRU eviction
+- [ ] `q12-st-worker-only` chunk requests/releases never on main thread
+- [ ] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
+
+### Q12.C — Asset Compression
+
+- [ ] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
+- [ ] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
+- [ ] `q12-cm-runtime-decode` runtime decode in asset worker
+- [ ] `q12-cm-opus-audio` audio shipped as Opus
+- [ ] `q12-cm-music-lazy` music lazy-loaded per district
+
+### Q12.D — GC Audit
+
+- [ ] `q12-gc-tick-loop-zero-alloc` zero per-frame allocations in tick loop
+- [ ] `q12-gc-render-loop-zero-alloc` zero per-frame allocations in render loop
+- [ ] `q12-gc-input-zero-alloc` zero per-frame allocations in input handling
+- [ ] `q12-gc-ci-heap-sample` CI smoke compares heap delta across N frames
+
+### Q12.E — Object Pool Audit
+
+- [ ] `q12-po-vehicles` vehicles pooled with high-water tracking
+- [ ] `q12-po-npcs` NPCs pooled with high-water tracking
+- [ ] `q12-po-projectiles` projectiles pooled
+- [ ] `q12-po-particles` particles pooled (if not GPU-only after Q10)
+- [ ] `q12-po-decals` decals pooled
+- [ ] `q12-po-ragdolls` ragdolls pooled
+- [ ] `q12-po-fx` FX pooled
+- [ ] `q12-po-dev-hud` dev HUD shows pool usage live
+
+### Q12.F — Memory Budget
+
+- [ ] `q12-mb-soft-cap-medium` soft cap 2 GB on medium map
+- [ ] `q12-mb-soft-cap-huge` soft cap 4 GB on huge map
+- [ ] `q12-mb-eviction-80pct` streaming evicts at 80% of cap
+- [ ] `q12-mb-hard-cap-recover` hard-cap path throws recoverable error
+
+### Q12.G — Bundle & Save Format
+
+- [ ] `q12-bd-initial-2mb` initial JS ≤ 2 MB gzipped
+- [ ] `q12-bd-manual-chunks` `vite.config.js` `manualChunks` audited for first-frame critical
+- [ ] `q12-bd-lazy-modules` non-critical modules lazy-loaded
+- [ ] `q12-sf-msgpack` save format moved to msgpack (cbor-x or msgpackr)
+- [ ] `q12-sf-100h-load` 100h synthetic save loads in < 5 s
+- [ ] `q12-sf-deterministic-roundtrip` round-trip is byte-identical for the same world
+- [ ] `q12-sf-migration-speed` no migration takes > 1 s per minor version step
+
+### Q12.H — Dev Memory HUD
+
+- [ ] `q12-dh-pool-counts` per-pool counts visible
+- [ ] `q12-dh-gc-events` GC events/sec visible
+- [ ] `q12-dh-heap-size` JS heap size visible
+- [ ] `q12-dh-gpu-mem-est` GPU memory estimate visible
+
+### Q12 — Definition of Done
+
+- [ ] 4-hour session: flat memory, no stalls > 33 ms after warmup, bundle < 2 MB gzipped
+- [ ] All Q12.A–Q12.H items ticked
+- [ ] Operator approval `q12.json`
+- [ ] Tag `0.12.0.0`
+
+---
+
+## Q13 — Living City Depth (2027-02-01 → 2027-05-31)
+
+**Goal:** Spend the recovered render and memory headroom on density and verticality. The city stops being a flat board.
+
+### Q13.A — Rooftop Traversal
+
+- [ ] `q13-rt-edge-tag` rooftop edges tagged in building metadata
+- [ ] `q13-rt-climb-controller` climb/jump controller for tagged edges
+- [ ] `q13-rt-accessible-flag` "accessible rooftop" flag in metadata
+- [ ] `q13-rt-fall-recovery` fall damage + ledge-grab recovery
+
+### Q13.B — Skybridges
+
+- [ ] `q13-sb-procedural` procedural skybridge spans between tall buildings in dense districts
+- [ ] `q13-sb-navmesh-bake` nav-mesh bakes skybridges
+- [ ] `q13-sb-npc-use` NPCs traverse skybridges where appropriate
+
+### Q13.C — Underground
+
+- [ ] `q13-ug-sewers` sewer layer with seamless world entry
+- [ ] `q13-ug-parking` parking-garage layer
+- [ ] `q13-ug-subway-tunnels` subway tunnel layer
+- [ ] `q13-ug-streaming` underground chunks stream in/out cleanly
+
+### Q13.D — Interior Expansion (10 templates)
+
+- [ ] `q13-it-shop-2` second shop template
+- [ ] `q13-it-shop-3` third shop template
+- [ ] `q13-it-office-1` office interior
+- [ ] `q13-it-office-2` corporate-floor interior
+- [ ] `q13-it-club` club interior
+- [ ] `q13-it-warehouse` warehouse interior
+- [ ] `q13-it-subway-station` subway station interior (separate from Q3 platform)
+- [ ] `q13-it-growth-assignment` zone growth picks new templates per building class
+
+### Q13.E — Density
+
+- [ ] `q13-de-npcs-200` 200+ visible NPCs at peak (was 120)
+- [ ] `q13-de-vehicles-80` 80+ vehicles on visible roads
+- [ ] `q13-de-lod-fidelity-curve` behavior fidelity drops with distance
+- [ ] `q13-de-spawner-zoning` spawner respects district zoning + time of day
+- [ ] `q13-de-perf-rebaseline` perf harness re-baselines at new density
+
+### Q13.F — Vertical Hacking
+
+- [ ] `q13-vh-cam-through-windows` camera-to-camera through windows
+- [ ] `q13-vh-profiler-cross-floor` profiler reaches NPCs across floors
+- [ ] `q13-vh-rooftop-hackables` rooftop-only hackables (HVAC, antennas, billboards)
+
+### Q13.G — Districts (8 total)
+
+- [ ] `q13-ds-entertainment` entertainment district
+- [ ] `q13-ds-government` government district
+- [ ] `q13-ds-transit-hub` transit-hub district
+- [ ] `q13-ds-waterfront-residential` waterfront-residential district
+
+### Q13.H — Photo Mode Upgrade
+
+- [ ] `q13-pm-dof` depth of field with focal pull
+- [ ] `q13-pm-free-cam-roll` free-cam roll/orbit
+- [ ] `q13-pm-time-scrub` time-of-day scrub
+
+### Q13.I — Save Schema for Vertical World
+
+- [ ] `q13-ss-strata-coords` rooftop / underground / interior coords coexist in one save
+- [ ] `q13-ss-migration-12-to-13` migration from 0.12.x written and tested
+- [ ] `q13-ss-sequence-before-content` schema bump landed before any new mission content
+
+### Q13 — Definition of Done
+
+- [ ] Peak-hour rooftop chase (3 skybridges → interior → subway tunnel) ≥ 60 fps
+- [ ] All Q13.A–Q13.I items ticked
+- [ ] Operator approval `q13.json`
+- [ ] Tag `0.13.0.0`
+
+---
+
+## Q14 — 1.0 RC, External Playtest, Launch (2027-06-01 → 2027-12-31)
+
+**Goal:** Ship a game people play for 10 hours, give to a friend, and don't apologize for.
+
+### Q14.A — Final Perf Pass
+
+- [ ] `q14-pf-frustum-reaudit` frustum culling re-audited after Q13 density work
+- [ ] `q14-pf-lod-retune` LOD thresholds re-tuned for new density
+- [ ] `q14-pf-drawcall-large-dense` ≤ 3000 draws on `large+200-NPCs+rain`
+- [ ] `q14-pf-gc-4h` GC clean across 4-hour session
+- [ ] `q14-pf-shader-cost-final` SSAO/GTAO half-res, bloom mips, volumetrics step count cost-budgeted per preset
+
+### Q14.B — Accessibility (Final)
+
+- [ ] `q14-ac-rebind-every-action` every action rebindable
+- [ ] `q14-ac-subtitle-size` multi-size subtitle
+- [ ] `q14-ac-subtitle-speakers` speaker labels
+- [ ] `q14-ac-colorblind-3` 3 colorblind palettes
+- [ ] `q14-ac-shake-toggle` camera-shake toggle
+- [ ] `q14-ac-reduced-motion` reduced-motion mode
+- [ ] `q14-ac-hold-vs-tap` hold-vs-tap interact toggle
+- [ ] `q14-ac-audio-mixer` per-channel audio mixer
+
+### Q14.C — Save Migration Matrix (Final)
+
+- [ ] `q14-sm-matrix` migration matrix `0.1.x` → `0.13.x` → `1.0`
+- [ ] `q14-sm-pw-roundtrip` Playwright round-trip per migration
+- [ ] `q14-sm-100h-final` 100h synthetic save round-trips clean
+
+### Q14.D — Steam Pipeline
+
+- [ ] `q14-st-depot-upload` depot upload end-to-end
+- [ ] `q14-st-achievements-30` ≥ 30 achievements defined and trigger-tested
+- [ ] `q14-st-cloudsaves` cloud saves tested across two installs
+- [ ] `q14-st-workshop` Steam Workshop wired for mods
+- [ ] `q14-st-beta-default` `0.13.x` on beta branch; `1.0` on default
+
+### Q14.E — External Playtest
+
+- [ ] `q14-pt-testers-3` 3 external testers signed up
+- [ ] `q14-pt-sessions-2-each` ≥ 2 sessions per tester
+- [ ] `q14-pt-logs-aggregated` logs aggregated into `docs/playtests/`
+- [ ] `q14-pt-no-hardcrash` zero hard crashes
+- [ ] `q14-pt-no-softlock` zero softlocks
+- [ ] `q14-pt-retro` retrospective in `docs/retros/`
+
+### Q14.F — Localization & Modding Scaffold
+
+- [ ] `q14-lc-i18n-catalog` all UI strings extracted to one i18n catalog
+- [ ] `q14-lc-second-language-smoke` pipeline works for one second language as smoke test
+- [ ] `q14-md-modding-doc` `docs/MODDING.md` published
+- [ ] `q14-md-example-mod` example mod ships in `assets/mods/example/`
+
+### Q14.G — Patch & Launch
+
+- [ ] `q14-ln-rc-pipeline` at least one `1.0.0-rc.N → 1.0.0-rc.N+1` cycle rehearsed
+- [ ] `q14-ln-rc1` tag `1.0.0-rc.1`
+- [ ] `q14-ln-rc-patch` ≤ 2 patch RCs allowed
+- [ ] `q14-ln-1-0-0` tag `1.0.0`
+- [ ] `q14-ln-release-notes` `docs/release_notes/1.0.0.md` complete
+- [ ] `q14-ln-post-mortem` launch post-mortem in `docs/retros/2027-12.md` (or 2028-XX if slipped)
+
+### Q14 — Definition of Done
+
+- [ ] External 2-hour sessions completed without hard crash or softlock
+- [ ] ≥ 2 external testers return for a second session unprompted
+- [ ] All Q14.A–Q14.G items ticked
+- [ ] Operator approval `q14.json`
 - [ ] Tag `1.0.0`
 
 ---
@@ -517,26 +941,44 @@ These don't belong to any one quarter. The curator keeps them topped up.
 
 ## Retrospectives (append at quarter end)
 
-### Q1 Retro (2026-06)
-*(pending)*
+### Q1 Retro (2026-04-04)
+*(pending — captured at tag `0.1.0.0`)*
 
-### Q2 Retro (2026-09)
-*(pending)*
+### Q2 Retro (2026-04-09)
+*(pending — captured at tag `0.2.0.0`)*
 
-### Q3 Retro (2026-12)
-*(pending)*
+### Q3 Retro (2026-04-15)
+*(pending — captured at tag `0.3.0.0`)*
 
-### Q4 Retro (2027-03)
-*(pending)*
+### Q4 Retro (2027-03 — recorded in `docs/retros/2027-03.md`)
+*Year-1 review on file. Re-anchor to 2026-04-19 ✅ when this checklist is next touched by a `meta` task.*
 
-### Q5 Retro (2027-06)
-*(pending)*
+### Q5 Retro (2026-04-23)
+*(pending — captured at tag `0.5.0.0`)*
 
-### Q6 Retro (2027-09)
-*(pending)*
+### Q6 Retro (2026-04-29)
+*(pending — captured at tag `0.6.0.0`)*
 
-### Q7 Retro (2027-12)
-*(pending)*
+### Q7 Retro (2026-05-15)
+*(pending — captured at tag `0.7.0.0`)*
 
-### Q8 Retro (2028-04)
-*(pending — includes 1.0 launch post-mortem)*
+### Q8 Retro (2026-06-05)
+*(pending — playability pass 2 retro, captured at tag `0.8.0.0`)*
+
+### Q9 Retro (2026-08-01)
+*(pending — graphics pass 1 retro, captured at tag `0.9.0.0`)*
+
+### Q10 Retro (2026-09-30)
+*(pending — graphics pass 2 retro, captured at tag `0.10.0.0`)*
+
+### Q11 Retro (2026-11-30)
+*(pending — render-pipeline optimization retro, captured at tag `0.11.0.0`)*
+
+### Q12 Retro (2027-01-31)
+*(pending — memory/streaming optimization retro, captured at tag `0.12.0.0`)*
+
+### Q13 Retro (2027-05-31)
+*(pending — living city depth retro, captured at tag `0.13.0.0`)*
+
+### Q14 Retro (2027-12 / early 2028)
+*(pending — includes 1.0 launch post-mortem at tag `1.0.0`)*
