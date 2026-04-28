@@ -36,6 +36,16 @@ const ZONE_BUILDINGS = {
     },
 };
 
+export const ZONE_INTERIORS = {
+    'market': 'shop',
+    'restaurant': 'shop',
+    'shopping-mall': 'shop',
+    'warehouse': 'safehouse',
+    'factory': null,
+    'house': null,
+    'apartment': null,
+};
+
 export class GrowthSimulator {
     constructor(game) {
         this.game = game;
@@ -185,6 +195,10 @@ export class GrowthSimulator {
 
         if (result?.ok && result.building) {
             lot.buildingId = result.building.id;
+            const interior = ZONE_INTERIORS[buildingType];
+            if (interior) {
+                result.building.interiorTemplate = interior;
+            }
         }
     }
 
