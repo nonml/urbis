@@ -2624,6 +2624,35 @@ function testHackCommsJam() {
 }
 
 testHackCommsJam();
+
+function testHackWeaponJam() {
+    console.log('\n[72] Combat Hack — weapon jam');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 161616, mode: 'standard' });
+        game.init();
+
+        const citizens = game.citizens?.citizens || [];
+        if (citizens.length > 0) {
+            citizens[0].faction = 'police';
+            citizens[0].x = 12;
+            citizens[0].y = 12;
+        }
+
+        const result = game.worldHacks.hackWeaponJam(12, 12);
+        assert(typeof result.ok === 'boolean', 'hackWeaponJam returns status');
+        if (result.ok) {
+            assert(result.targetId !== undefined, 'Returns target ID');
+            const target = citizens.find(c => c.id === result.targetId);
+            assert(target._weaponJamUntil > 0, 'Target has weapon jam timer');
+        }
+    } catch (e) {
+        console.log(`  ✗ Weapon jam test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackWeaponJam();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

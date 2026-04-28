@@ -423,6 +423,38 @@ export class WorldHackEffects {
         return this._commsJamUntil > (this.game.state?.time?.tick ?? 0);
     }
 
+    hackWeaponJam(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('weapon_jam', tick)) {
+            return { ok: false, reason: 'On cooldown' };
+        }
+        const citizens = this.game.citizens?.citizens || [];
+        let target = null;
+        let bestDist = 8;
+        for (const c of citizens) {
+            if (c.faction === 'citizens') continue;
+            const dx = (c.x ?? 0) - x;
+            const dy = (c.y ?? 0) - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                target = c;
+            }
+        }
+        if (!target) return { ok: false, reason: 'No armed target nearby' };
+
+        target._weaponJamUntil = tick + 15;
+        this._setCooldown('weapon_jam', tick, 25);
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(4);
+        this.game.ui?.showMessage?.('Enemy weapon jammed!', 'success');
+        try {
+            eventBus.emit(EVENT_TYPES.HACK_SUCCESS, {
+                type: 'weapon_jam', targetId: target.id,
+            });
+        } catch {}
+        return { ok: true, targetId: target.id };
+    }
+
     hackDetonateGrenade(x, y) {
         const tick = this.game.state.time.tick;
         if (this._isOnCooldown('grenade_det', tick)) {
