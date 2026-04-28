@@ -167,8 +167,8 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q2-pf-harness` `tools/perf_harness.mjs` runs headless + measures frame times
 - [x] `q2-pf-scenes` scenes: empty map, medium map, medium+120 NPCs, night+rain
 - [x] `q2-pf-budget` budget: 60 fps on reference GPU, degraded gracefully below
-- [ ] `q2-pf-ci-gate` harness result written to `tools/agent/baselines/perf.json`
-- [ ] `q2-pf-regression-check` gate compares and fails on > 10% regression
+- [x] `q2-pf-ci-gate` harness result written to `tools/agent/baselines/perf.json`
+- [x] `q2-pf-regression-check` gate compares and fails on > 10% regression
 
 ### Q2.H — Playtest Script
 
