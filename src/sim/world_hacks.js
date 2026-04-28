@@ -23,6 +23,8 @@ export class WorldHackEffects {
         this._steamBursts = [];        // { x, y, radius, untilTick }
         // Quick-hack cooldowns per category
         this._cooldowns = new Map();   // hackType -> untilTick
+        // Comms jam — enemies can't call backup
+        this._commsJamUntil = 0;
     }
 
     /**
@@ -396,10 +398,30 @@ export class WorldHackEffects {
             raisedBarriers: this._raisedBarriers.filter(b => tick < b.untilTick),
             recentExplosions: this._explosions.filter(e => tick - e.tick < 5),
             steamBursts: this._steamBursts.filter(s => tick < s.untilTick),
+            commsJammed: this._commsJamUntil > tick,
         };
     }
 
     // ── Internal helpers ──
+
+    hackCommsJam() {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('comms_jam', tick)) {
+            return { ok: false, reason: 'On cooldown' };
+        }
+        this._commsJamUntil = tick + 10;
+        this._setCooldown('comms_jam', tick, 30);
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(5);
+        this.game.ui?.showMessage?.('Enemy comms jammed for 10s!', 'success');
+        try {
+            eventBus.emit(EVENT_TYPES.HACK_SUCCESS, { type: 'comms_jam' });
+        } catch {}
+        return { ok: true };
+    }
+
+    get isCommsJammed() {
+        return this._commsJamUntil > (this.game.state?.time?.tick ?? 0);
+    }
 
     hackDetonateGrenade(x, y) {
         const tick = this.game.state.time.tick;

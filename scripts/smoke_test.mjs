@@ -2597,6 +2597,33 @@ function testHackDetonateGrenade() {
 }
 
 testHackDetonateGrenade();
+
+function testHackCommsJam() {
+    console.log('\n[71] Combat Hack — comms jam');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 151515, mode: 'standard' });
+        game.init();
+
+        const result = game.worldHacks.hackCommsJam();
+        assert(result.ok, 'Comms jam succeeds');
+        assert(game.worldHacks.isCommsJammed, 'isCommsJammed is true');
+
+        const effects = game.worldHacks.getActiveEffects();
+        assert(effects.commsJammed, 'Active effects show comms jammed');
+
+        const result2 = game.worldHacks.hackCommsJam();
+        assert(!result2.ok, 'Second jam blocked by cooldown');
+
+        game.runTicks(15);
+        assert(!game.worldHacks.isCommsJammed, 'Jam expired after 10 ticks');
+    } catch (e) {
+        console.log(`  ✗ Comms jam test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackCommsJam();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
