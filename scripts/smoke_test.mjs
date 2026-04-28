@@ -12,6 +12,13 @@
  * - Map bounds are respected
  */
 
+// Suppress Worker-not-defined rejections from PathfindingProxy in headless Node
+process.on('unhandledRejection', (reason) => {
+    if (reason instanceof ReferenceError && /Worker/.test(reason.message)) return;
+    console.error('Unhandled rejection:', reason);
+    process.exit(1);
+});
+
 // Import headless game that doesn't require browser dependencies
 import { Game } from '../src/headless_game.js';
 import { MAP_PRESETS } from '../src/constants.js';
@@ -1058,14 +1065,73 @@ function testFactionTuningV1() {
     }
 }
 
-console.log('='.repeat(60));
-console.log(`Results: ${passCount} passed, ${failCount} failed`);
-console.log('='.repeat(60));
+function runRapierDeterminismTest() {
+    return import('@dimforge/rapier3d-compat').then(mod => {
+        const RAPIER = mod.default;
+        return RAPIER.init().then(() => {
+            console.log('\n[30] Rapier Physics Determinism');
+            const STEPS = 1000;
+            const BODY_COUNT = 8;
+            const results = [];
 
-if (failCount > 0) {
-    console.log('\n❌ Some tests failed');
-    process.exit(1);
-} else {
-    console.log('\n✅ All smoke tests passed');
-    process.exit(0);
+            for (let run = 0; run < 2; run++) {
+                const world = new RAPIER.World({ x: 0, y: -9.81, z: 0 });
+                const bodies = [];
+
+                for (let i = 0; i < BODY_COUNT; i++) {
+                    const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+                        .setTranslation(i * 2.0, 10.0 + i, 0.0);
+                    const body = world.createRigidBody(bodyDesc);
+                    const cd = RAPIER.ColliderDesc.ball(0.5).setRestitution(0.3);
+                    world.createCollider(cd, body);
+                    bodies.push(body);
+                }
+
+                const groundDesc = RAPIER.RigidBodyDesc.fixed()
+                    .setTranslation(0, 0, 0);
+                const ground = world.createRigidBody(groundDesc);
+                world.createCollider(
+                    RAPIER.ColliderDesc.cuboid(50, 0.1, 50), ground
+                );
+
+                for (let s = 0; s < STEPS; s++) {
+                    world.step();
+                }
+
+                const positions = bodies.map(b => {
+                    const t = b.translation();
+                    return [t.x, t.y, t.z];
+                });
+                results.push(positions);
+                world.free();
+            }
+
+            let allMatch = true;
+            for (let i = 0; i < BODY_COUNT; i++) {
+                for (let axis = 0; axis < 3; axis++) {
+                    if (results[0][i][axis] !== results[1][i][axis]) {
+                        allMatch = false;
+                    }
+                }
+            }
+            assert(allMatch, 'Identical seeds produce identical positions after 1000 steps');
+        });
+    }).catch(e => {
+        console.log(`  ✗ Rapier determinism test failed: ${e.message}`);
+        failCount++;
+    });
 }
+
+runRapierDeterminismTest().then(() => {
+    console.log('='.repeat(60));
+    console.log(`Results: ${passCount} passed, ${failCount} failed`);
+    console.log('='.repeat(60));
+
+    if (failCount > 0) {
+        console.log('\n❌ Some tests failed');
+        process.exit(1);
+    } else {
+        console.log('\n✅ All smoke tests passed');
+        process.exit(0);
+    }
+});
