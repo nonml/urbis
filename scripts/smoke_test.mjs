@@ -2289,6 +2289,29 @@ function testCameraTraversal() {
 }
 
 testCameraTraversal();
+
+function testCameraViewFeed() {
+    console.log('\n[60] Camera Network — view feed as HUD quad');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 606060, mode: 'standard' });
+        game.init();
+        const cn = game.cameraNetwork;
+        const cam = cn.cameras[0];
+
+        cn.hopTo(cam);
+        assert(cn.isViewing, 'Viewing after hopTo');
+        assert(cn.activeCam === cam, 'Active cam set');
+
+        cn.exitCamera();
+        assert(!cn.isViewing, 'Not viewing after exit');
+    } catch (e) {
+        console.log(`  ✗ Camera view feed test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraViewFeed();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

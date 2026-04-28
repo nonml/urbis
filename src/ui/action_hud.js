@@ -115,6 +115,14 @@ export class ActionHUD {
             </div>
             <div class="ahud-prompt" id="ahud-prompt"></div>
             <div class="ahud-profiler" id="ahud-profiler"></div>
+            <div class="ahud-cam-feed" id="ahud-cam-feed">
+                <div class="ahud-cam-header"><span class="ahud-cam-icon">&#x1F4F7;</span> <span id="ahud-cam-label">CAM</span></div>
+                <div class="ahud-cam-body">
+                    <span id="ahud-cam-pos"></span>
+                    <span id="ahud-cam-linked"></span>
+                </div>
+                <div class="ahud-cam-hint"><kbd>Arrow keys</kbd> hop &middot; <kbd>ESC</kbd> exit</div>
+            </div>
             <div class="ahud-hint" id="ahud-hint"></div>
         `;
 
@@ -553,6 +561,48 @@ export class ActionHUD {
                     transition: opacity 0.3s;
                 }
 
+                /* ── Camera Feed Overlay ── */
+                .ahud-cam-feed {
+                    position: absolute;
+                    top: 14px;
+                    left: 14px;
+                    background: rgba(0,10,20,0.85);
+                    border: 1px solid rgba(0,255,255,0.35);
+                    border-radius: 4px;
+                    padding: 8px 12px;
+                    min-width: 160px;
+                    font-size: 11px;
+                    color: rgba(255,255,255,0.85);
+                    backdrop-filter: blur(4px);
+                    opacity: 0;
+                    transition: opacity 0.25s;
+                    pointer-events: none;
+                }
+                .ahud-cam-feed.on { opacity: 1; }
+                .ahud-cam-header {
+                    font-weight: 700;
+                    color: #00ffff;
+                    font-size: 12px;
+                    margin-bottom: 4px;
+                }
+                .ahud-cam-body { line-height: 1.5; }
+                .ahud-cam-hint {
+                    margin-top: 4px;
+                    font-size: 10px;
+                    color: rgba(255,255,255,0.5);
+                }
+                .ahud-cam-hint kbd {
+                    display: inline-block;
+                    background: rgba(255,255,255,0.12);
+                    border: 1px solid rgba(255,255,255,0.2);
+                    border-radius: 3px;
+                    padding: 0 4px;
+                    font-family: inherit;
+                    font-size: 10px;
+                    font-weight: 700;
+                    color: #fff;
+                }
+
                 /* ── Contextual Hints ── */
                 .ahud-hint {
                     position: absolute;
@@ -908,6 +958,9 @@ export class ActionHUD {
         // NPC Profiler overlay — shows citizen data when hack scan is active
         this._updateProfiler(state);
 
+        // Camera feed overlay
+        this._updateCamFeed();
+
         // Effects
         this._el.querySelector('#ahud-flash')?.classList.toggle('on', ph?.showDamageFlash || false);
         this._el.querySelector('#ahud-death')?.classList.toggle('on', ph?.isDead || false);
@@ -1089,6 +1142,26 @@ export class ActionHUD {
                 secretEl.style.opacity = isClose ? '1' : '0';
             }
         }
+    }
+
+    _updateCamFeed() {
+        const feed = this._el.querySelector('#ahud-cam-feed');
+        if (!feed) return;
+
+        const cn = this.game.cameraNetwork;
+        const viewing = cn?.isViewing;
+        feed.classList.toggle('on', !!viewing);
+        if (!viewing) return;
+
+        const cam = cn.activeCam;
+        const label = this._el.querySelector('#ahud-cam-label');
+        const pos = this._el.querySelector('#ahud-cam-pos');
+        const linked = this._el.querySelector('#ahud-cam-linked');
+
+        if (label) label.textContent = cam.name || 'CAM';
+        if (pos) pos.textContent = `Pos: ${cam.x}, ${cam.y}`;
+        const links = cn.getLinkedCameras(cam);
+        if (linked) linked.textContent = `Linked: ${links.length}`;
     }
 
     destroy() {

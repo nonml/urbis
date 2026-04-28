@@ -134,11 +134,15 @@ export class CameraNetwork {
     hopTo(cam) {
         if (!cam?._cam?.active) return false;
         this._activeCam = cam;
+        this.game.ui?.renderer3d?.setCameraHackView?.(cam.x, cam.y, 999);
         return true;
     }
 
     exitCamera() {
         this._activeCam = null;
+        if (this.game.ui?.renderer3d?._cameraHack) {
+            this.game.ui.renderer3d._cameraHack = null;
+        }
     }
 
     get activeCam() {
