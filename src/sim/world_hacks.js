@@ -336,6 +336,9 @@ export class WorldHackEffects {
                 ? citizen.incomeHistory.slice()
                 : new Array(12).fill(0),
             criminalRecord: citizen.criminalRecord || (this.game.rng.next() < 0.15 ? 'Petty theft' : 'None'),
+            criminalRecords: Array.isArray(citizen.criminalRecords)
+                ? citizen.criminalRecords.slice()
+                : [],
             faction: citizen.faction || 'citizens',
             happiness: citizen.happiness ?? 50,
             traits: citizen.traits || [],

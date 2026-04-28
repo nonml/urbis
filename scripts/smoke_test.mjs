@@ -2363,6 +2363,40 @@ function testProfilerIncomeHistory() {
 }
 
 testProfilerIncomeHistory();
+
+function testProfilerCriminalRecord() {
+    console.log('\n[63] Profiler — criminal records');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 808080, mode: 'standard' });
+        game.init();
+        const citizens = game.citizens?.citizens || [];
+        assert(citizens.length > 0, 'Citizens exist');
+
+        let hasRecords = false;
+        let hasClean = false;
+        for (const c of citizens) {
+            assert(Array.isArray(c.criminalRecords), `Citizen ${c.id} has criminalRecords array`);
+            if (c.criminalRecords.length > 0) {
+                hasRecords = true;
+                const r = c.criminalRecords[0];
+                assert(typeof r.charge === 'string', 'Record has charge');
+                assert(typeof r.outcome === 'string', 'Record has outcome');
+                assert(typeof r.year === 'number', 'Record has year');
+            } else {
+                hasClean = true;
+            }
+            if (hasRecords && hasClean) break;
+        }
+        assert(hasRecords, 'Some citizens have criminal records');
+        assert(hasClean, 'Some citizens have clean records');
+    } catch (e) {
+        console.log(`  ✗ Criminal record test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testProfilerCriminalRecord();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

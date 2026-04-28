@@ -34,6 +34,29 @@ export function getCitizenCapForPreset(preset = 'CITY') {
     return CITIZEN_CAPS[preset] || CITIZEN_CAPS.CITY;
 }
 
+const _CHARGES = [
+    'petty theft', 'vandalism', 'trespassing', 'data breach',
+    'cyber intrusion', 'assault', 'smuggling', 'fraud',
+    'illegal hacking', 'weapons possession',
+];
+const _OUTCOMES = ['acquitted', 'fined', 'community service', 'probation', 'incarcerated', 'pending'];
+
+function _generateCriminalRecords(citizen) {
+    const h = ((citizen.id ?? 0) * 2654435769) >>> 0;
+    if ((h & 0x7) > 1) return [];
+    const count = 1 + (h >>> 3) % 3;
+    const records = [];
+    for (let i = 0; i < count; i++) {
+        const mix = (h * (i + 1) * 31) >>> 0;
+        records.push({
+            charge: _CHARGES[mix % _CHARGES.length],
+            outcome: _OUTCOMES[(mix >>> 8) % _OUTCOMES.length],
+            year: 2020 + (mix >>> 16) % 7,
+        });
+    }
+    return records;
+}
+
 export function ensureCitizenState(citizen, map = null) {
     if (!citizen.schedule) {
         citizen.schedule = {
@@ -112,6 +135,9 @@ export function ensureCitizenState(citizen, map = null) {
     if (citizen._sim.surrendered === undefined) {
         citizen._sim.surrendered = false;
         citizen._sim.surrenderTimer = 0;
+    }
+    if (!Array.isArray(citizen.criminalRecords)) {
+        citizen.criminalRecords = _generateCriminalRecords(citizen);
     }
     if (!Array.isArray(citizen.incomeHistory)) {
         const base = citizen.income ?? citizen.salary ?? 0;
