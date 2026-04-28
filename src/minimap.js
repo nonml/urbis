@@ -44,7 +44,11 @@ export class Minimap {
 
         // Redraw terrain only when needed (seed/map change)
         if (this._dirty) {
-            this.drawTerrain();
+            if (this._interiorTemplate) {
+                this._drawInterior();
+            } else {
+                this.drawTerrain();
+            }
             this._dirty = false;
         }
 
@@ -73,6 +77,47 @@ export class Minimap {
                 ctx.fill();
             }
         }
+    }
+
+    setInterior(templateId) {
+        this._interiorTemplate = templateId;
+        this._dirty = true;
+    }
+
+    clearInterior() {
+        this._interiorTemplate = null;
+        this._dirty = true;
+    }
+
+    _drawInterior() {
+        const ctx = this.canvas.getContext('2d');
+        const rect = this.canvas.getBoundingClientRect();
+        const w = Math.max(1, Math.floor(rect.width));
+        const h = Math.max(1, Math.floor(rect.height));
+        this.canvas.width = w;
+        this.canvas.height = h;
+
+        ctx.fillStyle = '#222';
+        ctx.fillRect(0, 0, w, h);
+
+        const margin = 8;
+        const rw = w - margin * 2;
+        const rh = h - margin * 2;
+        ctx.strokeStyle = '#666';
+        ctx.lineWidth = 2;
+        ctx.strokeRect(margin, margin, rw, rh);
+
+        ctx.fillStyle = '#444';
+        ctx.fillRect(margin + 1, margin + 1, rw - 2, rh - 2);
+
+        ctx.fillStyle = '#88ccff';
+        ctx.font = '9px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(this._interiorTemplate || 'interior', w / 2, h / 2 + 3);
+
+        const doorW = rw * 0.2;
+        ctx.fillStyle = '#a87';
+        ctx.fillRect(w / 2 - doorW / 2, h - margin - 2, doorW, 4);
     }
 
     drawTerrain() {
