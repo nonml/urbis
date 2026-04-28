@@ -27,6 +27,7 @@ import { ensureCitizenState } from './sim/citizens/citizen_state.js';
 import { InteractableManager } from './sim/interactables.js';
 import { CameraNetwork } from './sim/camera_network.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
+import { HackChainExecutor } from './content/hack_chains/executor.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { QuestEngine } from './sim/quests/quest_engine.js';
 import { CaseManager } from './sim/cases/case_manager.js';
@@ -144,6 +145,7 @@ export class Game {
         this.interactables.game = this;
         this.cameraNetwork = new CameraNetwork(this);
         this.worldHacks = new WorldHackEffects(this);
+        this.hackChainExecutor = new HackChainExecutor(this);
         this.heatSystem = new HeatSystem(this);
         this.heatSystem.setHeat(this.state.player.heat || 0);
         this.content = { quests: [] };
@@ -357,6 +359,9 @@ export class Game {
         this.aftermathManager.updateAftermaths();
 
         this.interactables.updateAll(this.state.time.tick);
+        this.worldHacks.update(this.state.time.tick);
+        this.cameraNetwork.update(this.state.time.tick);
+        this.hackChainExecutor.update(this.state.time.tick);
         this.heatSystem.decay(false);
         this.questEngine.update();
         this.caseManager.update();

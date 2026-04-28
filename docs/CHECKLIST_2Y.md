@@ -367,7 +367,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q6-ch-steam-pipe` steam pipe burst hack
 - [x] `q6-ch-crane-drop` crane drop hack
-- [ ] `q6-ch-chain-editor` declarative chain file format in `src/content/hack_chains/`
+- [x] `q6-ch-chain-editor` declarative chain file format in `src/content/hack_chains/`
 - [ ] `q6-ch-sample-chains` 5 sample chains shipped
 
 ### Q6.D — Combat Hacks

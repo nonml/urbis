@@ -2497,6 +2497,52 @@ function testHackCraneDrop() {
 }
 
 testHackCraneDrop();
+
+import { validateChainDefinition } from '../src/content/hack_chains/schema.js';
+
+function testHackChainEditor() {
+    console.log('\n[68] Hack Chain — declarative chain format');
+    try {
+        const validChain = {
+            id: 'test_combo',
+            name: 'Test Combo',
+            cooldown: 30,
+            steps: [
+                { action: 'steam_pipe', delay: 0, offsetX: 0, offsetY: 0 },
+                { action: 'crane_drop', delay: 5, offsetX: 2, offsetY: 0 },
+            ],
+        };
+        const result = validateChainDefinition(validChain);
+        assert(result.valid, 'Valid chain passes validation');
+
+        const badChain = { id: 'bad', name: 'Bad' };
+        const badResult = validateChainDefinition(badChain);
+        assert(!badResult.valid, 'Invalid chain fails validation');
+        assert(badResult.errors.length > 0, 'Errors reported for bad chain');
+
+        const game = new Game({ mapPreset: 'CITY', seed: 131313, mode: 'standard' });
+        game.init();
+        const exec = game.hackChainExecutor;
+        assert(exec !== undefined, 'HackChainExecutor exists');
+
+        const execResult = exec.execute(validChain, 10, 10);
+        assert(execResult.ok, 'Chain execution starts');
+        assert(execResult.stepsQueued === 2, 'Two steps queued');
+        assert(exec.pendingCount === 2, 'Pending count is 2');
+
+        game.runTicks(1);
+        assert(exec.pendingCount < 2, 'First step fired');
+
+        game.runTicks(10);
+        assert(exec.pendingCount === 0, 'All steps fired');
+    } catch (e) {
+        console.log(`  ✗ Hack chain editor test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackChainEditor();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

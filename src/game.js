@@ -87,6 +87,7 @@ import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
 import { CameraNetwork } from './sim/camera_network.js';
+import { HackChainExecutor } from './content/hack_chains/executor.js';
 import { WaveEncounter } from './sim/encounters/wave_encounter.js';
 import { checkVehicleExplosion, getExplosionTargets, EXPLOSION_DAMAGE } from './vehicles/vehicle_state.js';
 import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
@@ -358,6 +359,7 @@ export class Game {
         // World hack effects (blackout, traffic freeze, CCTV disable)
         this.worldHacks = new WorldHackEffects(this);
         this.cameraNetwork = new CameraNetwork(this);
+        this.hackChainExecutor = new HackChainExecutor(this);
         this.waveEncounter = new WaveEncounter(this);
 
         // Weather and particle systems
@@ -857,6 +859,7 @@ export class Game {
         // World hack effects (blackout, traffic freeze, CCTV disable)
         this.worldHacks.update(this.state.time.tick);
         this.cameraNetwork.update(this.state.time.tick);
+        this.hackChainExecutor.update(this.state.time.tick);
 
         // 8b. Quest engine update
         this.questEngine.update();
