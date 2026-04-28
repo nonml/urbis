@@ -358,7 +358,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q6.B — Profiler Deepening
 
-- [ ] `q6-pr-income-history` year of income data
+- [x] `q6-pr-income-history` year of income data
 - [ ] `q6-pr-criminal-record` charges + outcomes
 - [ ] `q6-pr-relations-graph` 2-hop relationship graph
 - [ ] `q6-pr-schedule-vis` week schedule heatmap

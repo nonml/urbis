@@ -2337,6 +2337,32 @@ function testCameraHackFromCamera() {
 }
 
 testCameraHackFromCamera();
+
+function testProfilerIncomeHistory() {
+    console.log('\n[62] Profiler — income history (12 months)');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 707070, mode: 'standard' });
+        game.init();
+        const citizens = game.citizens?.citizens || [];
+        assert(citizens.length > 0, 'Citizens exist');
+
+        const c = citizens[0];
+        assert(Array.isArray(c.incomeHistory), 'Citizen has incomeHistory array');
+        assert(c.incomeHistory.length === 12, `incomeHistory has 12 entries (got ${c.incomeHistory.length})`);
+
+        game.runTicks(35);
+        assert(c.incomeHistory.length === 12, 'incomeHistory stays at 12 after snapshot');
+
+        const hist = c.incomeHistory.slice();
+        assert(hist.every(v => typeof v === 'number'), 'All entries are numbers');
+    } catch (e) {
+        console.log(`  ✗ Profiler income history test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testProfilerIncomeHistory();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

@@ -332,6 +332,9 @@ export class WorldHackEffects {
             name: citizen.name || `Citizen #${citizenId}`,
             occupation: citizen.job || citizen.occupation || 'Unemployed',
             income: citizen.income ?? Math.floor(this.game.rng.next() * 5000) + 1000,
+            incomeHistory: Array.isArray(citizen.incomeHistory)
+                ? citizen.incomeHistory.slice()
+                : new Array(12).fill(0),
             criminalRecord: citizen.criminalRecord || (this.game.rng.next() < 0.15 ? 'Petty theft' : 'None'),
             faction: citizen.faction || 'citizens',
             happiness: citizen.happiness ?? 50,

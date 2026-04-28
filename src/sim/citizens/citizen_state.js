@@ -113,10 +113,28 @@ export function ensureCitizenState(citizen, map = null) {
         citizen._sim.surrendered = false;
         citizen._sim.surrenderTimer = 0;
     }
+    if (!Array.isArray(citizen.incomeHistory)) {
+        const base = citizen.income ?? citizen.salary ?? 0;
+        citizen.incomeHistory = new Array(12).fill(base);
+        citizen._lastIncomeSnap = 0;
+    }
     citizen.needs.food = clamp01(citizen.needs.food);
     citizen.needs.rest = clamp01(citizen.needs.rest);
     citizen.needs.safety = clamp01(citizen.needs.safety);
     return citizen;
+}
+
+const MONTH_TICKS = 30;
+
+export function snapshotIncomeIfDue(citizen, tick) {
+    if (!Array.isArray(citizen.incomeHistory)) return;
+    const last = citizen._lastIncomeSnap ?? 0;
+    if (tick - last < MONTH_TICKS) return;
+    citizen._lastIncomeSnap = tick;
+    citizen.incomeHistory.push(citizen.income ?? citizen.salary ?? 0);
+    if (citizen.incomeHistory.length > 12) {
+        citizen.incomeHistory.shift();
+    }
 }
 
 export function deriveMood(citizen) {

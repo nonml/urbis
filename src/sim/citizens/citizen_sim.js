@@ -1,6 +1,6 @@
 // @ts-check
 /// <reference path="../../types/game.d.ts" />
-import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
+import { ensureCitizenState, deriveMood, getCitizenCapForPreset, snapshotIncomeIfDue } from './citizen_state.js';
 import { tickAmbient } from '../agents/bt_ambient.js';
 import { tickAlerted, isAlerted, flushDisturbances, initAlertedSystem } from '../agents/bt_alerted.js';
 import { tickEngaged, isEngaged, flushEngagedHits, initEngagedSystem } from '../agents/bt_engaged.js';
@@ -186,6 +186,7 @@ export class CitizenSim {
 
         for (const citizen of citizens) {
             ensureCitizenState(citizen, this.game.map);
+            snapshotIncomeIfDue(citizen, tick);
             const tier = this.getLODTier(citizen);
             if (citizen._sim) citizen._sim.lodTier = tier;
             this.lodCounts[tier]++;
