@@ -2254,6 +2254,41 @@ function testCameraNetworkTagging() {
 }
 
 testCameraNetworkTagging();
+
+function testCameraTraversal() {
+    console.log('\n[59] Camera Network — LOS traversal');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 606060, mode: 'standard' });
+        game.init();
+        const cn = game.cameraNetwork;
+        const cams = cn.cameras;
+        assert(cams.length >= 2, `Need ≥2 cameras for traversal (got ${cams.length})`);
+
+        const first = cams[0];
+        const linked = cn.getLinkedCameras(first);
+        assert(Array.isArray(linked), 'getLinkedCameras returns array');
+        assert(!linked.includes(first), 'Linked list excludes self');
+
+        assert(!cn.isViewing, 'Not viewing by default');
+        const hopped = cn.hopTo(first);
+        assert(hopped, 'hopTo returns true for active camera');
+        assert(cn.isViewing, 'isViewing is true after hop');
+        assert(cn.activeCam === first, 'activeCam points to hopped camera');
+
+        cn.exitCamera();
+        assert(!cn.isViewing, 'isViewing false after exit');
+        assert(cn.activeCam === null, 'activeCam null after exit');
+
+        const losOk = cn._hasLineOfSight(first.x, first.y, first.x, first.y);
+        assert(losOk, 'LOS to self is true');
+    } catch (e) {
+        console.log(`  ✗ Camera traversal test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraTraversal();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

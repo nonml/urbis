@@ -7,6 +7,7 @@ const TWO_PI = Math.PI * 2;
 const FACING_COUNT = 8;
 const DEFAULT_VIEW_ANGLE = Math.PI / 3;
 const DEFAULT_VIEW_RANGE = 12;
+const LOS_HOP_RANGE = 25;
 
 export class CameraNetwork {
     constructor(game) {
@@ -14,6 +15,7 @@ export class CameraNetwork {
         this._cameras = [];
         this._byDistrict = new Map();
         this._dirty = true;
+        this._activeCam = null;
     }
 
     rebuild() {
@@ -110,6 +112,62 @@ export class CameraNetwork {
         diff = ((diff % TWO_PI) + TWO_PI) % TWO_PI;
         if (diff > Math.PI) diff -= TWO_PI;
         return Math.abs(diff) <= meta.viewAngle / 2;
+    }
+
+    getLinkedCameras(cam) {
+        if (this._dirty) this.rebuild();
+        if (!cam?._cam) return [];
+        const linked = [];
+        for (const other of this._cameras) {
+            if (other === cam) continue;
+            if (!other._cam?.active) continue;
+            const dx = other.x - cam.x;
+            const dy = other.y - cam.y;
+            if (dx * dx + dy * dy > LOS_HOP_RANGE * LOS_HOP_RANGE) continue;
+            if (this._hasLineOfSight(cam.x, cam.y, other.x, other.y)) {
+                linked.push(other);
+            }
+        }
+        return linked;
+    }
+
+    hopTo(cam) {
+        if (!cam?._cam?.active) return false;
+        this._activeCam = cam;
+        return true;
+    }
+
+    exitCamera() {
+        this._activeCam = null;
+    }
+
+    get activeCam() {
+        return this._activeCam;
+    }
+
+    get isViewing() {
+        return this._activeCam !== null;
+    }
+
+    _hasLineOfSight(ax, ay, bx, by) {
+        const map = this.game.map;
+        if (!map?.grid) return true;
+
+        const dx = bx - ax;
+        const dy = by - ay;
+        const steps = Math.max(Math.abs(dx), Math.abs(dy));
+        if (steps < 1) return true;
+
+        const sx = dx / steps;
+        const sy = dy / steps;
+        for (let i = 1; i < steps; i++) {
+            const tx = Math.round(ax + sx * i);
+            const ty = Math.round(ay + sy * i);
+            if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return false;
+            const tile = map.grid[ty]?.[tx];
+            if (tile === 0) return false;
+        }
+        return true;
     }
 
     serialize() {
