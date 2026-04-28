@@ -107,4 +107,79 @@ export class CoverSystem {
     }
 }
 
+const SNAP_RANGE = 2.5;
+
+export class CoverController {
+    constructor(coverSystem) {
+        this._system = coverSystem;
+        this._state = 'idle';
+        this._point = null;
+        this._leaning = false;
+    }
+
+    get state() {
+        return this._state;
+    }
+
+    get point() {
+        return this._point;
+    }
+
+    get isInCover() {
+        return this._state === 'snapped' || this._state === 'leaning';
+    }
+
+    get isLeaning() {
+        return this._state === 'leaning';
+    }
+
+    get damageReduction() {
+        if (!this.isInCover) return 0;
+        return this._point?.height === COVER_HEIGHT.HIGH ? 0.7 : 0.4;
+    }
+
+    get aimPenalty() {
+        if (this._state === 'leaning') return 0.15;
+        if (this._state === 'snapped') return 0.5;
+        return 0;
+    }
+
+    snapToCover(playerX, playerY) {
+        const nearest = this._system.getNearest(playerX, playerY, SNAP_RANGE);
+        if (!nearest) return false;
+        this._point = nearest;
+        this._state = 'snapped';
+        this._leaning = false;
+        return true;
+    }
+
+    lean() {
+        if (this._state !== 'snapped') return false;
+        this._state = 'leaning';
+        this._leaning = true;
+        return true;
+    }
+
+    unlean() {
+        if (this._state !== 'leaning') return false;
+        this._state = 'snapped';
+        this._leaning = false;
+        return true;
+    }
+
+    release() {
+        this._state = 'idle';
+        this._point = null;
+        this._leaning = false;
+    }
+
+    getSnappedPosition() {
+        if (!this._point) return null;
+        return {
+            x: this._point.x + this._point.nx * 0.3,
+            y: this._point.y + this._point.ny * 0.3,
+        };
+    }
+}
+
 export { COVER_HEIGHT, COVER_TYPES };

@@ -26,6 +26,7 @@ import { eventBus, EVENT_TYPES } from '../src/sim/events.js';
 import { InteractableManager } from '../src/sim/interactables.js';
 import { getChunkId } from '../src/world/chunks.js';
 import { validateQuestDefinition } from '../src/content/quests/schema.js';
+import { CoverSystem, CoverController } from '../src/player/cover.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -267,6 +268,54 @@ testCaseArchetypesAssemblyV1();
 testFactionRegistryTrackingV1();
 testFactionPerksHostilityV1();
 testFactionTuningV1();
+testCoverSnapController();
+
+function testCoverSnapController() {
+    console.log('\n[44] Cover System — Snap-to-Cover Controller');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 55555 });
+        game.init();
+
+        const cs = new CoverSystem(game);
+        cs.rebuild();
+        const cc = new CoverController(cs);
+
+        assert(cc.state === 'idle', 'Starts idle');
+        assert(!cc.isInCover, 'Not in cover initially');
+
+        const px = Math.floor(game.map.width / 2);
+        const py = Math.floor(game.map.height / 2);
+        const snapped = cc.snapToCover(px, py);
+
+        if (cs.count > 0) {
+            assert(snapped, 'Snaps to nearest cover point');
+            assert(cc.state === 'snapped', 'State is snapped');
+            assert(cc.isInCover, 'isInCover true');
+            assert(cc.damageReduction > 0, 'Damage reduction when in cover');
+            assert(cc.aimPenalty > 0, 'Aim penalty when snapped');
+
+            const pos = cc.getSnappedPosition();
+            assert(pos !== null, 'Snapped position returned');
+
+            cc.lean();
+            assert(cc.isLeaning, 'Leaning state active');
+            assert(cc.aimPenalty < 0.5, 'Aim penalty reduced when leaning');
+
+            cc.unlean();
+            assert(cc.state === 'snapped', 'Back to snapped after unlean');
+
+            cc.release();
+            assert(cc.state === 'idle', 'Released to idle');
+            assert(!cc.isInCover, 'No longer in cover');
+        } else {
+            assert(!snapped, 'No cover points to snap to (expected for empty map)');
+        }
+    } catch (e) {
+        console.log(`  ✗ Cover snap controller test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
 
 function testInteractPrompt() {
     console.log('\n[8] Interact Prompt + Action Dispatch (Ticket B-3)');
