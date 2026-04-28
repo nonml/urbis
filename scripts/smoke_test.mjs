@@ -1396,7 +1396,53 @@ function runCrateBreakTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => {
+function runPropSpawnerTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[38] Physics Props — Density-Tuned Spawner');
+            const { RapierPhysicsWorld } = rwMod;
+            const { PhysicsPropManager, PropSpawner } = propMod;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 64 });
+            let rngVal = 0.1;
+            const rng = { next: () => { rngVal = (rngVal * 7 + 0.3) % 1; return rngVal; } };
+            const pm = new PhysicsPropManager(pw, rng);
+            const spawner = new PropSpawner(pm, rng);
+
+            const COMMERCIAL = 2;
+            const INDUSTRIAL = 3;
+            let spawned = 0;
+            for (let x = 0; x < 10; x++) {
+                const result = spawner.spawnForTile(x, 0, COMMERCIAL);
+                if (result) spawned++;
+            }
+            assert(spawned > 0, 'Spawner produces props for commercial tiles');
+            assert(spawned <= 10, 'Spawner respects density limit');
+
+            const dup = spawner.spawnForTile(0, 0, COMMERCIAL);
+            assert(dup === null, 'Spawner skips already-spawned tiles');
+
+            let indSpawned = 0;
+            for (let x = 10; x < 20; x++) {
+                if (spawner.spawnForTile(x, 1, INDUSTRIAL)) indSpawned++;
+            }
+            assert(indSpawned > 0, 'Industrial zone also spawns props');
+
+            spawner.reset();
+            assert(spawner.spawnedCount === 0, 'Reset clears spawned set');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Prop spawner test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

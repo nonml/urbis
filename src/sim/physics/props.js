@@ -197,3 +197,64 @@ export class PhysicsPropManager {
         }
     }
 }
+
+const ZONE_RESIDENTIAL = 1;
+const ZONE_COMMERCIAL = 2;
+const ZONE_INDUSTRIAL = 3;
+
+const SPAWN_TABLE = {
+    [ZONE_RESIDENTIAL]: {
+        types: ['traffic_cone', 'trashcan', 'chair'],
+        weights: [2, 3, 1],
+        density: 0.3,
+    },
+    [ZONE_COMMERCIAL]: {
+        types: ['traffic_cone', 'trashcan', 'sign', 'crate'],
+        weights: [2, 4, 3, 1],
+        density: 0.5,
+    },
+    [ZONE_INDUSTRIAL]: {
+        types: ['traffic_cone', 'trashcan', 'crate', 'sign'],
+        weights: [3, 2, 4, 2],
+        density: 0.6,
+    },
+};
+
+export class PropSpawner {
+    constructor(propManager, rng) {
+        this._pm = propManager;
+        this._rng = rng;
+        this._spawned = new Set();
+    }
+
+    spawnForTile(x, y, zoneType) {
+        const key = `${x},${y}`;
+        if (this._spawned.has(key)) return null;
+        const table = SPAWN_TABLE[zoneType];
+        if (!table) return null;
+        if (this._rng.next() > table.density) return null;
+
+        const type = this._pickWeighted(table.types, table.weights);
+        const prop = this._pm.spawn(type, x + 0.5, 0.5, y + 0.5);
+        if (prop) this._spawned.add(key);
+        return prop;
+    }
+
+    _pickWeighted(types, weights) {
+        const total = weights.reduce((s, w) => s + w, 0);
+        let roll = this._rng.next() * total;
+        for (let i = 0; i < types.length; i++) {
+            roll -= weights[i];
+            if (roll <= 0) return types[i];
+        }
+        return types[types.length - 1];
+    }
+
+    get spawnedCount() {
+        return this._spawned.size;
+    }
+
+    reset() {
+        this._spawned.clear();
+    }
+}

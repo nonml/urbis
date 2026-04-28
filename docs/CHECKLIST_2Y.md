@@ -205,7 +205,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q3-pp-sign` freestanding sign bends-then-falls
 - [x] `q3-pp-chair` chair for interiors
 - [x] `q3-pp-crate` breakable wooden crate (Q3.D dependency)
-- [ ] `q3-pp-spawner` density-tuned prop spawner per district
+- [x] `q3-pp-spawner` density-tuned prop spawner per district
 
 ### Q3.C — Ragdoll First Pass
 
