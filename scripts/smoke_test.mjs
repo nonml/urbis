@@ -3695,8 +3695,8 @@ function testArcMission2Recruitment() {
             'Driver choice writes specialist flag');
 
         const manifest = JSON.parse(readFileSyncSync('src/content/quests/arc/manifest.json', 'utf8'));
-        assert(manifest.files.length === 2 && manifest.files.includes('arc_m2_recruitment.json'),
-            'Manifest now lists 2 missions including m2');
+        assert(manifest.files.includes('arc_m2_recruitment.json'),
+            'Manifest lists m2 alongside other arc missions');
     } catch (e) {
         console.log(`  ✗ Arc m2 test failed: ${e.message}`);
         console.log(`  Stack: ${e.stack}`);
@@ -3705,6 +3705,61 @@ function testArcMission2Recruitment() {
 }
 
 testArcMission2Recruitment();
+
+function testArcMission3Planning() {
+    console.log('\n[91] Arc — mission 3: heist planning');
+    try {
+        const m3 = JSON.parse(readFileSyncSync('src/content/quests/arc/arc_m3_planning.json', 'utf8'));
+        const v = validateQuestDefinition(m3);
+        assert(v.valid, `arc_m3_planning validates (errors: ${v.errors.join('; ')})`);
+
+        assert(m3.id === 'arc_m3_planning', 'Mission has expected id');
+        assert(m3.missionIndex === 3, 'missionIndex = 3');
+        assert(Array.isArray(m3.requires) && m3.requires.includes('arc_m2_complete'),
+            'm3 gates on arc_m2_complete flag');
+
+        const choice = m3.steps.find(s => s.kind === 'choice');
+        assert(choice && choice.choices.length === 3, '3 approach choices (stealth/loud/inside)');
+        const branches = choice.choices.map(c => c.nextStep);
+        assert(new Set(branches).size === 3, 'Each choice branches to a different stage step');
+
+        for (const c of choice.choices) {
+            assert(Array.isArray(c.effect) && c.effect.some(e => e.startsWith('set_flag:plan=')),
+                `Choice ${c.id} writes plan flag`);
+        }
+
+        const stageSteps = m3.steps.filter(s => s.id.startsWith('stage_'));
+        assert(stageSteps.length === 3, 'Three stage steps, one per approach');
+        for (const ss of stageSteps) {
+            const completes = ss.onComplete?.find(e => e.startsWith('advance:'));
+            assert(completes === 'advance:dry_run', `${ss.id} re-converges to dry_run`);
+        }
+
+        const dryRun = m3.steps.find(s => s.id === 'dry_run');
+        assert(!!dryRun, 'Convergence step exists');
+
+        const recon = m3.steps.find(s => s.id === 'recon_cameras');
+        assert(recon && recon.kind === 'hack_node' && recon.nodeType === 'CCTV',
+            'CCTV recon step gates the approach choice');
+
+        const outcome = m3.steps.find(s => s.kind === 'outcome');
+        const unlock = outcome.outcomes[0].effect.find(e => e.startsWith('unlock:'));
+        assert(unlock === 'unlock:arc_m4_heist', 'Unlocks m4 heist');
+
+        const flagReward = m3.rewards.find(r => r.type === 'set_flag' && r.flag === 'arc_m3_complete');
+        assert(!!flagReward, 'Sets arc_m3_complete on completion');
+
+        const manifest = JSON.parse(readFileSyncSync('src/content/quests/arc/manifest.json', 'utf8'));
+        assert(manifest.files.includes('arc_m3_planning.json'),
+            'Manifest lists m3 alongside other arc missions');
+    } catch (e) {
+        console.log(`  ✗ Arc m3 test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testArcMission3Planning();
 
 testDistrictVariants();
 testBuildingTemplateSchema();

@@ -420,7 +420,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q7-ar-m1` mission 1: setup
 - [x] `q7-ar-m2` mission 2: recruitment
-- [ ] `q7-ar-m3` mission 3: heist planning
+- [x] `q7-ar-m3` mission 3: heist planning
 - [ ] `q7-ar-m4` mission 4: the heist
 - [ ] `q7-ar-m5` mission 5: betrayal
 - [ ] `q7-ar-m6` mission 6: resolution
