@@ -1313,7 +1313,49 @@ function runSignToppleTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => {
+function runChairPropTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[36] Physics Props — Chair');
+            const { RapierPhysicsWorld } = rwMod;
+            const { PhysicsPropManager, PROP_TYPES } = propMod;
+            const RR = rwMod.RAPIER;
+
+            assert(PROP_TYPES.chair !== undefined, 'chair type defined');
+            assert(PROP_TYPES.chair.collider === 'cuboid', 'Chair uses cuboid collider');
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rng = { next: () => 0.5 };
+            const pm = new PhysicsPropManager(pw, rng);
+
+            const groundDesc = RR.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+            const ground = pw.createRigidBody(groundDesc);
+            pw.createCollider(RR.ColliderDesc.cuboid(50, 0.1, 50), ground);
+
+            const chair = pm.spawn('chair', 2, 1, 3);
+            assert(chair !== null, 'Chair spawns');
+
+            for (let i = 0; i < 60; i++) pw.step();
+            const posRest = pm.getPosition(chair.id);
+            assert(posRest.y < 1.0, 'Chair settles under gravity');
+
+            pm.applyImpulse(chair.id, { x: 3, y: 1, z: 0 });
+            for (let i = 0; i < 30; i++) pw.step();
+            const posKicked = pm.getPosition(chair.id);
+            assert(posKicked.x > posRest.x + 0.05, 'Chair slides when pushed');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Chair prop test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

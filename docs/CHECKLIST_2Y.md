@@ -203,7 +203,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q3-pp-cone` traffic cone model + collider
 - [x] `q3-pp-trashcan` trash can rolls when kicked
 - [x] `q3-pp-sign` freestanding sign bends-then-falls
-- [ ] `q3-pp-chair` chair for interiors
+- [x] `q3-pp-chair` chair for interiors
 - [ ] `q3-pp-crate` breakable wooden crate (Q3.D dependency)
 - [ ] `q3-pp-spawner` density-tuned prop spawner per district
 
