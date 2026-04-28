@@ -2785,6 +2785,112 @@ function testCameraScriptSchema() {
 
 testCameraScriptSchema();
 
+import { CameraScriptPlayer } from '../src/render/cinematic/script_player.js';
+
+function approxEq(a, b, eps = 1e-3) { return Math.abs(a - b) < eps; }
+
+function testCameraScriptPlayer() {
+    console.log('\n[77] Cinematic — script player');
+    try {
+        const script = {
+            id: 'pan_test',
+            name: 'Pan Test',
+            shots: [
+                {
+                    duration: 2,
+                    easing: 'linear',
+                    from: { pos: [0, 0, 0],  lookAt: [10, 0, 0], fov: 60 },
+                    to:   { pos: [10, 0, 0], lookAt: [10, 0, 0], fov: 80 },
+                },
+                {
+                    duration: 1,
+                    easing: 'linear',
+                    from: { pos: [10, 0, 0], lookAt: [10, 0, 0] },
+                    to:   { pos: [10, 5, 0], lookAt: [10, 5, 0] },
+                },
+            ],
+        };
+
+        const player = new CameraScriptPlayer(script);
+        assert(!player.isActive(), 'Inactive before start()');
+
+        player.start();
+        assert(player.isActive(), 'Active after start()');
+
+        const p0 = player.getPose();
+        assert(p0.pos[0] === 0 && p0.pos[1] === 0 && p0.pos[2] === 0, 'Pose at t=0 matches first from.pos');
+        assert(p0.fov === 60, 'FOV at t=0 is 60');
+
+        player.update(1);
+        const pMid = player.getPose();
+        assert(approxEq(pMid.pos[0], 5), `Midpoint x=5 (got ${pMid.pos[0]})`);
+        assert(approxEq(pMid.fov, 70), `Midpoint fov=70 (got ${pMid.fov})`);
+
+        player.update(1.5);
+        assert(player.currentShotIndex === 1, 'Advanced to shot 1');
+        const pInShot1 = player.getPose();
+        assert(approxEq(pInShot1.pos[1], 2.5), `In shot 1 mid: y=2.5 (got ${pInShot1.pos[1]})`);
+
+        player.update(1);
+        assert(player.isFinished(), 'Finished after total duration');
+        assert(!player.isActive(), 'Inactive when finished');
+
+        const player2 = new CameraScriptPlayer({
+            id: 'ease_test', name: 'Ease',
+            shots: [{
+                duration: 1, easing: 'easeInOutCubic',
+                from: { pos: [0,0,0], lookAt: [1,0,0] },
+                to:   { pos: [10,0,0], lookAt: [1,0,0] },
+            }],
+        });
+        player2.start();
+        player2.update(0.5);
+        const eased = player2.getPose();
+        assert(approxEq(eased.pos[0], 5, 0.01), `easeInOutCubic mid is 5 (got ${eased.pos[0]})`);
+        player2.update(0.25);
+        const eased75 = player2.getPose();
+        assert(approxEq(eased75.pos[0], 9.375, 0.01),
+            `easeInOutCubic at 0.75 ≈ 9.375 (got ${eased75.pos[0]})`);
+
+        let calls = 0;
+        const player3 = new CameraScriptPlayer({
+            id: 'anchor_test', name: 'Anchor',
+            shots: [{
+                duration: 1, easing: 'linear',
+                from: { anchor: 'player' },
+                to:   { pos: [50, 0, 50], lookAt: [50, 0, 50] },
+            }],
+        }, (id) => {
+            calls++;
+            if (id === 'player') return { pos: [10, 1, 10], lookAt: [11, 1, 10] };
+            return null;
+        });
+        player3.start();
+        const ap0 = player3.getPose();
+        assert(calls >= 1, 'Anchor resolver invoked');
+        assert(ap0.pos[0] === 10 && ap0.pos[2] === 10, 'Anchor pos resolved into pose');
+
+        let throws = false;
+        try {
+            // eslint-disable-next-line no-new
+            new CameraScriptPlayer({ id: 'bad' });
+        } catch (e) { throws = true; }
+        assert(throws, 'Constructor throws on invalid script');
+
+        const player4 = new CameraScriptPlayer(script);
+        player4.start();
+        player4.skip();
+        assert(player4.isFinished(), 'skip() finishes playback');
+        assert(!player4.isActive(), 'skip() deactivates player');
+    } catch (e) {
+        console.log(`  ✗ Camera script player test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraScriptPlayer();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
