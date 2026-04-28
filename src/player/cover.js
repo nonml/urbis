@@ -98,6 +98,28 @@ export class CoverSystem {
         });
     }
 
+    findCoverFor(npcX, npcY, threatX, threatY, maxDist = 5) {
+        if (this._dirty) this.rebuild();
+        const points = this.getInRadius(npcX, npcY, maxDist);
+        let best = null;
+        let bestScore = -Infinity;
+        for (const cp of points) {
+            const toThreatX = threatX - cp.x;
+            const toThreatY = threatY - cp.y;
+            const dot = cp.nx * toThreatX + cp.ny * toThreatY;
+            if (dot <= 0) continue;
+            const dx = cp.x - npcX;
+            const dy = cp.y - npcY;
+            const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+            const score = dot / dist;
+            if (score > bestScore) {
+                bestScore = score;
+                best = cp;
+            }
+        }
+        return best;
+    }
+
     markDirty() {
         this._dirty = true;
     }

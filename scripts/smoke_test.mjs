@@ -270,6 +270,7 @@ testFactionPerksHostilityV1();
 testFactionTuningV1();
 testCoverSnapController();
 testCoverBlindfire();
+testCoverNpcUse();
 
 function testCoverBlindfire() {
     console.log('\n[45] Cover System — Blindfire Aim Penalty Curve');
@@ -308,6 +309,39 @@ function testCoverBlindfire() {
         assert(cc.aimPenalty === 0.5, 'Penalty resets to snapped level');
     } catch (e) {
         console.log(`  ✗ Cover blindfire test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testCoverNpcUse() {
+    console.log('\n[46] Cover System — NPC Cover Query');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 55555 });
+        game.init();
+
+        const cs = new CoverSystem(game);
+        cs.rebuild();
+
+        if (cs.count === 0) {
+            assert(true, 'No cover points on empty map (skip)');
+            return;
+        }
+
+        const cx = Math.floor(game.map.width / 2);
+        const cy = Math.floor(game.map.height / 2);
+        const cover = cs.findCoverFor(cx, cy, cx + 10, cy, 10);
+        assert(cover !== null, 'NPC finds cover facing threat');
+        assert(typeof cover.nx === 'number', 'Cover has normal');
+
+        const cc = new CoverController(cs);
+        const snapped = cc.snapToCover(cover.x, cover.y);
+        assert(snapped, 'NPC can snap to found cover point');
+        assert(cc.damageReduction > 0, 'NPC gets damage reduction from same cover');
+
+        cc.release();
+    } catch (e) {
+        console.log(`  ✗ NPC cover use test failed: ${e.message}`);
         console.log(`  Stack: ${e.stack}`);
         failCount++;
     }
