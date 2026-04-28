@@ -129,6 +129,12 @@ export class PoliceSystem {
         const heat = this.game.state.player.heat || 0;
         const wanted = this.isWanted();
 
+        const prevResponse = this._prevResponse || 'calm';
+        this._prevResponse = responseLevel;
+        if (responseLevel !== prevResponse && responseLevel !== 'calm') {
+            this.game.ui?.dispatchRadio?.showForHeatLevel(responseLevel);
+        }
+
         // Spawn response based on heat
         if (wanted && tick - this.lastSpawnTick >= 30) {
             this.lastSpawnTick = tick;
@@ -419,6 +425,7 @@ export class PoliceSystem {
         // Despawn all police
         this.units = [];
 
+        this.game.ui?.dispatchRadio?.showArrest();
         this.game.ui?.showMessage?.(`Busted! Fined $${fine}`, 'warning');
         this.game.ui?.renderer3d?.syncPlayer?.();
         if (this.game.ui?.renderer3d?._player) {

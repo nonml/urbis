@@ -32,6 +32,7 @@ import { PhotoMode } from './ui/photo_mode.js';
 import { VehicleAudio } from './audio/vehicle_audio.js';
 import { ActionHUD } from './ui/action_hud.js';
 import { WeaponWheel } from './ui/weapon_wheel.js';
+import { DispatchRadio } from './ui/dispatch_radio.js';
 import { WEAPONS } from './player/combat.js';
 
 
@@ -135,6 +136,7 @@ export class UIManager {
         this.photoMode = new PhotoMode(this.game);
         this.actionHUD = new ActionHUD(this.game);
         this.weaponWheel = new WeaponWheel(this.game);
+        this.dispatchRadio = new DispatchRadio(this.game);
         this._breachWasPaused = false;
 
         // Player movement state (third-person controller)
@@ -181,6 +183,9 @@ export class UIManager {
         this._hudStreetLayer = document.getElementById('hud-street-layer');
         if (this._hudStreetLayer && this.weaponWheel?.element) {
             this._hudStreetLayer.appendChild(this.weaponWheel.element);
+        }
+        if (this._hudStreetLayer && this.dispatchRadio?.element) {
+            this._hudStreetLayer.appendChild(this.dispatchRadio.element);
         }
         this._hudGodLayer = document.getElementById('hud-god-layer');
         this._toggleLabel = document.getElementById('toggle-label');
@@ -1393,6 +1398,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         
         // Update action HUD (health, wanted, weapon, speed)
         this.actionHUD?.update();
+        this.dispatchRadio?.update(dt);
 
         // Update new HUD elements
         const heat = this.game.state?.player?.heat ?? 0;
