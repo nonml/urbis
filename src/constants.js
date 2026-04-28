@@ -525,6 +525,10 @@ export const SFX = {
     RESOURCE_GAIN: 'resource_gain',
     RESOURCE_LOSS: 'resource_loss',
     RESOURCE_LOW: 'resource_low',
+
+    // Breakables
+    GLASS_IMPACT: 'glass_impact',
+    GLASS_SHATTER: 'glass_shatter',
 };
 
 // SFX parameters for procedural generation
@@ -659,5 +663,17 @@ export const SFX_PARAMS = {
         modulate: true,
         modulateRate: 3,
         modulateDepth: 20
+    },
+    [SFX.GLASS_IMPACT]: {
+        type: 'noise',
+        duration: 0.12,
+        volume: 0.7,
+        filter: { type: 'highpass', frequency: 3000, Q: 1.5 }
+    },
+    [SFX.GLASS_SHATTER]: {
+        type: 'noise',
+        duration: 0.45,
+        volume: 0.85,
+        filter: { type: 'highpass', frequency: 4000, Q: 2 }
     },
 };
