@@ -3591,6 +3591,64 @@ function testRadioMusicPool() {
 
 testRadioMusicPool();
 
+import { readFileSync as readFileSyncSync } from 'fs';
+
+function testArcMission1Setup() {
+    console.log('\n[89] Arc — mission 1: setup');
+    try {
+        const m1 = JSON.parse(readFileSyncSync('src/content/quests/arc/arc_m1_setup.json', 'utf8'));
+        const v = validateQuestDefinition(m1);
+        assert(v.valid, `arc_m1_setup validates (errors: ${v.errors.join('; ')})`);
+
+        assert(m1.id === 'arc_m1_setup', 'Mission has expected id');
+        assert(m1.arcId === 'main_arc', 'Belongs to main_arc');
+        assert(m1.missionIndex === 1, 'missionIndex = 1');
+        assert(m1.tags.includes('arc') && m1.tags.includes('setup'), 'Tagged as arc/setup');
+        assert(m1.trigger === 'ARC_M1_RADIO_HAIL', 'Trigger is the radio hail');
+        assert(m1.openingCinematic === 'intro_pan', 'References intro_pan cinematic');
+
+        const stepKinds = m1.steps.map(s => s.kind);
+        for (const k of ['trigger', 'go_to', 'interact', 'hack_node', 'choice', 'outcome']) {
+            assert(stepKinds.includes(k), `Mission contains a ${k} step`);
+        }
+
+        const choice = m1.steps.find(s => s.kind === 'choice');
+        assert(choice.choices.length === 2, 'Choice has exactly 2 options');
+        for (const c of choice.choices) {
+            assert(c.id && c.label && c.nextStep, `Choice ${c.id} has id/label/nextStep`);
+            assert(Array.isArray(c.effect) && c.effect.length > 0, `Choice ${c.id} has effects`);
+        }
+        assert(choice.choices[0].nextStep === choice.choices[1].nextStep,
+            'Both choices converge to the same next step (one mission path)');
+
+        const outcome = m1.steps.find(s => s.kind === 'outcome');
+        assert(Array.isArray(outcome.outcomes) && outcome.outcomes.length >= 1,
+            'Outcome has at least one resolution');
+        const unlock = outcome.outcomes[0].effect.find(e => e.startsWith('unlock:'));
+        assert(unlock === 'unlock:arc_m2_recruitment',
+            'Outcome unlocks the next arc mission');
+
+        const flagReward = m1.rewards.find(r => r.type === 'set_flag' && r.flag === 'arc_m1_complete');
+        assert(!!flagReward, 'Sets arc_m1_complete flag on completion');
+        const repReward = m1.rewards.find(r => r.type === 'rep_delta' && r.faction === 'fixer_network');
+        assert(!!repReward && repReward.amount > 0, 'Grants fixer_network reputation');
+
+        const manifest = JSON.parse(readFileSyncSync('src/content/quests/arc/manifest.json', 'utf8'));
+        assert(manifest.arcId === 'main_arc', 'Manifest declares arc id');
+        assert(Array.isArray(manifest.files) && manifest.files.includes('arc_m1_setup.json'),
+            'Manifest lists mission 1');
+
+        const fixerStep = m1.steps.find(s => s.speaker === 'fixer');
+        assert(!!fixerStep, 'Mission has at least one line voiced by the fixer archetype');
+    } catch (e) {
+        console.log(`  ✗ Arc m1 test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testArcMission1Setup();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

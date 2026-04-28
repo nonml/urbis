@@ -324,7 +324,8 @@ function checkJSONReferences(file, data, referencedIds) {
 function validateQuests() {
     log('\nChecking quest templates...');
     const questsDir = path.join(CONTENT_DIR, 'quests');
-    const questFiles = collectFiles(questsDir, '.json');
+    const questFiles = collectFiles(questsDir, '.json')
+        .filter(f => !path.basename(f).startsWith('manifest'));
 
     for (const file of questFiles) {
         const data = readJSON(file);
