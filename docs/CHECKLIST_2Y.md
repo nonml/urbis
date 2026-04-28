@@ -150,7 +150,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q2-hud-demand-bars` R/C/I bars in God-mode HUD
 - [x] `q2-hud-demand-tooltips` hover shows numeric demand
-- [ ] `q2-hud-growth-heatmap` toggle to tint tiles by growth pressure
+- [x] `q2-hud-growth-heatmap` toggle to tint tiles by growth pressure
 - [ ] `q2-hud-budget-widget` shows income/expenses per tick
 
 ### Q2.F — NPC Profiler Overlay

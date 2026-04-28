@@ -3939,7 +3939,7 @@ export class Renderer3D {
 
     /**
      * Set debug overlay mode
-     * @param {string} mode - 'none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services'
+     * @param {string} mode - 'none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services', 'growth'
      */
     setDebugMode(mode) {
         this._debugMode = mode;
@@ -4064,6 +4064,20 @@ export class Renderer3D {
                         } else {
                             colorHex = 0x991b1b;
                         }
+                        break;
+                    }
+
+                    case 'growth': {
+                        const zt = this.game.zoningManager?.getZone(x, y) ?? 0;
+                        if (zt === 0) break;
+                        const dem = this.game.demandCalculator?.getDemand?.() || {};
+                        const names = { 1: 'residential', 2: 'commercial', 3: 'industrial' };
+                        const pressure = (dem[names[zt]] ?? 0.5) - 0.5;
+                        const t = (pressure + 0.5);
+                        const rb = Math.floor(t * 255);
+                        const gb = Math.floor((1 - Math.abs(pressure) * 2) * 200);
+                        const bb = Math.floor((1 - t) * 255);
+                        colorHex = (rb << 16) | (gb << 8) | bb;
                         break;
                     }
                 }

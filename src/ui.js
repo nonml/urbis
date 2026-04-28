@@ -2061,7 +2061,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
      */
     toggleDebugOverlay() {
         if (!this.renderer3d) return;
-        const modes = ['none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services'];
+        const modes = ['none', 'districts', 'roads', 'parcels', 'pois', 'nav', 'services', 'growth'];
         let currentMode = this.renderer3d._debugMode || 'none';
         let idx = modes.indexOf(currentMode);
         idx = (idx + 1) % modes.length;
