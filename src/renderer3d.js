@@ -4199,8 +4199,15 @@ export class Renderer3D {
     }
 
     _buildInteriorScene(templateId) {
+        this._buildInteriorShell(10, 10, 3);
+        if (templateId === 'shop') this._buildShopProps();
+        else if (templateId === 'safehouse') this._buildSafehouseProps();
+        else if (templateId === 'subway') this._buildSubwayProps();
+    }
+
+    _buildInteriorShell(w, d, h) {
         const floor = new THREE.Mesh(
-            new THREE.PlaneGeometry(10, 10),
+            new THREE.PlaneGeometry(w, d),
             new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 })
         );
         floor.rotation.x = -Math.PI / 2;
@@ -4208,25 +4215,58 @@ export class Renderer3D {
         this._interiorGroup.add(floor);
 
         const wallMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 });
-        const wallGeo = new THREE.BoxGeometry(10, 3, 0.1);
+        const wallGeo = new THREE.BoxGeometry(w, h, 0.1);
+        const sideGeo = new THREE.BoxGeometry(d, h, 0.1);
+        const hw = w / 2;
+        const hd = d / 2;
+        const hh = h / 2;
         const walls = [
-            { pos: [0, 1.5, -5], rot: [0, 0, 0] },
-            { pos: [0, 1.5, 5], rot: [0, 0, 0] },
-            { pos: [-5, 1.5, 0], rot: [0, Math.PI / 2, 0] },
-            { pos: [5, 1.5, 0], rot: [0, Math.PI / 2, 0] },
+            { geo: wallGeo, pos: [0, hh, -hd], rot: [0, 0, 0] },
+            { geo: wallGeo, pos: [0, hh, hd], rot: [0, 0, 0] },
+            { geo: sideGeo, pos: [-hw, hh, 0], rot: [0, Math.PI / 2, 0] },
+            { geo: sideGeo, pos: [hw, hh, 0], rot: [0, Math.PI / 2, 0] },
         ];
-        for (const w of walls) {
-            const m = new THREE.Mesh(wallGeo, wallMat);
-            m.position.set(...w.pos);
-            m.rotation.set(...w.rot);
+        for (const wl of walls) {
+            const m = new THREE.Mesh(wl.geo, wallMat);
+            m.position.set(...wl.pos);
+            m.rotation.set(...wl.rot);
             m.castShadow = true;
             m.receiveShadow = true;
             this._interiorGroup.add(m);
         }
 
-        const light = new THREE.PointLight(0xffeedd, 1.0, 12);
-        light.position.set(0, 2.5, 0);
+        const light = new THREE.PointLight(0xffeedd, 1.0, 14);
+        light.position.set(0, h - 0.5, 0);
         this._interiorGroup.add(light);
+    }
+
+    _buildShopProps() {
+        const shelfMat = new THREE.MeshStandardMaterial({ color: 0x8b6914, roughness: 0.8 });
+        const shelfGeo = new THREE.BoxGeometry(3, 1.5, 0.4);
+        const positions = [[-3, 0.75, -3], [3, 0.75, -3], [-3, 0.75, 0]];
+        for (const p of positions) {
+            const shelf = new THREE.Mesh(shelfGeo, shelfMat);
+            shelf.position.set(...p);
+            shelf.castShadow = true;
+            this._interiorGroup.add(shelf);
+        }
+        const counterMat = new THREE.MeshStandardMaterial({ color: 0x666666, roughness: 0.5 });
+        const counter = new THREE.Mesh(
+            new THREE.BoxGeometry(4, 1, 0.6), counterMat
+        );
+        counter.position.set(2, 0.5, 3.5);
+        counter.castShadow = true;
+        this._interiorGroup.add(counter);
+
+        const neon = new THREE.PointLight(0x00ffcc, 0.5, 8);
+        neon.position.set(0, 2.5, -4.5);
+        this._interiorGroup.add(neon);
+    }
+
+    _buildSafehouseProps() {
+    }
+
+    _buildSubwayProps() {
     }
 
     /**
