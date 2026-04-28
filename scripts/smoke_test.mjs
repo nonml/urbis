@@ -1122,7 +1122,40 @@ function runRapierDeterminismTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => {
+function runRapierPoolTest() {
+    return import('../src/sim/physics/rapier_world.js').then(mod => {
+        const { RapierPhysicsWorld, initRapier, RAPIER: R } = mod;
+        return initRapier().then(() => {
+            console.log('\n[31] Rapier Rigid-Body Pool Cap + Recycle');
+            const pw = new RapierPhysicsWorld({ poolCap: 4 });
+            assert(pw.ready, 'Physics world initializes when Rapier is ready');
+            assert(pw.poolCap === 4, 'Pool cap is configurable');
+
+            const R2 = mod.RAPIER;
+            const ids = [];
+            for (let i = 0; i < 6; i++) {
+                const desc = R2.RigidBodyDesc.dynamic()
+                    .setTranslation(i, 5, 0);
+                const id = pw.createRigidBody(desc);
+                pw.createCollider(R2.ColliderDesc.ball(0.5), id);
+                ids.push(id);
+            }
+            assert(pw.bodyCount <= 4, `Body count capped at pool limit (got ${pw.bodyCount})`);
+            assert(pw.getBodyPosition(ids[0]) === null, 'Oldest body recycled');
+            assert(pw.getBodyPosition(ids[5]) !== null, 'Newest body still alive');
+
+            pw.removeBody(ids[5]);
+            assert(pw.getBodyPosition(ids[5]) === null, 'Explicit remove works');
+            assert(pw.bodyCount === 3, `Body count after remove is 3 (got ${pw.bodyCount})`);
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Rapier pool test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

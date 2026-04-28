@@ -12,14 +12,16 @@ export function isRapierReady() {
     return _initialized;
 }
 
-const FIXED_DT = 1 / 30;
 const GRAVITY = { x: 0.0, y: -9.81, z: 0.0 };
+const DEFAULT_POOL_CAP = 256;
 
 export class RapierPhysicsWorld {
-    constructor() {
+    constructor(options = {}) {
         this._world = null;
         this._bodies = new Map();
+        this._order = [];
         this._nextId = 1;
+        this._cap = options.poolCap ?? DEFAULT_POOL_CAP;
         if (_initialized) {
             this._world = new RAPIER.World(GRAVITY);
         }
@@ -29,6 +31,10 @@ export class RapierPhysicsWorld {
         return this._world !== null;
     }
 
+    get poolCap() {
+        return this._cap;
+    }
+
     step() {
         if (!this._world) return;
         this._world.step();
@@ -36,9 +42,13 @@ export class RapierPhysicsWorld {
 
     createRigidBody(desc) {
         if (!this._world) return null;
+        if (this._bodies.size >= this._cap) {
+            this._recycleOldest();
+        }
         const body = this._world.createRigidBody(desc);
         const id = this._nextId++;
         this._bodies.set(id, body);
+        this._order.push(id);
         return id;
     }
 
@@ -69,6 +79,19 @@ export class RapierPhysicsWorld {
         if (!body || !this._world) return;
         this._world.removeRigidBody(body);
         this._bodies.delete(id);
+        const idx = this._order.indexOf(id);
+        if (idx !== -1) this._order.splice(idx, 1);
+    }
+
+    _recycleOldest() {
+        while (this._order.length > 0 && this._bodies.size >= this._cap) {
+            const oldest = this._order.shift();
+            const body = this._bodies.get(oldest);
+            if (body) {
+                this._world.removeRigidBody(body);
+                this._bodies.delete(oldest);
+            }
+        }
     }
 
     get bodyCount() {
@@ -78,6 +101,7 @@ export class RapierPhysicsWorld {
     destroy() {
         if (!this._world) return;
         this._bodies.clear();
+        this._order.length = 0;
         this._world.free();
         this._world = null;
     }
