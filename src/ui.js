@@ -31,6 +31,8 @@ import { TooltipManager } from './ui/tooltips.js';
 import { PhotoMode } from './ui/photo_mode.js';
 import { VehicleAudio } from './audio/vehicle_audio.js';
 import { ActionHUD } from './ui/action_hud.js';
+import { WeaponWheel } from './ui/weapon_wheel.js';
+import { WEAPONS } from './player/combat.js';
 
 
 export class UIManager {
@@ -132,6 +134,7 @@ export class UIManager {
         this.hackNetwork = new HackNetwork(this.game);
         this.photoMode = new PhotoMode(this.game);
         this.actionHUD = new ActionHUD(this.game);
+        this.weaponWheel = new WeaponWheel(this.game);
         this._breachWasPaused = false;
 
         // Player movement state (third-person controller)
@@ -176,6 +179,9 @@ export class UIManager {
         this._staminaFill = document.getElementById('stamina-fill');
         this._staminaVal = document.getElementById('stamina-val');
         this._hudStreetLayer = document.getElementById('hud-street-layer');
+        if (this._hudStreetLayer && this.weaponWheel?.element) {
+            this._hudStreetLayer.appendChild(this.weaponWheel.element);
+        }
         this._hudGodLayer = document.getElementById('hud-god-layer');
         this._toggleLabel = document.getElementById('toggle-label');
         this._toggleIcon = document.getElementById('toggle-icon');
@@ -821,14 +827,17 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                 e.preventDefault();
                 this.photoMode?.toggle();
             }
-            // Weapon switching: 1 = fist, 2 = pistol, scroll = cycle
-            if (e.key === '1' && this.game.combat) {
-                this.game.combat.currentWeapon = 'fist';
-                this.showMessage('Equipped: Fists', 'normal');
+            // Weapon switching: 1-5 = direct select, X = toggle wheel
+            if (e.key >= '1' && e.key <= '5' && this.game.combat) {
+                const weaponKeys = Object.keys(WEAPONS);
+                const idx = parseInt(e.key) - 1;
+                if (idx < weaponKeys.length) {
+                    this.game.combat.setWeapon(weaponKeys[idx]);
+                    this.weaponWheel?.update();
+                }
             }
-            if (e.key === '2' && this.game.combat) {
-                this.game.combat.currentWeapon = 'pistol';
-                this.showMessage('Equipped: Pistol', 'normal');
+            if (e.key.toLowerCase() === 'x' && this.game.combat) {
+                this.weaponWheel?.toggle();
             }
             if (e.key.toLowerCase() === 'r' && this.game.combat) {
                 this.game.combat.reload();
