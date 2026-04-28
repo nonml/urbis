@@ -293,7 +293,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] 5-wave encounter survivable and judged fun by operator
 - [x] All Q4.A–Q4.E items ticked
 - [x] End-of-year-1 review recorded in `docs/retros/2027-03.md`
-- [ ] Operator approval file `q4.json`
+- [x] Operator approval file `q4.json`
 - [ ] Tag `0.4.0.0`
 
 ---
