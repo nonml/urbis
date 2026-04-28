@@ -2891,6 +2891,33 @@ function testCameraScriptPlayer() {
 
 testCameraScriptPlayer();
 
+import { previewScript } from '../tools/preview_shot.mjs';
+import { readFileSync } from 'fs';
+
+function testCameraScriptPreviewCLI() {
+    console.log('\n[78] Cinematic — preview CLI');
+    try {
+        const script = JSON.parse(readFileSync('src/content/cinematics/intro_pan.json', 'utf8'));
+        const r = previewScript(script, { samples: 5 });
+        assert(r.ok, 'Example script previews ok');
+        assert(r.output.includes('Camera Script:'), 'Output has header');
+        assert(r.output.includes('Sampling 5 frames'), 'Sample count reflected');
+        assert(r.output.includes('✓ Valid'), 'Validation footer present');
+        const lines = r.output.split('\n').filter(l => l.startsWith('  t='));
+        assert(lines.length === 5, `5 sample lines (got ${lines.length})`);
+
+        const bad = previewScript({ id: 'x' }, { samples: 5 });
+        assert(!bad.ok, 'Invalid script reports failure');
+        assert(bad.output.includes('Invalid camera script'), 'Invalid script error message present');
+    } catch (e) {
+        console.log(`  ✗ Preview CLI test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraScriptPreviewCLI();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

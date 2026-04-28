@@ -398,7 +398,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q7-cc-script-format` camera script format in JSON
 - [x] `q7-cc-playback` playback system inside `src/render/`
-- [ ] `q7-cc-editor-cli` CLI to preview a shot
+- [x] `q7-cc-editor-cli` CLI to preview a shot
 - [ ] `q7-cc-skip` player can skip cutscenes
 
 ### Q7.B — Local TTS

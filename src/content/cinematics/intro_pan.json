@@ -1,0 +1,20 @@
+{
+    "id": "intro_pan",
+    "name": "Intro pan over downtown",
+    "description": "Slow drift over downtown at dawn.",
+    "skippable": true,
+    "shots": [
+        {
+            "duration": 4,
+            "easing": "easeInOutCubic",
+            "from": { "pos": [100, 50, 100], "lookAt": [50, 0, 50], "fov": 60 },
+            "to":   { "pos": [120, 30, 80],  "lookAt": [60, 5, 60],  "fov": 50 }
+        },
+        {
+            "duration": 2,
+            "easing": "easeOutSine",
+            "from": { "pos": [120, 30, 80], "lookAt": [60, 5, 60],  "fov": 50 },
+            "to":   { "anchor": "player",   "fov": 55 }
+        }
+    ]
+}
