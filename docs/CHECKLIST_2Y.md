@@ -413,7 +413,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q7-rd-channel-structure` 3 channels with distinct moods
 - [x] `q7-rd-dj-banter-template` banter template filled by agent
-- [ ] `q7-rd-vehicle-radio` in-car tuning UI
+- [x] `q7-rd-vehicle-radio` in-car tuning UI
 - [ ] `q7-rd-music-pool` procedural + free-licence pool
 
 ### Q7.D — Mission Arc

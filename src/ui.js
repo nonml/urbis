@@ -33,6 +33,8 @@ import { VehicleAudio } from './audio/vehicle_audio.js';
 import { ActionHUD } from './ui/action_hud.js';
 import { WeaponWheel } from './ui/weapon_wheel.js';
 import { DispatchRadio } from './ui/dispatch_radio.js';
+import { RadioManager } from './audio/radio/manager.js';
+import { RadioHUD } from './ui/radio_hud.js';
 import { WEAPONS } from './player/combat.js';
 
 
@@ -68,6 +70,11 @@ export class UIManager {
 
         // Audio
         this.audioManager = createAudioManager(game);
+
+        // In-car radio (q7-rd-vehicle-radio)
+        this.radioManager = new RadioManager();
+        const radioHost = document.getElementById('hud-overlay') || document.body;
+        this.radioHUD = new RadioHUD({ parent: radioHost, radio: this.radioManager });
 
         // Initialize audio context on first user interaction (browser autoplay policy)
         const _initAudio = async () => {
@@ -907,6 +914,11 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
                     }
                 }
             }
+            if (e.key === '[' || e.key === ']' || e.key === '\\') {
+                if (this.radioHUD?.handleKey(e.key)) {
+                    e.preventDefault();
+                }
+            }
             if (e.key.toLowerCase() === 'h') {
                 e.preventDefault();
                 const vcH = this.game.vehicleController;
@@ -1399,6 +1411,7 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
         // Update action HUD (health, wanted, weapon, speed)
         this.actionHUD?.update();
         this.dispatchRadio?.update(dt);
+        this.radioHUD?.setDriving(this.game.vehicleController?.isDriving ?? false);
 
         // Update new HUD elements
         const heat = this.game.state?.player?.heat ?? 0;

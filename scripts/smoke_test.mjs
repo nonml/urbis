@@ -3451,6 +3451,71 @@ function testRadioBanterTemplates() {
 
 testRadioBanterTemplates();
 
+import { RadioHUD, RADIO_KEYS } from '../src/ui/radio_hud.js';
+
+function testRadioHUD() {
+    console.log('\n[87] Radio — in-car HUD + keybinds');
+    try {
+        const radio = new RadioManager();
+        const hud = new RadioHUD({ radio });
+
+        let s = hud.getRenderState();
+        assert(s.visible === false, 'Hidden when not driving');
+        assert(s.on === false, 'Radio off by default');
+
+        hud.setDriving(true);
+        s = hud.getRenderState();
+        assert(s.visible === true, 'Visible while driving');
+        assert(s.on === false, 'Still off until tuned');
+
+        const handled = hud.handleKey(RADIO_KEYS.next);
+        assert(handled, 'Next key handled while driving');
+        s = hud.getRenderState();
+        assert(s.on === true, 'Radio on after next');
+        assert(typeof s.name === 'string' && s.name.length > 0, 'Has channel name');
+        assert(typeof s.frequency === 'string' && s.frequency.includes('.'), 'Frequency formatted');
+        assert(s.color.startsWith('#'), 'Color is hex');
+
+        const firstName = s.name;
+        hud.handleKey(RADIO_KEYS.next);
+        s = hud.getRenderState();
+        assert(s.name !== firstName, 'Channel changed after second next');
+
+        hud.handleKey(RADIO_KEYS.previous);
+        s = hud.getRenderState();
+        assert(s.name === firstName, 'previous returns to first channel');
+
+        hud.handleKey(RADIO_KEYS.toggle);
+        s = hud.getRenderState();
+        assert(s.on === false, 'Toggle key turns radio off');
+
+        hud.handleKey(RADIO_KEYS.toggle);
+        s = hud.getRenderState();
+        assert(s.on === true, 'Toggle key turns radio back on');
+        assert(s.name === firstName, 'Toggle-back resumes last station');
+
+        hud.setDriving(false);
+        s = hud.getRenderState();
+        assert(s.visible === false, 'Hidden after exiting vehicle');
+
+        const ignored = hud.handleKey(RADIO_KEYS.next);
+        assert(ignored === false, 'Keys ignored when not driving');
+
+        const unrelated = hud.handleKey('z');
+        assert(unrelated === false, 'Unrelated key not handled');
+
+        let threw = false;
+        try { new RadioHUD({}); } catch (e) { threw = true; }
+        assert(threw, 'Constructor requires a RadioManager');
+    } catch (e) {
+        console.log(`  ✗ Radio HUD test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadioHUD();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
