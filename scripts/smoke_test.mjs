@@ -3282,6 +3282,89 @@ function testTTSDucker() {
 
 testTTSDucker();
 
+import { RADIO_CHANNELS, CHANNEL_IDS, getChannel, channelByFrequency } from '../src/audio/radio/channels.js';
+import { RadioManager } from '../src/audio/radio/manager.js';
+
+function testRadioChannelStructure() {
+    console.log('\n[85] Radio — 3 channels with distinct moods');
+    try {
+        assert(RADIO_CHANNELS.length === 3, `3 channels (got ${RADIO_CHANNELS.length})`);
+        assert(CHANNEL_IDS.length === 3, '3 channel ids exposed');
+
+        const moods = RADIO_CHANNELS.map(c => c.mood);
+        assert(new Set(moods).size === 3, 'All channel moods are distinct');
+
+        const palettes = RADIO_CHANNELS.map(c => c.palette);
+        assert(new Set(palettes).size === 3, 'All palette tags are distinct');
+
+        const ids = RADIO_CHANNELS.map(c => c.id);
+        assert(new Set(ids).size === 3, 'All channel ids are unique');
+
+        for (const ch of RADIO_CHANNELS) {
+            assert(typeof ch.name === 'string' && ch.name.length > 0, `${ch.id}: has name`);
+            assert(typeof ch.frequencyKHz === 'number' && ch.frequencyKHz > 0, `${ch.id}: has frequency`);
+            assert(typeof ch.color === 'string' && ch.color.startsWith('#'), `${ch.id}: has hex color`);
+            assert(typeof ch.djArchetype === 'string', `${ch.id}: has dj archetype`);
+            assert(typeof ch.description === 'string', `${ch.id}: has description`);
+        }
+
+        try { RADIO_CHANNELS[0].name = 'hacked'; } catch { /* expected in strict */ }
+        assert(RADIO_CHANNELS[0].name !== 'hacked', 'RADIO_CHANNELS is deep-frozen');
+
+        assert(getChannel('neon_105').frequencyKHz === 104900, 'getChannel returns frequency');
+        assert(getChannel('does-not-exist') === null, 'Unknown id returns null');
+
+        const near = channelByFrequency(105000);
+        assert(near && near.id === 'neon_105', 'channelByFrequency snaps to nearest');
+        const far = channelByFrequency(88500);
+        assert(far && far.id === 'static_fm', 'channelByFrequency picks static_fm at low band');
+
+        const radio = new RadioManager();
+        assert(!radio.isOn(), 'New RadioManager starts off');
+        assert(radio.currentChannel() === null, 'Off radio: no current channel');
+
+        const tuned = radio.tune('neon_105');
+        assert(tuned && tuned.id === 'neon_105', 'tune() returns the tuned channel');
+        assert(radio.isOn(), 'Radio is on after tune');
+        assert(radio.currentChannel().id === 'neon_105', 'Current channel matches tuned');
+
+        const after = radio.next();
+        assert(after.id === 'pirate_wave', 'next() advances by one');
+        const wrap = radio.next();
+        assert(wrap.id === 'static_fm', 'next() wraps to first channel');
+
+        const back = radio.previous();
+        assert(back.id === 'pirate_wave', 'previous() wraps backward');
+
+        radio.turnOff();
+        assert(!radio.isOn(), 'turnOff() turns radio off');
+        const resumed = radio.next();
+        assert(resumed.id === 'pirate_wave', 'next() from off resumes last station');
+
+        const noop = radio.tune('does-not-exist');
+        assert(noop === null, 'tune() with unknown id returns null');
+        assert(radio.currentChannel().id === 'pirate_wave', 'Tune failure does not change current');
+
+        const state = radio.serialize();
+        const radio2 = new RadioManager();
+        radio2.deserialize(state);
+        assert(radio2.currentChannel().id === 'pirate_wave', 'serialize/deserialize round-trips channel');
+
+        radio.turnOff();
+        const offState = radio.serialize();
+        const radio3 = new RadioManager();
+        radio3.deserialize(offState);
+        assert(!radio3.isOn(), 'serialize/deserialize round-trips off-state');
+        assert(radio3.next().id === 'pirate_wave', 'Resume after deserialized off restores last station');
+    } catch (e) {
+        console.log(`  ✗ Radio channel test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadioChannelStructure();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
