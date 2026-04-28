@@ -14,7 +14,8 @@ export const HEAT_THRESHOLDS = {
 export const POLICE_TYPES = {
     PATROL_CAR: { name: 'Patrol Car', speed: 18, handling: 0.8, heatCost: 5 },
     INTERCEPTOR: { name: 'Interceptor', speed: 24, handling: 0.95, heatCost: 10 },
-    DRONE: { name: 'Surveillance Drone', speed: 15, handling: 0.6, heatCost: 8 }
+    DRONE: { name: 'Surveillance Drone', speed: 15, handling: 0.6, heatCost: 8 },
+    HELICOPTER: { name: 'Police Helicopter', speed: 12, handling: 0.3, heatCost: 15 },
 };
 
 export class PoliceSystem {
@@ -25,6 +26,7 @@ export class PoliceSystem {
         this.pursuitMode = false;
         this._lastRoadblockTick = 0;
         this._roadblockCount = 0;
+        this._heliActive = false;
     }
 
     /**
@@ -149,6 +151,12 @@ export class PoliceSystem {
         if (responseLevel === 'pursuit' && tick - this._lastRoadblockTick > 60) {
             this._spawnRoadblock(tick);
         }
+        if (responseLevel === 'pursuit' && !this._heliActive) {
+            this._spawnHelicopter();
+        }
+        if (this._heliActive && responseLevel !== 'pursuit') {
+            this._despawnHelicopter();
+        }
 
         // Update each unit
         for (const unit of this.units) {
@@ -163,6 +171,33 @@ export class PoliceSystem {
             }
             return true;
         });
+    }
+
+    _spawnHelicopter() {
+        const px = this.game.state.player.x;
+        const py = this.game.state.player.y;
+        const unit = this.spawnUnit({
+            type: 'HELICOPTER',
+            x: px + 15,
+            y: py + 15,
+            heading: 0,
+        });
+        unit.state = 'helicopter_orbit';
+        unit._orbitAngle = 0;
+        unit._spotlightX = px;
+        unit._spotlightY = py;
+        this._heliActive = true;
+    }
+
+    _despawnHelicopter() {
+        this.units = this.units.filter(u => {
+            if (u.type === 'HELICOPTER') {
+                u.active = false;
+                return false;
+            }
+            return true;
+        });
+        this._heliActive = false;
     }
 
     _spawnRoadblock(tick) {
@@ -235,6 +270,17 @@ export class PoliceSystem {
                 unit.lastKnownY = playerY;
                 unit.searchProgress = 0;
             }
+        }
+
+        if (unit.state === 'helicopter_orbit') {
+            unit._orbitAngle = (unit._orbitAngle + 0.04) % (Math.PI * 2);
+            const orbitR = 12;
+            unit.x = playerX + Math.cos(unit._orbitAngle) * orbitR;
+            unit.y = playerY + Math.sin(unit._orbitAngle) * orbitR;
+            unit._spotlightX += (playerX - unit._spotlightX) * 0.1;
+            unit._spotlightY += (playerY - unit._spotlightY) * 0.1;
+            unit.heading = (unit._orbitAngle * 180 / Math.PI + 90) % 360;
+            return;
         }
 
         if (unit.state === 'roadblock') {

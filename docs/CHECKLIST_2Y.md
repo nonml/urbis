@@ -276,7 +276,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q4.D — Police Response Upgrade
 
 - [x] `q4-po-roadblock` patrol cars form a roadblock at high heat
-- [ ] `q4-po-helicopter` spotlight helicopter at wanted 3+
+- [x] `q4-po-helicopter` spotlight helicopter at wanted 3+
 - [ ] `q4-po-spikestrips` roadblock deploys spikes
 - [ ] `q4-po-dispatch-chat` radio barks via subtitles
 
