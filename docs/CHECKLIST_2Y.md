@@ -372,7 +372,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q6.D — Combat Hacks
 
-- [ ] `q6-chc-grenade-det` detonate enemy grenade
+- [x] `q6-chc-grenade-det` detonate enemy grenade
 - [ ] `q6-chc-comms-jam` 10s enemy comms jam
 - [ ] `q6-chc-weapon-jam` single-target weapon jam
 

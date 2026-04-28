@@ -401,6 +401,51 @@ export class WorldHackEffects {
 
     // ── Internal helpers ──
 
+    hackDetonateGrenade(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('grenade_det', tick)) {
+            return { ok: false, reason: 'On cooldown' };
+        }
+        const citizens = this.game.citizens?.citizens || [];
+        let target = null;
+        let bestDist = 10;
+        for (const c of citizens) {
+            const dx = (c.x ?? 0) - x;
+            const dy = (c.y ?? 0) - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist && c.faction !== 'citizens') {
+                bestDist = dist;
+                target = c;
+            }
+        }
+        if (!target) return { ok: false, reason: 'No valid target nearby' };
+
+        const tx = target.x ?? 0;
+        const ty = target.y ?? 0;
+        const radius = 4;
+        const damage = 55;
+        this._explosions.push({ x: tx, y: ty, radius, tick, type: 'grenade' });
+        this._setCooldown('grenade_det', tick, 35);
+
+        for (const c of citizens) {
+            const dx = (c.x ?? 0) - tx;
+            const dy = (c.y ?? 0) - ty;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < radius) {
+                c.health = (c.health ?? 100) - damage * (1 - dist / radius);
+            }
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(12);
+        this.game.ui?.showMessage?.('Enemy grenade detonated!', 'warning');
+        try {
+            eventBus.emit(EVENT_TYPES.HACK_SUCCESS, {
+                type: 'grenade_det', x: tx, y: ty,
+            });
+        } catch {}
+        return { ok: true, targetId: target.id };
+    }
+
     hackCraneDrop(x, y) {
         const tick = this.game.state.time.tick;
         if (this._isOnCooldown('crane_drop', tick)) {

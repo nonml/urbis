@@ -2567,6 +2567,36 @@ function testSampleChains() {
 }
 
 testSampleChains();
+
+function testHackDetonateGrenade() {
+    console.log('\n[70] Combat Hack — grenade detonation');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 141414, mode: 'standard' });
+        game.init();
+
+        const citizens = game.citizens?.citizens || [];
+        if (citizens.length > 0) {
+            citizens[0].faction = 'gang';
+            citizens[0].x = 10;
+            citizens[0].y = 10;
+        }
+
+        const result = game.worldHacks.hackDetonateGrenade(10, 10);
+        assert(typeof result.ok === 'boolean', 'hackDetonateGrenade returns status');
+        if (result.ok) {
+            assert(result.targetId !== undefined, 'Returns target ID on success');
+            const effects = game.worldHacks.getActiveEffects();
+            const gren = effects.recentExplosions.find(e => e.type === 'grenade');
+            assert(gren !== undefined, 'Grenade explosion recorded');
+        }
+    } catch (e) {
+        console.log(`  ✗ Grenade detonation test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackDetonateGrenade();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
