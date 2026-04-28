@@ -86,6 +86,7 @@ import { CombatSystem } from './player/combat.js';
 import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
+import { checkVehicleExplosion, getExplosionTargets, EXPLOSION_DAMAGE } from './vehicles/vehicle_state.js';
 import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
 import { PhysicsPropManager } from './sim/physics/props.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
@@ -572,6 +573,11 @@ export class Game {
             this.vehicleController.update(this.state.time.tick);
         }
 
+        // Vehicle explosion check
+        if (!this.state.time.paused && this.vehicleSystem) {
+            this._checkVehicleExplosions();
+        }
+
         // Player health update (respawn timer, damage flash)
         if (this.playerHealth) {
             this.playerHealth.update(frameDt);
@@ -922,6 +928,26 @@ export class Game {
         // NPC reactions (flee, dodge, report to police)
         if (this.npcReactions) {
             this.npcReactions.update();
+        }
+    }
+
+    _checkVehicleExplosions() {
+        const vehicles = this.vehicleSystem?.vehicles;
+        if (!vehicles) return;
+        const px = this.state.player.wx ?? this.state.player.x;
+        const py = this.state.player.wz ?? this.state.player.y;
+        const citizens = this.citizens?.citizens || [];
+        for (const v of vehicles) {
+            if (!checkVehicleExplosion(v)) continue;
+            const targets = getExplosionTargets(v, citizens, px, py);
+            if (targets.hitPlayer) {
+                this.playerHealth?.takeDamage(EXPLOSION_DAMAGE, 'vehicle_explosion');
+            }
+            for (const c of targets.hitCitizens) {
+                c.health = Math.max(0, (c.health ?? 100) - EXPLOSION_DAMAGE);
+            }
+            this.heatSystem?.addHeat(10);
+            this.ui?.showMessage?.('Vehicle exploded!', 'crisis');
         }
     }
 

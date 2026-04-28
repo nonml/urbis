@@ -222,6 +222,38 @@ export function getEngineState(vehicle) {
     return ENGINE_STATES.NORMAL;
 }
 
+export const EXPLOSION_RADIUS = 6;
+export const EXPLOSION_DAMAGE = 40;
+
+export function checkVehicleExplosion(vehicle) {
+    if (vehicle._exploded) return false;
+    if ((vehicle.health ?? 100) > 0) return false;
+    vehicle._exploded = true;
+    return true;
+}
+
+export function getExplosionTargets(vehicle, citizens, playerX, playerY) {
+    const results = { hitCitizens: [], hitPlayer: false };
+    const vx = vehicle.x ?? 0;
+    const vy = vehicle.y ?? 0;
+    const r2 = EXPLOSION_RADIUS * EXPLOSION_RADIUS;
+
+    const pdx = playerX - vx;
+    const pdy = playerY - vy;
+    if (pdx * pdx + pdy * pdy < r2) {
+        results.hitPlayer = true;
+    }
+
+    for (const c of citizens) {
+        const dx = (c.x ?? 0) - vx;
+        const dy = (c.y ?? 0) - vy;
+        if (dx * dx + dy * dy < r2) {
+            results.hitCitizens.push(c);
+        }
+    }
+    return results;
+}
+
 export function getEngineSpeedPenalty(vehicle) {
     const state = getEngineState(vehicle);
     if (state === ENGINE_STATES.DEAD) return 0;
