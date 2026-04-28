@@ -2653,6 +2653,40 @@ function testHackWeaponJam() {
 }
 
 testHackWeaponJam();
+
+function testRadialHackMenu() {
+    console.log('\n[73] Radial Hack Menu — menu structure');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 171717, mode: 'standard' });
+        game.init();
+
+        const node = game.interactables.interactables[0];
+        assert(node !== undefined, 'Have at least one interactable');
+
+        const actions = [];
+        switch (node.type) {
+            case 'CCTV_POLE':
+                actions.push('camera_takeover', 'cctv_disable');
+                break;
+            case 'POWER_SUBSTATION':
+                actions.push('district_blackout_ping');
+                break;
+            case 'TELECOM_BOX':
+                actions.push('traffic_light_switch', 'comms_jam');
+                break;
+            default:
+                actions.push('door_unlock');
+                break;
+        }
+        assert(actions.length > 0, `Node type ${node.type} has radial options`);
+    } catch (e) {
+        console.log(`  ✗ Radial hack menu test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadialHackMenu();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

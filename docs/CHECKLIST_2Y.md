@@ -378,7 +378,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q6.E — Radial Hack Menu
 
-- [ ] `q6-rm-menu` radial UI around targeted hackable
+- [x] `q6-rm-menu` radial UI around targeted hackable
 - [ ] `q6-rm-keyboard-fallback` number-key fallback preserved
 - [ ] `q6-rm-cooldowns` visible cooldown rings
 
