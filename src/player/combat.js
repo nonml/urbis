@@ -100,8 +100,14 @@ export class CombatSystem {
     constructor(game) {
         this.game = game;
         this.currentWeapon = 'fist';
-        this.ammo = { pistol: 12 };
-        this.reserve = { pistol: 48, shotgun: 24, smg: 90 };
+        this.ammo = {};
+        this.reserve = {};
+        for (const [key, w] of Object.entries(WEAPONS)) {
+            if (w.type === 'ranged') {
+                this.ammo[key] = w.ammo;
+                this.reserve[key] = (w.maxAmmo || 0) - w.ammo;
+            }
+        }
         this._lastFireTime = 0;
         this._muzzleFlash = false;
         this._muzzleFlashTimer = 0;
@@ -321,8 +327,9 @@ export class CombatSystem {
     }
 
     addAmmo(weapon, amount) {
-        const max = WEAPONS[weapon]?.maxAmmo || 60;
-        this.ammo[weapon] = Math.min(max, (this.ammo[weapon] || 0) + amount);
+        if (!WEAPONS[weapon] || WEAPONS[weapon].type !== 'ranged') return;
+        const maxReserve = (WEAPONS[weapon].maxAmmo || 60) - (WEAPONS[weapon].ammo || 0);
+        this.reserve[weapon] = Math.min(maxReserve, (this.reserve[weapon] || 0) + amount);
     }
 
     /**
