@@ -27,6 +27,7 @@ import { InteractableManager } from '../src/sim/interactables.js';
 import { getChunkId } from '../src/world/chunks.js';
 import { validateQuestDefinition } from '../src/content/quests/schema.js';
 import { CoverSystem, CoverController } from '../src/player/cover.js';
+import { WaveEncounter } from '../src/sim/encounters/wave_encounter.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
@@ -1802,6 +1803,76 @@ function runRagdollDespawnTest() {
         failCount++;
     });
 }
+
+function testWaveEncounter() {
+    console.log('\n[48] Wave Encounter System');
+    try {
+        const spawnedUnits = [];
+        let tickCounter = 0;
+        const mockGame = {
+            state: { time: { tick: 0 }, player: { x: 50, y: 50 } },
+            rng: { int: (a, b) => a },
+            policeSystem: {
+                units: spawnedUnits,
+                spawnUnit(opts) {
+                    const u = { id: `p_${spawnedUnits.length}`, active: true, ...opts };
+                    spawnedUnits.push(u);
+                    return u;
+                },
+            },
+            ui: { showMessage() {} },
+        };
+
+        const we = new WaveEncounter(mockGame);
+        assert(!we.active, 'Inactive before start');
+
+        we.start();
+        assert(we.active, 'Active after start');
+        assert(we.wave === 1, 'Starts at wave 1');
+        assert(spawnedUnits.length === 3, 'Wave 1 spawns 3 units');
+
+        for (const u of spawnedUnits) u.active = false;
+        mockGame.state.time.tick = 40;
+        we.update(40);
+        assert(we.wave === 2, 'Advances to wave 2 when cleared');
+
+        const w2Count = spawnedUnits.filter(u => u.active).length;
+        assert(w2Count === 4, 'Wave 2 spawns 4 units');
+
+        for (const u of spawnedUnits) u.active = false;
+        mockGame.state.time.tick = 230;
+        we.update(230);
+        assert(we.wave === 3, 'Advances to wave 3');
+
+        for (const u of spawnedUnits) u.active = false;
+        mockGame.state.time.tick = 420;
+        we.update(420);
+        assert(we.wave === 4, 'Advances to wave 4');
+
+        for (const u of spawnedUnits) u.active = false;
+        mockGame.state.time.tick = 610;
+        we.update(610);
+        assert(we.wave === 5, 'Advances to wave 5');
+
+        for (const u of spawnedUnits) u.active = false;
+        mockGame.state.time.tick = 800;
+        we.update(800);
+        assert(!we.active, 'Encounter ends after wave 5');
+        assert(we.completed, 'Marked completed on victory');
+
+        const data = we.serialize();
+        const we2 = new WaveEncounter(mockGame);
+        we2.deserialize(data);
+        assert(we2.completed, 'Serialization round-trips completed flag');
+        assert(we2.wave === 5, 'Serialization round-trips wave count');
+    } catch (e) {
+        console.log(`  ✗ Wave encounter test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
     console.log('='.repeat(60));

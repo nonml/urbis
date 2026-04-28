@@ -86,6 +86,7 @@ import { CombatSystem } from './player/combat.js';
 import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
+import { WaveEncounter } from './sim/encounters/wave_encounter.js';
 import { checkVehicleExplosion, getExplosionTargets, EXPLOSION_DAMAGE } from './vehicles/vehicle_state.js';
 import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
 import { PhysicsPropManager } from './sim/physics/props.js';
@@ -355,6 +356,7 @@ export class Game {
 
         // World hack effects (blackout, traffic freeze, CCTV disable)
         this.worldHacks = new WorldHackEffects(this);
+        this.waveEncounter = new WaveEncounter(this);
 
         // Weather and particle systems
         this.weatherSystem = new WeatherSystem(this);
@@ -755,6 +757,7 @@ export class Game {
         this.trafficManager.updateBusRoutes(this.buildings.buildings);
         this.policeRouter.updatePursuit();
         this.policeSystem.update(this.state.time.tick);
+        this.waveEncounter.update(this.state.time.tick);
         const policeCov = this.servicesManager.metrics?.city?.police || 0;
         if (policeCov < 0.25) this.factionSystem.modifyRep('citizens', -0.5, 'low_police_coverage', 'services');
         else if (policeCov > 0.6) this.factionSystem.modifyRep('citizens', 0.25, 'safe_streets', 'services');

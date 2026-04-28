@@ -97,6 +97,11 @@ export const EVENT_TYPES = {
     POLICE_UNIT_DESPAWNED: 'police_unit_despawned',
     POLICE_ENCOUNTER: 'police_encounter',
 
+    // Wave encounter events
+    WAVE_ENCOUNTER_STARTED: 'wave_encounter_started',
+    WAVE_STARTED: 'wave_started',
+    WAVE_ENCOUNTER_COMPLETED: 'wave_encounter_completed',
+
     // Campaign events
     CAMPAIGN_CASE_STARTED: 'campaign_case_started',
     CAMPAIGN_CASE_COMPLETED: 'campaign_case_completed',
