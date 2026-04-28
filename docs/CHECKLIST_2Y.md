@@ -181,8 +181,8 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] 15-min unguided playtest completes a starter objective with no crash
 - [x] All Q2.A–Q2.H items ticked
-- [ ] Operator approval file `q2.json` present
-- [ ] Tag `0.2.0.0`
+- [x] Operator approval file `q2.json` present
+- [x] Tag `0.2.0.0`
 
 ---
 
