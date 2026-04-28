@@ -172,10 +172,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2.H — Playtest Script
 
-- [ ] `q2-pt-15min` Playwright "playtest" scenario runs 15 minutes headless
-- [ ] `q2-pt-objective-completion` scripted agent completes starter objective
-- [ ] `q2-pt-no-crashes` zero uncaught errors in console during run
-- [ ] `q2-pt-screenshots-5` 5 checkpoint screenshots captured
+- [x] `q2-pt-15min` Playwright "playtest" scenario runs 15 minutes headless
+- [x] `q2-pt-objective-completion` scripted agent completes starter objective
+- [x] `q2-pt-no-crashes` zero uncaught errors in console during run
+- [x] `q2-pt-screenshots-5` 5 checkpoint screenshots captured
 
 ### Q2 — Definition of Done
 
