@@ -207,6 +207,29 @@ export function getTireCount(vehicle) {
     return Object.values(vehicle.tires).filter(Boolean).length;
 }
 
+export const ENGINE_STATES = {
+    NORMAL: 'normal',
+    SMOKING: 'smoking',
+    FIRE: 'fire',
+    DEAD: 'dead',
+};
+
+export function getEngineState(vehicle) {
+    const ratio = (vehicle.health ?? 100) / (vehicle.maxHealth ?? 100);
+    if (ratio <= 0) return ENGINE_STATES.DEAD;
+    if (ratio <= 0.15) return ENGINE_STATES.FIRE;
+    if (ratio <= 0.4) return ENGINE_STATES.SMOKING;
+    return ENGINE_STATES.NORMAL;
+}
+
+export function getEngineSpeedPenalty(vehicle) {
+    const state = getEngineState(vehicle);
+    if (state === ENGINE_STATES.DEAD) return 0;
+    if (state === ENGINE_STATES.FIRE) return 0.3;
+    if (state === ENGINE_STATES.SMOKING) return 0.7;
+    return 1.0;
+}
+
 export function getTireHandlingMul(vehicle) {
     const intact = getTireCount(vehicle);
     if (intact >= 4) return 1.0;
@@ -241,10 +264,15 @@ export function applyImpactDeform(vehicle, impactAngle, force, rng) {
  * @param {Object} terrain - Terrain properties at vehicle position
  */
 export function updateVehiclePhysics(vehicle, input, dt, terrain) {
-    if (vehicle.health <= 0) return;
+    if (vehicle.health <= 0) {
+        vehicle.speed *= 0.9;
+        if (Math.abs(vehicle.speed) < 0.1) vehicle.speed = 0;
+        return;
+    }
 
     const traction = terrain.traction || 1.0;
     const tireMul = getTireHandlingMul(vehicle);
+    const engineMul = getEngineSpeedPenalty(vehicle);
     const effectiveTraction = vehicle.traction * traction * tireMul;
 
     const throttle = input.throttle || 0;
@@ -274,8 +302,9 @@ export function updateVehiclePhysics(vehicle, input, dt, terrain) {
     }
 
     // Clamp speed
-    const maxRev = vehicle.maxSpeed * 0.25; // reverse max is 25% of forward
-    vehicle.speed = Math.max(-maxRev, Math.min(vehicle.maxSpeed, vehicle.speed));
+    const effectiveMax = vehicle.maxSpeed * engineMul;
+    const maxRev = effectiveMax * 0.25;
+    vehicle.speed = Math.max(-maxRev, Math.min(effectiveMax, vehicle.speed));
 
     // Natural friction
     if (throttle === 0 && brake === 0 && handbrake === 0) {
