@@ -3516,6 +3516,81 @@ function testRadioHUD() {
 
 testRadioHUD();
 
+import {
+    MUSIC_TRACKS, MUSIC_PALETTES,
+    tracksForPalette, playableTracksForPalette, MusicPool,
+} from '../src/audio/radio/music_pool.js';
+
+function testRadioMusicPool() {
+    console.log('\n[88] Radio — music pool (procedural + free-licence)');
+    try {
+        assert(MUSIC_PALETTES.length === 3, '3 palettes declared');
+        assert(MUSIC_TRACKS.length >= 9, `≥9 track entries (got ${MUSIC_TRACKS.length})`);
+
+        for (const palette of MUSIC_PALETTES) {
+            const all = tracksForPalette(palette);
+            const playable = playableTracksForPalette(palette);
+            assert(all.length >= 3, `${palette}: at least 3 declared tracks (got ${all.length})`);
+            assert(playable.length >= 3, `${palette}: at least 3 playable tracks (got ${playable.length})`);
+        }
+
+        const free = MUSIC_TRACKS.filter(t => t.source === 'asset');
+        assert(free.length === 3, `3 free-licence asset slots reserved (got ${free.length})`);
+        for (const t of free) {
+            assert(t.assetUrl === '', `Free slot ${t.id} starts empty (operator fills later)`);
+            assert(typeof t.attribution === 'string', `Free slot ${t.id} carries attribution note`);
+        }
+
+        for (const t of MUSIC_TRACKS) {
+            assert(typeof t.id === 'string' && t.id.length > 0, `Track has id: ${t.id}`);
+            assert(MUSIC_PALETTES.includes(t.palette), `Track ${t.id} palette is known: ${t.palette}`);
+            assert(['procedural', 'asset'].includes(t.source), `Track ${t.id} source is known`);
+            if (t.source === 'procedural') {
+                assert(t.proceduralParams && typeof t.proceduralParams.bpm === 'number',
+                    `Procedural track ${t.id} has bpm`);
+            }
+        }
+
+        const ids = MUSIC_TRACKS.map(t => t.id);
+        assert(new Set(ids).size === ids.length, 'All track ids are unique');
+
+        const rngA = new RNG(2026);
+        const rngB = new RNG(2026);
+        const poolA = new MusicPool(rngA);
+        const poolB = new MusicPool(rngB);
+        const a = poolA.pick('synthwave');
+        const b = poolB.pick('synthwave');
+        assert(a && b, 'pick returns a track for known palette');
+        assert(a.id === b.id, 'Same seed → same pick (deterministic)');
+        assert(a.source === 'procedural' || a.assetUrl, 'Picked track is playable');
+
+        const pool = new MusicPool(new RNG(99));
+        const picks = [];
+        for (let i = 0; i < 6; i++) picks.push(pool.pick('synthwave'));
+        for (let i = 1; i < picks.length; i++) {
+            assert(picks[i].id !== picks[i - 1].id,
+                `No back-to-back repeat (${picks[i - 1].id} -> ${picks[i].id})`);
+        }
+
+        const noPalette = pool.pick('does-not-exist');
+        assert(noPalette === null, 'Unknown palette returns null');
+
+        const ch = pool.pickForChannel('static_fm');
+        assert(ch && ch.palette === 'news_jazz', 'pickForChannel routes to channel palette');
+        assert(pool.pickForChannel('does-not-exist') === null, 'Unknown channel returns null');
+
+        let threw = false;
+        try { new MusicPool(); } catch (e) { threw = true; }
+        assert(threw, 'MusicPool requires an RNG');
+    } catch (e) {
+        console.log(`  ✗ Music pool test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadioMusicPool();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
