@@ -54,6 +54,8 @@ export const PROP_TYPES = {
         hx: 0.35,
         hy: 0.35,
         hz: 0.35,
+        breakable: true,
+        hp: 30,
     },
 };
 
@@ -63,6 +65,7 @@ export class PhysicsPropManager {
         this._rng = rng;
         this._props = new Map();
         this._nextId = 1;
+        this._onDestroy = [];
     }
 
     spawn(type, x, y, z) {
@@ -84,9 +87,31 @@ export class PhysicsPropManager {
         }
 
         const id = this._nextId++;
-        const prop = { id, type, bodyId, x, y, z };
+        const hp = def.breakable ? (def.hp ?? 30) : 0;
+        const prop = { id, type, bodyId, x, y, z, hp, maxHp: hp, destroyed: false };
         this._props.set(id, prop);
         return prop;
+    }
+
+    damage(id, amount) {
+        const prop = this._props.get(id);
+        if (!prop || prop.destroyed) return null;
+        const def = PROP_TYPES[prop.type];
+        if (!def?.breakable) return { destroyed: false, prop };
+        prop.hp -= amount;
+        if (prop.hp <= 0) {
+            prop.hp = 0;
+            prop.destroyed = true;
+            this._physics.removeBody(prop.bodyId);
+            this._props.delete(id);
+            for (const cb of this._onDestroy) cb(prop);
+            return { destroyed: true, prop };
+        }
+        return { destroyed: false, prop };
+    }
+
+    onDestroy(callback) {
+        this._onDestroy.push(callback);
     }
 
     _buildCollider(def) {

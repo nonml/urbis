@@ -1355,7 +1355,48 @@ function runChairPropTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => {
+function runCrateBreakTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[37] Physics Props — Breakable Crate');
+            const { RapierPhysicsWorld } = rwMod;
+            const { PhysicsPropManager, PROP_TYPES } = propMod;
+
+            assert(PROP_TYPES.crate.breakable === true, 'Crate is breakable');
+            assert(PROP_TYPES.crate.hp === 30, 'Crate has 30 HP');
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rng = { next: () => 0.5 };
+            const pm = new PhysicsPropManager(pw, rng);
+
+            let destroyedProp = null;
+            pm.onDestroy(prop => { destroyedProp = prop; });
+
+            const crate = pm.spawn('crate', 0, 1, 0);
+            assert(crate !== null, 'Crate spawns');
+            assert(crate.hp === 30, 'Crate starts with full HP');
+
+            const r1 = pm.damage(crate.id, 10);
+            assert(!r1.destroyed, 'Crate survives 10 damage');
+            assert(r1.prop.hp === 20, 'Crate HP reduced to 20');
+
+            const r2 = pm.damage(crate.id, 25);
+            assert(r2.destroyed, 'Crate destroyed at 0 HP');
+            assert(destroyedProp !== null, 'onDestroy callback fired');
+            assert(pm.propCount === 0, 'Destroyed crate removed from manager');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Crate break test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
