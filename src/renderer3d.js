@@ -4264,6 +4264,29 @@ export class Renderer3D {
     }
 
     _buildSafehouseProps() {
+        const mat = new THREE.MeshStandardMaterial({ color: 0x554433, roughness: 0.8 });
+        const desk = new THREE.Mesh(new THREE.BoxGeometry(2, 0.8, 1), mat);
+        desk.position.set(-3, 0.4, -3);
+        desk.castShadow = true;
+        this._interiorGroup.add(desk);
+
+        const bedMat = new THREE.MeshStandardMaterial({ color: 0x334455, roughness: 0.9 });
+        const bed = new THREE.Mesh(new THREE.BoxGeometry(2, 0.5, 3), bedMat);
+        bed.position.set(3, 0.25, -2.5);
+        bed.castShadow = true;
+        this._interiorGroup.add(bed);
+
+        const screenMat = new THREE.MeshStandardMaterial({
+            color: 0x111111, emissive: new THREE.Color(0x00aaff),
+            emissiveIntensity: 0.6,
+        });
+        const screen = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.8, 0.05), screenMat);
+        screen.position.set(-3, 1.2, -4.4);
+        this._interiorGroup.add(screen);
+
+        const warm = new THREE.PointLight(0xffaa55, 0.4, 6);
+        warm.position.set(-3, 2, -3);
+        this._interiorGroup.add(warm);
     }
 
     _buildSubwayProps() {

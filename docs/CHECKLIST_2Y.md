@@ -230,7 +230,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q3-in-minimap-swap` interior minimap overlay
 - [x] `q3-in-exit-trigger` exit door returns player to world position
 - [x] `q3-in-template-shop` convenience store interior
-- [ ] `q3-in-template-safehouse` player safehouse interior
+- [x] `q3-in-template-safehouse` player safehouse interior
 - [ ] `q3-in-template-subway` subway platform interior
 - [ ] `q3-in-growth-assignment` zone growth picks interior per building class
 
