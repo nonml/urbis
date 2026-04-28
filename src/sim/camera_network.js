@@ -153,6 +153,50 @@ export class CameraNetwork {
         return this._activeCam !== null;
     }
 
+    hackFromCamera() {
+        if (!this._activeCam) return { ok: false, reason: 'No camera active' };
+        const cam = this._activeCam;
+        const im = this.game.interactables;
+        if (!im) return { ok: false, reason: 'No interactables' };
+
+        const tick = this.game.state?.time?.tick ?? 0;
+        const range = cam._cam?.viewRange ?? DEFAULT_VIEW_RANGE;
+        let best = null;
+        let bestDist = range;
+
+        for (const node of im.interactables) {
+            if (node === cam) continue;
+            if (node.state !== 'available') continue;
+            const dx = node.x - cam.x;
+            const dy = node.y - cam.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < bestDist) {
+                bestDist = dist;
+                best = node;
+            }
+        }
+
+        if (!best) return { ok: false, reason: 'No hackable node in camera range' };
+
+        const action = this._pickAction(best);
+        const result = im.performHackAction(best, action, tick);
+        if (result.ok) {
+            best.state = 'success';
+            best.lastUsedTick = tick;
+            this.game.ui?.showMessage?.(result.msg || 'Remote hack!', 'success');
+        }
+        return { ok: result.ok, node: best, action };
+    }
+
+    _pickAction(node) {
+        switch (node.type) {
+            case 'POWER_SUBSTATION': return 'district_blackout_ping';
+            case 'CCTV_POLE': return 'camera_takeover';
+            case 'TELECOM_BOX': return 'traffic_light_switch';
+            default: return 'door_unlock';
+        }
+    }
+
     _hasLineOfSight(ax, ay, bx, by) {
         const map = this.game.map;
         if (!map?.grid) return true;

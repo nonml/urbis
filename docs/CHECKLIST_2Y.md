@@ -354,7 +354,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q6-cam-tagging` tag hackable cameras in world
 - [x] `q6-cam-traversal` hop between cameras by LOS
 - [x] `q6-cam-view-feed` render feed as HUD quad
-- [ ] `q6-cam-hack-from-camera` can trigger nearby hacks while viewing
+- [x] `q6-cam-hack-from-camera` can trigger nearby hacks while viewing
 
 ### Q6.B — Profiler Deepening
 

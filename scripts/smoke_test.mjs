@@ -2312,6 +2312,31 @@ function testCameraViewFeed() {
 }
 
 testCameraViewFeed();
+
+function testCameraHackFromCamera() {
+    console.log('\n[61] Camera Network — hack from camera');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 606060, mode: 'standard' });
+        game.init();
+        const cn = game.cameraNetwork;
+
+        const noView = cn.hackFromCamera();
+        assert(!noView.ok, 'Cannot hack without active camera');
+
+        const cam = cn.cameras[0];
+        cn.hopTo(cam);
+        const result = cn.hackFromCamera();
+        assert(typeof result.ok === 'boolean', 'hackFromCamera returns ok status');
+
+        cn.exitCamera();
+    } catch (e) {
+        console.log(`  ✗ Camera hack-from-camera test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraHackFromCamera();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
