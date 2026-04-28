@@ -34,6 +34,9 @@ import { validateVehicleDefinition } from '../src/content/vehicles/schema.js';
 import { generateVehicle, generateBatch as generateVehicleBatch } from '../src/content/vehicles/generator.js';
 import { validateWeaponDefinition } from '../src/content/weapons/schema.js';
 import { generateWeapon, generateBatch as generateWeaponBatch } from '../src/content/weapons/generator.js';
+import { generateQuest, generateBatch as generateQuestBatch } from '../src/content/quests/generator.js';
+import { validateNPCArchetype } from '../src/content/npcs/schema.js';
+import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
@@ -2016,9 +2019,75 @@ function testWeaponTemplateSchema() {
     }
 }
 
+function testQuestTemplateGenerator() {
+    console.log('\n[52] Quest Template Generator + Validator');
+    try {
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const quest = generateQuest(mockRng);
+        assert(typeof quest.id === 'string', 'Generated quest has id');
+        assert(Array.isArray(quest.steps), 'Has steps array');
+        assert(quest.steps.length > 0, 'Steps non-empty');
+        assert(Array.isArray(quest.tags), 'Has tags array');
+        assert(Array.isArray(quest.rewards), 'Has rewards array');
+
+        const r = validateQuestDefinition(quest);
+        assert(r.valid, 'Generated quest passes existing validator');
+        assert(r.errors.length === 0, 'No validation errors');
+
+        const batch = generateQuestBatch(mockRng, 15);
+        assert(batch.length === 15, 'Batch generates 15 quests');
+        const allValid = batch.every(q => validateQuestDefinition(q).valid);
+        assert(allValid, 'All generated quests pass validation');
+    } catch (e) {
+        console.log(`  ✗ Quest template test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testNPCTemplateSchema() {
+    console.log('\n[53] NPC Archetype Schema + Generator + Validator');
+    try {
+        const valid = {
+            id: 'test_npc', name: 'Test NPC', role: 'civilian',
+            title: 'Worker', personality: 'friendly', motivation: 'survival',
+            age: 35, income: 5000,
+        };
+        let r = validateNPCArchetype(valid);
+        assert(r.valid, 'Valid NPC passes validation');
+
+        r = validateNPCArchetype({});
+        assert(!r.valid, 'Empty object fails');
+
+        r = validateNPCArchetype({ ...valid, role: 'alien' });
+        assert(!r.valid, 'Invalid role rejected');
+
+        r = validateNPCArchetype({ ...valid, age: 10 });
+        assert(!r.valid, 'Under-age rejected');
+
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const gen = generateNPCArchetype(mockRng);
+        assert(typeof gen.id === 'string', 'Generated NPC has id');
+        assert(typeof gen.secret === 'string', 'Has secret');
+        r = validateNPCArchetype(gen);
+        assert(r.valid, 'Generated NPC passes validation');
+
+        const batch = generateNPCBatch(mockRng, 20);
+        assert(batch.length === 20, 'Batch generates 20 NPCs');
+        const allValid = batch.every(n => validateNPCArchetype(n).valid);
+        assert(allValid, 'All generated NPCs pass validation');
+    } catch (e) {
+        console.log(`  ✗ NPC template test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
 testWeaponTemplateSchema();
+testQuestTemplateGenerator();
+testNPCTemplateSchema();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
