@@ -5,6 +5,7 @@ import { tickAmbient } from '../agents/bt_ambient.js';
 import { tickAlerted, isAlerted, flushDisturbances, initAlertedSystem } from '../agents/bt_alerted.js';
 import { tickEngaged, isEngaged, flushEngagedHits, initEngagedSystem } from '../agents/bt_engaged.js';
 import { tickFleeTree, isFleeing, flushFleeEvents, initFleeSystem } from '../agents/bt_flee.js';
+import { tickSurrenderTree, isSurrendered, checkSurrender } from '../agents/bt_surrender.js';
 
 export class CitizenSim {
     constructor(game) {
@@ -75,7 +76,12 @@ export class CitizenSim {
     }
 
     updateMovement(citizen, timeOfDay, tier, tick) {
+        if (isSurrendered(citizen)) {
+            tickSurrenderTree(citizen, this.game, tick);
+            return;
+        }
         if (isEngaged(citizen)) {
+            checkSurrender(citizen, this.game);
             tickEngaged(citizen, this.game, tick);
             return;
         }

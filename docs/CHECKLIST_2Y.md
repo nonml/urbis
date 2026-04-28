@@ -263,7 +263,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q4-bt-engaged` engaged behavior with cover + fire
 - [x] `q4-bt-flee` flee behavior with panic radius
 - [x] `q4-bt-callbackup` call-for-backup action (spawns reinforcements)
-- [ ] `q4-bt-surrender` surrender state after heavy damage
+- [x] `q4-bt-surrender` surrender state after heavy damage
 
 ### Q4.C — Weapon Tier 2
 

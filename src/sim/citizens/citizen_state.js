@@ -109,6 +109,10 @@ export function ensureCitizenState(citizen, map = null) {
         citizen._sim.engFireTimer = 0;
         citizen._sim.engDuckTimer = 0;
     }
+    if (citizen._sim.surrendered === undefined) {
+        citizen._sim.surrendered = false;
+        citizen._sim.surrenderTimer = 0;
+    }
     citizen.needs.food = clamp01(citizen.needs.food);
     citizen.needs.rest = clamp01(citizen.needs.rest);
     citizen.needs.safety = clamp01(citizen.needs.safety);
