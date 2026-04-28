@@ -72,6 +72,24 @@ export class RadialHackMenu {
                     opacity: 0.4;
                     pointer-events: none;
                 }
+                .rhm-cd-ring {
+                    position: absolute;
+                    left: 0; top: 0;
+                    width: 100%;
+                    height: 100%;
+                    pointer-events: none;
+                }
+                .rhm-cd-ring circle {
+                    fill: none;
+                    stroke: #00ffff;
+                    stroke-width: 2;
+                    stroke-dasharray: 75.4;
+                    stroke-dashoffset: 0;
+                    transform: rotate(-90deg);
+                    transform-origin: center;
+                    transition: stroke-dashoffset 0.3s;
+                    opacity: 0.6;
+                }
                 .rhm-center {
                     position: absolute;
                     left: 50%;
@@ -192,7 +210,16 @@ export class RadialHackMenu {
         const tick = this.game.state?.time?.tick ?? 0;
         const wh = this.game.worldHacks;
         for (const a of actions) {
-            a.onCooldown = wh ? wh._isOnCooldown(a.id, tick) : false;
+            if (wh) {
+                const cdUntil = wh._cooldowns?.get(a.id) ?? 0;
+                a.onCooldown = cdUntil > tick;
+                a.cooldownFrac = a.onCooldown
+                    ? Math.min(1, (cdUntil - tick) / 30)
+                    : 0;
+            } else {
+                a.onCooldown = false;
+                a.cooldownFrac = 0;
+            }
         }
         return actions;
     }
@@ -215,6 +242,19 @@ export class RadialHackMenu {
             if (opt.onCooldown) seg.classList.add('cooldown');
             seg.textContent = `${i + 1}. ${opt.label}`;
             seg.style.transform = `translate(${x}px, ${y}px)`;
+            if (opt.onCooldown && opt.cooldownFrac !== undefined) {
+                const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+                svg.setAttribute('class', 'rhm-cd-ring');
+                svg.setAttribute('viewBox', '0 0 28 28');
+                const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+                circle.setAttribute('cx', '14');
+                circle.setAttribute('cy', '14');
+                circle.setAttribute('r', '12');
+                const circ = 75.4;
+                circle.style.strokeDashoffset = String(circ * (1 - opt.cooldownFrac));
+                svg.appendChild(circle);
+                seg.appendChild(svg);
+            }
             this._el.appendChild(seg);
         }
     }

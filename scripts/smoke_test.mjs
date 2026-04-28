@@ -2700,6 +2700,27 @@ function testRadialKeyboardFallback() {
 }
 
 testRadialKeyboardFallback();
+
+function testRadialCooldownRings() {
+    console.log('\n[75] Radial Menu — cooldown rings');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 181818, mode: 'standard' });
+        game.init();
+
+        game.worldHacks._setCooldown('cctv_disable', 0, 30);
+        const isCd = game.worldHacks._isOnCooldown('cctv_disable', 1);
+        assert(isCd, 'CCTV disable is on cooldown');
+
+        const notCd = game.worldHacks._isOnCooldown('cctv_disable', 31);
+        assert(!notCd, 'CCTV disable off cooldown after expiry');
+    } catch (e) {
+        console.log(`  ✗ Cooldown rings test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadialCooldownRings();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

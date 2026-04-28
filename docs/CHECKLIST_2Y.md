@@ -380,7 +380,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q6-rm-menu` radial UI around targeted hackable
 - [x] `q6-rm-keyboard-fallback` number-key fallback preserved
-- [ ] `q6-rm-cooldowns` visible cooldown rings
+- [x] `q6-rm-cooldowns` visible cooldown rings
 
 ### Q6 — Definition of Done
 
