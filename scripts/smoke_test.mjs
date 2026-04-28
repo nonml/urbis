@@ -3649,6 +3649,63 @@ function testArcMission1Setup() {
 
 testArcMission1Setup();
 
+function testArcMission2Recruitment() {
+    console.log('\n[90] Arc — mission 2: recruitment');
+    try {
+        const m2 = JSON.parse(readFileSyncSync('src/content/quests/arc/arc_m2_recruitment.json', 'utf8'));
+        const v = validateQuestDefinition(m2);
+        assert(v.valid, `arc_m2_recruitment validates (errors: ${v.errors.join('; ')})`);
+
+        assert(m2.id === 'arc_m2_recruitment', 'Mission has expected id');
+        assert(m2.missionIndex === 2, 'missionIndex = 2');
+        assert(Array.isArray(m2.requires) && m2.requires.includes('arc_m1_complete'),
+            'm2 gates on arc_m1_complete flag');
+
+        const choice = m2.steps.find(s => s.kind === 'choice');
+        assert(choice && choice.choices.length === 2, '2 specialist choices');
+        const branches = choice.choices.map(c => c.nextStep);
+        assert(new Set(branches).size === 2, 'Choices branch to different next steps');
+
+        const hackerPath = m2.steps.find(s => s.id === 'go_to_candidate_hacker');
+        const driverPath = m2.steps.find(s => s.id === 'go_to_candidate_driver');
+        assert(hackerPath && driverPath, 'Both branch entry steps exist');
+
+        const proveSteps = m2.steps.filter(s => s.id.startsWith('prove_to_'));
+        for (const ps of proveSteps) {
+            const completes = ps.onComplete?.find(e => e.startsWith('advance:'));
+            assert(completes === 'advance:convince_specialist',
+                `${ps.id} re-converges to convince_specialist`);
+        }
+
+        const convince = m2.steps.find(s => s.id === 'convince_specialist');
+        assert(!!convince, 'Convergence step exists');
+
+        const outcome = m2.steps.find(s => s.kind === 'outcome');
+        const unlock = outcome.outcomes[0].effect.find(e => e.startsWith('unlock:'));
+        assert(unlock === 'unlock:arc_m3_planning', 'Unlocks m3 planning');
+
+        const flagReward = m2.rewards.find(r => r.type === 'set_flag' && r.flag === 'arc_m2_complete');
+        assert(!!flagReward, 'Sets arc_m2_complete on completion');
+
+        const hackerEffect = choice.choices.find(c => c.id === 'recruit_hacker').effect;
+        const driverEffect = choice.choices.find(c => c.id === 'recruit_driver').effect;
+        assert(hackerEffect.some(e => e.startsWith('set_flag:specialist=')),
+            'Hacker choice writes specialist flag');
+        assert(driverEffect.some(e => e.startsWith('set_flag:specialist=')),
+            'Driver choice writes specialist flag');
+
+        const manifest = JSON.parse(readFileSyncSync('src/content/quests/arc/manifest.json', 'utf8'));
+        assert(manifest.files.length === 2 && manifest.files.includes('arc_m2_recruitment.json'),
+            'Manifest now lists 2 missions including m2');
+    } catch (e) {
+        console.log(`  ✗ Arc m2 test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testArcMission2Recruitment();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

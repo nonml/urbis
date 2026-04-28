@@ -1,0 +1,106 @@
+{
+    "id": "arc_m2_recruitment",
+    "type": "arc_mission",
+    "arcId": "main_arc",
+    "missionIndex": 2,
+    "title": "Cold Hands",
+    "description": "The fixer wants a third on the next job. Two candidates, two reputations, one decision — and either way, you have to convince them you're worth the risk.",
+    "tags": ["arc", "main_arc", "recruitment"],
+    "trigger": "ARC_M2_BRIEFING",
+    "requires": ["arc_m1_complete"],
+    "rewards": [
+        { "type": "add_resource", "resource": "gold", "amount": 80 },
+        { "type": "set_flag", "flag": "arc_m2_complete" },
+        { "type": "rep_delta", "faction": "fixer_network", "amount": 8 }
+    ],
+    "steps": [
+        {
+            "id": "start",
+            "kind": "trigger",
+            "trigger": "ARC_M2_BRIEFING",
+            "speaker": "fixer",
+            "text": "Fixer's voice again, tighter this time. \"You did clean work. We're going somewhere louder. I need you to bring me a third.\"",
+            "completeOn": 1
+        },
+        {
+            "id": "go_to_briefing",
+            "kind": "go_to",
+            "marker": "fixer_office",
+            "text": "Meet the fixer at the office above the laundry on Pell Street.",
+            "completeOn": 1
+        },
+        {
+            "id": "briefing",
+            "kind": "interact",
+            "speaker": "fixer",
+            "text": "\"Two names. Pick one. I won't pick for you — your team, your problem if it falls apart.\"",
+            "completeOn": 1
+        },
+        {
+            "id": "choice_specialist",
+            "kind": "choice",
+            "text": "Which specialist do you bring in?",
+            "choices": [
+                {
+                    "id": "recruit_hacker",
+                    "label": "Vela — the hacker. Burnt, brilliant, won't smile.",
+                    "effect": ["set_flag:specialist=hacker", "team_archetype_hacker"],
+                    "nextStep": "go_to_candidate_hacker"
+                },
+                {
+                    "id": "recruit_driver",
+                    "label": "Coen — the driver. Reckless, fast, talks too much.",
+                    "effect": ["set_flag:specialist=driver", "team_archetype_driver"],
+                    "nextStep": "go_to_candidate_driver"
+                }
+            ]
+        },
+        {
+            "id": "go_to_candidate_hacker",
+            "kind": "go_to",
+            "marker": "vela_workshop",
+            "text": "Vela works out of an unmarked door behind the noodle place on 7th.",
+            "completeOn": 1
+        },
+        {
+            "id": "prove_to_hacker",
+            "kind": "hack_node",
+            "nodeType": "TELECOM_BOX",
+            "text": "Vela won't talk until you breach the test box she's left out front.",
+            "onComplete": ["spawn_clue:vela_test_passed", "advance:convince_specialist"],
+            "completeOn": 1
+        },
+        {
+            "id": "go_to_candidate_driver",
+            "kind": "go_to",
+            "marker": "coen_garage",
+            "text": "Coen runs an off-the-books garage under the freeway.",
+            "completeOn": 1
+        },
+        {
+            "id": "prove_to_driver",
+            "kind": "investigate",
+            "text": "Coen wants you to scope a safehouse. Watch it from across the street, log who comes and goes.",
+            "onComplete": ["spawn_clue:coen_recon_passed", "advance:convince_specialist"],
+            "completeOn": 1
+        },
+        {
+            "id": "convince_specialist",
+            "kind": "interact",
+            "speaker": "rival",
+            "text": "The specialist hears you out, weighs the risk. \"Fine. But I pick the gear, and I pick the route.\"",
+            "completeOn": 1
+        },
+        {
+            "id": "resolve",
+            "kind": "outcome",
+            "outcomes": [
+                {
+                    "id": "team_assembled",
+                    "label": "Three of you now. The job has weight.",
+                    "effect": ["arc_m2_complete", "unlock:arc_m3_planning"]
+                }
+            ]
+        }
+    ]
+}

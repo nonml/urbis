@@ -419,7 +419,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q7.D — Mission Arc
 
 - [x] `q7-ar-m1` mission 1: setup
-- [ ] `q7-ar-m2` mission 2: recruitment
+- [x] `q7-ar-m2` mission 2: recruitment
 - [ ] `q7-ar-m3` mission 3: heist planning
 - [ ] `q7-ar-m4` mission 4: the heist
 - [ ] `q7-ar-m5` mission 5: betrayal

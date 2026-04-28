@@ -3,6 +3,7 @@
     "title": "Main Arc",
     "description": "Six-mission storyline: setup → recruitment → heist planning → the heist → betrayal → resolution.",
     "files": [
-        "arc_m1_setup.json"
+        "arc_m1_setup.json",
+        "arc_m2_recruitment.json"
     ]
 }
