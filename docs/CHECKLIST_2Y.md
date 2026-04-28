@@ -226,7 +226,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q3-in-doorway-tag` mark doorways in building metadata
 - [x] `q3-in-enter-trigger` "press F to enter" at tagged doors
-- [ ] `q3-in-scene-swap` interior scene root replaces outdoor scene root
+- [x] `q3-in-scene-swap` interior scene root replaces outdoor scene root
 - [ ] `q3-in-minimap-swap` interior minimap overlay
 - [ ] `q3-in-exit-trigger` exit door returns player to world position
 - [ ] `q3-in-template-shop` convenience store interior

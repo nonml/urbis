@@ -374,6 +374,12 @@ export class Renderer3D {
         this._zoneOverlayMesh = null;
         this._zoneMode = 'none'; // 'none', 'zones', 'zoned'
 
+        // Interior scene swap
+        this._interiorGroup = new THREE.Group();
+        this._interiorGroup.visible = false;
+        this._outdoorChildrenHidden = false;
+        this._outdoorVisibility = new Map();
+
         this._groundPlane = new THREE.Mesh(
             new THREE.PlaneGeometry(2000, 2000),
             new THREE.MeshBasicMaterial({ visible: false })
@@ -4165,6 +4171,62 @@ export class Renderer3D {
     setZoneMode(mode) {
         this._zoneMode = mode;
         this.updateZoneOverlay();
+    }
+
+    enterInterior(templateId) {
+        if (this._outdoorChildrenHidden) return;
+        this._outdoorVisibility.clear();
+        for (const child of this.scene.children) {
+            if (child === this._interiorGroup) continue;
+            this._outdoorVisibility.set(child, child.visible);
+            child.visible = false;
+        }
+        this._outdoorChildrenHidden = true;
+        this._interiorGroup.clear();
+        this._buildInteriorScene(templateId);
+        this._interiorGroup.visible = true;
+        this.scene.add(this._interiorGroup);
+    }
+
+    exitInterior() {
+        if (!this._outdoorChildrenHidden) return;
+        this._interiorGroup.visible = false;
+        for (const [child, vis] of this._outdoorVisibility) {
+            child.visible = vis;
+        }
+        this._outdoorVisibility.clear();
+        this._outdoorChildrenHidden = false;
+    }
+
+    _buildInteriorScene(templateId) {
+        const floor = new THREE.Mesh(
+            new THREE.PlaneGeometry(10, 10),
+            new THREE.MeshStandardMaterial({ color: 0x555555, roughness: 0.9 })
+        );
+        floor.rotation.x = -Math.PI / 2;
+        floor.receiveShadow = true;
+        this._interiorGroup.add(floor);
+
+        const wallMat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.7 });
+        const wallGeo = new THREE.BoxGeometry(10, 3, 0.1);
+        const walls = [
+            { pos: [0, 1.5, -5], rot: [0, 0, 0] },
+            { pos: [0, 1.5, 5], rot: [0, 0, 0] },
+            { pos: [-5, 1.5, 0], rot: [0, Math.PI / 2, 0] },
+            { pos: [5, 1.5, 0], rot: [0, Math.PI / 2, 0] },
+        ];
+        for (const w of walls) {
+            const m = new THREE.Mesh(wallGeo, wallMat);
+            m.position.set(...w.pos);
+            m.rotation.set(...w.rot);
+            m.castShadow = true;
+            m.receiveShadow = true;
+            this._interiorGroup.add(m);
+        }
+
+        const light = new THREE.PointLight(0xffeedd, 1.0, 12);
+        light.position.set(0, 2.5, 0);
+        this._interiorGroup.add(light);
     }
 
     /**
