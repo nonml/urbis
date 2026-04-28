@@ -1,5 +1,6 @@
 // Entry point for the game
 import { Game } from './game.js';
+import { initRapier } from './sim/physics/rapier_world.js';
 import { PerfOverlay } from './dev/perf_overlay.js';
 import { DevMenu } from './dev/dev_menu.js';
 import { UIManager } from './ui.js';
@@ -96,6 +97,8 @@ window.startGame = async function() {
         const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
+        updateLoading(20, 'LOADING PHYSICS...');
+        await initRapier();
         updateLoading(35, 'GENERATING WORLD...');
 
         // Clean up previous game instance if any
@@ -136,6 +139,8 @@ window.restartGame = async function() {
         const difficulty = document.getElementById('difficulty-select')?.value || 'NORMAL';
 
         await nextFrame();
+        updateLoading(20, 'LOADING PHYSICS...');
+        await initRapier();
         updateLoading(35, 'GENERATING WORLD...');
 
         // Clean up previous game instance

@@ -86,6 +86,7 @@ import { CombatSystem } from './player/combat.js';
 import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
+import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
 import { ModLoader } from './mod/mod_loader.js';
@@ -358,6 +359,9 @@ export class Game {
         this.particleSystem = createParticleSystem(this);
         this.tooltipManager = this.isHeadless ? null : new TooltipManager(this);
 
+        // Rapier physics world (WASM must be initialized before Game construction)
+        this.physics = new RapierPhysicsWorld();
+
         // Social graph system (Milestone J)
         this.socialGraph = new SocialGraph(this, this.rngStreams.sim);
 
@@ -598,6 +602,9 @@ export class Game {
     tickOnce(dt) {
         // Multiplayer lockstep gate — skip simulation body if waiting for server advance
         if (this.mp?.connected && !this.mp.onTick(this.state.time.tick)) return;
+
+        // Physics step (fixed-rate, deterministic)
+        this.physics.step();
 
         // Compute transit metrics from placed buildings
         const placedBuildings = this.buildings.buildings.reduce((map, b) => {
