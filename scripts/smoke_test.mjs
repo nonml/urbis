@@ -27,6 +27,7 @@ import { InteractableManager } from '../src/sim/interactables.js';
 import { getChunkId } from '../src/world/chunks.js';
 import { validateQuestDefinition } from '../src/content/quests/schema.js';
 import { CoverSystem, CoverController } from '../src/player/cover.js';
+import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -271,6 +272,7 @@ testFactionTuningV1();
 testCoverSnapController();
 testCoverBlindfire();
 testCoverNpcUse();
+testBehaviorTreeLibrary();
 
 function testCoverBlindfire() {
     console.log('\n[45] Cover System — Blindfire Aim Penalty Curve');
@@ -309,6 +311,58 @@ function testCoverBlindfire() {
         assert(cc.aimPenalty === 0.5, 'Penalty resets to snapped level');
     } catch (e) {
         console.log(`  ✗ Cover blindfire test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+function testBehaviorTreeLibrary() {
+    console.log('\n[47] Behavior Tree Library');
+    try {
+        const ctx = { hp: 80, ammo: 10, inCover: false };
+
+        const tree = selector(
+            sequence(
+                condition(c => c.hp < 20),
+                action(c => { c.fleeing = true; return SUCCESS; })
+            ),
+            sequence(
+                condition(c => c.ammo > 0),
+                action(c => { c.shooting = true; return SUCCESS; })
+            ),
+            action(c => { c.idling = true; return SUCCESS; })
+        );
+
+        let result = btTick(tree, ctx);
+        assert(result === SUCCESS, 'Tree returns SUCCESS');
+        assert(ctx.shooting === true, 'Selector picks shooting branch (hp ok, ammo > 0)');
+        assert(!ctx.fleeing, 'Did not flee (hp > 20)');
+
+        ctx.ammo = 0;
+        ctx.shooting = false;
+        result = btTick(tree, ctx);
+        assert(ctx.idling === true, 'Falls through to idle when no ammo and hp ok');
+
+        ctx.hp = 5;
+        ctx.fleeing = false;
+        result = btTick(tree, ctx);
+        assert(ctx.fleeing === true, 'Flees when hp < 20');
+
+        const invTree = inverter(condition(c => c.hp < 20));
+        assert(btTick(invTree, { hp: 80 }) === SUCCESS, 'Inverter flips FAILURE to SUCCESS');
+        assert(btTick(invTree, { hp: 5 }) === FAILURE, 'Inverter flips SUCCESS to FAILURE');
+
+        const seqFail = sequence(
+            action(() => SUCCESS),
+            action(() => FAILURE),
+            action(() => SUCCESS)
+        );
+        assert(btTick(seqFail, {}) === FAILURE, 'Sequence stops at first failure');
+
+        const runAction = action(() => RUNNING);
+        assert(btTick(runAction, {}) === RUNNING, 'RUNNING propagates from action');
+    } catch (e) {
+        console.log(`  ✗ BT library test failed: ${e.message}`);
         console.log(`  Stack: ${e.stack}`);
         failCount++;
     }
