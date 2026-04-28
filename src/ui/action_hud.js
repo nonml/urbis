@@ -983,7 +983,7 @@ export class ActionHUD {
         while (container.childElementCount < show.length) {
             const card = document.createElement('div');
             card.className = 'ahud-profile-card';
-            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div>';
+            card.innerHTML = '<div class="ahud-profile-name"></div><div class="ahud-profile-row"><span class="ahud-profile-age"></span><span class="ahud-profile-income"></span></div><div class="ahud-profile-row"><span></span><span></span></div>';
             container.appendChild(card);
         }
 
@@ -1021,7 +1021,8 @@ export class ActionHUD {
                 const incomeClass = income > 4000 ? 'high' : income > 2000 ? 'mid' : 'low';
                 const happiness = c.happiness ?? 50;
 
-                rows[0].children[0].textContent = occupation;
+                const age = c.age ?? '?';
+                rows[0].children[0].textContent = `${occupation}, ${age}y`;
                 rows[0].children[1].textContent = '$' + income;
                 rows[0].children[1].className = 'ahud-profile-income ' + incomeClass;
                 rows[1].children[0].textContent = c.faction || 'citizens';

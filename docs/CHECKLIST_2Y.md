@@ -155,12 +155,12 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2.F — NPC Profiler Overlay
 
-- [ ] `q2-pr-toggle` hack mode key toggles profiler
-- [ ] `q2-pr-float-panel` panel floats above nearest NPC
-- [ ] `q2-pr-fields-basic` name, age, income, job
+- [x] `q2-pr-toggle` hack mode key toggles profiler
+- [x] `q2-pr-float-panel` panel floats above nearest NPC
+- [x] `q2-pr-fields-basic` name, age, income, job
 - [ ] `q2-pr-fields-secret` hidden secret requires deeper hack
 - [ ] `q2-pr-fields-relations` top 3 relations
-- [ ] `q2-pr-lod-cull` only detailed NPCs get profiler data
+- [x] `q2-pr-lod-cull` only detailed NPCs get profiler data
 
 ### Q2.G — Perf Harness
 
