@@ -4,6 +4,7 @@
  */
 
 import { eventBus, EVENT_TYPES } from '../sim/events.js';
+import { blowTire } from '../vehicles/vehicle_state.js';
 
 export const WEAPONS = {
     fist: {
@@ -253,6 +254,9 @@ export class CombatSystem {
             if (bestHit) {
                 if (bestHit._isVehicle) {
                     bestHit.health = (bestHit.health || 100) - this.weapon.damage;
+                    if (bestHit.tires && this.game.rng.next() < 0.15) {
+                        blowTire(bestHit);
+                    }
                     delete bestHit._isVehicle;
                 }
                 // Knockback

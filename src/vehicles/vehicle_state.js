@@ -191,8 +191,29 @@ export function createVehicle(options = {}) {
         lastRoadTile: -1,
         driftFactor: 0,
         deformations: [],
-        _tiresBlown: false,
+        tires: { fl: true, fr: true, rl: true, rr: true },
     };
+}
+
+export function blowTire(vehicle, position) {
+    const keys = Object.keys(vehicle.tires);
+    const target = position || keys.find(k => vehicle.tires[k]);
+    if (!target || !vehicle.tires[target]) return false;
+    vehicle.tires[target] = false;
+    return true;
+}
+
+export function getTireCount(vehicle) {
+    return Object.values(vehicle.tires).filter(Boolean).length;
+}
+
+export function getTireHandlingMul(vehicle) {
+    const intact = getTireCount(vehicle);
+    if (intact >= 4) return 1.0;
+    if (intact === 3) return 0.7;
+    if (intact === 2) return 0.4;
+    if (intact === 1) return 0.15;
+    return 0.05;
 }
 
 const MAX_DEFORMATIONS = 6;
@@ -223,7 +244,8 @@ export function updateVehiclePhysics(vehicle, input, dt, terrain) {
     if (vehicle.health <= 0) return;
 
     const traction = terrain.traction || 1.0;
-    const effectiveTraction = vehicle.traction * traction;
+    const tireMul = getTireHandlingMul(vehicle);
+    const effectiveTraction = vehicle.traction * traction * tireMul;
 
     const throttle = input.throttle || 0;
     const brake = input.brake || 0;

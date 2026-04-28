@@ -1,7 +1,7 @@
 // Police system - manages police units, spawning, and pursuit behavior
 
 import { eventBus, EVENT_TYPES } from '../events.js';
-import { createVehicle, updateVehiclePhysics, getTerrainProperties, applyImpactDeform } from '../../vehicles/vehicle_state.js';
+import { createVehicle, updateVehiclePhysics, getTerrainProperties, applyImpactDeform, blowTire } from '../../vehicles/vehicle_state.js';
 
 // Heat thresholds for police response
 export const HEAT_THRESHOLDS = {
@@ -197,7 +197,8 @@ export class PoliceSystem {
                 strip.active = false;
                 veh.speed *= 0.2;
                 veh.health = (veh.health ?? 100) - 30;
-                veh._tiresBlown = true;
+                blowTire(veh, 'fl');
+                blowTire(veh, 'fr');
                 this.game.playerHealth?.takeDamage(5, 'spike_strip');
                 this.game.ui?.showMessage?.('Spike strip! Tires blown!', 'crisis');
             }

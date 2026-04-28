@@ -284,7 +284,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q4-vd-mesh-decimate` decimated mesh variants per vehicle
 - [x] `q4-vd-deform-bends` seeded bend transforms on impact
-- [ ] `q4-vd-tire-blowouts` tires can be shot out
+- [x] `q4-vd-tire-blowouts` tires can be shot out
 - [ ] `q4-vd-engine-smoke` progressive smoke + fire at low HP
 - [ ] `q4-vd-explode` explosion at 0 HP with AoE
 
