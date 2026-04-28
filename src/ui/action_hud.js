@@ -1,6 +1,7 @@
 /**
  * Action HUD — Watch Dogs-inspired minimal overlay inside the 3D viewport
  */
+import { BUILDING_3D } from '../constants.js';
 
 let _vec3Cache = null;
 
@@ -832,6 +833,20 @@ export class ActionHUD {
                     for (const c of citizens) {
                         if (this.game.stealth.canStealthKill(c.x, c.y, c.facing)) {
                             promptText = '<kbd>E</kbd> Stealth Takedown';
+                            break;
+                        }
+                    }
+                }
+                // Check for enterable building doorways
+                if (!promptText) {
+                    const bldgs = this.game.buildings?.buildings || [];
+                    for (const b of bldgs) {
+                        const def = BUILDING_3D[b.type];
+                        if (!def?.doorway) continue;
+                        const dx = (b.x ?? 0) - px;
+                        const dy = (b.y ?? 0) - py;
+                        if (dx * dx + dy * dy < 4) {
+                            promptText = '<kbd>F</kbd> Enter Building';
                             break;
                         }
                     }
