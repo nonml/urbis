@@ -12,6 +12,7 @@ export const PARTICLE_PROGRESS_RING = 'progress_ring';
 export const PARTICLE_RAIN = 'rain';
 export const PARTICLE_SNOW = 'snow';
 export const PARTICLE_SPARKLE = 'sparkle';
+export const PARTICLE_GLASS_SHARD = 'glass_shard';
 
 export const PARTICLE_TYPES = {
     [PARTICLE_FLOATING_TEXT]: {
@@ -43,6 +44,11 @@ export const PARTICLE_TYPES = {
         maxSize: 50,
         lifetime: 800,
         blendMode: 'additive'
+    },
+    [PARTICLE_GLASS_SHARD]: {
+        maxSize: 80,
+        lifetime: 600,
+        blendMode: 'normal'
     }
 };
 

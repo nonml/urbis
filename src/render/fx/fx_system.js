@@ -9,7 +9,7 @@
  * - Screen shake (impacts, crises)
  */
 
-import { createParticleSystem, PARTICLE_TYPES, PARTICLE_FLOATING_TEXT, PARTICLE_BURST, PARTICLE_PROGRESS_RING } from '../../world/particle_pool.js';
+import { createParticleSystem, PARTICLE_TYPES, PARTICLE_FLOATING_TEXT, PARTICLE_BURST, PARTICLE_PROGRESS_RING, PARTICLE_GLASS_SHARD } from '../../world/particle_pool.js';
 
 // VFX effect types
 export const VFX_TYPES = {
@@ -550,6 +550,24 @@ export class FXSystem {
             t: 0,
             duration,
         });
+    }
+
+    glassShardBurst(x, y, z, count = 12) {
+        const shardColors = [0x88ccff, 0xaaddff, 0x99bbee, 0xccddff];
+        for (let i = 0; i < count; i++) {
+            const angle = (Math.PI * 2 * i) / count;
+            const speed = 1.5 + (i % 3) * 0.5;
+            this.particleSystem.spawn(PARTICLE_GLASS_SHARD, x, y, z, {
+                vx: Math.cos(angle) * speed,
+                vy: 2 + (i % 4) * 0.3,
+                vz: Math.sin(angle) * speed,
+                size: 0.03 + (i % 3) * 0.01,
+                color: shardColors[i % shardColors.length],
+                alpha: 0.8,
+                rotationSpeed: 3 + i * 0.5,
+                maxLife: 400 + (i % 5) * 80,
+            });
+        }
     }
 
     /**
