@@ -249,7 +249,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q4.A — Cover System
 
-- [ ] `q4-cv-edge-tag` tag cover edges on static geometry
+- [x] `q4-cv-edge-tag` tag cover edges on static geometry
 - [ ] `q4-cv-snap` snap-to-cover controller state
 - [ ] `q4-cv-blindfire` blindfire aim penalty curve
 - [ ] `q4-cv-lean` lean out to shoot
