@@ -361,7 +361,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q6-pr-income-history` year of income data
 - [x] `q6-pr-criminal-record` charges + outcomes
 - [x] `q6-pr-relations-graph` 2-hop relationship graph
-- [ ] `q6-pr-schedule-vis` week schedule heatmap
+- [x] `q6-pr-schedule-vis` week schedule heatmap
 
 ### Q6.C — Hack Chains
 

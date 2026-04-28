@@ -340,6 +340,7 @@ export class WorldHackEffects {
                 ? citizen.criminalRecords.slice()
                 : [],
             relationsGraph: this._buildRelationsGraph(citizenId),
+            weekSchedule: citizen.weekSchedule || null,
             faction: citizen.faction || 'citizens',
             happiness: citizen.happiness ?? 50,
             traits: citizen.traits || [],

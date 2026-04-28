@@ -57,6 +57,29 @@ function _generateCriminalRecords(citizen) {
     return records;
 }
 
+const _PERIODS = ['night', 'morning', 'day', 'evening', 'dusk'];
+const _ACTIVITIES = ['home', 'work', 'leisure', 'errands', 'social'];
+
+function _generateWeekSchedule(citizen) {
+    const h = ((citizen.id ?? 0) * 48271) >>> 0;
+    const base = citizen.schedule || {};
+    const grid = [];
+    for (let day = 0; day < 7; day++) {
+        const row = [];
+        for (let p = 0; p < _PERIODS.length; p++) {
+            const mix = (h + day * 7 + p * 13) >>> 0;
+            const isWeekend = day >= 5;
+            let act = base[_PERIODS[p]] || 'home';
+            if (isWeekend && act === 'work' && (mix & 3) !== 0) {
+                act = _ACTIVITIES[(mix >>> 4) % 3 + 2];
+            }
+            row.push(act);
+        }
+        grid.push(row);
+    }
+    return grid;
+}
+
 export function ensureCitizenState(citizen, map = null) {
     if (!citizen.schedule) {
         citizen.schedule = {
@@ -135,6 +158,9 @@ export function ensureCitizenState(citizen, map = null) {
     if (citizen._sim.surrendered === undefined) {
         citizen._sim.surrendered = false;
         citizen._sim.surrenderTimer = 0;
+    }
+    if (!citizen.weekSchedule) {
+        citizen.weekSchedule = _generateWeekSchedule(citizen);
     }
     if (!Array.isArray(citizen.criminalRecords)) {
         citizen.criminalRecords = _generateCriminalRecords(citizen);

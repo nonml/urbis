@@ -2417,6 +2417,31 @@ function testProfilerRelationsGraph() {
 }
 
 testProfilerRelationsGraph();
+
+function testProfilerScheduleVis() {
+    console.log('\n[65] Profiler — week schedule heatmap');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 909090, mode: 'standard' });
+        game.init();
+        const citizens = game.citizens?.citizens || [];
+        const c = citizens[0];
+
+        assert(Array.isArray(c.weekSchedule), 'Citizen has weekSchedule');
+        assert(c.weekSchedule.length === 7, '7 days in schedule');
+        assert(c.weekSchedule[0].length === 5, '5 periods per day');
+
+        const weekend = c.weekSchedule[5];
+        const weekday = c.weekSchedule[0];
+        assert(typeof weekend[0] === 'string', 'Schedule entries are strings');
+        assert(typeof weekday[2] === 'string', 'Weekday day period is a string');
+    } catch (e) {
+        console.log(`  ✗ Schedule vis test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testProfilerScheduleVis();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
