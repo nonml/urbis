@@ -209,7 +209,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q3.C — Ragdoll First Pass
 
-- [ ] `q3-rd-3bone` 3-bone ragdoll skeleton (hip, chest, head)
+- [x] `q3-rd-3bone` 3-bone ragdoll skeleton (hip, chest, head)
 - [ ] `q3-rd-blend-in` ragdoll activates on death within 150ms
 - [ ] `q3-rd-blend-out` returns to rest pose within 1.5s
 - [ ] `q3-rd-knockback` explosive knockback applies impulse

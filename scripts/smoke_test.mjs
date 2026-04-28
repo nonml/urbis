@@ -1442,7 +1442,48 @@ function runPropSpawnerTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => {
+function runRagdoll3BoneTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/ragdoll.js'),
+    ]).then(([rwMod, ragMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[39] Ragdoll — 3-Bone Skeleton');
+            const { RapierPhysicsWorld } = rwMod;
+            const { Ragdoll } = ragMod;
+            const RR = rwMod.RAPIER;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+
+            const groundDesc = RR.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+            const ground = pw.createRigidBody(groundDesc);
+            pw.createCollider(RR.ColliderDesc.cuboid(50, 0.1, 50), ground);
+
+            const rag = new Ragdoll(pw, 0, 3, 0);
+            assert(rag.alive, 'Ragdoll is alive after creation');
+            assert(rag.bones.hip != null, 'Hip bone exists');
+            assert(rag.bones.chest != null, 'Chest bone exists');
+            assert(rag.bones.head != null, 'Head bone exists');
+
+            const pos0 = rag.getPositions();
+            assert(pos0.head.y > pos0.hip.y, 'Head starts above hip');
+
+            for (let i = 0; i < 90; i++) pw.step();
+            const pos1 = rag.getPositions();
+            assert(pos1.hip.y < 3.0, 'Ragdoll falls under gravity');
+
+            rag.destroy();
+            assert(!rag.alive, 'Ragdoll destroyed');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Ragdoll 3-bone test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

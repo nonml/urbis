@@ -1,0 +1,105 @@
+import { RAPIER, isRapierReady } from './rapier_world.js';
+
+const BONE = {
+    hip:   { hy: 0.2, radius: 0.15, mass: 8, y: 0.0 },
+    chest: { hy: 0.25, radius: 0.18, mass: 12, y: 0.5 },
+    head:  { hy: 0.12, radius: 0.12, mass: 4, y: 0.95 },
+};
+
+const JOINT_LIMITS = {
+    hipChest:  { minAngle: -0.3, maxAngle: 0.3 },
+    chestHead: { minAngle: -0.5, maxAngle: 0.5 },
+};
+
+export class Ragdoll {
+    constructor(physics, x, y, z) {
+        this._physics = physics;
+        this.bones = {};
+        this.joints = [];
+        this._alive = false;
+        if (!isRapierReady() || !physics.ready) return;
+        this._build(x, y, z);
+    }
+
+    _build(x, y, z) {
+        const hip = this._createBone('hip', x, y + BONE.hip.y, z);
+        const chest = this._createBone('chest', x, y + BONE.chest.y, z);
+        const head = this._createBone('head', x, y + BONE.head.y, z);
+
+        this.bones = { hip, chest, head };
+
+        this._createJoint(hip, chest, BONE.hip.hy, BONE.chest.hy, JOINT_LIMITS.hipChest);
+        this._createJoint(chest, head, BONE.chest.hy, BONE.head.hy, JOINT_LIMITS.chestHead);
+
+        this._alive = true;
+    }
+
+    _createBone(name, x, y, z) {
+        const def = BONE[name];
+        const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
+            .setTranslation(x, y, z)
+            .setAdditionalMass(def.mass);
+        const bodyId = this._physics.createRigidBody(bodyDesc);
+        const colliderDesc = RAPIER.ColliderDesc.capsule(def.hy, def.radius);
+        this._physics.createCollider(colliderDesc, bodyId);
+        return bodyId;
+    }
+
+    _createJoint(parentId, childId, parentHy, childHy, limits) {
+        const world = this._physics._world;
+        if (!world) return;
+        const parentBody = this._physics._bodies.get(parentId);
+        const childBody = this._physics._bodies.get(childId);
+        if (!parentBody || !childBody) return;
+
+        const anchor1 = { x: 0, y: parentHy, z: 0 };
+        const anchor2 = { x: 0, y: -childHy, z: 0 };
+        const axis = { x: 1, y: 0, z: 0 };
+
+        const params = RAPIER.JointData.revolute(anchor1, anchor2, axis);
+        const joint = world.createImpulseJoint(params, parentBody, childBody, true);
+        if (joint.setLimits) {
+            joint.setLimits(limits.minAngle, limits.maxAngle);
+        }
+        this.joints.push(joint);
+    }
+
+    get alive() {
+        return this._alive;
+    }
+
+    getPositions() {
+        if (!this._alive) return null;
+        return {
+            hip: this._physics.getBodyPosition(this.bones.hip),
+            chest: this._physics.getBodyPosition(this.bones.chest),
+            head: this._physics.getBodyPosition(this.bones.head),
+        };
+    }
+
+    getRotations() {
+        if (!this._alive) return null;
+        return {
+            hip: this._physics.getBodyRotation(this.bones.hip),
+            chest: this._physics.getBodyRotation(this.bones.chest),
+            head: this._physics.getBodyRotation(this.bones.head),
+        };
+    }
+
+    applyImpulse(boneName, impulse) {
+        const bodyId = this.bones[boneName];
+        if (bodyId == null) return;
+        this._physics.applyImpulse(bodyId, impulse);
+    }
+
+    destroy() {
+        if (!this._alive) return;
+        for (const name of ['head', 'chest', 'hip']) {
+            const id = this.bones[name];
+            if (id != null) this._physics.removeBody(id);
+        }
+        this.bones = {};
+        this.joints = [];
+        this._alive = false;
+    }
+}
