@@ -189,8 +189,27 @@ export function createVehicle(options = {}) {
         driverId: options.driverId || null,
         spawnTick: options.spawnTick || 0,
         lastRoadTile: -1,
-        driftFactor: 0
+        driftFactor: 0,
+        deformations: [],
+        _tiresBlown: false,
     };
+}
+
+const MAX_DEFORMATIONS = 6;
+
+export function applyImpactDeform(vehicle, impactAngle, force, rng) {
+    if (vehicle.deformations.length >= MAX_DEFORMATIONS) return;
+    const seed = rng ? rng.next() : 0.5;
+    const bendX = Math.cos(impactAngle) * force * (0.5 + seed * 0.5);
+    const bendY = Math.sin(impactAngle) * force * (0.5 + seed * 0.5);
+    const twist = (seed - 0.5) * force * 0.3;
+    vehicle.deformations.push({
+        localX: Math.cos(impactAngle) * 0.5,
+        localY: Math.sin(impactAngle) * 0.5,
+        bendX,
+        bendY,
+        twist,
+    });
 }
 
 /**

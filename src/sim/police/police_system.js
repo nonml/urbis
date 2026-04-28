@@ -1,7 +1,7 @@
 // Police system - manages police units, spawning, and pursuit behavior
 
 import { eventBus, EVENT_TYPES } from '../events.js';
-import { createVehicle, updateVehiclePhysics, getTerrainProperties } from '../../vehicles/vehicle_state.js';
+import { createVehicle, updateVehiclePhysics, getTerrainProperties, applyImpactDeform } from '../../vehicles/vehicle_state.js';
 
 // Heat thresholds for police response
 export const HEAT_THRESHOLDS = {
@@ -374,6 +374,8 @@ export class PoliceSystem {
                 const playerVehicle = vc.getActiveVehicle();
                 if (playerVehicle && unit.speed > 5) {
                     playerVehicle.health -= 15;
+                    const impactAngle = Math.atan2(unit.y - playerVehicle.y, unit.x - playerVehicle.x);
+                    applyImpactDeform(playerVehicle, impactAngle, 0.4, this.game.rng);
                     playerVehicle.speed *= 0.5;
                     unit.speed *= 0.3;
                     if (ph) ph.takeDamage(10, 'police_ram');
