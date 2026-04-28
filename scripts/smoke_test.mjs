@@ -3041,6 +3041,65 @@ async function testTTSStubBackend() {
 
 await testTTSStubBackend();
 
+import { VOICE_BANK, ARCHETYPE_IDS, getArchetypeVoice, resolveVoiceId, listArchetypes, DEFAULT_ARCHETYPE } from '../src/audio/tts/voicebank.js';
+
+async function testTTSVoicebank() {
+    console.log('\n[81] TTS — 6 archetype voicebank');
+    try {
+        assert(ARCHETYPE_IDS.length === 6, `6 archetypes (got ${ARCHETYPE_IDS.length})`);
+
+        const expected = ['fixer', 'operator', 'enforcer', 'civilian', 'rival', 'narrator'];
+        for (const id of expected) {
+            assert(VOICE_BANK[id], `Archetype '${id}' present`);
+        }
+
+        const voiceIds = ARCHETYPE_IDS.map(id => VOICE_BANK[id].voiceId);
+        assert(new Set(voiceIds).size === 6, 'All voice ids are unique');
+
+        for (const id of ARCHETYPE_IDS) {
+            const v = VOICE_BANK[id];
+            assert(typeof v.voiceId === 'string' && v.voiceId.length > 0, `${id}: has voiceId`);
+            assert(typeof v.mood === 'string', `${id}: has mood`);
+            assert(typeof v.gender === 'string', `${id}: has gender`);
+            assert(typeof v.language === 'string', `${id}: has language`);
+        }
+
+        let mutated = false;
+        try { VOICE_BANK.fixer.voiceId = 'hacked'; } catch (e) { mutated = false; }
+        assert(VOICE_BANK.fixer.voiceId === 'en_US-ryan-medium', 'VOICE_BANK is frozen against mutation');
+
+        assert(getArchetypeVoice('rival').voiceId === 'en_GB-cori-medium', 'getArchetypeVoice returns rival voice');
+        assert(getArchetypeVoice('does-not-exist') === null, 'Unknown archetype returns null');
+        assert(resolveVoiceId('fixer') === 'en_US-ryan-medium', 'resolveVoiceId routes to fixer');
+        assert(resolveVoiceId('does-not-exist') === VOICE_BANK[DEFAULT_ARCHETYPE].voiceId,
+            'resolveVoiceId falls back to narrator on unknown id');
+
+        const list = listArchetypes();
+        assert(Array.isArray(list) && list.length === 6, 'listArchetypes returns 6 entries');
+        assert(list[0].id === 'fixer' && list[0].voiceId, 'List entries flatten id alongside voice data');
+
+        const svc = new TTSService();
+        const r1 = await svc.synthesizeAs('fixer', 'We have a problem.');
+        assert(r1.voiceId === 'en_US-ryan-medium', 'synthesizeAs uses fixer voice');
+        const r2 = await svc.synthesizeAs('rival', 'We have a problem.');
+        assert(r2.voiceId === 'en_GB-cori-medium', 'synthesizeAs uses rival voice');
+        assert(r1.audio !== r2.audio, 'Different archetypes produce different cache entries');
+
+        const r3 = await svc.synthesizeAs('fixer', 'We have a problem.');
+        assert(r3.cached === true, 'Repeat synthesizeAs hits cache');
+
+        const fallback = await svc.synthesizeAs('does-not-exist', 'fallback test');
+        assert(fallback.voiceId === VOICE_BANK[DEFAULT_ARCHETYPE].voiceId,
+            'Unknown archetype synthesizeAs falls back to narrator');
+    } catch (e) {
+        console.log(`  ✗ TTS voicebank test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+await testTTSVoicebank();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

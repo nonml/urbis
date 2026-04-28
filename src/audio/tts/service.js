@@ -15,6 +15,7 @@
  */
 
 import { StubBackend } from './backends/stub.js';
+import { resolveVoiceId } from './voicebank.js';
 
 const DEFAULT_VOICE = 'en_US-amy-medium';
 
@@ -74,6 +75,10 @@ export class TTSService {
             this._cache.delete(oldest);
         }
         return { ...stored, cached: false };
+    }
+
+    async synthesizeAs(archetypeId, text) {
+        return this.synthesize(text, resolveVoiceId(archetypeId));
     }
 
     has(text, voiceId = this.defaultVoice) {
