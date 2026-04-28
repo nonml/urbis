@@ -19,6 +19,8 @@ export const WEAPONS = {
         recoilGain: 0,
         recoilMax: 0,
         recoilRecovery: 0,
+        adsFov: 0,
+        adsSpreadMul: 1,
     },
     bat: {
         name: 'Baseball Bat',
@@ -34,6 +36,8 @@ export const WEAPONS = {
         recoilGain: 0,
         recoilMax: 0,
         recoilRecovery: 0,
+        adsFov: 0,
+        adsSpreadMul: 1,
     },
     pistol: {
         name: 'Pistol',
@@ -50,6 +54,8 @@ export const WEAPONS = {
         recoilGain: 1.2,
         recoilMax: 4.0,
         recoilRecovery: 3.0,
+        adsFov: 50,
+        adsSpreadMul: 0.4,
     },
     shotgun: {
         name: 'Shotgun',
@@ -67,6 +73,8 @@ export const WEAPONS = {
         recoilGain: 3.5,
         recoilMax: 8.0,
         recoilRecovery: 5.0,
+        adsFov: 55,
+        adsSpreadMul: 0.7,
     },
     smg: {
         name: 'SMG',
@@ -83,6 +91,8 @@ export const WEAPONS = {
         recoilGain: 0.8,
         recoilMax: 6.0,
         recoilRecovery: 2.0,
+        adsFov: 50,
+        adsSpreadMul: 0.5,
     },
 };
 
@@ -99,6 +109,8 @@ export class CombatSystem {
         this._reloadTimer = 0;
         this._reloadDuration = 0;
         this._recoilLevel = 0;
+        this._adsActive = false;
+        this._adsFov = 0;
     }
 
     get weapon() {
@@ -112,6 +124,8 @@ export class CombatSystem {
     setWeapon(key) {
         if (WEAPONS[key]) {
             this.currentWeapon = key;
+            this._adsActive = false;
+            this._recoilLevel = 0;
             this.game.ui?.showMessage?.(`Equipped: ${this.weapon.name}`, 'normal');
         }
     }
@@ -174,7 +188,8 @@ export class CombatSystem {
         if (dist > range && this.weapon.type === 'melee') return { hit: false };
 
         const pellets = this.weapon.pellets || 1;
-        const baseSpread = (this.weapon.spread || 0) + this._recoilLevel;
+        const adsMul = this._adsActive ? (this.weapon.adsSpreadMul || 1) : 1;
+        const baseSpread = ((this.weapon.spread || 0) + this._recoilLevel) * adsMul;
         const spread = baseSpread * (Math.PI / 180);
         const baseAngle = Math.atan2(dx, -dy);
         const hits = [];
@@ -322,6 +337,9 @@ export class CombatSystem {
             const recovery = (this.weapon.recoilRecovery || 2.0) * (dt / 1000);
             this._recoilLevel = Math.max(0, this._recoilLevel - recovery);
         }
+        const targetFov = this._adsActive ? (this.weapon.adsFov || 60) : 0;
+        const fovRate = 8 * (dt / 1000);
+        this._adsFov += (targetFov - this._adsFov) * Math.min(1, fovRate);
         if (this._reloading && this._reloadTimer > 0) {
             this._reloadTimer -= dt;
             if (this._reloadTimer <= 0) {
@@ -332,6 +350,20 @@ export class CombatSystem {
 
     get recoilLevel() {
         return this._recoilLevel;
+    }
+
+    toggleADS() {
+        if (this.weapon.type !== 'ranged') return;
+        this._adsActive = !this._adsActive;
+    }
+
+    get isADS() {
+        return this._adsActive && this.weapon.type === 'ranged';
+    }
+
+    get adsFovTarget() {
+        if (!this._adsActive) return 0;
+        return this.weapon.adsFov || 0;
     }
 
     getAmmoDisplay() {
