@@ -325,10 +325,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q5.D — District Variants
 
-- [ ] `q5-dv-docks` docks district with warehouses, cranes, boats
-- [ ] `q5-dv-industrial` industrial district with smokestacks, yards
-- [ ] `q5-dv-suburbs` suburbs with houses, lawns
-- [ ] `q5-dv-oldtown` old-town with narrow streets
+- [x] `q5-dv-docks` docks district with warehouses, cranes, boats
+- [x] `q5-dv-industrial` industrial district with smokestacks, yards
+- [x] `q5-dv-suburbs` suburbs with houses, lawns
+- [x] `q5-dv-oldtown` old-town with narrow streets
 
 ### Q5.E — Multimodal Critic Upgrade
 

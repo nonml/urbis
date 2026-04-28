@@ -37,6 +37,7 @@ import { generateWeapon, generateBatch as generateWeaponBatch } from '../src/con
 import { generateQuest, generateBatch as generateQuestBatch } from '../src/content/quests/generator.js';
 import { ContentQueue } from '../src/content/queue.js';
 import { getContentStats } from '../src/content/registry.js';
+import { generateDistricts } from '../src/gen/districts.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
@@ -2143,6 +2144,36 @@ function testContentGoals() {
     }
 }
 
+function testDistrictVariants() {
+    console.log('\n[56] District Variants — Docks, Suburbs, Old-town');
+    try {
+        const result = generateDistricts(64, 64, 99999, 12);
+        const themes = result.districts.map(d => d.theme);
+        const hasTheme = (t) => themes.includes(t);
+
+        assert(hasTheme('docks'), 'Docks district theme assigned');
+        assert(hasTheme('suburbs'), 'Suburbs district theme assigned');
+        assert(hasTheme('oldtown'), 'Old-town district theme assigned');
+
+        const docks = result.districts.find(d => d.theme === 'docks');
+        assert(docks.buildingPools.includes('warehouse'), 'Docks pool includes warehouse');
+        assert(docks.buildingPools.includes('port'), 'Docks pool includes port');
+
+        const suburbs = result.districts.find(d => d.theme === 'suburbs');
+        assert(suburbs.buildingPools.includes('house'), 'Suburbs pool includes house');
+        assert(suburbs.buildingPools.includes('park'), 'Suburbs pool includes park');
+
+        const old = result.districts.find(d => d.theme === 'oldtown');
+        assert(old.buildingPools.includes('library'), 'Old-town pool includes library');
+        assert(old.buildingPools.includes('restaurant'), 'Old-town pool includes restaurant');
+    } catch (e) {
+        console.log(`  ✗ District variants test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
 testWeaponTemplateSchema();

@@ -13,6 +13,12 @@ const DISTRICT_NAMES = {
                  'Bayfront', 'Portside', 'Fisherman\'s Wharf', 'Shipping District', 'Coastal'],
     elite: ['Manor Hills', 'Estate District', 'Garden Quarter', 'Park Avenue', 'Grand Estates',
             'Highland Heights', 'Victoria Heights', 'Noble Gardens', 'Ridgeview', 'Crestwood'],
+    docks: ['Cargo Bay', 'Crane Yard', 'Container Port', 'Dry Dock', 'Freight Terminal',
+            'Loading Pier', 'Shipbreaker Row', 'Anchor Point', 'Warehouse Row', 'Tidal Basin'],
+    suburbs: ['Maple Lane', 'Cherry Blossom', 'Birchwood', 'Cedar Park', 'Elm Court',
+              'Rosewood', 'Lakeside', 'Sunnyvale', 'Plum Valley', 'Aspen Grove'],
+    oldtown: ['Old Quarter', 'Heritage Row', 'Cobblestone Lane', 'Bell Tower District', 'Market Alley',
+              'Clock Square', 'Lantern Street', 'Chapel Hill', 'Guild Row', 'Founder\'s Walk'],
 };
 
 const DISTRICT_THEMES = Object.keys(DISTRICT_NAMES);
@@ -247,7 +253,10 @@ function getBuildingPools(theme) {
         commercial: ['market', 'warehouse', 'town-hall', 'school'],
         industrial: ['lumber-mill', 'warehouse', 'town-hall'],
         waterfront: ['market', 'warehouse', 'town-hall', 'farm'],
-        elite: ['house', 'market', 'town-hall', 'school']
+        elite: ['house', 'market', 'town-hall', 'school'],
+        docks: ['warehouse', 'port', 'market', 'lumber-mill'],
+        suburbs: ['house', 'farm', 'school', 'park'],
+        oldtown: ['house', 'market', 'library', 'museum', 'restaurant'],
     };
     return pools[theme] || ['house', 'farm', 'market', 'warehouse', 'town-hall'];
 }
