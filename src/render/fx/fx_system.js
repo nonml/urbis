@@ -303,6 +303,9 @@ export class FXSystem {
         // Decals (blood splats, etc.)
         this._decals = [];
 
+        // Glass shatter animations
+        this._glassAnimations = [];
+
         // Screen shake
         this.screenShake = new ScreenShake(this.config.screenShake);
         
@@ -520,8 +523,33 @@ export class FXSystem {
         for (const d of this._decals) d.life += dt;
         this._decals = this._decals.filter(d => d.life < d.duration);
 
+        // Update glass shatter animations
+        this._glassAnimations = this._glassAnimations.filter(anim => {
+            anim.t += dt / anim.duration;
+            if (anim.t >= 1.0) {
+                if (anim.shaderRef?.uniforms?.uShatter) {
+                    anim.shaderRef.uniforms.uShatter.value = 1.0;
+                }
+                return false;
+            }
+            if (anim.shaderRef?.uniforms?.uShatter) {
+                anim.shaderRef.uniforms.uShatter.value = anim.t;
+            }
+            return true;
+        });
+
         // Update screen shake
         this.screenShake.update(dt);
+    }
+
+    shatterGlass(material, duration = 0.4) {
+        const ref = material?.userData?.shatterRef;
+        if (!ref) return;
+        this._glassAnimations.push({
+            shaderRef: ref,
+            t: 0,
+            duration,
+        });
     }
 
     /**
@@ -587,6 +615,7 @@ export class FXSystem {
         this.activeProgressRings = [];
         this.activeHighlightPulses = [];
         this.particleSystem.clear();
+        this._glassAnimations = [];
         this.screenShake.active = false;
     }
 }

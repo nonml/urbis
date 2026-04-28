@@ -217,7 +217,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q3.D — Breakables
 
-- [ ] `q3-br-glass-shader` shattering glass shader
+- [x] `q3-br-glass-shader` shattering glass shader
 - [ ] `q3-br-glass-particles` shard particle burst
 - [ ] `q3-br-glass-sound` impact + shatter SFX
 - [ ] `q3-br-crate-break` crate destruction + loot drop hook

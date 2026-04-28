@@ -1159,6 +1159,62 @@ export class Renderer3D {
         return meshes;
     }
 
+    _createGlassMaterial() {
+        const mat = new THREE.MeshPhysicalMaterial({
+            color: 0x88ccff,
+            transparent: true,
+            opacity: 0.45,
+            roughness: 0.05,
+            metalness: 0.15,
+            transmission: 0.6,
+            thickness: 0.3,
+            envMapIntensity: 1.4,
+            side: THREE.DoubleSide,
+        });
+        mat.userData = { shatterRef: null };
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uShatter = { value: 0.0 };
+            mat.userData.shatterRef = shader;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+                uniform float uShatter;
+                vec2 _glHash(vec2 p) {
+                    p = vec2(dot(p, vec2(127.1, 311.7)),
+                             dot(p, vec2(269.5, 183.3)));
+                    return fract(sin(p) * 43758.5453);
+                }
+                float _glVoronoi(vec2 uv, float scale) {
+                    vec2 g = floor(uv * scale);
+                    vec2 f = fract(uv * scale);
+                    float minDist = 1.0;
+                    for (int y = -1; y <= 1; y++) {
+                        for (int x = -1; x <= 1; x++) {
+                            vec2 neighbor = vec2(float(x), float(y));
+                            vec2 point = _glHash(g + neighbor);
+                            vec2 diff = neighbor + point - f;
+                            minDist = min(minDist, length(diff));
+                        }
+                    }
+                    return minDist;
+                }`
+            );
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <dithering_fragment>',
+                `#include <dithering_fragment>
+                if (uShatter > 0.01) {
+                    vec2 uv = vUv;
+                    float cracks = _glVoronoi(uv, 6.0 + uShatter * 10.0);
+                    float edge = smoothstep(0.02, 0.06, cracks);
+                    float fade = 1.0 - uShatter * 0.7;
+                    gl_FragColor.rgb = mix(vec3(0.9), gl_FragColor.rgb, edge) * fade;
+                    gl_FragColor.a *= mix(1.0, 0.2, uShatter * (1.0 - edge));
+                }`
+            );
+        };
+        return mat;
+    }
+
     /**
      * Build 3D road models for road tiles based on neighbor connectivity.
      * Neighbor bitmask: N=1, E=2, S=4, W=8
