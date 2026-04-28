@@ -2,6 +2,7 @@
 /// <reference path="../../types/game.d.ts" />
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
 import { tickAmbient } from '../agents/bt_ambient.js';
+import { tickAlerted, isAlerted, flushDisturbances, initAlertedSystem } from '../agents/bt_alerted.js';
 
 export class CitizenSim {
     constructor(game) {
@@ -15,6 +16,7 @@ export class CitizenSim {
         this._pendingWorkerResult = null; // results from last async tick, applied next tick
         this._workerMsgId = 0;
         this._initWorker();
+        this._alertedInited = false;
     }
 
     _initWorker() {
@@ -71,6 +73,10 @@ export class CitizenSim {
     }
 
     updateMovement(citizen, timeOfDay, tier, tick) {
+        if (isAlerted(citizen)) {
+            tickAlerted(citizen, this.game, tick);
+            return;
+        }
         tickAmbient(citizen, this.game, timeOfDay, tick, tier);
     }
 
@@ -143,6 +149,11 @@ export class CitizenSim {
 
     updateAll(citizens, timeOfDay, tick) {
         const t0 = performance.now();
+        if (!this._alertedInited) {
+            initAlertedSystem();
+            this._alertedInited = true;
+        }
+        flushDisturbances(citizens, tick);
         this.enforceCitizenCap();
         this.lodCounts = { near: 0, mid: 0, far: 0 };
 

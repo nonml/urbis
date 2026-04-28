@@ -88,6 +88,13 @@ export function ensureCitizenState(citizen, map = null) {
         citizen._sim.chatTimer = 0;
         citizen._sim.chatPartnerId = null;
     }
+    if (citizen._sim.alertState === undefined) {
+        citizen._sim.alertState = null;
+        citizen._sim.alertTimer = 0;
+        citizen._sim.alertCooldown = 0;
+        citizen._sim.alertTargetX = 0;
+        citizen._sim.alertTargetY = 0;
+    }
     citizen.needs.food = clamp01(citizen.needs.food);
     citizen.needs.rest = clamp01(citizen.needs.rest);
     citizen.needs.safety = clamp01(citizen.needs.safety);
