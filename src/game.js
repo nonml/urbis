@@ -87,6 +87,7 @@ import { StealthSystem } from './player/stealth.js';
 import { NPCReactionSystem } from './sim/citizens/npc_reactions.js';
 import { WorldHackEffects } from './sim/world_hacks.js';
 import { RapierPhysicsWorld } from './sim/physics/rapier_world.js';
+import { PhysicsPropManager } from './sim/physics/props.js';
 import { ServiceDispatcher, PoliceRouter, EmergencyRouter } from './sim/services/routing_integration.js';
 
 import { ModLoader } from './mod/mod_loader.js';
@@ -361,6 +362,7 @@ export class Game {
 
         // Rapier physics world (WASM must be initialized before Game construction)
         this.physics = new RapierPhysicsWorld();
+        this.propManager = new PhysicsPropManager(this.physics, this.rngStreams.sim);
 
         // Social graph system (Milestone J)
         this.socialGraph = new SocialGraph(this, this.rngStreams.sim);

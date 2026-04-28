@@ -1192,7 +1192,47 @@ function runRapierSaveLoadTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => {
+function runPhysicsPropTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[33] Physics Props — Traffic Cone');
+            const { RapierPhysicsWorld } = rwMod;
+            const { PhysicsPropManager, PROP_TYPES } = propMod;
+
+            assert(PROP_TYPES.traffic_cone !== undefined, 'traffic_cone type defined');
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rng = { next: () => 0.5 };
+            const pm = new PhysicsPropManager(pw, rng);
+
+            const cone = pm.spawn('traffic_cone', 5, 2, 0);
+            assert(cone !== null, 'Cone spawns successfully');
+            assert(cone.type === 'traffic_cone', 'Cone has correct type');
+            assert(pm.propCount === 1, 'Prop count is 1');
+
+            const pos0 = pm.getPosition(cone.id);
+            assert(pos0 !== null, 'Cone has initial position');
+            assert(Math.abs(pos0.x - 5) < 0.01, 'Cone X matches spawn');
+
+            for (let i = 0; i < 30; i++) pw.step();
+            const pos1 = pm.getPosition(cone.id);
+            assert(pos1.y < pos0.y, 'Cone falls under gravity');
+
+            pm.remove(cone.id);
+            assert(pm.propCount === 0, 'Prop removed');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Physics prop test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
