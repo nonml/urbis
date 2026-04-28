@@ -2543,6 +2543,30 @@ function testHackChainEditor() {
 }
 
 testHackChainEditor();
+
+import { SAMPLE_CHAINS } from '../src/content/hack_chains/chains.js';
+
+function testSampleChains() {
+    console.log('\n[69] Hack Chain — 5 sample chains');
+    try {
+        assert(SAMPLE_CHAINS.length === 5, `5 sample chains (got ${SAMPLE_CHAINS.length})`);
+
+        for (const chain of SAMPLE_CHAINS) {
+            const result = validateChainDefinition(chain);
+            assert(result.valid, `Chain '${chain.id}' passes validation`);
+            assert(chain.steps.length >= 2, `Chain '${chain.id}' has ≥2 steps`);
+        }
+
+        const ids = SAMPLE_CHAINS.map(c => c.id);
+        assert(new Set(ids).size === 5, 'All chain IDs are unique');
+    } catch (e) {
+        console.log(`  ✗ Sample chains test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testSampleChains();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
