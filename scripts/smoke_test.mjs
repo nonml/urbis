@@ -2397,6 +2397,26 @@ function testProfilerCriminalRecord() {
 }
 
 testProfilerCriminalRecord();
+
+function testProfilerRelationsGraph() {
+    console.log('\n[64] Profiler — 2-hop relations graph');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 808080, mode: 'standard' });
+        game.init();
+        const citizens = game.citizens?.citizens || [];
+        assert(citizens.length > 0, 'Citizens exist');
+
+        const c = citizens[0];
+        assert(Array.isArray(c.relationshipEdges), 'Citizen has relationshipEdges');
+        assert(typeof c.name === 'string', 'Citizen has name');
+    } catch (e) {
+        console.log(`  ✗ Relations graph test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testProfilerRelationsGraph();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();

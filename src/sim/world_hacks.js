@@ -339,6 +339,7 @@ export class WorldHackEffects {
             criminalRecords: Array.isArray(citizen.criminalRecords)
                 ? citizen.criminalRecords.slice()
                 : [],
+            relationsGraph: this._buildRelationsGraph(citizenId),
             faction: citizen.faction || 'citizens',
             happiness: citizen.happiness ?? 50,
             traits: citizen.traits || [],
@@ -383,6 +384,42 @@ export class WorldHackEffects {
     }
 
     // ── Internal helpers ──
+
+    _buildRelationsGraph(citizenId) {
+        const sg = this.game.socialGraph;
+        if (!sg) return { nodes: [], edges: [] };
+
+        const hop1 = sg.getCitizenConnections(citizenId);
+        const nodeSet = new Set([citizenId]);
+        const edges = [];
+        const citizens = this.game.citizens?.citizens || [];
+
+        for (const c of hop1) {
+            nodeSet.add(c.id);
+            edges.push({ from: citizenId, to: c.id, type: c.type });
+        }
+
+        for (const c of hop1) {
+            const hop2 = sg.getCitizenConnections(c.id);
+            for (const c2 of hop2) {
+                if (c2.id === citizenId) continue;
+                nodeSet.add(c2.id);
+                edges.push({ from: c.id, to: c2.id, type: c2.type });
+            }
+        }
+
+        const nodes = [];
+        for (const id of nodeSet) {
+            const cit = citizens.find(c => c.id === id);
+            nodes.push({
+                id,
+                name: cit?.name || `#${id}`,
+                faction: cit?.faction || 'citizens',
+            });
+        }
+
+        return { nodes, edges };
+    }
 
     _isOnCooldown(hackType, tick) {
         return (this._cooldowns.get(hackType) || 0) > tick;
