@@ -2918,6 +2918,70 @@ function testCameraScriptPreviewCLI() {
 
 testCameraScriptPreviewCLI();
 
+import { CinematicController } from '../src/render/cinematic/cinematic_controller.js';
+
+function testCinematicSkip() {
+    console.log('\n[79] Cinematic — controller skip behavior');
+    try {
+        const skippableScript = {
+            id: 'skip_test', name: 'Skip Test', skippable: true,
+            shots: [{
+                duration: 3, easing: 'linear',
+                from: { pos: [0,0,0], lookAt: [1,0,0] },
+                to:   { pos: [10,0,0], lookAt: [1,0,0] },
+            }],
+        };
+        const lockedScript = {
+            id: 'locked', name: 'Locked', skippable: false,
+            shots: [{
+                duration: 3, easing: 'linear',
+                from: { pos: [0,0,0], lookAt: [1,0,0] },
+                to:   { pos: [10,0,0], lookAt: [1,0,0] },
+            }],
+        };
+
+        let completion = null;
+        const ctrl = new CinematicController();
+        assert(!ctrl.isPlaying(), 'Idle before play()');
+        assert(ctrl.getSkipPrompt() === null, 'No prompt when idle');
+
+        ctrl.play(skippableScript, { onComplete: (r) => { completion = r; } });
+        assert(ctrl.isPlaying(), 'Playing after play()');
+        assert(ctrl.getSkipPrompt() === 'press ESC to skip', 'Skip prompt visible during skippable cutscene');
+        assert(ctrl.currentScriptId() === 'skip_test', 'Tracks current script id');
+
+        ctrl.update(1);
+        assert(ctrl.isPlaying(), 'Still playing mid-shot');
+
+        const skipped = ctrl.requestSkip();
+        assert(skipped, 'requestSkip returns true for skippable script');
+        assert(!ctrl.isPlaying(), 'Stopped after skip');
+        assert(completion && completion.reason === 'skipped', 'onComplete fired with reason=skipped');
+        assert(completion.scriptId === 'skip_test', 'onComplete carries script id');
+
+        completion = null;
+        ctrl.play(lockedScript, { onComplete: (r) => { completion = r; } });
+        assert(ctrl.getSkipPrompt() === null, 'No prompt for non-skippable script');
+        const lockedSkip = ctrl.requestSkip();
+        assert(!lockedSkip, 'requestSkip refused for non-skippable script');
+        assert(ctrl.isPlaying(), 'Still playing after refused skip');
+
+        ctrl.update(3.5);
+        assert(!ctrl.isPlaying(), 'Finished after duration');
+        assert(completion && completion.reason === 'completed', 'onComplete fired with reason=completed');
+
+        const ctrl2 = new CinematicController();
+        const noopSkip = ctrl2.requestSkip();
+        assert(!noopSkip, 'requestSkip on idle controller is a no-op');
+    } catch (e) {
+        console.log(`  ✗ Cinematic skip test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCinematicSkip();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
