@@ -28,6 +28,8 @@ import { getChunkId } from '../src/world/chunks.js';
 import { validateQuestDefinition } from '../src/content/quests/schema.js';
 import { CoverSystem, CoverController } from '../src/player/cover.js';
 import { WaveEncounter } from '../src/sim/encounters/wave_encounter.js';
+import { validateBuildingDefinition } from '../src/content/buildings/schema.js';
+import { generateBuilding, generateBatch } from '../src/content/buildings/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
@@ -1872,6 +1874,53 @@ function testWaveEncounter() {
     }
 }
 
+function testBuildingTemplateSchema() {
+    console.log('\n[49] Building Template Schema + Generator + Validator');
+    try {
+        const valid = {
+            id: 'test_house', name: 'Test House', icon: '🏠',
+            description: 'A test house.', category: 'residential',
+            cost: { gold: 10, wood: 20, food: 0 },
+            income: { gold: 1, food: 0, wood: 0 },
+            upkeep: 2, population: 4,
+        };
+        let r = validateBuildingDefinition(valid);
+        assert(r.valid, 'Valid building passes validation');
+        assert(r.errors.length === 0, 'No errors on valid building');
+
+        r = validateBuildingDefinition({});
+        assert(!r.valid, 'Empty object fails validation');
+        assert(r.errors.length > 0, 'Errors reported for missing fields');
+
+        r = validateBuildingDefinition({ ...valid, cost: { gold: -5 } });
+        assert(!r.valid, 'Negative cost rejected');
+
+        r = validateBuildingDefinition({ ...valid, category: 'bogus' });
+        assert(!r.valid, 'Invalid category rejected');
+
+        r = validateBuildingDefinition({ ...valid, population: 10, category: 'commercial' });
+        assert(r.valid, 'Population mismatch is a warning, not an error');
+        assert(r.warnings.length > 0, 'Warning emitted for pop/category mismatch');
+
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const gen = generateBuilding(mockRng, { category: 'residential' });
+        assert(typeof gen.id === 'string', 'Generated building has id');
+        assert(gen.population > 0, 'Residential building has population');
+        const gr = validateBuildingDefinition(gen);
+        assert(gr.valid, 'Generated building passes validation');
+
+        const batch = generateBatch(mockRng, 10, { category: 'commercial' });
+        assert(batch.length === 10, 'Batch generates correct count');
+        const allValid = batch.every(b => validateBuildingDefinition(b).valid);
+        assert(allValid, 'All generated buildings pass validation');
+    } catch (e) {
+        console.log(`  ✗ Building template test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testBuildingTemplateSchema();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
