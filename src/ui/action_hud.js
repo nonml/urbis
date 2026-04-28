@@ -103,9 +103,9 @@ export class ActionHUD {
                 <div class="ahud-death-line"></div>
             </div>
             <div class="ahud-demand" id="ahud-demand">
-                <div class="ahud-demand-row"><span class="ahud-demand-label">R</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-r" style="background:#4caf50"></div></div></div>
-                <div class="ahud-demand-row"><span class="ahud-demand-label">C</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-c" style="background:#2196f3"></div></div></div>
-                <div class="ahud-demand-row"><span class="ahud-demand-label">I</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-i" style="background:#ff9800"></div></div></div>
+                <div class="ahud-demand-row" id="ahud-dem-row-r"><span class="ahud-demand-label">R</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-r" style="background:#4caf50"></div></div></div>
+                <div class="ahud-demand-row" id="ahud-dem-row-c"><span class="ahud-demand-label">C</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-c" style="background:#2196f3"></div></div></div>
+                <div class="ahud-demand-row" id="ahud-dem-row-i"><span class="ahud-demand-label">I</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-i" style="background:#ff9800"></div></div></div>
             </div>
             <div class="ahud-prompt" id="ahud-prompt"></div>
             <div class="ahud-profiler" id="ahud-profiler"></div>
@@ -389,6 +389,7 @@ export class ActionHUD {
                     display: flex;
                     align-items: center;
                     gap: 4px;
+                    cursor: help;
                 }
                 .ahud-demand-label {
                     font-size: 10px;
@@ -664,12 +665,21 @@ export class ActionHUD {
             demandEl.classList.toggle('on', isGod);
             if (isGod) {
                 const d = state.economy?.demand || {};
+                const rVal = d.residential ?? 0.5;
+                const cVal = d.commercial ?? 0.5;
+                const iVal = d.industrial ?? 0.5;
                 const r = this._el.querySelector('#ahud-dem-r');
                 const c = this._el.querySelector('#ahud-dem-c');
                 const ind = this._el.querySelector('#ahud-dem-i');
-                if (r) r.style.width = `${(d.residential ?? 0.5) * 100}%`;
-                if (c) c.style.width = `${(d.commercial ?? 0.5) * 100}%`;
-                if (ind) ind.style.width = `${(d.industrial ?? 0.5) * 100}%`;
+                if (r) r.style.width = `${rVal * 100}%`;
+                if (c) c.style.width = `${cVal * 100}%`;
+                if (ind) ind.style.width = `${iVal * 100}%`;
+                const rRow = this._el.querySelector('#ahud-dem-row-r');
+                const cRow = this._el.querySelector('#ahud-dem-row-c');
+                const iRow = this._el.querySelector('#ahud-dem-row-i');
+                if (rRow) rRow.title = `Residential: ${(rVal * 100).toFixed(0)}%`;
+                if (cRow) cRow.title = `Commercial: ${(cVal * 100).toFixed(0)}%`;
+                if (iRow) iRow.title = `Industrial: ${(iVal * 100).toFixed(0)}%`;
             }
         }
 

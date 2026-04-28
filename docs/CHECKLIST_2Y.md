@@ -149,7 +149,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q2.E — Demand Bars and Growth HUD
 
 - [x] `q2-hud-demand-bars` R/C/I bars in God-mode HUD
-- [ ] `q2-hud-demand-tooltips` hover shows numeric demand
+- [x] `q2-hud-demand-tooltips` hover shows numeric demand
 - [ ] `q2-hud-growth-heatmap` toggle to tint tiles by growth pressure
 - [ ] `q2-hud-budget-widget` shows income/expenses per tick
 
