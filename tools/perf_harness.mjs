@@ -10,10 +10,44 @@ const ROOT = join(__dirname, '..');
 const BASELINE_PATH = join(ROOT, 'tools', 'agent', 'baselines', 'perf.json');
 
 const SCENES = [
-  { name: 'empty_map', setup: 'window.__perfScene="empty"' },
-  { name: 'medium_map', setup: 'window.__perfScene="medium"' },
-  { name: 'medium_120npcs', setup: 'window.__perfScene="medium_npcs"' },
-  { name: 'night_rain', setup: 'window.__perfScene="night_rain"' },
+  {
+    name: 'empty_map',
+    setup: `(() => {
+      const g = window.game; if (!g) return;
+      g.weatherSystem?.forceWeather('clear', 999);
+      g.state.time.timeOfDay = 0.5;
+    })()`,
+  },
+  {
+    name: 'medium_map',
+    setup: `(() => {
+      const g = window.game; if (!g) return;
+      g.weatherSystem?.forceWeather('clear', 999);
+      g.state.time.timeOfDay = 0.5;
+    })()`,
+  },
+  {
+    name: 'medium_120npcs',
+    setup: `(() => {
+      const g = window.game; if (!g) return;
+      g.weatherSystem?.forceWeather('clear', 999);
+      g.state.time.timeOfDay = 0.5;
+      const cx = Math.floor(g.map.width / 2);
+      const cy = Math.floor(g.map.height / 2);
+      while (g.citizens.citizens.length < 120) {
+        g.citizens.spawnCitizen(cx + (g.citizens.citizens.length % 20) - 10,
+                                cy + Math.floor(g.citizens.citizens.length / 20) - 3);
+      }
+    })()`,
+  },
+  {
+    name: 'night_rain',
+    setup: `(() => {
+      const g = window.game; if (!g) return;
+      g.weatherSystem?.forceWeather('rain', 999);
+      g.state.time.timeOfDay = 0.95;
+    })()`,
+  },
 ];
 
 const SAMPLE_DURATION_MS = 5000;
