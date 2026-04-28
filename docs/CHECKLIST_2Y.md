@@ -305,7 +305,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q5.A — Template Freeze
 
 - [x] `q5-tmpl-building` schema + generator + validator
-- [ ] `q5-tmpl-vehicle` schema + generator + validator
+- [x] `q5-tmpl-vehicle` schema + generator + validator
 - [ ] `q5-tmpl-weapon` schema + generator + validator
 - [ ] `q5-tmpl-quest` schema + generator + validator (references QUEST_SCHEMA.md)
 - [ ] `q5-tmpl-npc` schema + generator + validator

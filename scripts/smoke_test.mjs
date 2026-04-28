@@ -30,6 +30,8 @@ import { CoverSystem, CoverController } from '../src/player/cover.js';
 import { WaveEncounter } from '../src/sim/encounters/wave_encounter.js';
 import { validateBuildingDefinition } from '../src/content/buildings/schema.js';
 import { generateBuilding, generateBatch } from '../src/content/buildings/generator.js';
+import { validateVehicleDefinition } from '../src/content/vehicles/schema.js';
+import { generateVehicle, generateBatch as generateVehicleBatch } from '../src/content/vehicles/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 
 let passCount = 0;
@@ -1920,7 +1922,51 @@ function testBuildingTemplateSchema() {
     }
 }
 
+function testVehicleTemplateSchema() {
+    console.log('\n[50] Vehicle Template Schema + Generator + Validator');
+    try {
+        const valid = {
+            id: 'test_car', name: 'Test Car', modelKey: 'sedan', category: 'civilian',
+            maxSpeed: 16, acceleration: 4, braking: 8, turningSpeed: 2.0,
+            wheelbase: 2.8, width: 1.8, length: 4.5, traction: 1.0, mass: 1500, maxHealth: 100,
+        };
+        let r = validateVehicleDefinition(valid);
+        assert(r.valid, 'Valid vehicle passes validation');
+        assert(r.errors.length === 0, 'No errors on valid vehicle');
+
+        r = validateVehicleDefinition({});
+        assert(!r.valid, 'Empty object fails validation');
+
+        r = validateVehicleDefinition({ ...valid, maxSpeed: -1 });
+        assert(!r.valid, 'Negative maxSpeed rejected');
+
+        r = validateVehicleDefinition({ ...valid, category: 'flying' });
+        assert(!r.valid, 'Invalid category rejected');
+
+        r = validateVehicleDefinition({ ...valid, maxSpeed: 60 });
+        assert(r.valid, 'Very fast vehicle is valid');
+        assert(r.warnings.length > 0, 'Warning for extreme speed');
+
+        const mockRng = { int: (a, b) => a + ((b - a) >> 1) };
+        const gen = generateVehicle(mockRng, { category: 'sport' });
+        assert(typeof gen.id === 'string', 'Generated vehicle has id');
+        assert(gen.maxSpeed > 0, 'Has positive maxSpeed');
+        const gr = validateVehicleDefinition(gen);
+        assert(gr.valid, 'Generated vehicle passes validation');
+
+        const batch = generateVehicleBatch(mockRng, 10);
+        assert(batch.length === 10, 'Batch generates correct count');
+        const allValid = batch.every(v => validateVehicleDefinition(v).valid);
+        assert(allValid, 'All generated vehicles pass validation');
+    } catch (e) {
+        console.log(`  ✗ Vehicle template test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testBuildingTemplateSchema();
+testVehicleTemplateSchema();
 testWaveEncounter();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
