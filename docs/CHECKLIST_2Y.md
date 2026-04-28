@@ -338,10 +338,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q5 — Definition of Done
 
-- [ ] All content goals met; all validators green
-- [ ] Multimodal critic active
-- [ ] Operator approval file `q5.json`
-- [ ] Tag `0.5.0.0`
+- [x] All content goals met; all validators green
+- [x] Multimodal critic active
+- [x] Operator approval file `q5.json`
+- [x] Tag `0.5.0.0`
 
 ---
 

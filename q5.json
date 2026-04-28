@@ -1,0 +1,14 @@
+{
+  "quarter": "Q5",
+  "milestone": "Content Engine",
+  "version": "0.5.0.0",
+  "approved": true,
+  "approvedDate": "2026-04-28",
+  "sections": [
+    "Q5.A — Template Freeze",
+    "Q5.B — Low-Priority Content Queue",
+    "Q5.C — Content Goals",
+    "Q5.D — District Variants",
+    "Q5.E — Multimodal Critic Upgrade"
+  ]
+}
