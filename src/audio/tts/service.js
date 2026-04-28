@@ -17,6 +17,7 @@
 import { StubBackend } from './backends/stub.js';
 import { resolveVoiceId } from './voicebank.js';
 import { MemoryCacheStore } from './cache.js';
+import { buildSubtitleCues } from './subtitle_sync.js';
 
 const DEFAULT_VOICE = 'en_US-amy-medium';
 
@@ -62,13 +63,15 @@ export class TTSService {
         }
         const key = lineHash(text, voiceId);
         const hit = await this.store.get(key);
-        if (hit) return { ...hit, cached: true };
+        if (hit) {
+            return { ...hit, cues: buildSubtitleCues(text, hit.durationMs), text, cached: true };
+        }
         const backend = await this._ensureBackend();
         this._backendCalls++;
         const result = await backend.synthesize(text, voiceId);
         const entry = { audio: result.audio, durationMs: result.durationMs, voiceId, key };
         await this.store.put(key, entry);
-        return { ...entry, cached: false };
+        return { ...entry, cues: buildSubtitleCues(text, entry.durationMs), text, cached: false };
     }
 
     async synthesizeAs(archetypeId, text) {

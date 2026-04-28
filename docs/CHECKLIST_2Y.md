@@ -406,7 +406,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q7-tts-install` install Piper or XTTS locally — operator approval
 - [x] `q7-tts-voicebank` 6 archetype voices banked
 - [x] `q7-tts-line-cache` generated lines cached by hash
-- [ ] `q7-tts-subtitle-sync` subtitle timing per phoneme
+- [x] `q7-tts-subtitle-sync` subtitle timing per phoneme
 - [ ] `q7-tts-ducking` music ducks under dialogue
 
 ### Q7.C — Radio

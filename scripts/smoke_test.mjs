@@ -3158,6 +3158,67 @@ async function testTTSLineCachePersistence() {
 
 await testTTSLineCachePersistence();
 
+import { buildSubtitleCues, findCueAt } from '../src/audio/tts/subtitle_sync.js';
+
+async function testTTSSubtitleSync() {
+    console.log('\n[83] TTS — subtitle sync (per-word cues)');
+    try {
+        const cues = buildSubtitleCues('Hello citizen welcome.', 2000);
+        assert(cues.length === 3, `3 word cues (got ${cues.length})`);
+        assert(cues[0].word === 'Hello', 'First cue is "Hello"');
+        assert(cues[2].word === 'welcome.', 'Last cue keeps trailing punctuation');
+        assert(cues[0].startMs === 0, 'First cue starts at 0');
+        assert(cues[2].endMs === 2000, 'Last cue ends at duration');
+
+        for (let i = 1; i < cues.length; i++) {
+            assert(cues[i].startMs === cues[i - 1].endMs, `Cue ${i} contiguous with previous`);
+        }
+
+        for (let i = 0; i < cues.length; i++) {
+            assert(cues[i].idx === i, `Cue ${i} has idx=${i}`);
+            assert(cues[i].endMs > cues[i].startMs, `Cue ${i} has positive span`);
+        }
+
+        const longWord = buildSubtitleCues('I antidisestablishmentarianism', 1000);
+        assert(longWord[1].endMs - longWord[1].startMs > longWord[0].endMs - longWord[0].startMs,
+            'Longer word gets a bigger time slice');
+
+        const punct = buildSubtitleCues('Hello, world.', 1000);
+        const helloSpan = punct[0].endMs - punct[0].startMs;
+        const worldSpan = punct[1].endMs - punct[1].startMs;
+        assert(helloSpan > 0 && worldSpan > 0, 'Punctuated cues have positive spans');
+
+        assert(buildSubtitleCues('', 1000).length === 0, 'Empty text yields no cues');
+        assert(buildSubtitleCues('Hi', 0).length === 0, 'Zero duration yields no cues');
+        assert(buildSubtitleCues('Hi', -10).length === 0, 'Negative duration yields no cues');
+
+        const c0 = findCueAt(cues, 0);
+        assert(c0 && c0.word === 'Hello', 'findCueAt(0) returns first word');
+        const cMid = findCueAt(cues, 1500);
+        assert(cMid !== null, 'findCueAt mid-span returns a cue');
+        assert(findCueAt(cues, -5) === null, 'findCueAt rejects negative time');
+        assert(findCueAt(cues, 5000) === null, 'findCueAt past end returns null');
+        assert(findCueAt([], 0) === null, 'findCueAt on empty returns null');
+
+        const svc = new TTSService();
+        const r = await svc.synthesize('Hello citizen.');
+        assert(Array.isArray(r.cues), 'Service result includes cues array');
+        assert(r.cues.length === 2, '2 cues for 2 words');
+        assert(r.text === 'Hello citizen.', 'Service result includes original text');
+        assert(r.cues[r.cues.length - 1].endMs === r.durationMs,
+            'Last cue ends at audio durationMs');
+
+        const r2 = await svc.synthesize('Hello citizen.');
+        assert(r2.cached === true && r2.cues.length === 2, 'Cached result still carries cues');
+    } catch (e) {
+        console.log(`  ✗ TTS subtitle sync test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+await testTTSSubtitleSync();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
