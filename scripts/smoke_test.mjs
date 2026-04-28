@@ -2721,6 +2721,70 @@ function testRadialCooldownRings() {
 }
 
 testRadialCooldownRings();
+
+import { validateCameraScript, totalDuration, VALID_EASING } from '../src/render/cinematic/script_schema.js';
+
+function testCameraScriptSchema() {
+    console.log('\n[76] Cinematic — camera script JSON schema');
+    try {
+        const validScript = {
+            id: 'intro_pan',
+            name: 'Intro pan over downtown',
+            description: 'Slow drift over downtown at dawn.',
+            shots: [
+                {
+                    duration: 4,
+                    easing: 'easeInOutCubic',
+                    from: { pos: [100, 50, 100], lookAt: [50, 0, 50], fov: 60 },
+                    to:   { pos: [120, 30, 80],  lookAt: [60, 5, 60],  fov: 50 },
+                },
+                {
+                    duration: 2,
+                    easing: 'linear',
+                    from: { anchor: 'player' },
+                    to:   { pos: [60, 5, 60], lookAt: [60, 0, 60] },
+                },
+            ],
+        };
+        const result = validateCameraScript(validScript);
+        assert(result.valid, `Valid script passes (errors: ${result.errors.join('; ')})`);
+        assert(totalDuration(validScript) === 6, 'totalDuration sums shot durations');
+
+        const noShots = { id: 'x', name: 'X', shots: [] };
+        assert(!validateCameraScript(noShots).valid, 'Empty shots array rejected');
+
+        const badEasing = {
+            id: 'x', name: 'X',
+            shots: [{ duration: 1, easing: 'bogus', from: { pos: [0,0,0], lookAt: [1,0,0] }, to: { pos: [0,0,0], lookAt: [1,0,0] } }],
+        };
+        assert(!validateCameraScript(badEasing).valid, 'Unknown easing rejected');
+
+        const badFov = {
+            id: 'x', name: 'X',
+            shots: [{ duration: 1, from: { pos: [0,0,0], lookAt: [1,0,0], fov: 200 }, to: { pos: [0,0,0], lookAt: [1,0,0] } }],
+        };
+        assert(!validateCameraScript(badFov).valid, 'Out-of-range fov rejected');
+
+        const badVec = {
+            id: 'x', name: 'X',
+            shots: [{ duration: 1, from: { pos: [0,0], lookAt: [1,0,0] }, to: { pos: [0,0,0], lookAt: [1,0,0] } }],
+        };
+        assert(!validateCameraScript(badVec).valid, 'Wrong-length pos vector rejected');
+
+        const noId = { name: 'X', shots: validScript.shots };
+        assert(!validateCameraScript(noId).valid, 'Missing id rejected');
+
+        assert(VALID_EASING.has('linear') && VALID_EASING.has('easeInOutCubic'), 'Easing set exposes named curves');
+        assert(!validateCameraScript(null).valid, 'Null script rejected without throwing');
+    } catch (e) {
+        console.log(`  ✗ Camera script schema test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testCameraScriptSchema();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
