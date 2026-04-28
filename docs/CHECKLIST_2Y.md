@@ -412,7 +412,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q7.C — Radio
 
 - [x] `q7-rd-channel-structure` 3 channels with distinct moods
-- [ ] `q7-rd-dj-banter-template` banter template filled by agent
+- [x] `q7-rd-dj-banter-template` banter template filled by agent
 - [ ] `q7-rd-vehicle-radio` in-car tuning UI
 - [ ] `q7-rd-music-pool` procedural + free-licence pool
 

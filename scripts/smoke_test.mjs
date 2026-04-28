@@ -3365,6 +3365,92 @@ function testRadioChannelStructure() {
 
 testRadioChannelStructure();
 
+import {
+    BANTER_KINDS, RADIO_MOODS, listMoods, getTemplates,
+    pickBanter, pickBanterForChannel, templateCountByMood, _allTemplates
+} from '../src/audio/radio/banter.js';
+import { RNG } from '../src/rng.js';
+
+function testRadioBanterTemplates() {
+    console.log('\n[86] Radio — DJ banter templates');
+    try {
+        const moods = listMoods();
+        assert(moods.length === 3, `3 moods (got ${moods.length})`);
+        for (const m of ['talk', 'synthwave', 'underground']) {
+            assert(moods.includes(m), `Mood '${m}' present`);
+        }
+
+        for (const mood of moods) {
+            for (const kind of BANTER_KINDS) {
+                const pool = getTemplates(mood, kind);
+                assert(pool.length >= 2, `${mood}/${kind}: at least 2 templates (got ${pool.length})`);
+            }
+        }
+
+        const counts = templateCountByMood();
+        for (const mood of moods) {
+            assert(counts[mood] >= 10, `${mood}: at least 10 total templates (got ${counts[mood]})`);
+        }
+
+        const ctx = {
+            channelName: 'Static FM',
+            frequency: '88.3',
+            timeOfDay: 'sundown',
+            weather: 'rain-slick',
+            songTitle: 'Lost Signals',
+            eventSummary: 'a council vote at midnight',
+        };
+        const all = _allTemplates();
+        for (const { template } of all) {
+            const filled = template.replace(/\{(\w+)\}/g, (_, k) => ctx[k] ?? '__MISS__');
+            assert(!filled.includes('__MISS__'),
+                `Template "${template}" filled cleanly with full context`);
+            assert(!filled.includes('{') || !filled.includes('}'),
+                `Template "${template}" has no leftover slots`);
+        }
+
+        const rng = new RNG(424242);
+        const line1 = pickBanter(rng, 'talk', 'intro', ctx);
+        assert(typeof line1 === 'string' && line1.length > 0, 'pickBanter returns a string');
+        assert(!line1.includes('{'), 'Banter line has all slots filled');
+
+        const rngA = new RNG(7777);
+        const rngB = new RNG(7777);
+        const a = pickBanter(rngA, 'synthwave', 'intro', ctx);
+        const b = pickBanter(rngB, 'synthwave', 'intro', ctx);
+        assert(a === b, 'Same seed → identical banter pick (deterministic)');
+
+        const partial = pickBanter(new RNG(1), 'talk', 'intro', {});
+        assert(typeof partial === 'string' && !partial.includes('{'),
+            'Missing slots fall back to defaults, no raw tokens leak');
+
+        assert(pickBanter(new RNG(1), 'no-such-mood', 'intro') === null,
+            'Unknown mood returns null');
+        assert(pickBanter(new RNG(1), 'talk', 'no-such-kind') === null,
+            'Unknown kind returns null');
+
+        const ch = pickBanterForChannel(new RNG(99), 'neon_105', 'intro');
+        assert(typeof ch === 'string' && ch.length > 0, 'pickBanterForChannel returns line');
+        assert(ch.includes('Neon 105') || ch.includes('104.9'),
+            `Channel-aware banter mentions channel info ("${ch}")`);
+        assert(pickBanterForChannel(new RNG(99), 'does-not-exist', 'intro') === null,
+            'Unknown channel id returns null');
+
+        assert(RADIO_MOODS.length === 3 && RADIO_MOODS.includes('underground'),
+            'RADIO_MOODS exports the mood list');
+
+        let mutated = false;
+        try { RADIO_MOODS.push('hacked'); } catch (e) { mutated = false; }
+        assert(RADIO_MOODS.length === 3, 'RADIO_MOODS is frozen');
+    } catch (e) {
+        console.log(`  ✗ Banter test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testRadioBanterTemplates();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
