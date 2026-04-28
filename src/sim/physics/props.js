@@ -31,6 +31,7 @@ export const PROP_TYPES = {
         hx: 0.4,
         hy: 1.0,
         hz: 0.08,
+        toppleThreshold: 0.4,
     },
     chair: {
         name: 'Chair',
@@ -105,6 +106,23 @@ export class PhysicsPropManager {
         const prop = this._props.get(id);
         if (!prop) return;
         this._physics.applyImpulse(prop.bodyId, impulse);
+    }
+
+    applyTorqueImpulse(id, torque) {
+        const prop = this._props.get(id);
+        if (!prop) return;
+        this._physics.applyTorqueImpulse(prop.bodyId, torque);
+    }
+
+    isToppled(id) {
+        const prop = this._props.get(id);
+        if (!prop) return false;
+        const def = PROP_TYPES[prop.type];
+        if (!def?.toppleThreshold) return false;
+        const rot = this._physics.getBodyRotation(prop.bodyId);
+        if (!rot) return false;
+        const sinHalf = Math.sqrt(rot.x * rot.x + rot.z * rot.z);
+        return sinHalf > def.toppleThreshold;
     }
 
     getPosition(id) {

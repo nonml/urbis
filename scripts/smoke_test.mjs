@@ -1273,7 +1273,47 @@ function runTrashcanKickTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => {
+function runSignToppleTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/props.js'),
+    ]).then(([rwMod, propMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[35] Physics Props — Sign Bend-Then-Fall');
+            const { RapierPhysicsWorld } = rwMod;
+            const { PhysicsPropManager, PROP_TYPES } = propMod;
+            const RR = rwMod.RAPIER;
+
+            assert(PROP_TYPES.sign.toppleThreshold > 0, 'Sign has topple threshold');
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rng = { next: () => 0.5 };
+            const pm = new PhysicsPropManager(pw, rng);
+
+            const groundDesc = RR.RigidBodyDesc.fixed().setTranslation(0, 0, 0);
+            const ground = pw.createRigidBody(groundDesc);
+            pw.createCollider(RR.ColliderDesc.cuboid(50, 0.1, 50), ground);
+
+            const sign = pm.spawn('sign', 0, 1.0, 0);
+            assert(sign !== null, 'Sign spawns');
+
+            for (let i = 0; i < 60; i++) pw.step();
+            assert(!pm.isToppled(sign.id), 'Sign upright at rest');
+
+            pm.applyImpulse(sign.id, { x: 80, y: 20, z: 0 });
+            pm.applyTorqueImpulse(sign.id, { x: 0, y: 0, z: 40 });
+            for (let i = 0; i < 120; i++) pw.step();
+            assert(pm.isToppled(sign.id), 'Sign topples after strong impact');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Sign topple test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

@@ -80,6 +80,12 @@ export class RapierPhysicsWorld {
         body.applyImpulse(impulse, true);
     }
 
+    applyTorqueImpulse(id, torque) {
+        const body = this._bodies.get(id);
+        if (!body) return;
+        body.applyTorqueImpulse(torque, true);
+    }
+
     removeBody(id) {
         const body = this._bodies.get(id);
         if (!body || !this._world) return;
