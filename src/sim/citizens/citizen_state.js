@@ -95,6 +95,14 @@ export function ensureCitizenState(citizen, map = null) {
         citizen._sim.alertTargetX = 0;
         citizen._sim.alertTargetY = 0;
     }
+    if (citizen._sim.engState === undefined) {
+        citizen._sim.engState = null;
+        citizen._sim.engCover = null;
+        citizen._sim.engThreatX = 0;
+        citizen._sim.engThreatY = 0;
+        citizen._sim.engFireTimer = 0;
+        citizen._sim.engDuckTimer = 0;
+    }
     citizen.needs.food = clamp01(citizen.needs.food);
     citizen.needs.rest = clamp01(citizen.needs.rest);
     citizen.needs.safety = clamp01(citizen.needs.safety);

@@ -3,6 +3,7 @@
 import { ensureCitizenState, deriveMood, getCitizenCapForPreset } from './citizen_state.js';
 import { tickAmbient } from '../agents/bt_ambient.js';
 import { tickAlerted, isAlerted, flushDisturbances, initAlertedSystem } from '../agents/bt_alerted.js';
+import { tickEngaged, isEngaged, flushEngagedHits, initEngagedSystem } from '../agents/bt_engaged.js';
 
 export class CitizenSim {
     constructor(game) {
@@ -73,6 +74,10 @@ export class CitizenSim {
     }
 
     updateMovement(citizen, timeOfDay, tier, tick) {
+        if (isEngaged(citizen)) {
+            tickEngaged(citizen, this.game, tick);
+            return;
+        }
         if (isAlerted(citizen)) {
             tickAlerted(citizen, this.game, tick);
             return;
@@ -151,9 +156,11 @@ export class CitizenSim {
         const t0 = performance.now();
         if (!this._alertedInited) {
             initAlertedSystem();
+            initEngagedSystem();
             this._alertedInited = true;
         }
         flushDisturbances(citizens, tick);
+        flushEngagedHits(citizens, this.game);
         this.enforceCitizenCap();
         this.lodCounts = { near: 0, mid: 0, far: 0 };
 
