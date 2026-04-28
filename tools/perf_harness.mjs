@@ -144,13 +144,32 @@ async function main() {
 
   await browser.close();
 
+  const FPS_TARGET = 60;
+  const FPS_WARN = 30;
+  let budgetFailures = 0;
+  console.log(`\n[perf] Budget check (target: ${FPS_TARGET} fps):`);
+  for (const r of results) {
+    if (r.error) { console.log(`  ${r.scene}: SKIP (error)`); continue; }
+    if (r.fps >= FPS_TARGET) {
+      console.log(`  ${r.scene}: PASS (${r.fps} fps)`);
+    } else if (r.fps >= FPS_WARN) {
+      console.log(`  ${r.scene}: DEGRADED (${r.fps} fps — below ${FPS_TARGET})`);
+    } else {
+      console.log(`  ${r.scene}: FAIL (${r.fps} fps — below minimum ${FPS_WARN})`);
+      budgetFailures++;
+    }
+  }
+
   const output = {
     timestamp: new Date().toISOString(),
+    fpsTarget: FPS_TARGET,
+    fpsMinimum: FPS_WARN,
     results,
+    budgetPass: budgetFailures === 0,
   };
 
   writeFileSync(BASELINE_PATH, JSON.stringify(output, null, 2));
-  console.log(`[perf] Results written to ${BASELINE_PATH}`);
+  console.log(`\n[perf] Results written to ${BASELINE_PATH}`);
 
   if (existsSync(BASELINE_PATH)) {
     const prev = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
