@@ -107,6 +107,11 @@ export class ActionHUD {
                 <div class="ahud-demand-row" id="ahud-dem-row-c"><span class="ahud-demand-label">C</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-c" style="background:#2196f3"></div></div></div>
                 <div class="ahud-demand-row" id="ahud-dem-row-i"><span class="ahud-demand-label">I</span><div class="ahud-demand-track"><div class="ahud-demand-fill" id="ahud-dem-i" style="background:#ff9800"></div></div></div>
             </div>
+            <div class="ahud-budget" id="ahud-budget">
+                <span class="ahud-budget-income" id="ahud-budget-income">+0</span>
+                <span class="ahud-budget-sep">/</span>
+                <span class="ahud-budget-expense" id="ahud-budget-expense">-0</span>
+            </div>
             <div class="ahud-prompt" id="ahud-prompt"></div>
             <div class="ahud-profiler" id="ahud-profiler"></div>
             <div class="ahud-hint" id="ahud-hint"></div>
@@ -411,6 +416,21 @@ export class ActionHUD {
                     transition: width 0.3s;
                 }
 
+                /* ── Budget Widget (God Mode) ── */
+                .ahud-budget {
+                    position: absolute;
+                    top: 110px;
+                    left: 10px;
+                    font-size: 11px;
+                    font-family: monospace;
+                    opacity: 0;
+                    transition: opacity 0.3s;
+                }
+                .ahud-budget.on { opacity: 1; }
+                .ahud-budget-income { color: #4caf50; }
+                .ahud-budget-expense { color: #ef5350; }
+                .ahud-budget-sep { color: rgba(255,255,255,0.4); margin: 0 2px; }
+
                 /* ── Vehicle Enter/Exit Fade ── */
                 .ahud-veh-fade {
                     position: absolute;
@@ -680,6 +700,22 @@ export class ActionHUD {
                 if (rRow) rRow.title = `Residential: ${(rVal * 100).toFixed(0)}%`;
                 if (cRow) cRow.title = `Commercial: ${(cVal * 100).toFixed(0)}%`;
                 if (iRow) iRow.title = `Industrial: ${(iVal * 100).toFixed(0)}%`;
+            }
+        }
+
+        // Budget widget (god mode only)
+        const budgetEl = this._el.querySelector('#ahud-budget');
+        if (budgetEl) {
+            const isGod = this.game.mode === 'god';
+            budgetEl.classList.toggle('on', isGod);
+            if (isGod) {
+                const bm = this.game.budgetManager;
+                const inc = bm?.lastBudgetIncome ?? 0;
+                const exp = bm?.lastBudgetExpenses ?? 0;
+                const incEl = this._el.querySelector('#ahud-budget-income');
+                const expEl = this._el.querySelector('#ahud-budget-expense');
+                if (incEl) incEl.textContent = `+${inc}`;
+                if (expEl) expEl.textContent = `-${exp}`;
             }
         }
 
