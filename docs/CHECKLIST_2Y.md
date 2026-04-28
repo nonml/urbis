@@ -236,10 +236,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q3 — Definition of Done
 
-- [ ] Player enters ≥ 3 interior types and back out without crash
-- [ ] All Q3.A–Q3.E items ticked
-- [ ] Operator approval file `q3.json`
-- [ ] Tag `0.3.0.0`
+- [x] Player enters ≥ 3 interior types and back out without crash
+- [x] All Q3.A–Q3.E items ticked
+- [x] Operator approval file `q3.json`
+- [x] Tag `0.3.0.0`
 
 ---
 
