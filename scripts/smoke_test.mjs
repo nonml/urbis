@@ -2982,6 +2982,65 @@ function testCinematicSkip() {
 
 testCinematicSkip();
 
+import { TTSService, lineHash } from '../src/audio/tts/service.js';
+import { StubBackend } from '../src/audio/tts/backends/stub.js';
+
+async function testTTSStubBackend() {
+    console.log('\n[80] TTS — install + service abstraction (stub backend)');
+    try {
+        const svc = new TTSService();
+        const r1 = await svc.synthesize('Hello, citizen.');
+        assert(r1.audio instanceof Uint8Array, 'Returns Uint8Array audio buffer');
+        assert(r1.audio.length > 44, 'Audio buffer larger than WAV header');
+        assert(r1.durationMs > 0, `durationMs > 0 (got ${r1.durationMs})`);
+        assert(r1.voiceId === 'en_US-amy-medium', 'Default voice applied');
+        assert(r1.cached === false, 'First call is not a cache hit');
+
+        const headerStr = String.fromCharCode(...r1.audio.slice(0, 4));
+        assert(headerStr === 'RIFF', 'WAV header is RIFF');
+
+        const r2 = await svc.synthesize('Hello, citizen.');
+        assert(r2.cached === true, 'Repeat call is a cache hit');
+        assert(r2.audio === r1.audio, 'Cache hit returns same buffer reference');
+        assert(svc.has('Hello, citizen.'), 'has() reflects cache state');
+        assert(svc.cacheSize === 1, 'Cache size is 1 after one unique entry');
+
+        const r3 = await svc.synthesize('Different line.');
+        assert(r3.cached === false, 'Different text is a cache miss');
+        assert(svc.cacheSize === 2, 'Cache size grows to 2');
+
+        const r4 = await svc.synthesize('Hello, citizen.', 'en_GB-alan-low');
+        assert(r4.cached === false, 'Different voice on same text is a cache miss');
+
+        const longer = await svc.synthesize('A '.repeat(50));
+        assert(longer.durationMs > r1.durationMs, 'Longer text yields longer duration');
+
+        const k1 = lineHash('Hello.', 'en_US-amy-medium');
+        const k2 = lineHash('Hello.', 'en_US-amy-medium');
+        const k3 = lineHash('Hello.', 'en_US-ryan-low');
+        assert(k1 === k2, 'lineHash is deterministic');
+        assert(k1 !== k3, 'lineHash differs by voice');
+
+        let threw = false;
+        try { await svc.synthesize(''); } catch (e) { threw = true; }
+        assert(threw, 'Empty text rejected');
+
+        const bare = new StubBackend();
+        const direct = await bare.synthesize('Test', 'en_US-amy-medium');
+        assert(direct.audio instanceof Uint8Array, 'StubBackend usable directly');
+        assert(direct.sampleRate === 22050, 'StubBackend reports 22.05kHz sample rate');
+
+        svc.clearCache();
+        assert(svc.cacheSize === 0, 'clearCache empties cache');
+    } catch (e) {
+        console.log(`  ✗ TTS service test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+await testTTSStubBackend();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
