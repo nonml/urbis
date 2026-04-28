@@ -835,8 +835,39 @@ Paste this info with your bug report at: docs/BUG_REPORT.md`;
             }
             if (e.key.toLowerCase() === 'f') {
                 e.preventDefault();
+                const im = this.game.interiorManager;
+                if (im?.active) {
+                    const pos = im.exit();
+                    if (pos) {
+                        this.game.player.x = pos.x;
+                        this.game.player.y = pos.y;
+                    }
+                    this.renderer3d?.exitInterior();
+                    this.game.minimap?.clearInterior();
+                    this.showMessage('Exited building', 'normal');
+                } else if (im && !this.game.vehicleController?.isDriving) {
+                    const px = this.game.player.wx ?? this.game.player.x;
+                    const py = this.game.player.wz ?? this.game.player.y;
+                    const bldgs = this.game.buildings?.buildings || [];
+                    let entered = false;
+                    for (const b of bldgs) {
+                        if (!im.canEnter(b.type)) continue;
+                        const dx = (b.x ?? 0) - px;
+                        const dy = (b.y ?? 0) - py;
+                        if (dx * dx + dy * dy < 4) {
+                            if (im.enter(b)) {
+                                this.renderer3d?.enterInterior(im.templateId);
+                                this.game.minimap?.setInterior(im.templateId);
+                                this.showMessage(`Entered ${im.templateId}`, 'normal');
+                                entered = true;
+                            }
+                            break;
+                        }
+                    }
+                    if (entered) return;
+                }
                 const vc = this.game.vehicleController;
-                if (vc) {
+                if (vc && !im?.active) {
                     if (vc.isDriving) {
                         this.actionHud?.showVehicleFade();
                         vc.exitVehicle();

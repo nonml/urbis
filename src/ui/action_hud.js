@@ -799,7 +799,10 @@ export class ActionHUD {
         const prompt = this._el.querySelector('#ahud-prompt');
         if (prompt) {
             let promptText = '';
-            if (this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead) {
+            const interior = this.game.interiorManager;
+            if (interior?.active) {
+                promptText = '<kbd>F</kbd> Exit Building';
+            } else if (this.game.mode === 'street' && !vc?.isDriving && !ph?.isDead) {
                 // Check for nearby vehicles
                 const px = this.game.player.wx ?? this.game.player.x;
                 const py = this.game.player.wz ?? this.game.player.y;
