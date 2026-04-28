@@ -163,18 +163,18 @@ export const BUILDING_3D = {
     [BUILDING_HOUSE]: { height: 0.22 },      // 1-2 storey residential
     [BUILDING_FARM]: { height: 0.14 },        // low barn
     [BUILDING_LUMBER_MILL]: { height: 0.28 },
-    [BUILDING_MARKET]: { height: 0.32 },
+    [BUILDING_MARKET]: { height: 0.32, doorway: { side: 'south', interior: 'shop' } },
     [BUILDING_TOWN_HALL]: { height: 0.55 },
-    [BUILDING_WAREHOUSE]: { height: 0.30 },
+    [BUILDING_WAREHOUSE]: { height: 0.30, doorway: { side: 'south', interior: 'safehouse' } },
     [BUILDING_BARRACKS]: { height: 0.35 },
     [BUILDING_SCHOOL]: { height: 0.30 },
     // Transit / infrastructure buildings
     'bus-stop':      { height: 0.30 },
     'bus-depot':     { height: 0.70 },
-    'metro-station': { height: 0.90 },
+    'metro-station': { height: 0.90, doorway: { side: 'south', interior: 'subway' } },
     'tollway-gate':  { height: 0.40 },
     'highway-ramp':  { height: 0.30 },
-    'subway-shaft':  { height: 0.50 },
+    'subway-shaft':  { height: 0.50, doorway: { side: 'south', interior: 'subway' } },
 };
 
 // Crisis events
