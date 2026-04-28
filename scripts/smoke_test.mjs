@@ -1583,7 +1583,47 @@ function runRagdollKnockbackTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => {
+function runRagdollDespawnTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/ragdoll.js'),
+    ]).then(([rwMod, ragMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[43] Ragdoll — Deterministic Despawn');
+            const { RapierPhysicsWorld } = rwMod;
+            const { RagdollManager } = ragMod;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rm = new RagdollManager(pw, { despawnTicks: 10 });
+
+            const id = rm.spawn(0, 3, 0, 0);
+            assert(id !== null, 'Ragdoll spawned via manager');
+            assert(rm.count === 1, 'Manager tracks 1 ragdoll');
+
+            rm.update(5);
+            assert(rm.count === 1, 'Still alive at tick 5');
+
+            rm.update(10);
+            assert(rm.count === 0, 'Despawned at tick 10 (deterministic)');
+            assert(rm.get(id) === null, 'Ragdoll no longer accessible');
+
+            const id2 = rm.spawn(0, 3, 0, 20);
+            const id3 = rm.spawn(5, 3, 0, 22);
+            assert(rm.count === 2, 'Two ragdolls tracked');
+            rm.update(30);
+            assert(rm.count === 1, 'First despawned, second still alive');
+            rm.update(32);
+            assert(rm.count === 0, 'Both despawned by their respective deadlines');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Ragdoll despawn test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));

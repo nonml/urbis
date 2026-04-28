@@ -167,5 +167,51 @@ export class Ragdoll {
         this.bones = {};
         this.joints = [];
         this._alive = false;
+        this._state = 'destroyed';
+    }
+}
+
+const DEFAULT_DESPAWN_TICKS = 150;
+
+export class RagdollManager {
+    constructor(physics, options = {}) {
+        this._physics = physics;
+        this._ragdolls = new Map();
+        this._nextId = 1;
+        this._despawnTicks = options.despawnTicks ?? DEFAULT_DESPAWN_TICKS;
+    }
+
+    spawn(x, y, z, tick) {
+        const rag = new Ragdoll(this._physics, x, y, z);
+        if (!rag.alive) return null;
+        rag.activate(tick);
+        const id = this._nextId++;
+        this._ragdolls.set(id, { id, ragdoll: rag, spawnTick: tick });
+        return id;
+    }
+
+    update(tick) {
+        for (const [id, entry] of this._ragdolls) {
+            entry.ragdoll.update(tick);
+            if (tick - entry.spawnTick >= this._despawnTicks) {
+                entry.ragdoll.destroy();
+                this._ragdolls.delete(id);
+            }
+        }
+    }
+
+    get(id) {
+        return this._ragdolls.get(id)?.ragdoll ?? null;
+    }
+
+    get count() {
+        return this._ragdolls.size;
+    }
+
+    destroyAll() {
+        for (const [, entry] of this._ragdolls) {
+            entry.ragdoll.destroy();
+        }
+        this._ragdolls.clear();
     }
 }
