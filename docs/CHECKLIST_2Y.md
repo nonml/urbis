@@ -179,8 +179,8 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q2 — Definition of Done
 
-- [ ] 15-min unguided playtest completes a starter objective with no crash
-- [ ] All Q2.A–Q2.H items ticked
+- [x] 15-min unguided playtest completes a starter objective with no crash
+- [x] All Q2.A–Q2.H items ticked
 - [ ] Operator approval file `q2.json` present
 - [ ] Tag `0.2.0.0`
 
