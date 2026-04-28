@@ -401,6 +401,47 @@ export class WorldHackEffects {
 
     // ── Internal helpers ──
 
+    hackCraneDrop(x, y) {
+        const tick = this.game.state.time.tick;
+        if (this._isOnCooldown('crane_drop', tick)) {
+            return { ok: false, reason: 'On cooldown' };
+        }
+        const radius = 3;
+        const damage = 60;
+        this._explosions.push({ x, y, radius, tick, type: 'crane' });
+        this._setCooldown('crane_drop', tick, 60);
+
+        const citizens = this.game.citizens?.citizens || [];
+        for (const c of citizens) {
+            const dx = (c.x ?? 0) - x;
+            const dy = (c.y ?? 0) - y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+            if (dist < radius) {
+                c.health = (c.health ?? 100) - damage * (1 - dist / radius);
+            }
+        }
+
+        const vs = this.game.vehicleSystem;
+        if (vs) {
+            for (const v of vs.vehicles) {
+                const dx = v.x - x;
+                const dy = v.y - y;
+                if (Math.sqrt(dx * dx + dy * dy) < radius) {
+                    v.health = (v.health ?? 100) - damage;
+                }
+            }
+        }
+
+        if (this.game.heatSystem) this.game.heatSystem.addHeat(18);
+        this.game.ui?.showMessage?.('Crane payload dropped!', 'warning');
+        try {
+            eventBus.emit(EVENT_TYPES.HACK_SUCCESS, {
+                type: 'crane_drop', x, y,
+            });
+        } catch {}
+        return { ok: true };
+    }
+
     hackSteamPipe(x, y) {
         const tick = this.game.state.time.tick;
         if (this._isOnCooldown('steam_pipe', tick)) {

@@ -2473,6 +2473,30 @@ function testHackSteamPipe() {
 }
 
 testHackSteamPipe();
+
+function testHackCraneDrop() {
+    console.log('\n[67] Hack Chain — crane drop');
+    try {
+        const game = new Game({ mapPreset: 'CITY', seed: 121212, mode: 'standard' });
+        game.init();
+
+        const result = game.worldHacks.hackCraneDrop(12, 12);
+        assert(result.ok, 'Crane drop hack succeeds');
+
+        const effects = game.worldHacks.getActiveEffects();
+        const crane = effects.recentExplosions.find(e => e.type === 'crane');
+        assert(crane !== undefined, 'Crane explosion recorded');
+
+        const result2 = game.worldHacks.hackCraneDrop(20, 20);
+        assert(!result2.ok, 'Second crane drop blocked by cooldown');
+    } catch (e) {
+        console.log(`  ✗ Crane drop test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testHackCraneDrop();
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
