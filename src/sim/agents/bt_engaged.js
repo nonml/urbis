@@ -1,5 +1,6 @@
 import { sequence, selector, condition, action, tick as btTick, SUCCESS, FAILURE } from './bt.js';
 import { eventBus, EVENT_TYPES } from '../events.js';
+import { tryCallBackup } from './bt_callbackup.js';
 
 const ENGAGE_RADIUS = 10;
 const FIRE_TICKS = 3;
@@ -98,6 +99,7 @@ function tickFire(ctx) {
     if (dist < NPC_FIRE_RANGE && ctx.game.rng.next() < 0.3) {
         ctx.game.playerHealth?.takeDamage(NPC_DAMAGE, 'npc_gunfire');
     }
+    tryCallBackup(c, ctx.game, ctx.tick);
     if (c._sim.engFireTimer <= 0) {
         c._sim.engDuckTimer = DUCK_TICKS;
     }
