@@ -332,9 +332,9 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q5.E — Multimodal Critic Upgrade
 
-- [ ] `q5-cr-vision-model` select and install local VLM (e.g. Qwen2-VL 7B)
-- [ ] `q5-cr-screenshot-understanding` critic sees screenshots rather than captions
-- [ ] `q5-cr-findings-quality` blocker false-positive rate < 5% over 2 weeks
+- [x] `q5-cr-vision-model` select and install local VLM (e.g. Qwen2-VL 7B)
+- [x] `q5-cr-screenshot-understanding` critic sees screenshots rather than captions
+- [x] `q5-cr-findings-quality` blocker false-positive rate < 5% over 2 weeks
 
 ### Q5 — Definition of Done
 
