@@ -188,7 +188,10 @@ export class CombatSystem {
         if (dist > range && this.weapon.type === 'melee') return { hit: false };
 
         const pellets = this.weapon.pellets || 1;
-        const adsMul = this._adsActive ? (this.weapon.adsSpreadMul || 1) : 1;
+        const moving = player._isMoving || false;
+        const hipMul = (!this._adsActive && this.weapon.type === 'ranged')
+            ? (moving ? 1.6 : 1.2) : 1;
+        const adsMul = this._adsActive ? (this.weapon.adsSpreadMul || 1) : hipMul;
         const baseSpread = ((this.weapon.spread || 0) + this._recoilLevel) * adsMul;
         const spread = baseSpread * (Math.PI / 180);
         const baseAngle = Math.atan2(dx, -dy);

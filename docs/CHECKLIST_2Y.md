@@ -269,7 +269,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q4-wp-recoil-curves` per-weapon recoil curves
 - [x] `q4-wp-ads` aim-down-sights state with FOV shift
-- [ ] `q4-wp-hipfire-spread` wider spread when hipfiring
+- [x] `q4-wp-hipfire-spread` wider spread when hipfiring
 - [ ] `q4-wp-ammo-refactor` unified ammo model for all weapons
 - [ ] `q4-wp-weapon-wheel` radial weapon selector
 
