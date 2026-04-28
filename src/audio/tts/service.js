@@ -16,6 +16,7 @@
 
 import { StubBackend } from './backends/stub.js';
 import { resolveVoiceId } from './voicebank.js';
+import { MemoryCacheStore } from './cache.js';
 
 const DEFAULT_VOICE = 'en_US-amy-medium';
 
@@ -40,8 +41,8 @@ export class TTSService {
     constructor(opts = {}) {
         this.defaultVoice = opts.defaultVoice ?? DEFAULT_VOICE;
         this.backend = opts.backend ?? null;
-        this._cache = new Map();
-        this._cacheCap = opts.cacheSize ?? 256;
+        this.store = opts.store ?? new MemoryCacheStore({ cacheSize: opts.cacheSize ?? 256 });
+        this._backendCalls = 0;
     }
 
     async _ensureBackend() {
@@ -60,32 +61,25 @@ export class TTSService {
             throw new Error('TTS: text must be a non-empty string');
         }
         const key = lineHash(text, voiceId);
-        if (this._cache.has(key)) {
-            const hit = this._cache.get(key);
-            this._cache.delete(key);
-            this._cache.set(key, hit);
-            return { ...hit, cached: true };
-        }
+        const hit = await this.store.get(key);
+        if (hit) return { ...hit, cached: true };
         const backend = await this._ensureBackend();
+        this._backendCalls++;
         const result = await backend.synthesize(text, voiceId);
-        const stored = { audio: result.audio, durationMs: result.durationMs, voiceId, key };
-        this._cache.set(key, stored);
-        if (this._cache.size > this._cacheCap) {
-            const oldest = this._cache.keys().next().value;
-            this._cache.delete(oldest);
-        }
-        return { ...stored, cached: false };
+        const entry = { audio: result.audio, durationMs: result.durationMs, voiceId, key };
+        await this.store.put(key, entry);
+        return { ...entry, cached: false };
     }
 
     async synthesizeAs(archetypeId, text) {
         return this.synthesize(text, resolveVoiceId(archetypeId));
     }
 
-    has(text, voiceId = this.defaultVoice) {
-        return this._cache.has(lineHash(text, voiceId));
+    async has(text, voiceId = this.defaultVoice) {
+        return (await this.store.get(lineHash(text, voiceId))) !== null;
     }
 
-    clearCache() { this._cache.clear(); }
+    async clearCache() { await this.store.clear(); }
 
-    get cacheSize() { return this._cache.size; }
+    get backendCallCount() { return this._backendCalls; }
 }

@@ -3002,12 +3002,12 @@ async function testTTSStubBackend() {
         const r2 = await svc.synthesize('Hello, citizen.');
         assert(r2.cached === true, 'Repeat call is a cache hit');
         assert(r2.audio === r1.audio, 'Cache hit returns same buffer reference');
-        assert(svc.has('Hello, citizen.'), 'has() reflects cache state');
-        assert(svc.cacheSize === 1, 'Cache size is 1 after one unique entry');
+        assert(await svc.has('Hello, citizen.'), 'has() reflects cache state');
+        assert(svc.backendCallCount === 1, 'Backend invoked once after one unique synthesize');
 
         const r3 = await svc.synthesize('Different line.');
         assert(r3.cached === false, 'Different text is a cache miss');
-        assert(svc.cacheSize === 2, 'Cache size grows to 2');
+        assert(svc.backendCallCount === 2, 'Backend invoked twice after two unique synthesize calls');
 
         const r4 = await svc.synthesize('Hello, citizen.', 'en_GB-alan-low');
         assert(r4.cached === false, 'Different voice on same text is a cache miss');
@@ -3030,8 +3030,8 @@ async function testTTSStubBackend() {
         assert(direct.audio instanceof Uint8Array, 'StubBackend usable directly');
         assert(direct.sampleRate === 22050, 'StubBackend reports 22.05kHz sample rate');
 
-        svc.clearCache();
-        assert(svc.cacheSize === 0, 'clearCache empties cache');
+        await svc.clearCache();
+        assert(!(await svc.has('Hello, citizen.')), 'clearCache removes entries');
     } catch (e) {
         console.log(`  ✗ TTS service test failed: ${e.message}`);
         console.log(`  Stack: ${e.stack}`);
@@ -3099,6 +3099,64 @@ async function testTTSVoicebank() {
 }
 
 await testTTSVoicebank();
+
+import { FilesystemCacheStore, MemoryCacheStore } from '../src/audio/tts/cache.js';
+import { mkdtempSync, rmSync, existsSync, readdirSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+
+async function testTTSLineCachePersistence() {
+    console.log('\n[82] TTS — line cache persists across service instances');
+    const dir = mkdtempSync(join(tmpdir(), 'tts-cache-'));
+    try {
+        const store1 = new FilesystemCacheStore({ baseDir: dir });
+        const svc1 = new TTSService({ store: store1 });
+        const r1 = await svc1.synthesize('Persistent line.', 'en_US-amy-medium');
+        assert(r1.cached === false, 'First service: cache miss');
+        assert(svc1.backendCallCount === 1, 'First service: backend invoked once');
+
+        const files = readdirSync(dir);
+        assert(files.some(f => f.endsWith('.wav')), 'WAV file written to baseDir');
+        assert(files.some(f => f.endsWith('.json')), 'Sidecar metadata written');
+
+        const store2 = new FilesystemCacheStore({ baseDir: dir });
+        const svc2 = new TTSService({ store: store2 });
+        const r2 = await svc2.synthesize('Persistent line.', 'en_US-amy-medium');
+        assert(r2.cached === true, 'Second service: cache hit from disk');
+        assert(svc2.backendCallCount === 0, 'Second service: backend never invoked');
+        assert(r2.durationMs === r1.durationMs, 'durationMs round-trips through disk');
+        assert(r2.audio.length === r1.audio.length, 'Audio bytes round-trip through disk');
+
+        const r3 = await svc2.synthesize('Different persistent line.');
+        assert(r3.cached === false, 'New text on persistent service: still hits backend');
+        assert(svc2.backendCallCount === 1, 'Backend invoked exactly once for new text');
+
+        await svc2.clearCache();
+        assert(readdirSync(dir).length === 0, 'clearCache removes files from disk');
+
+        const mem = new MemoryCacheStore({ cacheSize: 2 });
+        await mem.put('a', { audio: new Uint8Array([1]), durationMs: 1, voiceId: 'v', key: 'a' });
+        await mem.put('b', { audio: new Uint8Array([2]), durationMs: 1, voiceId: 'v', key: 'b' });
+        await mem.put('c', { audio: new Uint8Array([3]), durationMs: 1, voiceId: 'v', key: 'c' });
+        assert(await mem.get('a') === null, 'MemoryCacheStore evicts oldest at cap');
+        assert((await mem.get('b')) !== null, 'MemoryCacheStore retains b');
+        assert((await mem.get('c')) !== null, 'MemoryCacheStore retains c');
+
+        let threw = false;
+        try {
+            await store2.get('../escape/path');
+        } catch (e) { threw = true; }
+        assert(threw, 'FilesystemCacheStore rejects unsafe keys');
+    } catch (e) {
+        console.log(`  ✗ TTS line-cache persistence test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    } finally {
+        if (existsSync(dir)) rmSync(dir, { recursive: true, force: true });
+    }
+}
+
+await testTTSLineCachePersistence();
 
 testDistrictVariants();
 testBuildingTemplateSchema();
