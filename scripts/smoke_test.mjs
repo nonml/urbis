@@ -1516,7 +1516,41 @@ function runRagdollBlendInTest() {
     });
 }
 
-runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => {
+function runRagdollBlendOutTest() {
+    return Promise.all([
+        import('../src/sim/physics/rapier_world.js'),
+        import('../src/sim/physics/ragdoll.js'),
+    ]).then(([rwMod, ragMod]) => {
+        return rwMod.initRapier().then(() => {
+            console.log('\n[41] Ragdoll — Blend-Out Within 1.5s');
+            const { RapierPhysicsWorld } = rwMod;
+            const { Ragdoll } = ragMod;
+
+            const pw = new RapierPhysicsWorld({ poolCap: 32 });
+            const rag = new Ragdoll(pw, 0, 3, 0);
+
+            rag.activate(0);
+            rag.update(5);
+            assert(rag.state === 'active', 'Active after blend-in');
+
+            rag.beginRest(10);
+            assert(rag.state === 'blending_out', 'Blending out after beginRest');
+            assert(rag.blendFactor(10) === 1, 'Blend 1.0 at rest start');
+            assert(rag.blendFactor(32) > 0 && rag.blendFactor(32) < 1, 'Blend partial midway');
+
+            rag.update(55);
+            assert(rag.state === 'rest', 'Rest state after 45 ticks (1.5s)');
+            assert(rag.blendFactor(55) === 0, 'Blend factor 0 at rest');
+
+            pw.destroy();
+        });
+    }).catch(e => {
+        console.log(`  ✗ Ragdoll blend-out test failed: ${e.message}`);
+        failCount++;
+    });
+}
+
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
