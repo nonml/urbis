@@ -269,6 +269,49 @@ testFactionRegistryTrackingV1();
 testFactionPerksHostilityV1();
 testFactionTuningV1();
 testCoverSnapController();
+testCoverBlindfire();
+
+function testCoverBlindfire() {
+    console.log('\n[45] Cover System — Blindfire Aim Penalty Curve');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 55555 });
+        game.init();
+
+        const cs = new CoverSystem(game);
+        cs.rebuild();
+        const cc = new CoverController(cs);
+
+        const px = Math.floor(game.map.width / 2);
+        const py = Math.floor(game.map.height / 2);
+        cc.snapToCover(px, py);
+
+        if (!cc.isInCover) {
+            assert(true, 'No cover available (skip blindfire tests)');
+            return;
+        }
+
+        cc.blindfire();
+        assert(cc.isBlindFiring, 'Blindfire state active');
+        assert(cc.isInCover, 'Still in cover during blindfire');
+        const pen0 = cc.aimPenalty;
+        assert(pen0 >= 0.6, 'Blindfire starts with high aim penalty');
+
+        for (let i = 0; i < 10; i++) cc.tickBlindfire();
+        const pen10 = cc.aimPenalty;
+        assert(pen10 > pen0, 'Penalty increases over time');
+        assert(pen10 <= 0.9, 'Penalty capped at 0.9');
+
+        assert(cc.damageReduction > 0, 'Still has damage reduction while blindfiring');
+
+        cc.stopBlindfire();
+        assert(cc.state === 'snapped', 'Back to snapped after stop');
+        assert(cc.aimPenalty === 0.5, 'Penalty resets to snapped level');
+    } catch (e) {
+        console.log(`  ✗ Cover blindfire test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
 
 function testCoverSnapController() {
     console.log('\n[44] Cover System — Snap-to-Cover Controller');

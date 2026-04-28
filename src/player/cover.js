@@ -115,6 +115,7 @@ export class CoverController {
         this._state = 'idle';
         this._point = null;
         this._leaning = false;
+        this._blindfireTicks = 0;
     }
 
     get state() {
@@ -126,7 +127,11 @@ export class CoverController {
     }
 
     get isInCover() {
-        return this._state === 'snapped' || this._state === 'leaning';
+        return this._state === 'snapped' || this._state === 'leaning' || this._state === 'blindfire';
+    }
+
+    get isBlindFiring() {
+        return this._state === 'blindfire';
     }
 
     get isLeaning() {
@@ -135,10 +140,16 @@ export class CoverController {
 
     get damageReduction() {
         if (!this.isInCover) return 0;
+        if (this._state === 'blindfire') {
+            return this._point?.height === COVER_HEIGHT.HIGH ? 0.6 : 0.3;
+        }
         return this._point?.height === COVER_HEIGHT.HIGH ? 0.7 : 0.4;
     }
 
     get aimPenalty() {
+        if (this._state === 'blindfire') {
+            return Math.min(0.9, 0.6 + this._blindfireTicks * 0.02);
+        }
         if (this._state === 'leaning') return 0.15;
         if (this._state === 'snapped') return 0.5;
         return 0;
@@ -150,6 +161,26 @@ export class CoverController {
         this._point = nearest;
         this._state = 'snapped';
         this._leaning = false;
+        return true;
+    }
+
+    blindfire() {
+        if (this._state !== 'snapped') return false;
+        this._state = 'blindfire';
+        this._blindfireTicks = 0;
+        return true;
+    }
+
+    tickBlindfire() {
+        if (this._state === 'blindfire') {
+            this._blindfireTicks++;
+        }
+    }
+
+    stopBlindfire() {
+        if (this._state !== 'blindfire') return false;
+        this._state = 'snapped';
+        this._blindfireTicks = 0;
         return true;
     }
 
