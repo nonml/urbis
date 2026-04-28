@@ -121,6 +121,27 @@ export const VEHICLE_TYPES = {
     },
 };
 
+export const DAMAGE_STAGES = [
+    { threshold: 1.0, label: 'pristine', meshSuffix: '' },
+    { threshold: 0.7, label: 'light', meshSuffix: '_dmg1' },
+    { threshold: 0.4, label: 'heavy', meshSuffix: '_dmg2' },
+    { threshold: 0.0, label: 'wrecked', meshSuffix: '_wreck' },
+];
+
+export function getDamageStage(vehicle) {
+    const ratio = (vehicle.health ?? 100) / (vehicle.maxHealth ?? 100);
+    for (const stage of DAMAGE_STAGES) {
+        if (ratio >= stage.threshold) return stage;
+    }
+    return DAMAGE_STAGES[DAMAGE_STAGES.length - 1];
+}
+
+export function getDamageMeshKey(vehicle) {
+    const type = VEHICLE_TYPES[vehicle.type] || VEHICLE_TYPES.PASSENGER;
+    const stage = getDamageStage(vehicle);
+    return type.modelKey + stage.meshSuffix;
+}
+
 /** Map traffic model keys (e.g. 'sedan', 'taxi') to VEHICLE_TYPES key */
 export const MODEL_TO_TYPE = {};
 for (const [key, cfg] of Object.entries(VEHICLE_TYPES)) {
