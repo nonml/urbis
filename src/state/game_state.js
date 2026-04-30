@@ -4,7 +4,7 @@ import { randomSeed32, randomId } from '../rng.js';
 import { createRNGStreamSeeds } from '../rng_streams.js';
 
 // v2 adds `economy` (demand/budget/debt) used by multiple sim modules.
-export const CURRENT_SCHEMA_VERSION = 2;
+export const CURRENT_SCHEMA_VERSION = 8;
 
 /**
  * Creates a new GameState with default values

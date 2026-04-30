@@ -1,0 +1,17 @@
+{
+    "id": "side_protection",
+    "type": "casefile",
+    "title": "Protection Detail",
+    "description": "Protect a witness during their testimony.",
+    "tags": ["side", "protection", "witness"],
+    "rewards": [
+        { "type": "add_resource", "resource": "gold", "amount": 50 },
+        { "type": "rep_delta", "faction": "authorities", "amount": 4 }
+    ],
+    "steps": [
+        { "id": "start", "kind": "trigger", "trigger": "SIDE_PROTECTION", "completeOn": 1 },
+        { "id": "secure", "kind": "hack_node", "nodeType": "CCTV", "text": "Secure the area via cameras.", "completeOn": 1 },
+        { "id": "protect", "kind": "investigate", "text": "Hold the position during testimony.", "completeOn": 1 },
+        { "id": "resolve", "kind": "outcome", "outcomes": [{ "id": "protection_done", "effect": ["side_complete"] }] }
+    ]
+}

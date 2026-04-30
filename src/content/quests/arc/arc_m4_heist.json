@@ -1,0 +1,95 @@
+{
+    "id": "arc_m4_heist",
+    "type": "arc_mission",
+    "arcId": "main_arc",
+    "missionIndex": 4,
+    "title": "Concourse",
+    "description": "The plan is locked. The crew is set. Now you execute — and the city watches.",
+    "tags": ["arc", "main_arc", "heist", "execution"],
+    "trigger": "ARC_M4_HEIST_NIGHT",
+    "requires": ["arc_m3_complete"],
+    "rewards": [
+        { "type": "add_resource", "resource": "gold", "amount": 150 },
+        { "type": "set_flag", "flag": "arc_m4_complete" },
+        { "type": "rep_delta", "faction": "fixer_network", "amount": 10 },
+        { "type": "modify_heat", "delta": 8 }
+    ],
+    "steps": [
+        {
+            "id": "start",
+            "kind": "trigger",
+            "trigger": "ARC_M4_HEIST_NIGHT",
+            "speaker": "fixer",
+            "text": "Fixer on the line, voice flat. \"Midnight. Be where you need to be.\"",
+            "completeOn": 1
+        },
+        {
+            "id": "go_to_staging",
+            "kind": "go_to",
+            "marker": "heist_staging",
+            "text": "Move to the staging point. The crew is already in position.",
+            "completeOn": 1
+        },
+        {
+            "id": "hack_security",
+            "kind": "hack_node",
+            "nodeType": "CCTV",
+            "text": "Blind the tower security grid. Kill the cameras on floors 20 through 24.",
+            "onComplete": ["spawn_clue:security_blind", "advance:entry"],
+            "completeOn": 1
+        },
+        {
+            "id": "entry_stealth",
+            "kind": "go_to",
+            "marker": "service_entrance",
+            "text": "Service shaft entry. Move slow, stay on the dark side of every camera.",
+            "onComplete": ["advance:vault"],
+            "completeOn": 1,
+            "requires": ["plan=stealth"]
+        },
+        {
+            "id": "entry_loud",
+            "kind": "investigate",
+            "text": "Front door. Drop the lobby guards before they can call it in.",
+            "onComplete": ["advance:vault"],
+            "completeOn": 1,
+            "requires": ["plan=loud"]
+        },
+        {
+            "id": "entry_inside",
+            "kind": "interact",
+            "speaker": "bent_guard",
+            "text": "Bent guard opens the side door. Walks you past the checkpoint clean.",
+            "onComplete": ["advance:vault"],
+            "completeOn": 1,
+            "requires": ["plan=inside"]
+        },
+        {
+            "id": "vault_breach",
+            "kind": "hack_node",
+            "nodeType": "POWER_SUBSTATION",
+            "text": "Bypass the vault door. Reroute power through the backup grid while the team moves in.",
+            "onComplete": ["spawn_clue:vault_open", "advance:exfil"],
+            "completeOn": 1
+        },
+        {
+            "id": "exfil",
+            "kind": "go_to",
+            "marker": "heist_exit",
+            "text": "Extract. Get the package out before response closes the block.",
+            "onComplete": ["advance:resolve"],
+            "completeOn": 1
+        },
+        {
+            "id": "resolve",
+            "kind": "outcome",
+            "outcomes": [
+                {
+                    "id": "heist_done",
+                    "label": "The score is clean. Package secured. Now the real problem starts.",
+                    "effect": ["arc_m4_complete", "unlock:arc_m5_betrayal"]
+                }
+            ]
+        }
+    ]
+}

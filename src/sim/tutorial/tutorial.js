@@ -111,7 +111,99 @@ const TUTORIAL_STEPS = [
             label: 'Main Case Started',
             effect: ['gains_clue:main_case_started']
         }]
-    }
+    },
+    // --- Q8 additions: weapon, hack, vehicle, narrative coverage ---
+    {
+        id: 'weapon_wheel',
+        title: 'Weapon Wheel',
+        description: 'Press Tab to cycle weapons. Each weapon has different range, spread, and heat cost.',
+        kind: 'trigger',
+        trigger: 'weapon_cycled',
+        autoAdvance: true,
+    },
+    {
+        id: 'ads_aim',
+        title: 'Aim Down Sights',
+        description: 'Hold right-click to aim down sights (ADS). Reduces spread for precision shots.',
+        kind: 'trigger',
+        trigger: 'ads_activated',
+        autoAdvance: true,
+    },
+    {
+        id: 'sniper_range',
+        title: 'Long-Range Shot',
+        description: 'Equip the sniper rifle. ADS at distant targets for maximum accuracy.',
+        kind: 'trigger',
+        trigger: 'sniper_fired',
+        autoAdvance: true,
+    },
+    {
+        id: 'radial_hack_menu',
+        title: 'Radial Hack Menu',
+        description: 'Press H near a hackable node to open the radial menu. Number keys select hacks.',
+        kind: 'trigger',
+        trigger: 'radial_hack_opened',
+        autoAdvance: true,
+    },
+    {
+        id: 'camera_traversal',
+        title: 'Camera Hopping',
+        description: 'Hack a CCTV camera, then hop to adjacent cameras for line-of-sight coverage.',
+        kind: 'trigger',
+        trigger: 'camera_hopped',
+        autoAdvance: true,
+    },
+    {
+        id: 'hack_chains',
+        title: 'Hack Chains',
+        description: 'Chain hacks together: steam pipe burst, crane drop, comms jam. Each hack enables the next.',
+        kind: 'trigger',
+        trigger: 'hack_chain_completed',
+        autoAdvance: true,
+    },
+    {
+        id: 'combat_hacks',
+        title: 'Combat Hacks',
+        description: 'Use hacks in combat: detonate enemy grenades, jam comms, jam weapons.',
+        kind: 'trigger',
+        trigger: 'combat_hack_used',
+        autoAdvance: true,
+    },
+    {
+        id: 'vehicle_carjack',
+        title: 'Vehicle Carjack',
+        description: 'Approach an unoccupied vehicle and press F to steal it. Fast escape or mobile combat.',
+        kind: 'trigger',
+        trigger: 'vehicle_carjacked',
+        autoAdvance: true,
+    },
+    {
+        id: 'vehicle_ads',
+        title: 'Drive-by ADS',
+        description: 'Aim down sights while driving for targeted shots. Movement adds spread.',
+        kind: 'trigger',
+        trigger: 'vehicle_ads_fired',
+        autoAdvance: true,
+    },
+    {
+        id: 'vehicle_damage',
+        title: 'Vehicle Damage Stages',
+        description: 'Vehicles degrade: scratched → dented → smoking → destroyed. Repair at garages.',
+        kind: 'trigger',
+        trigger: 'vehicle_damage_seen',
+        autoAdvance: true,
+    },
+    {
+        id: 'narcative_handoff',
+        title: 'The Story Begins',
+        description: 'Tutorial complete. A new voice on the radio — the fixer wants to talk.',
+        kind: 'outcome',
+        outcomes: [{
+            label: 'Listen to the fixer',
+            effect: ['tutorial_complete', 'unlock:arc_m1_setup']
+        }]
+    },
+
 ];
 
 /**

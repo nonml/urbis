@@ -1,0 +1,17 @@
+{
+    "id": "side_vehicle_theft",
+    "type": "casefile",
+    "title": "Vehicle Theft",
+    "description": "Someone wants a specific vehicle recovered. Find it, bring it back.",
+    "tags": ["side", "vehicle", "recovery"],
+    "rewards": [
+        { "type": "add_resource", "resource": "gold", "amount": 60 },
+        { "type": "modify_heat", "delta": 3 }
+    ],
+    "steps": [
+        { "id": "start", "kind": "trigger", "trigger": "SIDE_VEHICLE_THEFT", "completeOn": 1 },
+        { "id": "locate", "kind": "hack_node", "nodeType": "CCTV", "text": "Track the vehicle via cameras.", "completeOn": 1 },
+        { "id": "recover", "kind": "go_to", "marker": "vehicle_location", "text": "Recover the vehicle.", "completeOn": 1 },
+        { "id": "resolve", "kind": "outcome", "outcomes": [{ "id": "theft_done", "effect": ["side_complete"] }] }
+    ]
+}

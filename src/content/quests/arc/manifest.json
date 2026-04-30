@@ -1,10 +1,13 @@
 {
     "arcId": "main_arc",
     "title": "Main Arc",
-    "description": "Six-mission storyline: setup → recruitment → heist planning → the heist → betrayal → resolution.",
+    "description": "Six-mission storyline: setup \u2192 recruitment \u2192 heist planning \u2192 the heist \u2192 betrayal \u2192 resolution.",
     "files": [
         "arc_m1_setup.json",
         "arc_m2_recruitment.json",
-        "arc_m3_planning.json"
+        "arc_m3_planning.json",
+        "arc_m4_heist.json",
+        "arc_m5_betrayal.json",
+        "arc_m6_resolution.json"
     ]
 }

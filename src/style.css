@@ -2248,3 +2248,98 @@ body {
 
 /* Hide old-UI remnants */
 .info-panel { display: none !important; }
+
+/* ═══════════════════════════════════════
+   SUBTITLE RENDERER
+   ═══════════════════════════════════════ */
+#subtitle-container {
+    position: fixed;
+    bottom: 8%;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 50;
+    text-align: center;
+    pointer-events: none;
+    transition: opacity 0.3s ease;
+}
+
+#subtitle-container.subtitle-off {
+    opacity: 0;
+}
+
+#subtitle-container.subtitle-on {
+    opacity: 1;
+}
+
+#subtitle-container.subtitle-fade {
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.subtitle-speaker {
+    font-family: var(--font-mono, 'Courier New', monospace);
+    font-size: 12px;
+    color: var(--accent, #00e0c0);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 4px;
+    opacity: 0;
+    transition: opacity 0.2s ease;
+}
+
+.subtitle-speaker.speaker-visible {
+    opacity: 1;
+}
+
+.subtitle-text {
+    font-family: var(--font-mono, 'Courier New', monospace);
+    color: var(--text, #e0e0e0);
+    background: rgba(0, 0, 0, 0.75);
+    padding: 8px 16px;
+    border-radius: 4px;
+    max-width: 50%;
+    margin: 0 auto;
+    line-height: 1.4;
+    word-wrap: break-word;
+}
+
+/* Size variants */
+#subtitle-container[data-size="small"] .subtitle-text {
+    font-size: 14px;
+    max-width: 40%;
+}
+
+#subtitle-container[data-size="medium"] .subtitle-text {
+    font-size: 18px;
+    max-width: 50%;
+}
+
+#subtitle-container[data-size="large"] .subtitle-text {
+    font-size: 24px;
+    max-width: 60%;
+}
+
+/* ═══════════════════════════════════════
+   COLORBLIND PALETTES
+   ═══════════════════════════════════════ */
+
+/* Deuteranopia (green-blind) — shift greens to yellow/brown, preserve reds/blues */
+[data-colorblind="deutan"] {
+    --neon-green: #ffcc00;
+    --neon-cyan: #00aaff;
+    --neon-amber: #ff6600;
+}
+
+/* Protanopia (red-blind) — shift reds to orange/yellow, preserve greens/blues */
+[data-colorblind="protan"] {
+    --neon-red: #ff6600;
+    --neon-magenta: #ffaa44;
+    --neon-amber: #ffcc00;
+}
+
+/* Tritanopia (blue-blind) — shift blues to purple, preserve reds/greens */
+[data-colorblind="tritan"] {
+    --neon-blue: #aa44ff;
+    --neon-cyan: #00ffaa;
+    --neon-purple: #ff44aa;
+}

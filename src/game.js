@@ -15,6 +15,7 @@ import { DIFFICULTY, BUILDING_TYPES, MAP_PRESETS, BUILDING_SECURITY, TERRAIN_ROA
 import { RNG, randomSeed32 } from './rng.js';
 import { createRNGStreams, createRNGStreamSeeds, createRNGsFromSeeds } from './rng_streams.js';
 import { createNewGameState, validateGameState as validateState, migrateState, CURRENT_SCHEMA_VERSION } from './state/game_state.js';
+import { getErrorHandler } from './dev/error_capture.js';
 import { validateGameState, assertStateShape } from './state/validate.js';
 import { ScheduleManager } from './sim/schedule.js';
 import { InteractableManager } from './sim/interactables.js';

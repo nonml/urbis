@@ -711,12 +711,14 @@ export class QuestEngine {
                 completedSteps: q.completedSteps,
                 data: q.data,
                 context: q.context,
+                zeroHostilities: q.zeroHostilities,
             })),
             completedQuests: this.completedQuests.map((q) => ({
                 id: q.id,
                 outcome: q.data.outcome,
                 data: q.data,
                 context: q.context,
+                zeroHostilities: q.zeroHostilities,
             }))
         };
     }
@@ -734,6 +736,7 @@ export class QuestEngine {
             quest.currentStepIndex = qData.currentStepIndex;
             quest.completedSteps = qData.completedSteps || [];
             quest.data = { ...quest.data, ...(qData.data || {}) };
+            quest.zeroHostilities = qData.zeroHostilities ?? true;
             quest.lastUpdated = now();
             return quest;
         }).filter(Boolean);
@@ -747,6 +750,7 @@ export class QuestEngine {
             quest.currentStepIndex = quest.steps.length;
             quest.data = { ...quest.data, ...(qData.data || {}) };
             quest.data.outcome = qData.outcome;
+            quest.zeroHostilities = qData.zeroHostilities ?? true;
             return quest;
         }).filter(Boolean);
     }
