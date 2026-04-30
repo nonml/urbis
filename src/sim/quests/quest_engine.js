@@ -60,6 +60,7 @@ export function createQuestInstance(questDef, context = {}) {
             choicePending: null,
             outcome: null,
         },
+        zeroHostilities: true,
         createdAt: now(),
         lastUpdated: now()
     };
@@ -114,6 +115,12 @@ export class QuestEngine {
 
         eventBus.on(EVENT_TYPES.INTERACTABLE_AVAILABLE, (data) => {
             this.handleInteractableAvailable(data.interactable);
+        }, this);
+
+        eventBus.on(EVENT_TYPES.PLAYER_FIRED_WEAPON, () => {
+            this.activeQuests.forEach((quest) => {
+                quest.zeroHostilities = false;
+            });
         }, this);
     }
 
@@ -175,6 +182,7 @@ export class QuestEngine {
         eventBus.emit(EVENT_TYPES.QUEST_COMPLETED, {
             questId: quest.id,
             outcome,
+            zeroHostilities: quest.zeroHostilities,
             tick: now()
         });
     }

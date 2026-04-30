@@ -3761,6 +3761,74 @@ function testArcMission3Planning() {
 
 testArcMission3Planning();
 
+
+function testZeroHostilitiesQuest() {
+    console.log('\n[92] Quest — zero-hostilities tracking');
+    try {
+        const game = new Game({ mapPreset: 'SMALL', seed: 424242, mode: 'standard' });
+        game.init();
+
+        // Create a simple stealth quest
+        const stealthQuest = {
+            id: 'stealth_infiltration',
+            type: 'casefile',
+            title: 'Silent Infiltration',
+            tags: ['stealth', 'hacking'],
+            rewards: [{ type: 'add_resource', resource: 'gold', amount: 100 }],
+            steps: [
+                { id: 'hack_entry', kind: 'hack_node', nodeType: 'TELECOM_BOX', completeOn: 1 },
+                { id: 'done', kind: 'outcome', outcomes: [{ id: 'clean_exit', effect: [] }] },
+            ],
+        };
+
+        const q = game.questEngine.addQuest(stealthQuest);
+
+        // 1. Quest starts with zeroHostilities = true
+        assert(q.zeroHostilities === true, 'New quest has zeroHostilities = true');
+
+        // 2. Complete quest without firing — should remain zero hostilities
+        game.questEngine.advanceQuest(q); // advances through steps
+
+        // Quest should be completed
+        const completed = game.questEngine.completedQuests.find(c => c.id === 'stealth_infiltration');
+        if (completed) {
+            assert(completed.zeroHostilities === true, 'Completed quest retains zeroHostilities = true');
+        } else {
+            // Quest may still be active if steps need more advancement
+            assert(q.zeroHostilities === true, 'Active quest retains zeroHostilities = true');
+        }
+
+        // 3. Now test: firing a weapon breaks zero hostilities
+        const game2 = new Game({ mapPreset: 'SMALL', seed: 424243, mode: 'standard' });
+        game2.init();
+        const q2 = game2.questEngine.addQuest(stealthQuest);
+        assert(q2.zeroHostilities === true, 'Second quest starts with zeroHostilities = true');
+
+        // Fire a weapon event — should break zero hostilities on all active quests
+        eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, { weapon: 'pistol' });
+        assert(q2.zeroHostilities === false, 'Firing weapon sets zeroHostilities = false');
+
+        // 4. Multiple active quests should all be affected
+        const q3 = game2.questEngine.addQuest({
+            id: 'second_quest',
+            type: 'casefile',
+            title: 'Second Quest',
+            steps: [{ id: 'done', kind: 'outcome', outcomes: [{ id: 'done', effect: [] }] }],
+        });
+        eventBus.emit(EVENT_TYPES.PLAYER_FIRED_WEAPON, { weapon: 'smg' });
+        assert(q2.zeroHostilities === false, 'First quest zeroHostilities = false after second shot');
+        assert(q3.zeroHostilities === false, 'Second quest zeroHostilities = false after shot');
+
+        console.log('  ✓ Zero-hostilities tracking works for stealth missions');
+    } catch (e) {
+        console.log(`  ✗ Zero-hostilities test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
+testZeroHostilitiesQuest();
+
 testDistrictVariants();
 testBuildingTemplateSchema();
 testVehicleTemplateSchema();
