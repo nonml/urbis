@@ -482,7 +482,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q8 — Definition of Done
 
 - [ ] Blind playtest (≤ 3h) completes arc + one zero-gunfire mission, no crash, no softlock
-- [ ] All Q8.A–Q8.E items ticked
+- [x] All Q8.A–Q8.E items ticked
 - [ ] Operator approval `q8.json`
 - [ ] Tag `0.8.0.0`
 
