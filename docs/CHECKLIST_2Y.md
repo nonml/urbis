@@ -510,10 +510,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q9.C — Cascaded Shadow Maps
 
-- [ ] `q9-csm-3-cascade` 3-cascade CSM replaces `DirectionalLight.shadow`
-- [ ] `q9-csm-pcf-soft` soft PCF (or PCSS) filter; tunable per preset
-- [ ] `q9-csm-perf-budget` shadow-map resolution budgets per preset; CI gate on shadow draw count
-- [ ] `q9-csm-stable-cascades` cascade frustums stable under camera motion (no shadow swim)
+- [x] `q9-csm-3-cascade` 3-cascade CSM replaces `DirectionalLight.shadow`
+- [x] `q9-csm-pcf-soft` soft PCF (or PCSS) filter; tunable per preset
+- [x] `q9-csm-perf-budget` shadow-map resolution budgets per preset; CI gate on shadow draw count
+- [x] `q9-csm-stable-cascades` cascade frustums stable under camera motion (no shadow swim)
 
 ### Q9.D — Volumetric Fog & Lighting
 

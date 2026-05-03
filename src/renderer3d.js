@@ -242,6 +242,66 @@ export class Renderer3D {
         this.sunLightFar.shadow.bias = -0.003;
         this.sunLightFar.shadow.normalBias = 0.08;
         this.scene.add(this.sunLightFar);
+        this._setupCSM();
+
+    /** 3-cascade CSM: replace single sun shadow with cascaded shadows */
+    _setupCSM() {
+        // Disable single shadow on sun light; use cascades instead
+        this.sunLight.castShadow = false;
+        this.sunLight.shadow.mapSize.width = 0;
+        this.sunLight.shadow.mapSize.height = 0;
+
+        // Cascade config: [near, far, resolution]
+        const cascades = [
+            { near: 1, far: 25, res: 1024 },   // Close: high detail
+            { near: 25, far: 75, res: 512 },    // Mid: medium detail
+            { near: 75, far: 150, res: 256 },   // Far: low detail
+        ];
+
+        this._csmLights = [];
+        this._csmCameras = [];
+
+        for (let i = 0; i < cascades.length; i++) {
+            const c = cascades[i];
+            const light = new THREE.DirectionalLight(0xfffbe0, 1.8 / (i + 1));
+            light.position.copy(this.sunLight.position);
+            light.castShadow = true;
+            light.shadow.mapSize.width = c.res;
+            light.shadow.mapSize.height = c.res;
+            light.shadow.camera.near = c.near;
+            light.shadow.camera.far = c.far;
+            light.shadow.camera.left = -50 * (i + 1);
+            light.shadow.camera.right = 50 * (i + 1);
+            light.shadow.camera.top = 50 * (i + 1);
+            light.shadow.camera.bottom = -50 * (i + 1);
+            light.shadow.bias = -0.001;
+            light.shadow.normalBias = 0.02;
+            light.shadow.radius = 2; // PCF soft
+            this.scene.add(light);
+            this._csmLights.push(light);
+            this._csmCameras.push(light.shadow.camera);
+        }
+    }
+
+    /** Update CSM frustums based on camera position */
+    _updateCSM() {
+        if (!this._csmLights || this._csmLights.length === 0) return;
+
+        const camPos = this.camera.position;
+        const sunDir = this.sunLight.position.clone().normalize();
+
+        for (let i = 0; i < this._csmLights.length; i++) {
+            const light = this._csmLights[i];
+            const cam = this._csmCameras[i];
+
+            // Position light to follow sun direction relative to camera
+            const offset = sunDir.clone().multiplyScalar(30 + i * 10);
+            light.position.copy(camPos).add(offset);
+            light.target.position.copy(camPos);
+            light.target.updateMatrix();
+            cam.updateMatrixWorld();
+        }
+    }
         
         // Day/Night cycle
         this.dayNightCycle = createDayNightCycle();
@@ -3813,6 +3873,7 @@ export class Renderer3D {
 
         this.syncPlayer();
         this.updateCamera(dt);
+        this._updateCSM();
         this.syncChunkStreaming();
         if (this._debugMode === 'services') {
             this.updateDebugOverlay();
