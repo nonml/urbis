@@ -503,7 +503,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q9.B — HDR Pipeline
 
-- [ ] `q9-hdr-renderer-config` `WebGLRenderer.toneMapping = ACESFilmicToneMapping`, `outputColorSpace = SRGBColorSpace`
+- [x] `q9-hdr-renderer-config` `WebGLRenderer.toneMapping = ACESFilmicToneMapping`, `outputColorSpace = SRGBColorSpace`
 - [ ] `q9-hdr-render-targets` `EffectComposer` render targets switched to `HalfFloatType`
 - [ ] `q9-hdr-no-double-gamma` audit verifies no manual sRGB conversion downstream of tone mapping
 - [ ] `q9-hdr-exposure-target` per-scene exposure target driven by day/night system
