@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 3,
+    "difficulty": 4,
     "title": "Sand Table",
     "description": "Three of you, one target, a week to plan it. The route, the entry, the exit — every variable you don't pick now becomes a problem you can't fix later.",
     "tags": ["arc", "main_arc", "planning", "heist"],

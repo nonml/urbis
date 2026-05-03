@@ -336,6 +336,49 @@ function validateQuests() {
     }
 }
 
+
+/**
+ * Validate arc mission difficulty monotonicity
+ */
+function validateArcMissions() {
+    log('\nChecking arc mission difficulty progression...');
+    const arcDir = path.join(CONTENT_DIR, 'quests', 'arc');
+    if (!fs.existsSync(arcDir)) {
+        log('  SKIP: No arc directory');
+        return;
+    }
+
+    const arcFiles = fs.readdirSync(arcDir)
+        .filter(f => f.startsWith('arc_m') && f.endsWith('.json'))
+        .sort();
+
+    if (arcFiles.length === 0) {
+        log('  SKIP: No arc missions found');
+        return;
+    }
+
+    const missions = arcFiles.map(f => {
+        const data = JSON.parse(fs.readFileSync(path.join(arcDir, f), 'utf8'));
+        return { id: data.id, index: data.missionIndex, difficulty: data.difficulty };
+    }).sort((a, b) => a.index - b.index);
+
+    // Check monotonic increase (core missions m1-m5)
+    let monotonic = true;
+    for (let i = 1; i < missions.length - 1; i++) {
+        if (missions[i].difficulty <= missions[i-1].difficulty) {
+            results.errors.push('Arc difficulty not monotonic: ' + missions[i-1].id + ' (' + missions[i-1].difficulty + ') >= ' + missions[i].id + ' (' + missions[i].difficulty + ')');
+            monotonic = false;
+        }
+    }
+
+    if (monotonic) {
+        results.passed++;
+        log('  OK: Arc difficulty rises monotonically');
+    } else {
+        log('  FAIL: Arc difficulty not monotonic');
+    }
+}
+
 /**
  * Validate crisis content
  */
@@ -513,6 +556,7 @@ function main() {
 
     // Validate all content types
     validateQuests();
+    validateArcMissions();
     validateCrises();
     validatePolicies();
     validateFactions();

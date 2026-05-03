@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 1,
+    "difficulty": 2,
     "title": "First Cut",
     "description": "The fixer wants a small thing done quietly. Either you can handle a courier run or you can't — and that decides what comes next.",
     "tags": ["arc", "main_arc", "setup", "tutorial-bridge"],

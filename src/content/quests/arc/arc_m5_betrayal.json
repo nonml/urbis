@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 5,
+    "difficulty": 9,
     "title": "Blood Debt",
     "description": "Someone sold the plan. The fixer knew. Now the city's hunting you, and the only person you trust is the one who just pointed a gun at you.",
     "tags": ["arc", "main_arc", "betrayal", "consequence"],

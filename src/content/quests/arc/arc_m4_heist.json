@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 4,
+    "difficulty": 7,
     "title": "Concourse",
     "description": "The plan is locked. The crew is set. Now you execute — and the city watches.",
     "tags": ["arc", "main_arc", "heist", "execution"],

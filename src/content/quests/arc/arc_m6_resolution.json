@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 6,
+    "difficulty": 6,
     "title": "Last Move",
     "description": "The fixer's gone. The crew's scattered. The city's got your heat signature painted on every wall. One last move to clean this up — or walk away.",
     "tags": ["arc", "main_arc", "resolution", "finale"],

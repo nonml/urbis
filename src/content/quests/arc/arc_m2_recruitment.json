@@ -3,6 +3,7 @@
     "type": "arc_mission",
     "arcId": "main_arc",
     "missionIndex": 2,
+    "difficulty": 3,
     "title": "Cold Hands",
     "description": "The fixer wants a third on the next job. Two candidates, two reputations, one decision — and either way, you have to convince them you're worth the risk.",
     "tags": ["arc", "main_arc", "recruitment"],
