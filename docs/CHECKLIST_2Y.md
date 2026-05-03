@@ -470,7 +470,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q8.D — Save Format Freeze (`schemaVersion = 8`)
 
 - [x] `q8-sf-schema-bump` schemaVersion bumped to 8 (migrations v2→v3 through v7→v8)
-- [ ] `q8-sf-migration-tests` Playwright round-trip from `0.1.x` → `0.8.0.0` saves
+- [x] `q8-sf-migration-tests` Playwright round-trip from `0.1.x` → `0.8.0.0` saves
 - [x] `q8-sf-shape-frozen` docs/SAVE_SCHEMA.md written, matches code
 
 ### Q8.E — Crash Budget
