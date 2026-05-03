@@ -458,7 +458,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q8-df-combat-curve` combat difficulty smoothed (no spike at heat 3, no flat at heat 5+)
 - [x] `q8-df-stealth-curve` stealth detection curve smoothed across day/night and crowd density
-- [ ] `q8-df-economy-curve` early-game money pressure verified; mid-game plateau filled with a goal
+- [x] `q8-df-economy-curve` early-game money pressure verified; mid-game plateau filled with a goal
 - [ ] `q8-df-mission-difficulty` Q7 arc missions playtested in order; difficulty rises monotonically
 
 ### Q8.C — Quest Validator Coverage
