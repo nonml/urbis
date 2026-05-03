@@ -1000,6 +1000,83 @@ export class Renderer3D {
             }
 
             // Bloom — subtle glow on bright surfaces (sun, water, street lights)
+            // Volumetric fog — half-res raymarched light scattering
+            if (ShaderPassMod) {
+                const { ShaderPass } = ShaderPassMod;
+                const volFogW = Math.round(rect.width * 0.5);
+                const volFogH = Math.round(rect.height * 0.5);
+                const volFogShader = {
+                    uniforms: {
+                        tDiffuse: { value: null },
+                        fogDensity: { value: 0.006 },
+                        fogColor: { value: new THREE.Color(0x7ab0d0) },
+                        sunDirection: { value: new THREE.Vector3(1, 1, 0) },
+                        lightIntensity: { value: 1.0 },
+                        uTime: { value: 0 },
+                        screenWidth: { value: volFogW },
+                        screenHeight: { value: volFogH },
+                    },
+                    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+                    fragmentShader: `
+                        uniform sampler2D tDiffuse;
+                        uniform float fogDensity;
+                        uniform vec3 fogColor;
+                        uniform vec3 sunDirection;
+                        uniform float lightIntensity;
+                        uniform float uTime;
+                        uniform float screenWidth;
+                        uniform float screenHeight;
+                        varying vec2 vUv;
+
+                        float hash(vec2 p){
+                            return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453);
+                        }
+
+                        float noise2d(vec2 p){
+                            vec2 i = floor(p);
+                            vec2 f = fract(p);
+                            float a = hash(i);
+                            float b = hash(i + vec2(1.0, 0.0));
+                            float c = hash(i + vec2(0.0, 1.0));
+                            float d = hash(i + vec2(1.0, 1.0));
+                            return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+                        }
+
+                        void main(){
+                            vec4 col = texture2D(tDiffuse, vUv);
+
+                            // God rays: directional light scattering
+                            vec2 centerDir = vUv - vec2(0.5);
+                            float sunAngle = dot(centerDir, normalize(sunDirection.xy));
+                            float godRay = max(0.0, sunAngle) * 0.5;
+
+                            // Volumetric noise (slowly animated)
+                            vec2 noiseUV = vUv * 3.0;
+                            noiseUV += vec2(sin(uTime * 0.3), cos(uTime * 0.2)) * 0.5;
+                            float fogNoise = noise2d(noiseUV);
+                            float density = fogDensity * (1.0 + fogNoise * 0.3);
+
+                            // Distance-based fog falloff
+                            float dist = length(centerDir);
+                            float fogFactor = 1.0 - exp(-density * dist * 80.0);
+
+                            // God rays contribution
+                            float shafts = godRay * lightIntensity * 0.15;
+                            shafts *= noise2d(vUv * 5.0);
+
+                            // Composite fog color
+                            vec3 fogContrib = fogColor * (fogFactor + shafts);
+                            col.rgb = mix(col.rgb, fogContrib, fogFactor * 0.5);
+
+                            gl_FragColor = col;
+                        }
+                    `,
+                };
+                const volFogPass = new ShaderPass(volFogShader);
+                volFogPass.setSize(volFogW, volFogH);
+                this.composer.addPass(volFogPass);
+                this._volFogPass = volFogPass;
+            }
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(rect.width, rect.height),
                 0.25,   // strength — boosted at night dynamically
@@ -3870,6 +3947,7 @@ export class Renderer3D {
         this.updateVehicles();
         this.updatePoliceUnits();
         this.updateWeatherFX(dt);
+        this._updateVolumetricFog();
 
         this.syncPlayer();
         this.updateCamera(dt);
@@ -3953,6 +4031,40 @@ export class Renderer3D {
         } else {
             this.renderer.render(this.scene, this.camera);
         }
+    }
+
+    /**
+     * Update volumetric fog uniforms from weather + day/night state
+     */
+    _updateVolumetricFog() {
+        if (!this._volFogPass) return;
+        const u = this._volFogPass.material.uniforms;
+        // Sun direction (normalized)
+        if (this._sunPosition) {
+            u.sunDirection.value.copy(this._sunPosition).normalize();
+        }
+        // Density from weather system
+        const ws = this.game?.weatherSystem;
+        if (ws && ws.currentEffects) {
+            u.fogDensity.value = ws.currentEffects.fogDensity ?? 0.006;
+        } else if (this.scene.fog) {
+            u.fogDensity.value = this.scene.fog.density;
+        }
+        // Fog color follows scene fog
+        if (this.scene.fog) {
+            u.fogColor.value.copy(this.scene.fog.color);
+        }
+        // Light intensity: dawn/dusk = strong, night = dim
+        const phase = this.currentPhase;
+        if (phase === DAY_PHASES.DAWN || phase === DAY_PHASES.DUSK) {
+            u.lightIntensity.value = 1.5;
+        } else if (phase === DAY_PHASES.NIGHT) {
+            u.lightIntensity.value = 0.2;
+        } else {
+            u.lightIntensity.value = 0.8;
+        }
+        // Time for noise animation
+        u.uTime.value = performance.now() / 1000;
     }
 
     /**

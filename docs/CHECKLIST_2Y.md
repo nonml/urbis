@@ -517,7 +517,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q9.D — Volumetric Fog & Lighting
 
-- [ ] `q9-vol-raymarch-pass` half-res raymarched volumetric pass
+- [x] `q9-vol-raymarch-pass` half-res raymarched volumetric pass
 - [ ] `q9-vol-sun-shafts` sun shafts visible at low sun angles (dawn/dusk)
 - [ ] `q9-vol-streetlight-cones` night street-light cones receive volumetrics
 - [ ] `q9-vol-weather-density` density modulated by weather system (fog, storm, rain)
