@@ -837,6 +837,7 @@ export class Renderer3D {
                             if (m.roughness !== undefined) m.roughness = Math.max(0.55, m.roughness);
                         }
                     });
+                    this._enforcePBR(root);
                     this._propModels.set(name, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -854,6 +855,7 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    this._enforcePBR(root);
                     this._vegetationModels.set(name, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -871,6 +873,7 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    this._enforcePBR(root);
                     this._detailModels.set(name, root);
                     resolve();
                 }, undefined, () => resolve());
