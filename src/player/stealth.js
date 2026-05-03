@@ -3,6 +3,7 @@
  * Manages visibility states, crouching, detection modifiers, and stealth kills.
  */
 
+import { STEALTH_DETECTION_MODIFIERS } from '../constants.js';
 import { eventBus, EVENT_TYPES } from '../sim/events.js';
 
 /** Visibility states */
@@ -56,14 +57,55 @@ export class StealthSystem {
         const timeOfDay = this.game.state?.time?.timeOfDay ?? 12;
         const isNight = timeOfDay < 6 || timeOfDay > 20;
         const isDuskDawn = (timeOfDay >= 6 && timeOfDay < 8) || (timeOfDay >= 18 && timeOfDay <= 20);
-        if (isNight) base *= 0.5;
-        else if (isDuskDawn) base *= 0.75;
+        const timeMods = STEALTH_DETECTION_MODIFIERS.timeOfDay;
+        if (isNight) base *= timeMods.night;
+        else if (isDuskDawn) base *= timeMods.dawn;
+        else base *= timeMods.day;
 
         // Weapon drawn increases visibility
         const combat = this.game.combatSystem;
         if (combat && combat.currentWeapon !== 'fist') base *= 1.3;
 
+        // Crowd density modifier
+        base *= this._getCrowdDensityModifier();
+
+        // Weather modifier
+        base *= this._getWeatherModifier();
+
         return base;
+    }
+
+    /**
+     * Get crowd density modifier based on nearby NPCs.
+     */
+    _getCrowdDensityModifier() {
+        const player = this.game.state.player;
+        const agents = this.game.world?.agents || [];
+        const px = player.wx ?? player.x;
+        const py = player.wz ?? player.y;
+        let nearbyCount = 0;
+        for (const agent of agents) {
+            if (agent.x === undefined || agent.y === undefined) continue;
+            const dist = Math.sqrt((agent.x - px) ** 2 + (agent.y - py) ** 2);
+            if (dist < 15) nearbyCount++;
+        }
+        const mods = STEALTH_DETECTION_MODIFIERS.crowdDensity;
+        if (nearbyCount >= 20) return mods.crowded;
+        if (nearbyCount >= 10) return mods.dense;
+        if (nearbyCount >= 5) return mods.moderate;
+        if (nearbyCount >= 2) return mods.sparse;
+        return mods.empty;
+    }
+
+    /**
+     * Get weather modifier for detection.
+     */
+    _getWeatherModifier() {
+        const weather = this.game.weatherSystem;
+        if (!weather) return STEALTH_DETECTION_MODIFIERS.weather.clear;
+        const mods = STEALTH_DETECTION_MODIFIERS.weather;
+        const type = weather.type || 'clear';
+        return mods[type] ?? mods.clear;
     }
 
     /**

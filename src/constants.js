@@ -677,3 +677,100 @@ export const SFX_PARAMS = {
         filter: { type: 'highpass', frequency: 4000, Q: 2 }
     },
 };
+// Combat difficulty by heat level — smoothed curve
+// Level 0 = calm, 1 = alert, 2 = search, 3 = pursuit, 4 = critical, 5 = lockdown
+// No spike at level 3, no flat at level 5+
+export const COMBAT_DIFFICULTY_LEVELS = [
+    // Level 0: Calm — no active police response
+    {
+        label: 'calm',
+        heatMin: 0,
+        heatMax: 19,
+        spawnCount: 0,
+        unitTypes: [],
+        aggression: 0,       // NPCs ignore player
+        patrolInterval: 0,   // no extra patrols
+        specialActions: [],
+    },
+    // Level 1: Alert — single patrol notices something
+    {
+        label: 'alert',
+        heatMin: 20,
+        heatMax: 39,
+        spawnCount: 1,
+        unitTypes: ['PATROL_CAR'],
+        aggression: 0.2,     // cautious, observes first
+        patrolInterval: 45,  // slow response
+        specialActions: [],
+    },
+    // Level 2: Search — active investigation, moderate pressure
+    {
+        label: 'search',
+        heatMin: 40,
+        heatMax: 59,
+        spawnCount: 2,
+        unitTypes: ['PATROL_CAR', 'PATROL_CAR'],
+        aggression: 0.4,     // will pursue if player is spotted
+        patrolInterval: 30,
+        specialActions: [],
+    },
+    // Level 3: Pursuit — full response, but controlled escalation
+    {
+        label: 'pursuit',
+        heatMin: 60,
+        heatMax: 79,
+        spawnCount: 3,
+        unitTypes: ['PATROL_CAR', 'PATROL_CAR', 'INTERCEPTOR'],
+        aggression: 0.6,     // active engagement, will use force
+        patrolInterval: 20,
+        specialActions: ['roadblock'],
+    },
+    // Level 4: Critical — heavy response, aerial support
+    {
+        label: 'critical',
+        heatMin: 80,
+        heatMax: 89,
+        spawnCount: 4,
+        unitTypes: ['PATROL_CAR', 'PATROL_CAR', 'INTERCEPTOR', 'DRONE'],
+        aggression: 0.8,     // aggressive pursuit, drone tracking
+        patrolInterval: 15,
+        specialActions: ['roadblock', 'helicopter'],
+    },
+    // Level 5: Lockdown — maximum response, city-wide
+    {
+        label: 'lockdown',
+        heatMin: 90,
+        heatMax: 100,
+        spawnCount: 5,
+        unitTypes: ['PATROL_CAR', 'PATROL_CAR', 'INTERCEPTOR', 'INTERCEPTOR', 'DRONE'],
+        aggression: 1.0,     // full engagement, spike strips, helicopter
+        patrolInterval: 10,
+        specialActions: ['roadblock', 'helicopter', 'spike_strips'],
+    },
+];
+
+// Stealth detection modifiers by environment
+export const STEALTH_DETECTION_MODIFIERS = {
+    // Time of day multipliers (applied to base detection radius)
+    timeOfDay: {
+        night: 0.4,     // 22:00-05:00 — dark, hard to see
+        dusk: 0.6,      // 18:00-21:00 — twilight
+        dawn: 0.6,      // 05:00-08:00 — twilight
+        day: 1.0,       // 08:00-18:00 — full visibility
+    },
+    // Crowd density multipliers (more NPCs = harder to hide but easier to blend)
+    crowdDensity: {
+        empty: 1.2,     // no cover, easy to spot
+        sparse: 1.0,    // few NPCs, normal detection
+        moderate: 0.8,  // some cover, slightly harder to spot player
+        dense: 0.6,     // lots of cover, harder to distinguish player
+        crowded: 0.4,   // very hard to spot player in crowd
+    },
+    // Weather multipliers
+    weather: {
+        clear: 1.0,
+        cloudy: 0.9,
+        rain: 0.7,      // rain reduces visibility
+        storm: 0.5,     // heavy rain, very low visibility
+    },
+};

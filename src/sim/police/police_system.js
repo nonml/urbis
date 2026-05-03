@@ -2,12 +2,15 @@
 
 import { eventBus, EVENT_TYPES } from '../events.js';
 import { createVehicle, updateVehiclePhysics, getTerrainProperties, applyImpactDeform, blowTire } from '../../vehicles/vehicle_state.js';
+import { COMBAT_DIFFICULTY_LEVELS } from '../../constants.js';
 
 // Heat thresholds for police response
 export const HEAT_THRESHOLDS = {
-    ALERT: 25,
-    SEARCH: 50,
-    PURSUIT: 75
+    ALERT: 20,
+    SEARCH: 40,
+    PURSUIT: 60,
+    CRITICAL: 80,
+    LOCKDOWN: 90
 };
 
 // Police unit types
@@ -17,6 +20,18 @@ export const POLICE_TYPES = {
     DRONE: { name: 'Surveillance Drone', speed: 15, handling: 0.6, heatCost: 8 },
     HELICOPTER: { name: 'Police Helicopter', speed: 12, handling: 0.3, heatCost: 15 },
 };
+
+/**
+ * Get combat difficulty level for current heat value.
+ * Returns the level config from COMBAT_DIFFICULTY_LEVELS.
+ */
+export function getDifficultyLevelForHeat(heat) {
+    for (let i = COMBAT_DIFFICULTY_LEVELS.length - 1; i >= 0; i--) {
+        const level = COMBAT_DIFFICULTY_LEVELS[i];
+        if (heat >= level.heatMin) return level;
+    }
+    return COMBAT_DIFFICULTY_LEVELS[0];
+}
 
 export class PoliceSystem {
     constructor(game) {
@@ -57,10 +72,20 @@ export class PoliceSystem {
      */
     getResponseLevel() {
         const heat = this.game.state.player.heat || 0;
+        if (heat >= HEAT_THRESHOLDS.LOCKDOWN) return 'lockdown';
+        if (heat >= HEAT_THRESHOLDS.CRITICAL) return 'critical';
         if (heat >= HEAT_THRESHOLDS.PURSUIT) return 'pursuit';
         if (heat >= HEAT_THRESHOLDS.SEARCH) return 'search';
         if (heat >= HEAT_THRESHOLDS.ALERT) return 'alert';
         return 'calm';
+    }
+
+    /**
+     * Get current difficulty config for spawning and aggression
+     */
+    getDifficultyConfig() {
+        const heat = this.game.state.player.heat || 0;
+        return getDifficultyLevelForHeat(heat);
     }
 
     /**
@@ -94,8 +119,9 @@ export class PoliceSystem {
     /**
      * Spawn police near player
      * @param {number} count - Number of units to spawn
+     * @param {string[]} unitTypes - Types of units to spawn
      */
-    spawnNearPlayer(count) {
+    spawnNearPlayer(count, unitTypes) {
         const playerX = this.game.state.player.x;
         const playerY = this.game.state.player.y;
         const districtId = this.game.map.getDistrictAt(playerX, playerY) || 0;
@@ -117,7 +143,8 @@ export class PoliceSystem {
                 y: Math.round(sy),
                 heading: this.game.rng.int(0, 359),
                 targetX: playerX,
-                targetY: playerY
+                targetY: playerY,
+                type: unitTypes?.[i] || 'PATROL_CAR',
             });
         }
     }
@@ -129,6 +156,8 @@ export class PoliceSystem {
         const heat = this.game.state.player.heat || 0;
         const wanted = this.isWanted();
 
+        const difficulty = this.getDifficultyConfig();
+        const responseLevel = difficulty.label;
         const prevResponse = this._prevResponse || 'calm';
         this._prevResponse = responseLevel;
         if (responseLevel !== prevResponse && responseLevel !== 'calm') {
@@ -138,12 +167,8 @@ export class PoliceSystem {
         // Spawn response based on heat
         if (wanted && tick - this.lastSpawnTick >= 30) {
             this.lastSpawnTick = tick;
-            const responseLevel = this.getResponseLevel();
-            let spawnCount = 0;
-
-            if (responseLevel === 'alert') spawnCount = 1;
-            else if (responseLevel === 'search') spawnCount = 3;
-            else if (responseLevel === 'pursuit') spawnCount = 5;
+            const spawnCount = difficulty.spawnCount;
+            const unitTypes = difficulty.unitTypes;
 
             // Adjust for police rep
             const policeRep = this.game.factions?.reputation?.police || 0;
@@ -151,18 +176,23 @@ export class PoliceSystem {
             if (policeRep > 40) spawnCount = Math.floor(spawnCount * 0.5);
 
             if (spawnCount > 0) {
-                this.spawnNearPlayer(spawnCount);
+                this.spawnNearPlayer(spawnCount, unitTypes);
             }
         }
 
-        if (responseLevel === 'pursuit' && tick - this._lastRoadblockTick > 60) {
+        // Handle special actions based on difficulty level
+        const actions = difficulty.specialActions || [];
+        if (actions.includes('roadblock') && tick - this._lastRoadblockTick > 60) {
             this._spawnRoadblock(tick);
         }
-        if (responseLevel === 'pursuit' && !this._heliActive) {
+        if (actions.includes('helicopter') && !this._heliActive) {
             this._spawnHelicopter();
         }
-        if (this._heliActive && responseLevel !== 'pursuit') {
+        if (this._heliActive && !actions.includes('helicopter')) {
             this._despawnHelicopter();
+        }
+        if (actions.includes('spike_strips')) {
+            this._checkSpikeStrips();
         }
 
         this._checkSpikeStrips();
