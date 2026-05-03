@@ -524,10 +524,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q9.E — Screen-Space Reflections
 
-- [ ] `q9-ssr-stochastic` stochastic SSR pass with temporal accumulation
-- [ ] `q9-ssr-wet-roads` wet-road materials request SSR; dry roads do not
-- [ ] `q9-ssr-fallback` env-probe fallback when SSR rays miss
-- [ ] `q9-ssr-perf-toggle` SSR off on "Performance" preset, on at "High" and above
+- [x] `q9-ssr-stochastic` stochastic SSR pass with temporal accumulation
+- [x] `q9-ssr-wet-roads` wet-road materials request SSR; dry roads do not
+- [x] `q9-ssr-fallback` env-probe fallback when SSR rays miss
+- [x] `q9-ssr-perf-toggle` SSR off on "Performance" preset, on at "High" and above
 
 ### Q9.F — Bloom, LUT, Sky, Env Probe
 

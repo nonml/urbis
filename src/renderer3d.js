@@ -1107,8 +1107,119 @@ export class Renderer3D {
                 const volFogPass = new ShaderPass(volFogShader);
                 volFogPass.setSize(volFogW, volFogH);
                 this.composer.addPass(volFogPass);
-                this._volFogPass = volFogPass;
+
+            // SSR — screen-space reflections for wet surfaces
+            if (ShaderPassMod) {
+                const { ShaderPass } = ShaderPassMod;
+                const ssrShader = {
+                    uniforms: {
+                        tDiffuse: { value: null },
+                        tDepth: { value: null },
+                        wetness: { value: 0.0 },
+                        maxTrace: { value: 128.0 },
+                        stepSize: { value: 0.02 },
+                        fadePower: { value: 0.5 },
+                        temporalAlpha: { value: 0.3 },
+                        prevSSR: { value: null },
+                    },
+                    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+                    fragmentShader: `
+                        uniform sampler2D tDiffuse;
+                        uniform sampler2D tDepth;
+                        uniform float wetness;
+                        uniform float maxTrace;
+                        uniform float stepSize;
+                        uniform float fadePower;
+                        uniform float temporalAlpha;
+                        uniform sampler2D prevSSR;
+                        varying vec2 vUv;
+
+                        void main(){
+                            vec4 col = texture2D(tDiffuse, vUv);
+                            float depth = texture2D(tDepth, vUv).r;
+
+                            // Skip if no wetness or no geometry
+                            if (wetness < 0.01 || depth > 0.99) {
+                                gl_FragColor = col;
+                                return;
+                            }
+
+                            // Estimate normal from depth derivatives
+                            vec2 texelSize = vec2(1.0) / vec2(textureSize(tDepth, 0));
+                            float dL = texture2D(tDepth, vUv - vec2(texelSize.x, 0.0)).r;
+                            float dR = texture2D(tDepth, vUv + vec2(texelSize.x, 0.0)).r;
+                            float dD = texture2D(tDepth, vUv - vec2(0.0, texelSize.y)).r;
+                            float dU = texture2D(tDepth, vUv + vec2(0.0, texelSize.y)).r;
+                            vec3 normal = normalize(vec3(
+                                dR - dL,
+                                2.0 * depth,
+                                dU - dD
+                            ));
+
+                            // View direction and reflection
+                            vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0));
+                            vec3 reflectDir = reflect(-viewDir, normal);
+
+                            // Only reflect for surfaces facing camera (horizontal surfaces)
+                            float reflectStrength = abs(normal.y);
+                            if (reflectStrength < 0.3) {
+                                gl_FragColor = col;
+                                return;
+                            }
+
+                            // Ray march for reflection
+                            vec2 rayStep = reflectDir.xz * stepSize / max(0.001, abs(reflectDir.y));
+                            vec2 uv = vUv;
+                            vec3 reflection = vec3(0.0);
+                            float traceDist = 0.0;
+                            float reflectionWeight = 0.0;
+
+                            for (float i = 0.0; i < maxTrace; i++) {
+                                uv += rayStep * 0.01;
+                                traceDist += stepSize;
+
+                                // Out of bounds check
+                                if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
+
+                                float sampleDepth = texture2D(tDepth, uv).r;
+                                vec3 sampleCol = texture2D(tDiffuse, uv).rgb;
+
+                                // Hit test: check if ray is at surface level
+                                float heightDiff = abs(sampleDepth - depth);
+                                if (heightDiff < 0.1 * traceDist) {
+                                    reflection = sampleCol;
+                                    reflectionWeight = 1.0 / (1.0 + traceDist * 0.5);
+                                    break;
+                                }
+                            }
+
+                            // Env-probe fallback: use sky color when rays miss
+                            if (reflectionWeight < 0.1) {
+                                reflection = mix(col.rgb, vec3(0.1, 0.12, 0.15), 0.3);
+                                reflectionWeight = 0.1;
+                            }
+
+                            // Wetness modulation
+                            float reflectionAmount = wetness * reflectionWeight * reflectStrength;
+                            vec3 finalCol = mix(col.rgb, reflection, reflectionAmount * fadePower);
+
+                            // Temporal accumulation with previous frame
+                            vec4 prev = texture2D(prevSSR, vUv);
+                            finalCol = mix(finalCol, prev.rgb, temporalAlpha * 0.5);
+
+                            gl_FragColor = vec4(finalCol, col.a);
+                        }
+                    `,
+                };
+                const ssrPass = new ShaderPass(ssrShader);
+                this.composer.addPass(ssrPass);
+                this._ssrPass = ssrPass;
+                // Temporal accumulation buffer
+                this._ssrPrevRT = new THREE.WebGLRenderTarget(
+                    rect.width, rect.height, THREE.RGBAFormat
+                );
             }
+
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(rect.width, rect.height),
                 0.25,   // strength — boosted at night dynamically
@@ -3980,6 +4091,7 @@ export class Renderer3D {
         this.updatePoliceUnits();
         this.updateWeatherFX(dt);
         this._updateVolumetricFog();
+        this._updateSSR();
 
         this.syncPlayer();
         this.updateCamera(dt);
@@ -4063,6 +4175,18 @@ export class Renderer3D {
         } else {
             this.renderer.render(this.scene, this.camera);
         }
+    }
+
+    /**
+     * Update SSR uniforms from wetness and camera state
+     */
+    _updateSSR() {
+        if (!this._ssrPass) return;
+        const u = this._ssrPass.material.uniforms;
+        // Wetness drives reflection intensity
+        u.wetness.value = this._wetness ?? 0.0;
+        // Disable SSR when wetness is very low (perf optimization)
+        u.enabled = (this._wetness ?? 0.0) > 0.05;
     }
 
     /**
