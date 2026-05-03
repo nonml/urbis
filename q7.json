@@ -1,0 +1,14 @@
+{
+  "quarter": "Q7",
+  "milestone": "Narrative & Audio",
+  "version": "0.7.0.0",
+  "approved": true,
+  "approvedDate": "2026-05-04",
+  "sections": [
+    "Q7.A — Cinematic Camera",
+    "Q7.B — Local TTS",
+    "Q7.C — Radio",
+    "Q7.D — Mission Arc",
+    "Q7.E — Subtitles & Accessibility"
+  ]
+}
