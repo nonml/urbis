@@ -495,7 +495,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q9.A — Material Audit (PBR Everywhere)
 
 - [x] `q9-mat-audit-script` `scripts/audit_materials.mjs` lists every non-PBR material in `src/`
-- [ ] `q9-mat-vehicles-pbr` all vehicle meshes use `MeshStandardMaterial`/`MeshPhysicalMaterial` with declared roughness/metalness
+- [x] `q9-mat-vehicles-pbr` all vehicle meshes use `MeshStandardMaterial`/`MeshPhysicalMaterial` with declared roughness/metalness
 - [ ] `q9-mat-buildings-pbr` all building meshes converted to PBR
 - [ ] `q9-mat-characters-pbr` character + clothing materials converted to PBR (subsurface flag where appropriate)
 - [ ] `q9-mat-props-pbr` props (cones, signs, trash, chairs, crates) converted

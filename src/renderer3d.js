@@ -753,6 +753,7 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    this._enforceVehiclePBR(root);
                     this._vehicleModels.set(type, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -1414,6 +1415,36 @@ export class Renderer3D {
         return group;
     }
 
+
+    /** Enforce PBR materials on vehicle GLTF meshes */
+    _enforceVehiclePBR(group) {
+        group.traverse((child) => {
+            if (!child.isMesh) return;
+            const mat = child.material;
+            if (!mat) return;
+            // Already PBR — keep as-is
+            if (mat.isMeshStandardMaterial || mat.isMeshPhysicalMaterial) {
+                // Ensure roughness/metalness defaults
+                if (mat.roughness === undefined) mat.roughness = 0.7;
+                if (mat.metalness === undefined) mat.metalness = 0.0;
+                return;
+            }
+            // Convert non-PBR to MeshStandardMaterial
+            const color = mat.color ? mat.color.getHex() : 0xcccccc;
+            const emissive = mat.emissive ? mat.emissive.getHex() : 0x000000;
+            const emissiveIntensity = mat.emissiveIntensity || 0;
+            const transparent = mat.transparent || false;
+            const opacity = mat.opacity ?? 1.0;
+            const map = mat.map || null;
+            const wireframe = mat.wireframe || false;
+            const side = mat.side || THREE.FrontSide;
+            const newMat = new THREE.MeshStandardMaterial({
+                color, emissive, emissiveIntensity, transparent, opacity,
+                map, wireframe, side, roughness: 0.7, metalness: 0.0,
+            });
+            child.material = newMat;
+        });
+    }
     /** Procedural traffic light: pole + housing + 3 signal lenses */
     _buildTrafficLight(px, py, pz) {
         const objects = [];
