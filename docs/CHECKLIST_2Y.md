@@ -477,7 +477,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q8-cb-3h-playthrough` scripted Playwright playthrough runs 3 hours headless with zero uncaught errors
 - [x] `q8-cb-error-handler` global error handler wired into game.init()
-- [ ] `q8-cb-bundle-growth` bundle size growth ≤ 10% versus `0.7.0.0`
+- [x] `q8-cb-bundle-growth` bundle size growth ≤ 10% versus `0.7.0.0`
 
 ### Q8 — Definition of Done
 
