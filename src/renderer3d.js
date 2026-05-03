@@ -740,6 +740,7 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
+                    this._enforcePBR(root);
                     this._gltfModels.set(type, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -753,7 +754,7 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
-                    this._enforceVehiclePBR(root);
+                    this._enforcePBR(root);
                     this._vehicleModels.set(type, root);
                     resolve();
                 }, undefined, () => resolve());
@@ -1416,8 +1417,8 @@ export class Renderer3D {
     }
 
 
-    /** Enforce PBR materials on vehicle GLTF meshes */
-    _enforceVehiclePBR(group) {
+    /** Enforce PBR materials on GLTF meshes (vehicles, buildings, props) */
+    _enforcePBR(group) {
         group.traverse((child) => {
             if (!child.isMesh) return;
             const mat = child.material;
