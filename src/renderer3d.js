@@ -1012,6 +1012,7 @@ export class Renderer3D {
                         fogColor: { value: new THREE.Color(0x7ab0d0) },
                         sunDirection: { value: new THREE.Vector3(1, 1, 0) },
                         lightIntensity: { value: 1.0 },
+                        sunAngle: { value: 0.5 },
                         uTime: { value: 0 },
                         screenWidth: { value: volFogW },
                         screenHeight: { value: volFogH },
@@ -1023,6 +1024,7 @@ export class Renderer3D {
                         uniform vec3 fogColor;
                         uniform vec3 sunDirection;
                         uniform float lightIntensity;
+                        uniform float sunAngle;
                         uniform float uTime;
                         uniform float screenWidth;
                         uniform float screenHeight;
@@ -1042,13 +1044,40 @@ export class Renderer3D {
                             return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
                         }
 
+                        // Improved god rays with screen-space light scattering
+                        float godRays(vec2 uv, vec3 sunDir, float intensity){
+                            // Direction from screen center toward sun
+                            vec2 dir = uv - vec2(0.5);
+                            float sunDot = dot(dir, normalize(sunDir.xy));
+
+                            // Low sun angle = more dramatic shafts
+                            float lowSun = 1.0 - abs(sunDir.y);
+                            float shaftStrength = max(0.0, sunDot) * intensity * (0.5 + lowSun * 1.5);
+
+                            // Noise-based volumetric scattering
+                            float n = noise2d(uv * 4.0 + vec2(sin(uTime*0.15), cos(uTime*0.12)));
+                            shaftStrength *= n;
+
+                            // Falloff from center
+                            float dist = length(dir);
+                            shaftStrength *= exp(-dist * 1.5);
+
+                            return shaftStrength;
+                        }
+
+                        // Streetlight cone approximation: bright areas get volumetric fog
+                        float lightCones(vec2 uv, vec4 color){
+                            // Sample brightness — bright pixels suggest nearby lights
+                            float bright = dot(color.rgb, vec3(0.299, 0.587, 0.114));
+                            // Threshold: only bright areas get volumetric treatment
+                            float cone = smoothstep(0.3, 0.8, bright);
+                            // Noise for volumetric appearance
+                            float n = noise2d(uv * 6.0 + vec2(sin(uTime*0.2), cos(uTime*0.15)));
+                            return cone * n * 0.2;
+                        }
+
                         void main(){
                             vec4 col = texture2D(tDiffuse, vUv);
-
-                            // God rays: directional light scattering
-                            vec2 centerDir = vUv - vec2(0.5);
-                            float sunAngle = dot(centerDir, normalize(sunDirection.xy));
-                            float godRay = max(0.0, sunAngle) * 0.5;
 
                             // Volumetric noise (slowly animated)
                             vec2 noiseUV = vUv * 3.0;
@@ -1057,16 +1086,19 @@ export class Renderer3D {
                             float density = fogDensity * (1.0 + fogNoise * 0.3);
 
                             // Distance-based fog falloff
+                            vec2 centerDir = vUv - vec2(0.5);
                             float dist = length(centerDir);
                             float fogFactor = 1.0 - exp(-density * dist * 80.0);
 
-                            // God rays contribution
-                            float shafts = godRay * lightIntensity * 0.15;
-                            shafts *= noise2d(vUv * 5.0);
+                            // God rays from sun
+                            float shafts = godRays(vUv, sunDirection, lightIntensity);
 
-                            // Composite fog color
-                            vec3 fogContrib = fogColor * (fogFactor + shafts);
-                            col.rgb = mix(col.rgb, fogContrib, fogFactor * 0.5);
+                            // Streetlight cones from bright areas
+                            float cones = lightCones(vUv, col);
+
+                            // Composite fog
+                            vec3 fogContrib = fogColor * (fogFactor + shafts + cones);
+                            col.rgb = mix(col.rgb, fogContrib, fogFactor * 0.5 + shafts * 0.3 + cones * 0.2);
 
                             gl_FragColor = col;
                         }
@@ -4062,6 +4094,10 @@ export class Renderer3D {
             u.lightIntensity.value = 0.2;
         } else {
             u.lightIntensity.value = 0.8;
+        }
+        // Sun angle: vertical component (low sun = more dramatic shafts)
+        if (this._sunPosition) {
+            u.sunAngle.value = Math.abs(this._sunPosition.y);
         }
         // Time for noise animation
         u.uTime.value = performance.now() / 1000;
