@@ -2462,7 +2462,7 @@ export class Renderer3D {
         group.add(legs);
 
         // Head — small, proportional
-        const headMat = new THREE.MeshStandardMaterial({ color: 0xd4a574, roughness: 0.55 });
+        const headMat = new THREE.MeshPhysicalMaterial({ color: 0xd4a574, roughness: 0.55, metalness: 0.0, sheenRoughness: 0.6, sheenColor: new THREE.Color(0x332211), sheen: 1.0 });
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.10 * s, 10, 8), headMat);
         head.castShadow = true;
         head.position.y = 0.72 * s + 0.05;

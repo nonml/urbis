@@ -85,7 +85,7 @@ export function createProceduralCharacter(seed = 0) {
     const shirtColor = SHIRT_COLORS[Math.floor(h2 * SHIRT_COLORS.length)];
     const pantsColor = PANTS_COLORS[Math.floor(h3 * PANTS_COLORS.length)];
 
-    const skinMat = new THREE.MeshStandardMaterial({ color: skinColor, roughness: 0.8, metalness: 0.0 });
+    const skinMat = new THREE.MeshPhysicalMaterial({ color: skinColor, roughness: 0.8, metalness: 0.0, sheenRoughness: 0.6, sheenColor: new THREE.Color(0x332211), sheen: 1.0 });
     const shirtMat = new THREE.MeshStandardMaterial({ color: shirtColor, roughness: 0.7, metalness: 0.0 });
     const pantsMat = new THREE.MeshStandardMaterial({ color: pantsColor, roughness: 0.75, metalness: 0.0 });
     const shoeMat = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.9, metalness: 0.0 });
