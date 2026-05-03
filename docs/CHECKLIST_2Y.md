@@ -437,8 +437,8 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q7-dod-arc` 6-mission arc completable end to end (m1-m6 authored)
 - [x] `q7-dod-audio` Voice, music, subtitles all functional (TTS + radio + subtitle renderer)
-- [ ] Operator approval `q7.json`
-- [ ] Tag `0.7.0.0`
+- [x] Operator approval `q7.json`
+- [x] Tag `0.7.0.0`
 
 ---
 
