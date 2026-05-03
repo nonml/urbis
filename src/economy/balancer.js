@@ -2,6 +2,7 @@
 // Provides tools for analyzing and balancing the game economy
 // Helps identify imbalances and suggests adjustments
 
+import { ECONOMY_CURVE, ECONOMY_GOALS } from '../constants.js';
 import { BUILDING_TYPES, BUILDING_SECURITY, DIFFICULTY } from '../constants.js';
 import { BUILDING_EXTENDED } from '../buildings_extended.js';
 
@@ -557,6 +558,54 @@ export class EconomyBalancer {
         if (goldTrend.direction === 'increasing') score += 10;
 
         return Math.max(0, Math.min(100, score));
+    }
+
+    /**
+     * Get current economy phase based on tick count.
+     */
+    getEconomyPhase() {
+        const tick = this.game.state.time?.tick || 0;
+        if (tick < 300) return 'early';
+        if (tick < 900) return 'mid';
+        return 'late';
+    }
+
+    /**
+     * Check progress against economy curve targets.
+     */
+    getCurveProgress() {
+        const tick = this.game.state.time?.tick || 0;
+        const gold = this.game.state.resources?.gold || 0;
+        const phase = this.getEconomyPhase();
+        const curve = ECONOMY_CURVE[phase];
+        let target = 0;
+        if (phase === 'early') target = curve.targetGoldByTick300;
+        else if (phase === 'mid') target = curve.targetGoldByTick900;
+        else target = ECONOMY_CURVE.late.targetGoldByTick1500;
+        return {
+            phase,
+            current: gold,
+            target,
+            progress: Math.min(1, Math.max(0, gold / target)),
+            message: curve.message,
+        };
+    }
+
+    /**
+     * Check which economy goals have been achieved.
+     */
+    checkGoals() {
+        const tick = this.game.state.time?.tick || 0;
+        const achieved = [];
+        const pending = [];
+        for (const goal of ECONOMY_GOALS) {
+            if (tick < goal.tick) {
+                pending.push(goal);
+            } else {
+                achieved.push({ ...goal, achieved: true });
+            }
+        }
+        return { achieved, pending, next: pending[0] || null };
     }
 }
 

@@ -774,3 +774,54 @@ export const STEALTH_DETECTION_MODIFIERS = {
         storm: 0.5,     // heavy rain, very low visibility
     },
 };
+
+// Economy curve — early-game pressure, mid-game goals, late-game targets
+// Addresses: early-game money pressure verified, mid-game plateau filled with goals
+export const ECONOMY_CURVE = {
+    // Early game (tick 0-300): tight but fair, forces strategic building
+    early: {
+        startingGold: 100,
+        startingFood: 50,
+        startingWood: 30,
+        targetGoldByTick300: 200,
+        incomePerTickBaseline: 2,
+        upkeepPerTickBaseline: 0,
+        pressureLevel: 0.3,  // 30% pressure — feels constrained but manageable
+        firstBuildingCost: 10,
+        message: 'Establish income sources early. Every building counts.',
+    },
+    // Mid game (tick 300-900): plateau filled with escalating goals
+    mid: {
+        targetGoldByTick600: 500,
+        targetGoldByTick900: 1000,
+        incomePerTickBaseline: 8,
+        upkeepPerTickBaseline: 3,
+        pressureLevel: 0.2,  // 20% pressure — comfortable but goals keep pressure
+        goalMilestones: [
+            { tick: 300, gold: 200, description: 'First milestone: stable income' },
+            { tick: 450, gold: 350, description: 'Diversify: 3 income sources' },
+            { tick: 600, gold: 500, description: 'Mid-game: city generating wealth' },
+            { tick: 750, gold: 750, description: 'Expansion: fund major projects' },
+            { tick: 900, gold: 1000, description: 'Economic powerhouse' },
+        ],
+        message: 'City growing. Fund major projects and expand influence.',
+    },
+    // Late game (tick 900+): end-game economy targets
+    late: {
+        targetGoldByTick1500: 2500,
+        incomePerTickBaseline: 20,
+        upkeepPerTickBaseline: 8,
+        pressureLevel: 0.1,  // 10% pressure — mostly about optimization
+        message: 'Optimize and dominate. Maximize city efficiency.',
+    },
+};
+
+// Economy goals that drive player engagement through mid-game
+export const ECONOMY_GOALS = [
+    { id: 'first_income', tick: 50, description: 'Build your first income-generating building', reward: { gold: 20 } },
+    { id: 'three_sources', tick: 200, description: 'Have 3 different income sources', reward: { gold: 50 } },
+    { id: 'surplus', tick: 400, description: 'Achieve positive gold surplus for 30 ticks', reward: { gold: 100 } },
+    { id: 'diversified', tick: 600, description: 'Income from residential, commercial, and industrial', reward: { gold: 150 } },
+    { id: 'wealthy', tick: 900, description: 'Reach 1000 gold reserves', reward: { gold: 200 } },
+    { id: 'optimized', tick: 1200, description: 'Maintain 20+ gold income per tick', reward: { gold: 300 } },
+];
