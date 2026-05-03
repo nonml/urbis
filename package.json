@@ -15,6 +15,7 @@
     "validate": "node scripts/validate_content.mjs",
     "lint:basic": "node scripts/lint_basic.mjs",
     "check:no-math-random": "node scripts/check_no_math_random.mjs",
+    "check:pbr": "node scripts/audit_materials.mjs --ci",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",

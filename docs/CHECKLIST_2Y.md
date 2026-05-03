@@ -499,7 +499,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q9-mat-buildings-pbr` all building meshes converted to PBR
 - [x] `q9-mat-characters-pbr` character + clothing materials converted to PBR (subsurface flag where appropriate)
 - [x] `q9-mat-props-pbr` props (cones, signs, trash, chairs, crates) converted
-- [ ] `q9-mat-ci-check` CI fails on new non-PBR material in non-HUD/non-sky paths
+- [x] `q9-mat-ci-check` CI fails on new non-PBR material in non-HUD/non-sky paths
 
 ### Q9.B — HDR Pipeline
 

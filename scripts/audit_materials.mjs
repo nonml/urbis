@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // Material Audit Script — Q9.A
 // Lists every non-PBR material usage in src/
-// Usage: node scripts/audit_materials.mjs [--json]
+// Usage: node scripts/audit_materials.mjs [--json] [--ci]
 
 import fs from 'fs';
 import path from 'path';
@@ -11,6 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const SRC_DIR = path.join(__dirname, '../src');
 const JSON_OUTPUT = process.argv.includes('--json');
+const CI_MODE = process.argv.includes('--ci');
 
 // Non-PBR material classes that should be flagged
 const NON_PBR_SURFACE = {
@@ -32,6 +33,29 @@ const PBR_MATERIALS = new Set([
     'MeshPhysicalMaterial',
 ]);
 
+// CI exemptions: known acceptable non-PBR usages (file:line -> reason)
+// These are debug overlays, FX effects, god mode, sky — not game content.
+const CI_EXEMPTIONS = {
+    'src/render/lighting/day_night.js:140': 'Stars (PointsMaterial, sky)',
+    'src/renderer3d.js:385': 'Ground plane (invisible)',
+    'src/renderer3d.js:2010': 'Building window glow (additive emissive)',
+    'src/renderer3d.js:2482': 'Muzzle flash FX',
+    'src/renderer3d.js:2499': 'Visibility ring FX',
+    'src/renderer3d.js:2578': 'Debug wireframe (LineBasicMaterial)',
+    'src/renderer3d.js:2624': 'Decal overlay (Q10)',
+    'src/renderer3d.js:3153': 'Debug wireframe (LineBasicMaterial)',
+    'src/renderer3d.js:3207': 'Weather particles (PointsMaterial)',
+    'src/renderer3d.js:3540': 'Debug overlay',
+    'src/renderer3d.js:3557': 'Scaffolding (debug)',
+    'src/renderer3d.js:4064': 'Debug overlay (vertex colors)',
+    'src/renderer3d.js:4377': 'Zone overlay (debug)',
+    'src/renderer3d.js:4491': 'Build ghost (god mode)',
+    'src/renderer3d.js:4504': 'Footprint outline (god mode)',
+    'src/renderer3d.js:4566': 'Hover highlight (god mode)',
+    'src/renderer3d.js:4676': 'Hack placement ring (FX)',
+    'src/renderer3d.js:4786': 'Particle material (FX)',
+};
+
 /**
  * Recursively collect all JS files in a directory
  */
@@ -51,27 +75,17 @@ function collectJSFiles(dir) {
 
 /**
  * Extract material class names from a line.
- * Handles: new THREE.MeshBasicMaterial({
- *          new MeshStandardMaterial({
- *          const mat = new THREE.MeshPhongMaterial({
- *          ternary: ? THREE.PointsMaterial :
  */
 function extractMaterials(line) {
     const materials = [];
-
-    // Pattern 1: direct instantiation — new THREE.XxxMaterial(
-    //                or: new XxxMaterial(
     const directMatches = line.matchAll(/new\s+(?:THREE\.)?(\w+Material)\s*\(/g);
     for (const m of directMatches) {
         materials.push(m[1]);
     }
-
-    // Pattern 2: ternary — ? THREE.XxxMaterial :
     const ternaryMatches = line.matchAll(/\?\s*THREE\.(\w+Material)\s*:/g);
     for (const m of ternaryMatches) {
         materials.push(m[1]);
     }
-
     return materials;
 }
 
@@ -82,7 +96,8 @@ function scanFile(filePath) {
     const content = fs.readFileSync(filePath, 'utf8');
     const lines = content.split('\n');
     const findings = [];
-    const relative = filePath.replace(__dirname + '/', '');
+    const projectRoot = path.join(__dirname, '..');
+    const relative = filePath.replace(projectRoot + '/', '');
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
@@ -143,7 +158,32 @@ function main() {
         process.exit(allFindings.filter(f => f.severity === 'ERROR').length > 0 ? 1 : 0);
     }
 
-    // Human-readable report
+    // CI mode: check for non-exempted non-PBR materials
+    if (CI_MODE) {
+        const errors = allFindings.filter(f => f.severity === 'ERROR');
+        const unexempted = errors.filter(e => {
+            const key = `${e.file}:${e.line}`;
+            return !CI_EXEMPTIONS[key];
+        });
+
+        if (unexempted.length === 0) {
+            console.log('[PASS] CI material audit: all non-PBR materials are exempted.');
+            console.log(`  ${errors.length} exempted, ${allFindings.length - errors.length} notes.`);
+            process.exit(0);
+        } else {
+            console.log(`[FAIL] CI material audit: ${unexempted.length} non-exempted non-PBR material(s):\n`);
+            for (const e of unexempted) {
+                console.log(`  ${e.file}:${e.line} — ${e.material}`);
+                console.log(`  Context: ${e.context}`);
+                console.log(`  Fix: ${e.suggestion}`);
+                console.log();
+            }
+            console.log('To add an exemption, update CI_EXEMPTIONS in scripts/audit_materials.mjs');
+            process.exit(1);
+        }
+    }
+
+    // Human-readable report (non-CI mode)
     const errors = allFindings.filter(f => f.severity === 'ERROR');
     const notes  = allFindings.filter(f => f.severity === 'NOTE');
     const unknown = allFindings.filter(f => f.severity === 'UNKNOWN');
