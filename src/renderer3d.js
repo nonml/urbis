@@ -919,6 +919,9 @@ export class Renderer3D {
             this.composer = new EffectComposer(this.renderer);
             this.composer.setSize(rect.width, rect.height);
 
+            // HDR: switch render targets to HalfFloatType for tone mapping
+            this.composer.renderTarget1.type = THREE.HalfFloatType;
+            this.composer.renderTarget2.type = THREE.HalfFloatType;
             const renderPass = new RenderPass(this.scene, this.camera);
             this.composer.addPass(renderPass);
 
