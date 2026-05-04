@@ -531,13 +531,13 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q9.F — Bloom, LUT, Sky, Env Probe
 
-- [ ] `q9-bloom-multi-mip` multi-mip thresholded bloom replaces single-pass UnrealBloom params
-- [ ] `q9-lut-system` per-time-of-day LUT (dawn/day/dusk/night) blended by day/night
-- [ ] `q9-lut-weather-tint` weather tint overlay on LUT
-- [ ] `q9-sky-disc` sun and moon disc render at correct angular size
-- [ ] `q9-sky-stars` star field visible at low light pollution
-- [ ] `q9-sky-lightning-exposure` lightning flash is a true exposure spike, not alpha overlay
-- [ ] `q9-env-probe` periodic env cube capture for IBL on metals/glass
+- [x] `q9-bloom-multi-mip` multi-mip thresholded bloom replaces single-pass UnrealBloom params
+- [x] `q9-lut-system` per-time-of-day LUT (dawn/day/dusk/night) blended by day/night
+- [x] `q9-lut-weather-tint` weather tint overlay on LUT
+- [x] `q9-sky-disc` sun and moon disc render at correct angular size
+- [x] `q9-sky-stars` star field visible at low light pollution
+- [x] `q9-sky-lightning-exposure` lightning flash is a true exposure spike, not alpha overlay
+- [x] `q9-env-probe` periodic env cube capture for IBL on metals/glass
 
 ### Q9.G — Quality Presets
 

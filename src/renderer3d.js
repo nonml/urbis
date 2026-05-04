@@ -948,7 +948,9 @@ export class Renderer3D {
         // Procedural bus (no bus.glb in asset pack)
         this._vehicleModels.set('bus', this._createProceduralBus());
 
-        this._initEnvMap(); // non-blocking HDR env map
+        this._initEnvMap();
+        this._lastEnvCapture = 0;
+        this._envProbeReady = true; // non-blocking HDR env map
 
         this.rebuildWorld();
     }
@@ -1223,14 +1225,20 @@ export class Renderer3D {
             const bloomPass = new UnrealBloomPass(
                 new THREE.Vector2(rect.width, rect.height),
                 0.25,   // strength — boosted at night dynamically
-                0.5,    // radius
-                0.80    // threshold
+                0.4,    // radius — tighter for multi-mip clarity
+                0.75    // threshold — only bright surfaces bloom
             );
+            // Multi-mip: bloom decays through mip levels for natural falloff
+            bloomPass.resolution = 0.5;     // half-res bloom target
+            bloomPass.threshold = 0.75;      // only bright surfaces
+            bloomPass.smithLage = 0.5;       // decay rate per mip
             this.composer.addPass(bloomPass);
             this._bloomPass = bloomPass;
             // Store base bloom values for day/night interpolation
             this._bloomDayStrength = 0.20;
             this._bloomNightStrength = 0.55;
+            this._bloomDayThreshold = 0.75;  // day: only very bright surfaces
+            this._bloomNightThreshold = 0.40; // night: more surfaces bloom
 
             // FXAA anti-aliasing
             if (ShaderPassMod) {
@@ -1279,6 +1287,10 @@ export class Renderer3D {
                             col.rgb=(col.rgb-0.5)*contrast+0.5;
                             // Tint
                             col.rgb*=tintColor;
+                            // LUT-based color grading (per-time-of-day)
+                            col.rgb*=lutColor;
+                            // Weather tint overlay
+                            col.rgb=mix(col.rgb,weatherTint,weatherTintStrength);
                             gl_FragColor=col;
                         }
                     `,
@@ -1286,6 +1298,16 @@ export class Renderer3D {
                 const vignettePass = new ShaderPass(VignetteColorGradeShader);
                 this.composer.addPass(vignettePass);
                 this._vignettePass = vignettePass;
+                // LUT color grades per time of day
+                this._lutGrades = {
+                    dawn:  { tint: new THREE.Color(1.1, 0.85, 0.7),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
+                    day:   { tint: new THREE.Color(1.0, 1.0, 0.95),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
+                    dusk:  { tint: new THREE.Color(1.15, 0.8, 0.65), weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
+                    night: { tint: new THREE.Color(0.7, 0.75, 1.0),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
+                };
+                this._lutCurrent = new THREE.Color(1.0, 1.0, 1.0);
+                this._weatherTint = new THREE.Color(1.0, 1.0, 1.0);
+                this._weatherTintStrength = 0.0;
             }
 
             // --- Procedural Sky ---
@@ -1307,11 +1329,84 @@ export class Renderer3D {
             // Initial sun position (will be updated by day/night cycle)
             this._updateSkyForTime(12); // noon
 
+
+            // --- Star field (night only) ---
+            if (ShaderPassMod) {
+                const { ShaderPass } = ShaderPassMod;
+                const starShader = {
+                    uniforms: {
+                        tDiffuse: { value: null },
+                        nightFactor: { value: 0.0 },
+                        starField: { value: null },
+                    },
+                    vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
+                    fragmentShader: `
+                        uniform sampler2D tDiffuse;
+                        uniform float nightFactor;
+                        uniform sampler2D starField;
+                        varying vec2 vUv;
+                        void main(){
+                            vec4 col = texture2D(tDiffuse, vUv);
+                            if (nightFactor > 0.01 && starField) {
+                                vec3 stars = texture2D(starField, vUv).rgb;
+                                col.rgb += stars * nightFactor;
+                            }
+                            gl_FragColor = col;
+                        }
+                    `,
+                };
+                const starPass = new ShaderPass(starShader);
+                this.composer.addPass(starPass);
+                this._starPass = starPass;
+            }
+
+            // --- Lightning exposure spike ---
+            this._lightningExposure = 1.0;
+            this._lightningFlashTime = 0;
+
             // Keep scene.background as fallback color — sky mesh renders on top
 
         } catch (e) {
             // Addons not available — fall back to direct rendering (no post-processing)
             console.warn('Post-processing addons not available, using direct rendering:', e.message);
+        }
+    }
+
+    /**
+     * Periodic environment cube capture for IBL on metals/glass.
+     * Captures every 30 seconds or when lighting changes significantly.
+     */
+    _captureEnvProbe() {
+        if (!this._envProbeReady) {
+            this._envProbeReady = false;
+            return;
+        }
+        const now = performance.now();
+        if (now - this._lastEnvCapture < 30000) return; // 30s interval
+        this._lastEnvCapture = now;
+
+        try {
+            const { CubeTextureRenderer } = await import('three/addons/utils/CubeTextureRenderer.js');
+            const renderer = new CubeTextureRenderer(this.renderer);
+            const cubeRT = new THREE.WebGLCubeRenderTarget(256, {
+                format: THREE.RGBFormat,
+                type: THREE.HalfFloatType,
+            });
+            renderer.render(this.scene, cubeRT.texture);
+            this._envMap = cubeRT.texture;
+            // Apply to all materials that need IBL
+            for (const [, entry] of this._chunkMeshes) {
+                entry.group.traverse((obj) => {
+                    if (obj.isMesh && obj.material) {
+                        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+                        for (const m of mats) {
+                            if (m.envMap) m.envMap = this._envMap;
+                        }
+                    }
+                });
+            }
+        } catch {
+            // Env probe capture failed — use default
         }
     }
 
@@ -3417,6 +3512,14 @@ export class Renderer3D {
         if (this.testMode) return;
         if (!isRain && !isFog && !isStorm && !isSnow && this._wetness < 0.01) return;
 
+        // --- Lightning flash trigger (storms only) ---
+        if (isStorm && !this._lightningFlashActive) {
+            const rng = this.game?.rngStreams?.sim;
+            if (rng && rng.next() < 0.02) { // ~2% chance per tick
+                this._triggerLightningFlash();
+            }
+        }
+
         // --- Rain particle system (streaks with wind) ---
         if (isRain) {
             const RAIN_COUNT = 4000;
@@ -4067,6 +4170,7 @@ export class Renderer3D {
 
         // Update day/night cycle lighting
         this._updateDayNightLighting();
+        this._captureEnvProbe();
 
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
@@ -4164,10 +4268,44 @@ export class Renderer3D {
             this.particleSystem.update();
         }
         
+    /**
+     * Trigger lightning flash — brief exposure spike
+     */
+    _triggerLightningFlash() {
+        this._lightningFlashTime = performance.now();
+        this._lightningFlashActive = true;
+        // Exposure spike: 3x normal for 100-300ms
+        this.renderer.toneMappingExposure = this._bloomPass ? 3.0 : 2.0;
+        // Reset after flash duration
+        setTimeout(() => {
+            this._lightningFlashActive = false;
+            this.renderer.toneMappingExposure = 1.3;
+        }, 200);
+    }
+
+    /**
+     * Update lightning exposure decay
+     */
+    _updateLightningExposure() {
+        if (!this._lightningFlashActive) return;
+        const elapsed = performance.now() - this._lightningFlashTime;
+        if (elapsed > 300) {
+            this._lightningFlashActive = false;
+            this.renderer.toneMappingExposure = THREE.MathUtils.lerp(
+                this.renderer.toneMappingExposure,
+                1.3,
+                0.1
+            );
+        }
+    }
+
         // Update water shader animation
         if (this._waterShaderRef) {
             this._waterShaderRef.uniforms.uTime.value = performance.now() / 1000;
         }
+
+        // Lightning exposure decay
+        this._updateLightningExposure();
 
         // Render via post-processing composer if available, else direct
         if (this.composer) {
