@@ -87,6 +87,7 @@ import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
 import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_night.js';
+import { PRESETS, DEFAULT_PRESET, applyPreset } from './render/presets.js';
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
@@ -202,6 +203,14 @@ export class Renderer3D {
         this.renderer.toneMappingExposure = 1.3;
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderScale = 1.0;
+        this._preset = DEFAULT_PRESET;
+        // Auto-detect: measure first-frame timing to pick appropriate preset
+        this._detectPreset().then((detected) => {
+            if (detected && detected !== DEFAULT_PRESET) {
+                this._preset = detected;
+                applyPreset(this, detected);
+            }
+        });
         this.setRenderScale(1.0);
 
         // Lighting — hemisphere light for natural sky/ground fill
@@ -953,6 +962,28 @@ export class Renderer3D {
         this._envProbeReady = true; // non-blocking HDR env map
 
         this.rebuildWorld();
+    }
+
+    /**
+     * Auto-detect hardware capability and pick appropriate preset.
+     * Renders a test scene and measures frame time.
+     */
+    async _detectPreset() {
+        try {
+            // Quick test: render a frame and measure time
+            const start = performance.now();
+            // Wait for next frame
+            await new Promise((resolve) => requestAnimationFrame(resolve));
+            const frameTime = performance.now() - start;
+
+            // Pick preset based on frame time
+            if (frameTime < 4) return 'ultra';      // <4ms = very fast
+            if (frameTime < 8) return 'high';       // <8ms = fast
+            if (frameTime < 16) return 'medium';    // <16ms = moderate
+            return 'low';                            // slow
+        } catch {
+            return DEFAULT_PRESET;
+        }
     }
 
     /**
