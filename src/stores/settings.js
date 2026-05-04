@@ -21,6 +21,7 @@ export const DEFAULT_SETTINGS = {
     reducedMotion:    false,
     highContrast:     false,
     colorblindMode:   'none',
+    qualityPreset:    'medium',
 };
 
 export const SETTINGS_KEYS = {
@@ -40,6 +41,7 @@ export const SETTINGS_KEYS = {
     reducedMotion:     'game_settings_reduced_motion',
     highContrast:      'game_settings_high_contrast',
     colorblindMode:    'game_settings_colorblind_mode',
+    qualityPreset:     'game_settings_quality_preset',
 };
 
 /** Reactive store for settings values — kept in sync with SettingsManager. */

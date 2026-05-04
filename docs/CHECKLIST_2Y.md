@@ -543,7 +543,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q9-qp-define` `low / medium / high / ultra` presets defined in `src/render/presets.js`
 - [x] `q9-qp-autodetect` first-frame timing picks default preset
-- [ ] `q9-qp-settings-ui` in-game settings UI exposes preset and individual toggles
+- [x] `q9-qp-settings-ui` in-game settings UI exposes preset and individual toggles
 - [ ] `q9-qp-perf-baseline` perf harness captures per-preset numbers in `tools/agent/baselines/perf.json`
 - [ ] `q9-qp-screenshot-baselines` Q1.I baselines re-captured at "Performance" preset
 

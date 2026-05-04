@@ -69,6 +69,12 @@ export class SettingsManager {
             case 'colorblindMode':
                 if (window.themeManager) window.themeManager.setColorblindMode(value);
                 break;
+            case 'qualityPreset':
+                if (window.renderer3d) {
+                    const { applyPreset } = await import('../render/presets.js');
+                    applyPreset(window.renderer3d, value);
+                }
+                break;
         }
     }
 
