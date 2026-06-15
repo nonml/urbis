@@ -9,6 +9,7 @@
     "build:beta": "node tools/release_build.js",
     "preview": "vite preview",
     "test": "node scripts/smoke_test.mjs",
+    "scenario": "node scripts/scenario.mjs",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",

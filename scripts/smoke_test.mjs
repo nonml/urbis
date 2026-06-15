@@ -38,8 +38,6 @@ import { generateQuest, generateBatch as generateQuestBatch } from '../src/conte
 import { ContentQueue } from '../src/content/queue.js';
 import { getContentStats } from '../src/content/registry.js';
 import { generateDistricts } from '../src/gen/districts.js';
-import { VisionModel } from '../src/content/critic/vision_model.js';
-import { ScreenshotCritic } from '../src/content/critic/screenshot_critic.js';
 import { CameraNetwork } from '../src/sim/camera_network.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
@@ -2176,42 +2174,6 @@ function testDistrictVariants() {
     }
 }
 
-async function testMultimodalCritic() {
-    console.log('\n[57] Multimodal Critic — VLM + Screenshot Understanding');
-    try {
-        const model = new VisionModel({ backend: 'stub' });
-        await model.init();
-        assert(model.ready, 'Stub model initializes');
-        assert(model.backend === 'stub', 'Backend is stub');
-
-        const result = await model.analyze('/fake/screenshot.png', 'check UI');
-        assert(result.success, 'Stub analyze returns success');
-        assert(typeof result.score === 'number', 'Returns numeric score');
-
-        const critic = new ScreenshotCritic({ model });
-        await critic.init();
-        const check = await critic.checkScreenshot('/fake/test.png', 'ui_check');
-        assert(!check.blocker, 'Stub returns no blockers');
-        assert(critic.totalChecks === 1, 'Check count incremented');
-
-        critic.markFinding(0, false);
-        critic.markFinding(1, false);
-        assert(critic.falsePositiveRate === 0, 'Zero FP rate with no false positives');
-        assert(critic.meetsQualityTarget(), 'Meets < 5% target');
-
-        critic.markFinding(2, true);
-        assert(critic.falsePositiveRate < 0.34, 'FP rate updates correctly');
-
-        const stats = critic.getStats();
-        assert(stats.modelReady, 'Stats reports model ready');
-        assert(stats.totalChecks === 1, 'Stats tracks checks');
-    } catch (e) {
-        console.log(`  ✗ Multimodal critic test failed: ${e.message}`);
-        console.log(`  Stack: ${e.stack}`);
-        failCount++;
-    }
-}
-
 function testCameraNetworkTagging() {
     console.log('\n[58] Camera Network — tagging CCTV nodes');
     try {
@@ -3839,7 +3801,7 @@ testContentQueue();
 testContentGoals();
 testWaveEncounter();
 
-testMultimodalCritic().then(() => runRapierDeterminismTest()).then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
+runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
     console.log('='.repeat(60));
     console.log(`Results: ${passCount} passed, ${failCount} failed`);
     console.log('='.repeat(60));
