@@ -4418,8 +4418,10 @@ export class Renderer3D {
             this.ambientLight.color.lerp(tintColor, blendFactor * 0.3); // Subtle tint effect
         }
         
-        // Update procedural sky sun position to match time of day
-        this._updateSkyForTime(timeOfDay);
+        // Update procedural sky sun position to match time of day.
+        // timeOfDay is a 0-1 fraction; _updateSkyForTime expects game hours.
+        const cycleLength = this.lightingManager?.config?.cycleLength ?? 24;
+        this._updateSkyForTime(timeOfDay * cycleLength);
 
         // Store current phase for debugging
         this.currentPhase = lighting.phase;
