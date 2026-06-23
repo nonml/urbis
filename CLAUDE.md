@@ -103,7 +103,7 @@ Zone growth in `src/sim/zoning/growth_sim.js` maps stage → building type. If y
 
 1. **Does it feel good?** — If it's player-facing: test it yourself (via Playwright or headless). Mechanical correctness is table stakes. Feel is the bar.
 
-2. **Does it break anything?** — Run `npm run lint:basic`, `npm run check:no-math-random`, `npm run validate`, `npm test`. All green. Zero exceptions.
+2. **Does it break anything?** — Run `npm run gate` (= `lint:basic` → `check:no-math-random` → `validate` → `build` → `test`). All green. Zero exceptions. The `build` step is mandatory: lint/validate/test do **not** parse the bundle, so syntax/import errors only surface in `npm run build`.
 
 3. **Would I be proud of this code in 6 months?** — If you'd be embarrassed to show it: refactor before committing. No "I'll clean this up later." Later never comes.
 
@@ -121,7 +121,7 @@ Zone growth in `src/sim/zoning/growth_sim.js` maps stage → building type. If y
 2. Write a ≤5-line plan in chat before touching any file
 3. Edit only `files_allowed`
 4. Stay within `max_loc` lines changed
-5. Run gate: `npm run lint:basic` → `npm run check:no-math-random` → `npm run validate` → `npm test`
+5. Run gate: `npm run gate` (`lint:basic` → `check:no-math-random` → `validate` → `build` → `test`)
 6. Gate fails? Fix the real cause. Max 2 retries. Still failing → revert + flag `needs_rework`
 7. Tick matching `[ ]` → `[x]` in `docs/CHECKLIST_2Y.md`
 8. Commit with format: `<type>(<area>): <title>` + `Why:` + `Task:` + `Checklist:`
