@@ -7,67 +7,67 @@
 export const LIGHTING_PRESETS = {
     DAWN: {
         name: 'dawn',
-        skyColor: 0xff6b6b,
-        fogColor: 0xffa07a,
-        ambientIntensity: 0.3,
-        sunIntensity: 0.5,
-        sunAngle: Math.PI / 6, // 30 degrees above horizon
+        skyColor: 0xe8845a,      // Warm coral-orange horizon
+        fogColor: 0xd4724a,      // Deeper warm haze
+        ambientIntensity: 0.25,
+        sunIntensity: 0.45,
+        sunAngle: Math.PI / 6,   // 30 degrees above horizon
         shadowIntensity: 0.2,
         starVisibility: 0.0,
-        moonVisibility: 0.3,
+        moonVisibility: 0.2,
         // Color grading for ambience
-        tint: 0xffb366, // Warm orange-pink tint
-        tintStrength: 0.25,
+        tint: 0xf09050,          // Warm orange-pink tint
+        tintStrength: 0.28,
         saturation: 1.1,
-        brightness: 0.9
+        brightness: 0.75
     },
     DAY: {
         name: 'day',
-        skyColor: 0x87ceeb,
-        fogColor: 0xb9d6ff,
-        ambientIntensity: 0.7,
-        sunIntensity: 1.0,
-        sunAngle: Math.PI / 3, // 60 degrees (high sun)
-        shadowIntensity: 0.8,
+        skyColor: 0x8fbce4,      // Clear blue sky — matches design spec
+        fogColor: 0xbdd4f0,      // Slightly desaturated blue haze
+        ambientIntensity: 0.8,
+        sunIntensity: 1.2,
+        sunAngle: Math.PI / 3,   // 60 degrees (high sun)
+        shadowIntensity: 0.85,
         starVisibility: 0.0,
         moonVisibility: 0.0,
         // Color grading for ambience
-        tint: 0xd4e8ff, // Slight cool blue tint
-        tintStrength: 0.1,
+        tint: 0xdaeeff,          // Very slight warm-cool tint
+        tintStrength: 0.08,
         saturation: 1.0,
         brightness: 1.0
     },
     DUSK: {
         name: 'dusk',
-        skyColor: 0xffa500,
-        fogColor: 0xff8c42,
-        ambientIntensity: 0.5,
-        sunIntensity: 0.3,
+        skyColor: 0xd9622a,      // Deep amber-orange sunset
+        fogColor: 0xb84e20,      // Rich warm ground haze
+        ambientIntensity: 0.3,
+        sunIntensity: 0.25,
         sunAngle: -Math.PI / 12, // Just below horizon
-        shadowIntensity: 0.4,
-        starVisibility: 0.3,
-        moonVisibility: 0.5,
+        shadowIntensity: 0.35,
+        starVisibility: 0.2,
+        moonVisibility: 0.4,
         // Color grading for ambience
-        tint: 0xff8c42, // Warm orange sunset tint
-        tintStrength: 0.3,
-        saturation: 1.2,
-        brightness: 0.85
+        tint: 0xe07030,          // Warm orange-red sunset tint
+        tintStrength: 0.32,
+        saturation: 1.15,
+        brightness: 0.72
     },
     NIGHT: {
         name: 'night',
-        skyColor: 0x1a1a2e,
-        fogColor: 0x0a0a1a,
-        ambientIntensity: 0.15,
+        skyColor: 0x0a1222,      // Deep navy — matches design spec
+        fogColor: 0x070d18,      // Near-black ground level fog
+        ambientIntensity: 0.05,  // Genuinely dark — ground is dim
         sunIntensity: 0.0,
-        sunAngle: -Math.PI / 2, // Below horizon
+        sunAngle: -Math.PI / 2,  // Below horizon
         shadowIntensity: 0.0,
         starVisibility: 1.0,
-        moonVisibility: 0.8,
+        moonVisibility: 0.9,
         // Color grading for ambience
-        tint: 0x2a3a5a, // Cool blue night tint
-        tintStrength: 0.35,
-        saturation: 0.8,
-        brightness: 0.6
+        tint: 0x1a2a44,          // Cool blue-navy night tint
+        tintStrength: 0.4,
+        saturation: 0.7,
+        brightness: 0.3           // Clearly below half of day — makes night visibly dark
     }
 };
 

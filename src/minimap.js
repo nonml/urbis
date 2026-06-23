@@ -1,5 +1,32 @@
 // Minimap module (canvas-based; supports variable map sizes)
 import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN } from './constants.js';
+import { ZONE_TYPES } from './sim/zoning/zoning.js';
+
+// Cartographic color palette — design system §Minimap
+const COLOR = Object.freeze({
+    water:       '#a9c6dd',
+    land:        '#c9d3c0',
+    forest:      '#9ab89a',
+    mountain:    '#b0a898',
+    road:        '#8d96a2',
+    residential: '#8fc7a0',
+    commercial:  '#7fb0d8',
+    industrial:  '#e0bd7a',
+    player:      '#2f9be0',  // --accent
+    viewport:    '#ffffff',
+    // interior schematic
+    interiorBg:  '#d8dde4',
+    interiorWall:'#9aa6b2',
+    interiorFloor:'#c5cdd6',
+    interiorDoor:'#a89070',
+    interiorText:'#4a86c8',
+    // police blips
+    policeA:     '#4a86c8',  // --info  (calm-flash)
+    policeB:     '#df5a5a',  // --danger (alert-flash)
+});
+
+// Zone overlay alpha (0–255) — light tint over terrain
+const ZONE_ALPHA = 140;
 
 export class Minimap {
     constructor(game) {
@@ -67,7 +94,7 @@ export class Minimap {
             const ctx = this.canvas.getContext('2d');
             const rect = this.canvas.getBoundingClientRect();
             const flash = Math.sin(performance.now() * 0.008) > 0;
-            ctx.fillStyle = flash ? '#2255ff' : '#ff2222';
+            ctx.fillStyle = flash ? COLOR.policeA : COLOR.policeB;
             for (const u of ps.units) {
                 if (!u.active) continue;
                 const bx = (u.x / this.game.map.width) * rect.width;
@@ -97,26 +124,31 @@ export class Minimap {
         this.canvas.width = w;
         this.canvas.height = h;
 
-        ctx.fillStyle = '#222';
+        // Neutral schematic background
+        ctx.fillStyle = COLOR.interiorBg;
         ctx.fillRect(0, 0, w, h);
 
         const margin = 8;
         const rw = w - margin * 2;
         const rh = h - margin * 2;
-        ctx.strokeStyle = '#666';
+
+        // Soft wall border — neutral, no neon
+        ctx.strokeStyle = COLOR.interiorWall;
         ctx.lineWidth = 2;
         ctx.strokeRect(margin, margin, rw, rh);
 
-        ctx.fillStyle = '#444';
+        ctx.fillStyle = COLOR.interiorFloor;
         ctx.fillRect(margin + 1, margin + 1, rw - 2, rh - 2);
 
-        ctx.fillStyle = '#88ccff';
-        ctx.font = '9px monospace';
+        // Label
+        ctx.fillStyle = COLOR.interiorText;
+        ctx.font = '9px system-ui, sans-serif';
         ctx.textAlign = 'center';
         ctx.fillText(this._interiorTemplate || 'interior', w / 2, h / 2 + 3);
 
+        // Door indicator
         const doorW = rw * 0.2;
-        ctx.fillStyle = '#a87';
+        ctx.fillStyle = COLOR.interiorDoor;
         ctx.fillRect(w / 2 - doorW / 2, h - margin - 2, doorW, 4);
     }
 
@@ -138,7 +170,8 @@ export class Minimap {
                 const mx = Math.min(this.game.map.width - 1, Math.floor(px * sx));
                 const my = Math.min(this.game.map.height - 1, Math.floor(py * sy));
                 const t = this.game.map.getTileAt(mx, my);
-                const [r, g, b] = terrainRGB(t);
+                const zone = this.game.zoning?.getZone(mx, my) ?? ZONE_TYPES.NONE;
+                const [r, g, b] = _blendZoneOverTerrain(t, zone);
                 const i = (py * w + px) * 4;
                 img.data[i + 0] = r;
                 img.data[i + 1] = g;
@@ -150,12 +183,43 @@ export class Minimap {
     }
 }
 
-function terrainRGB(t) {
+// --- helpers ----------------------------------------------------------------
+
+function _hexToRGB(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+}
+
+function _terrainRGB(t) {
     switch (t) {
-        case TERRAIN_WATER: return [77, 166, 255];
-        case TERRAIN_GRASS: return [102, 205, 170];
-        case TERRAIN_FOREST: return [45, 106, 79];
-        case TERRAIN_MOUNTAIN: return [139, 69, 19];
-        default: return [60, 60, 60];
+        case TERRAIN_WATER:    return _hexToRGB(COLOR.water);
+        case TERRAIN_GRASS:    return _hexToRGB(COLOR.land);
+        case TERRAIN_FOREST:   return _hexToRGB(COLOR.forest);
+        case TERRAIN_MOUNTAIN: return _hexToRGB(COLOR.mountain);
+        default:               return _hexToRGB(COLOR.land);
     }
+}
+
+function _zoneRGB(zone) {
+    switch (zone) {
+        case ZONE_TYPES.RESIDENTIAL: return _hexToRGB(COLOR.residential);
+        case ZONE_TYPES.COMMERCIAL:  return _hexToRGB(COLOR.commercial);
+        case ZONE_TYPES.INDUSTRIAL:  return _hexToRGB(COLOR.industrial);
+        default:                     return null;
+    }
+}
+
+// Blend zone color over terrain at ZONE_ALPHA opacity (alpha-composite, 0–255)
+function _blendZoneOverTerrain(terrainType, zone) {
+    const [tr, tg, tb] = _terrainRGB(terrainType);
+    const zoneColor = _zoneRGB(zone);
+    if (!zoneColor) return [tr, tg, tb];
+
+    const [zr, zg, zb] = zoneColor;
+    const a = ZONE_ALPHA / 255;
+    return [
+        Math.round(zr * a + tr * (1 - a)),
+        Math.round(zg * a + tg * (1 - a)),
+        Math.round(zb * a + tb * (1 - a)),
+    ];
 }

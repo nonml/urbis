@@ -213,8 +213,10 @@ export class Renderer3D {
         });
         this.setRenderScale(1.0);
 
-        // Lighting — hemisphere light for natural sky/ground fill
-        this.hemiLight = new THREE.HemisphereLight(0xb8e4ff, 0x6aaa60, 1.1);
+        // Lighting — hemisphere light for natural sky/ground fill.
+        // Base intensity is modulated by time of day so night actually goes dark.
+        this._hemiBaseIntensity = 1.1;
+        this.hemiLight = new THREE.HemisphereLight(0xb8e4ff, 0x6aaa60, this._hemiBaseIntensity);
         this.scene.add(this.hemiLight);
 
         this.ambientLight = new THREE.AmbientLight(0xfff8f0, 0.55);
@@ -4408,7 +4410,28 @@ export class Renderer3D {
         
         // Apply lighting to scene lights
         this.lightingManager.applyToScene(this.ambientLight, this.sunLight);
-        
+
+        // Hemisphere fill must dim at night too, or it daylights the scene and
+        // night looks like day regardless of the ambient/sun presets.
+        if (this.hemiLight) {
+            const fill = (lighting.phase === DAY_PHASES.NIGHT) ? 0.12
+                : (lighting.phase === DAY_PHASES.DUSK) ? 0.45
+                : (lighting.phase === DAY_PHASES.DAWN) ? 0.55
+                : 1.0;
+            const targetHemi = this._hemiBaseIntensity * fill;
+            this.hemiLight.intensity = THREE.MathUtils.lerp(this.hemiLight.intensity, targetHemi, 0.08);
+        }
+
+        // Drive sky + fog color from the day/night system so the sky actually
+        // darkens at night. Season sets a daytime base; weather overrides later
+        // in the frame for storms, so this only governs the clear-sky tint.
+        if (this.scene.background && lighting.skyColor) {
+            this.scene.background.lerp(lighting.skyColor, 0.08);
+        }
+        if (this.scene.fog && lighting.fogColor) {
+            this.scene.fog.color.lerp(lighting.fogColor, 0.08);
+        }
+
         // Apply tint effect to ambient light for color grading
         const grading = this.lightingManager.getColorGrading();
         if (grading && this.ambientLight) {
