@@ -551,7 +551,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [ ] Side-by-side screenshots of `street-noon` / `street-night` / `rain` / `interior-shop` vs `0.8.0.0` baseline are clearly better
 - [ ] Perf harness shows ≤ 15% regression on "High", 0% regression on "Performance" (new default)
-- [ ] All Q9.A–Q9.G items ticked
+- [x] All Q9.A–Q9.G items ticked
 - [ ] Operator approval `q9.json`
 - [ ] Tag `0.9.0.0`
 
