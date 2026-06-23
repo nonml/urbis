@@ -45,7 +45,7 @@ export class SettingsManager {
         this.applySetting(key, value);
     }
 
-    applySetting(key, value) {
+    async applySetting(key, value) {
         switch (key) {
             case 'showFPS':
                 if (window.renderer3d) window.renderer3d.showFPS = value;

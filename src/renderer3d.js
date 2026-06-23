@@ -253,65 +253,6 @@ export class Renderer3D {
         this.scene.add(this.sunLightFar);
         this._setupCSM();
 
-    /** 3-cascade CSM: replace single sun shadow with cascaded shadows */
-    _setupCSM() {
-        // Disable single shadow on sun light; use cascades instead
-        this.sunLight.castShadow = false;
-        this.sunLight.shadow.mapSize.width = 0;
-        this.sunLight.shadow.mapSize.height = 0;
-
-        // Cascade config: [near, far, resolution]
-        const cascades = [
-            { near: 1, far: 25, res: 1024 },   // Close: high detail
-            { near: 25, far: 75, res: 512 },    // Mid: medium detail
-            { near: 75, far: 150, res: 256 },   // Far: low detail
-        ];
-
-        this._csmLights = [];
-        this._csmCameras = [];
-
-        for (let i = 0; i < cascades.length; i++) {
-            const c = cascades[i];
-            const light = new THREE.DirectionalLight(0xfffbe0, 1.8 / (i + 1));
-            light.position.copy(this.sunLight.position);
-            light.castShadow = true;
-            light.shadow.mapSize.width = c.res;
-            light.shadow.mapSize.height = c.res;
-            light.shadow.camera.near = c.near;
-            light.shadow.camera.far = c.far;
-            light.shadow.camera.left = -50 * (i + 1);
-            light.shadow.camera.right = 50 * (i + 1);
-            light.shadow.camera.top = 50 * (i + 1);
-            light.shadow.camera.bottom = -50 * (i + 1);
-            light.shadow.bias = -0.001;
-            light.shadow.normalBias = 0.02;
-            light.shadow.radius = 2; // PCF soft
-            this.scene.add(light);
-            this._csmLights.push(light);
-            this._csmCameras.push(light.shadow.camera);
-        }
-    }
-
-    /** Update CSM frustums based on camera position */
-    _updateCSM() {
-        if (!this._csmLights || this._csmLights.length === 0) return;
-
-        const camPos = this.camera.position;
-        const sunDir = this.sunLight.position.clone().normalize();
-
-        for (let i = 0; i < this._csmLights.length; i++) {
-            const light = this._csmLights[i];
-            const cam = this._csmCameras[i];
-
-            // Position light to follow sun direction relative to camera
-            const offset = sunDir.clone().multiplyScalar(30 + i * 10);
-            light.position.copy(camPos).add(offset);
-            light.target.position.copy(camPos);
-            light.target.updateMatrix();
-            cam.updateMatrixWorld();
-        }
-    }
-        
         // Day/Night cycle
         this.dayNightCycle = createDayNightCycle();
         
@@ -476,6 +417,65 @@ export class Renderer3D {
         if (!this.testMode) this._initPostProcessing();
         // Async: load Kenney GLB models + terrain textures, then rebuild once ready
         this._preloadAssets();
+    }
+
+    /** 3-cascade CSM: replace single sun shadow with cascaded shadows */
+    _setupCSM() {
+        // Disable single shadow on sun light; use cascades instead
+        this.sunLight.castShadow = false;
+        this.sunLight.shadow.mapSize.width = 0;
+        this.sunLight.shadow.mapSize.height = 0;
+
+        // Cascade config: [near, far, resolution]
+        const cascades = [
+            { near: 1, far: 25, res: 1024 },   // Close: high detail
+            { near: 25, far: 75, res: 512 },    // Mid: medium detail
+            { near: 75, far: 150, res: 256 },   // Far: low detail
+        ];
+
+        this._csmLights = [];
+        this._csmCameras = [];
+
+        for (let i = 0; i < cascades.length; i++) {
+            const c = cascades[i];
+            const light = new THREE.DirectionalLight(0xfffbe0, 1.8 / (i + 1));
+            light.position.copy(this.sunLight.position);
+            light.castShadow = true;
+            light.shadow.mapSize.width = c.res;
+            light.shadow.mapSize.height = c.res;
+            light.shadow.camera.near = c.near;
+            light.shadow.camera.far = c.far;
+            light.shadow.camera.left = -50 * (i + 1);
+            light.shadow.camera.right = 50 * (i + 1);
+            light.shadow.camera.top = 50 * (i + 1);
+            light.shadow.camera.bottom = -50 * (i + 1);
+            light.shadow.bias = -0.001;
+            light.shadow.normalBias = 0.02;
+            light.shadow.radius = 2; // PCF soft
+            this.scene.add(light);
+            this._csmLights.push(light);
+            this._csmCameras.push(light.shadow.camera);
+        }
+    }
+
+    /** Update CSM frustums based on camera position */
+    _updateCSM() {
+        if (!this._csmLights || this._csmLights.length === 0) return;
+
+        const camPos = this.camera.position;
+        const sunDir = this.sunLight.position.clone().normalize();
+
+        for (let i = 0; i < this._csmLights.length; i++) {
+            const light = this._csmLights[i];
+            const cam = this._csmCameras[i];
+
+            // Position light to follow sun direction relative to camera
+            const offset = sunDir.clone().multiplyScalar(30 + i * 10);
+            light.position.copy(camPos).add(offset);
+            light.target.position.copy(camPos);
+            light.target.updateMatrix();
+            cam.updateMatrixWorld();
+        }
     }
 
     resize() {
@@ -1140,6 +1140,8 @@ export class Renderer3D {
                 const volFogPass = new ShaderPass(volFogShader);
                 volFogPass.setSize(volFogW, volFogH);
                 this.composer.addPass(volFogPass);
+                this._volFogPass = volFogPass;
+            }
 
             // SSR — screen-space reflections for wet surfaces
             if (ShaderPassMod) {
@@ -1408,24 +1410,21 @@ export class Renderer3D {
      * Captures every 30 seconds or when lighting changes significantly.
      */
     _captureEnvProbe() {
-        if (!this._envProbeReady) {
-            this._envProbeReady = false;
-            return;
-        }
+        if (!this._envProbeReady || this.testMode) return;
         const now = performance.now();
         if (now - this._lastEnvCapture < 30000) return; // 30s interval
         this._lastEnvCapture = now;
 
         try {
-            const { CubeTextureRenderer } = await import('three/addons/utils/CubeTextureRenderer.js');
-            const renderer = new CubeTextureRenderer(this.renderer);
-            const cubeRT = new THREE.WebGLCubeRenderTarget(256, {
-                format: THREE.RGBFormat,
-                type: THREE.HalfFloatType,
-            });
-            renderer.render(this.scene, cubeRT.texture);
-            this._envMap = cubeRT.texture;
-            // Apply to all materials that need IBL
+            // Reuse a single cube camera + render target to avoid per-capture allocation.
+            if (!this._envCubeRT) {
+                this._envCubeRT = new THREE.WebGLCubeRenderTarget(256, { type: THREE.HalfFloatType });
+                this._envCubeCam = new THREE.CubeCamera(0.5, 1000, this._envCubeRT);
+            }
+            this._envCubeCam.position.copy(this.camera.position);
+            this._envCubeCam.update(this.renderer, this.scene);
+            this._envMap = this._envCubeRT.texture;
+            // Apply to all materials that already declare an env map slot
             for (const [, entry] of this._chunkMeshes) {
                 entry.group.traverse((obj) => {
                     if (obj.isMesh && obj.material) {
@@ -4298,7 +4297,23 @@ export class Renderer3D {
         if (this.particleSystem) {
             this.particleSystem.update();
         }
-        
+
+        // Update water shader animation
+        if (this._waterShaderRef) {
+            this._waterShaderRef.uniforms.uTime.value = performance.now() / 1000;
+        }
+
+        // Lightning exposure decay
+        this._updateLightningExposure();
+
+        // Render via post-processing composer if available, else direct
+        if (this.composer) {
+            this.composer.render();
+        } else {
+            this.renderer.render(this.scene, this.camera);
+        }
+    }
+
     /**
      * Trigger lightning flash — brief exposure spike
      */
@@ -4327,22 +4342,6 @@ export class Renderer3D {
                 1.3,
                 0.1
             );
-        }
-    }
-
-        // Update water shader animation
-        if (this._waterShaderRef) {
-            this._waterShaderRef.uniforms.uTime.value = performance.now() / 1000;
-        }
-
-        // Lightning exposure decay
-        this._updateLightningExposure();
-
-        // Render via post-processing composer if available, else direct
-        if (this.composer) {
-            this.composer.render();
-        } else {
-            this.renderer.render(this.scene, this.camera);
         }
     }
 
@@ -4516,6 +4515,16 @@ export class Renderer3D {
         if (this.composer) {
             this.composer.setSize(width * scale, height * scale);
         }
+    }
+
+    /**
+     * Apply a named quality preset (low / medium / high / ultra).
+     * @param {string} presetName - key from PRESETS
+     */
+    setPreset(presetName) {
+        if (!PRESETS[presetName]) return false;
+        applyPreset(this, presetName);
+        return true;
     }
 
     /**

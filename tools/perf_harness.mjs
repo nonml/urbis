@@ -50,8 +50,19 @@ const SCENES = [
   },
 ];
 
+// Presets to sweep — matches keys in src/render/presets.js.
+const PRESETS = ['low', 'medium', 'high', 'ultra'];
+
 const SAMPLE_DURATION_MS = 5000;
 const WARMUP_MS = 2000;
+
+async function applyPreset(page, presetName) {
+  return page.evaluate((name) => {
+    const r = window.game?.ui?.renderer3d;
+    if (!r || typeof r.setPreset !== 'function') return false;
+    return r.setPreset(name);
+  }, presetName);
+}
 
 async function measureScene(page, scene) {
   await page.evaluate(scene.setup);
@@ -94,6 +105,11 @@ async function measureScene(page, scene) {
   };
 }
 
+/** Stable per-(preset, scene) key for matching against prior baselines. */
+function resultKey(r) {
+  return r.preset ? `${r.preset}/${r.scene}` : r.scene;
+}
+
 async function ensureServer() {
   try {
     const res = await fetch('http://localhost:4173');
@@ -121,6 +137,16 @@ async function main() {
   console.log('[perf] Loading game...');
   try {
     await page.goto('http://localhost:4173', { timeout: 30000 });
+    await page.waitForLoadState('networkidle');
+    // Start a new game so window.game (and its renderer) exists.
+    const startBtn = page.locator('#start-btn');
+    if (await startBtn.count()) {
+      await startBtn.first().click();
+    }
+    // Wait for the game + 3D renderer to be live before measuring.
+    await page.waitForFunction(() => !!(window.game && window.game.ui && window.game.ui.renderer3d), {
+      timeout: 30000,
+    });
     await page.waitForTimeout(3000);
   } catch (err) {
     console.error('[perf] Failed to load game:', err.message);
@@ -130,15 +156,27 @@ async function main() {
   }
 
   const results = [];
-  for (const scene of SCENES) {
-    console.log(`[perf] Measuring: ${scene.name}...`);
-    try {
-      const result = await measureScene(page, scene);
-      results.push(result);
-      console.log(`  fps=${result.fps} avg=${result.avgMs}ms p95=${result.p95Ms}ms`);
-    } catch (err) {
-      console.warn(`  [skip] ${scene.name}: ${err.message}`);
-      results.push({ scene: scene.name, error: err.message });
+  for (const preset of PRESETS) {
+    const applied = await applyPreset(page, preset);
+    if (!applied) {
+      console.warn(`[perf] Could not apply preset "${preset}" (renderer not ready) — skipping`);
+      for (const scene of SCENES) {
+        results.push({ preset, scene: scene.name, error: 'preset not applied' });
+      }
+      continue;
+    }
+    console.log(`\n[perf] Preset: ${preset}`);
+    for (const scene of SCENES) {
+      console.log(`[perf] Measuring: ${preset}/${scene.name}...`);
+      try {
+        const result = await measureScene(page, scene);
+        result.preset = preset;
+        results.push(result);
+        console.log(`  fps=${result.fps} avg=${result.avgMs}ms p95=${result.p95Ms}ms`);
+      } catch (err) {
+        console.warn(`  [skip] ${preset}/${scene.name}: ${err.message}`);
+        results.push({ preset, scene: scene.name, error: err.message });
+      }
     }
   }
 
@@ -149,21 +187,29 @@ async function main() {
   let budgetFailures = 0;
   console.log(`\n[perf] Budget check (target: ${FPS_TARGET} fps):`);
   for (const r of results) {
-    if (r.error) { console.log(`  ${r.scene}: SKIP (error)`); continue; }
+    const key = resultKey(r);
+    if (r.error) { console.log(`  ${key}: SKIP (error)`); continue; }
     if (r.fps >= FPS_TARGET) {
-      console.log(`  ${r.scene}: PASS (${r.fps} fps)`);
+      console.log(`  ${key}: PASS (${r.fps} fps)`);
     } else if (r.fps >= FPS_WARN) {
-      console.log(`  ${r.scene}: DEGRADED (${r.fps} fps — below ${FPS_TARGET})`);
+      console.log(`  ${key}: DEGRADED (${r.fps} fps — below ${FPS_TARGET})`);
     } else {
-      console.log(`  ${r.scene}: FAIL (${r.fps} fps — below minimum ${FPS_WARN})`);
+      console.log(`  ${key}: FAIL (${r.fps} fps — below minimum ${FPS_WARN})`);
       budgetFailures++;
     }
+  }
+
+  // Read the prior baseline BEFORE overwriting so the comparison is meaningful.
+  let prev = null;
+  if (existsSync(BASELINE_PATH)) {
+    try { prev = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8')); } catch { prev = null; }
   }
 
   const output = {
     timestamp: new Date().toISOString(),
     fpsTarget: FPS_TARGET,
     fpsMinimum: FPS_WARN,
+    presets: PRESETS,
     results,
     budgetPass: budgetFailures === 0,
   };
@@ -171,24 +217,21 @@ async function main() {
   writeFileSync(BASELINE_PATH, JSON.stringify(output, null, 2));
   console.log(`\n[perf] Results written to ${BASELINE_PATH}`);
 
-  if (existsSync(BASELINE_PATH)) {
-    const prev = JSON.parse(readFileSync(BASELINE_PATH, 'utf-8'));
-    if (prev.results) {
-      let regressions = 0;
-      for (const cur of results) {
-        if (cur.error) continue;
-        const base = prev.results.find(r => r.scene === cur.scene);
-        if (!base || base.error) continue;
-        const delta = ((cur.avgMs - base.avgMs) / base.avgMs) * 100;
-        if (delta > 10) {
-          console.warn(`[perf] REGRESSION: ${cur.scene} avg +${delta.toFixed(1)}%`);
-          regressions++;
-        }
+  if (prev && prev.results) {
+    let regressions = 0;
+    for (const cur of results) {
+      if (cur.error) continue;
+      const base = prev.results.find(r => resultKey(r) === resultKey(cur));
+      if (!base || base.error) continue;
+      const delta = ((cur.avgMs - base.avgMs) / base.avgMs) * 100;
+      if (delta > 10) {
+        console.warn(`[perf] REGRESSION: ${resultKey(cur)} avg +${delta.toFixed(1)}%`);
+        regressions++;
       }
-      if (regressions > 0) {
-        console.error(`[perf] ${regressions} regression(s) detected (>10%)`);
-        process.exit(1);
-      }
+    }
+    if (regressions > 0) {
+      console.error(`[perf] ${regressions} regression(s) detected (>10%)`);
+      process.exit(1);
     }
   }
 
