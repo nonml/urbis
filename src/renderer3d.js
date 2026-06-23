@@ -546,6 +546,7 @@ export class Renderer3D {
 
         // Detailed character pool (LOD: articulated humanoids for nearby citizens)
         this._characterPool = new CharacterPool(THREE, this.scene, this.game);
+        this._characterPool.groundHeightAt = (wx, wz) => this._elevAtWorld(wx, wz);
         this._detailedCitizenSet = new Set();
         this._lastFrameTime = performance.now() / 1000;
 
@@ -2012,6 +2013,7 @@ export class Renderer3D {
         // Offset: position the plane so its tiles align with world coordinates
         const originX = bounds.minX - this._mapHalfW;
         const originZ = bounds.minY - this._mapHalfH;
+        const dryColor = new THREE.Color(0xc2bd92); // pale, sun-dried tint for high ground
 
         for (let iz = 0; iz <= segsZ; iz++) {
             for (let ix = 0; ix <= segsX; ix++) {
@@ -2038,12 +2040,20 @@ export class Renderer3D {
                     Math.min(gx, this.game.map.width - 1),
                     Math.min(gy, this.game.map.height - 1)
                 );
-                const finalH = t === TERRAIN_WATER ? -0.2 : smoothH;
+                const elev = this._baseElevation(gx, gy);
+                const finalH = t === TERRAIN_WATER ? -0.2 : smoothH + elev;
 
                 pos.setXYZ(vi, wx, finalH, wz);
 
-                // Vertex color based on terrain type
+                // Vertex color based on terrain type, broken up so the ground
+                // never reads as a flat uniform sheet.
                 tmpColor.setHex(getColor(gx, gy));
+                if (t !== TERRAIN_WATER) {
+                    // Large-scale brightness drift (±7%) + drier, paler crests.
+                    const drift = 0.93 + this._valueNoise(gx / 13 + 50, gy / 13 + 50) * 0.14;
+                    tmpColor.multiplyScalar(drift);
+                    tmpColor.lerp(dryColor, Math.min(0.16, elev * 0.11));
+                }
                 colors[vi * 3] = tmpColor.r;
                 colors[vi * 3 + 1] = tmpColor.g;
                 colors[vi * 3 + 2] = tmpColor.b;
@@ -2302,6 +2312,57 @@ export class Renderer3D {
     }
 
     /** Returns the smoothed terrain Y for a given tile (matches heightmap vertex logic) */
+    // -------------------------------------------------------------------------
+    // Continuous ground elevation — gentle rolling hills layered on top of the
+    // per-tile terrain heights so the city sits in real, undulating land instead
+    // of on a flat board. Pure hash-based value noise: deterministic from the
+    // world seed, no RNG-stream consumption, no Math.random. Sampled by the
+    // terrain mesh AND by every object that rests on the ground (buildings,
+    // roads, trees, citizens, vehicles, the player) so nothing floats or sinks.
+    // -------------------------------------------------------------------------
+
+    /** Max added height (world units) of the rolling-hills field. */
+    static ELEV_AMPLITUDE = 1.75;
+
+    /** Integer hash → [0,1), seeded once from the world seed. */
+    _elevHash(ix, iz) {
+        if (this._elevSeed === undefined) {
+            this._elevSeed = ((this.game?.state?.meta?.seed ?? 1) >>> 0) || 1;
+        }
+        let h = (Math.imul(ix | 0, 374761393) + Math.imul(iz | 0, 668265263) + Math.imul(this._elevSeed, 2246822519)) >>> 0;
+        h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+        return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+    }
+
+    /** Smooth bilinear value noise at continuous tile coordinates. */
+    _valueNoise(x, z) {
+        const x0 = Math.floor(x), z0 = Math.floor(z);
+        const fx = x - x0, fz = z - z0;
+        const sx = fx * fx * (3 - 2 * fx);
+        const sz = fz * fz * (3 - 2 * fz);
+        const n00 = this._elevHash(x0, z0), n10 = this._elevHash(x0 + 1, z0);
+        const n01 = this._elevHash(x0, z0 + 1), n11 = this._elevHash(x0 + 1, z0 + 1);
+        return (n00 + (n10 - n00) * sx) * (1 - sz) + (n01 + (n11 - n01) * sx) * sz;
+    }
+
+    /**
+     * Additive rolling-hills height (≥ 0) at continuous tile coordinates.
+     * Three octaves: broad swells, medium folds, fine surface detail.
+     */
+    _baseElevation(gx, gz) {
+        const o1 = this._valueNoise(gx / 24, gz / 24);
+        const o2 = this._valueNoise(gx / 9, gz / 9);
+        const o3 = this._valueNoise(gx / 3.5, gz / 3.5);
+        let n = o1 * 0.60 + o2 * 0.28 + o3 * 0.12;
+        n = n * n * (3 - 2 * n); // smoothstep — flatter lowlands, rounded crests
+        return n * Renderer3D.ELEV_AMPLITUDE;
+    }
+
+    /** Ground elevation at a world-space (x, z) position. */
+    _elevAtWorld(wx, wz) {
+        return this._baseElevation(wx + this._mapHalfW, wz + this._mapHalfH);
+    }
+
     _smoothTerrainY(tx, ty) {
         const th = Renderer3D.TERRAIN_HEIGHT;
         const getH = (x, y) => {
@@ -2316,7 +2377,7 @@ export class Renderer3D {
         const hS = getH(tx, ty + 1);
         const hE = getH(tx + 1, ty);
         const hW = getH(tx - 1, ty);
-        return h0 * 0.5 + (hN + hS + hE + hW) * 0.125;
+        return h0 * 0.5 + (hN + hS + hE + hW) * 0.125 + this._baseElevation(tx + 0.5, ty + 0.5);
     }
 
     _buildBuildingMeshesForChunk(bounds, buildings) {
@@ -2930,7 +2991,7 @@ export class Renderer3D {
         // player.wx/wz are in tile-space coordinates (0..width) continuous.
         const wx = (p.wx ?? (p.x + 0.5)) - this._mapHalfW;
         const wz = (p.wz ?? (p.y + 0.5)) - this._mapHalfH;
-        if (this._player) this._player.position.set(wx, 0.12, wz);
+        if (this._player) this._player.position.set(wx, 0.12 + this._elevAtWorld(wx, wz), wz);
 
         // Muzzle flash billboard
         if (this._muzzleFlashMesh) {
@@ -3124,7 +3185,7 @@ export class Renderer3D {
             const c = this.game.citizens.citizens[i];
             const wx = c.x - this._mapHalfW + 0.5;
             const wz = c.y - this._mapHalfH + 0.5;
-            dummy.position.set(wx, 0.12, wz);
+            dummy.position.set(wx, 0.12 + this._elevAtWorld(wx, wz), wz);
             dummy.updateMatrix();
             this._citizensMesh.setMatrixAt(i, dummy.matrix);
         }
@@ -3234,6 +3295,7 @@ export class Renderer3D {
 
             const wx = pet.dispX - this._mapHalfW + 0.5;
             const wz = pet.dispY - this._mapHalfH + 0.5;
+            const groundY = this._elevAtWorld(wx, wz);
 
             // Pet heading: face toward owner
             const dx = cp.dispX - pet.dispX;
@@ -3245,12 +3307,12 @@ export class Renderer3D {
             if (isMoving) {
                 const trot = Math.sin(currentTime * 8 + pet.phase);
                 const yBob = 0.02 + Math.abs(trot) * 0.015;
-                dummy.position.set(wx, yBob, wz);
+                dummy.position.set(wx, yBob + groundY, wz);
                 dummy.rotation.set(0, petHeading, trot * 0.1);
             } else {
                 // Idle: slight head movement (simulated via small rotation)
                 const sniff = Math.sin(currentTime * 1.5 + pet.phase) * 0.06;
-                dummy.position.set(wx, 0.02, wz);
+                dummy.position.set(wx, 0.02 + groundY, wz);
                 dummy.rotation.set(0, petHeading + sniff, 0);
             }
 
@@ -3367,6 +3429,7 @@ export class Renderer3D {
             dummy.scale.set(1, 1, 1);
             const wx = cp.dispX - this._mapHalfW + 0.5;
             const wz = cp.dispY - this._mapHalfH + 0.5;
+            const groundY = this._elevAtWorld(wx, wz);
 
             if (anim) {
                 if (isMoving) {
@@ -3374,15 +3437,15 @@ export class Renderer3D {
                     const stride = Math.sin(currentTime * walkSpeed + anim.phase);
                     const yBob = 0.12 + Math.abs(stride) * 0.035;
                     const lean = stride * 0.12;
-                    dummy.position.set(wx, yBob, wz);
+                    dummy.position.set(wx, yBob + groundY, wz);
                     dummy.rotation.set(0, cp.heading, lean);
                 } else {
                     const breathe = Math.sin(currentTime * anim.speed * 0.5 + anim.phase) * 0.01;
-                    dummy.position.set(wx, 0.12 + breathe, wz);
+                    dummy.position.set(wx, 0.12 + breathe + groundY, wz);
                     dummy.rotation.set(0, cp.heading, 0);
                 }
             } else {
-                dummy.position.set(wx, 0.12, wz);
+                dummy.position.set(wx, 0.12 + groundY, wz);
                 dummy.rotation.set(0, 0, 0);
             }
 
@@ -3426,7 +3489,7 @@ export class Renderer3D {
             if (!child) continue;
             const wx = v.x - this._mapHalfW + 0.5;
             const wz = v.y - this._mapHalfH + 0.5;
-            child.position.set(wx, 0.06, wz);
+            child.position.set(wx, 0.06 + this._elevAtWorld(wx, wz), wz);
             child.rotation.y = v.angle ?? 0;
         }
     }
@@ -3469,7 +3532,9 @@ export class Renderer3D {
             const u = units[i];
             const child = this._policeGroup.children[i];
             if (!child) continue;
-            child.position.set(u.x - this._mapHalfW + 0.5, 0.06, u.y - this._mapHalfH + 0.5);
+            const pwx = u.x - this._mapHalfW + 0.5;
+            const pwz = u.y - this._mapHalfH + 0.5;
+            child.position.set(pwx, 0.06 + this._elevAtWorld(pwx, pwz), pwz);
             child.rotation.y = (u.heading || 0) * Math.PI / 180;
 
             if (u.state === 'pursuit') {

@@ -320,7 +320,9 @@ export class CharacterPool {
             const wx = cp.dispX - mapHalfW + 0.5;
             const wz = cp.dispY - mapHalfH + 0.5;
 
-            entry.group.position.set(wx, 0, wz);
+            // Optional ground-height hook so detailed characters ride terrain elevation.
+            const gy = this.groundHeightAt ? this.groundHeightAt(wx, wz) : 0;
+            entry.group.position.set(wx, gy, wz);
             entry.group.rotation.y = cp.heading || 0;
 
             // Animation
