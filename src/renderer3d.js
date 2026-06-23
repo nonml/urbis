@@ -2888,6 +2888,78 @@ export class Renderer3D {
     }
 
     /**
+     * Instanced ground scatter — low-poly rocks (grass + mountain) and bushes
+     * (grass) for natural ground detail. One draw call per type per chunk;
+     * deterministic per tile; sits on _smoothTerrainY so it rides the terrain.
+     */
+    _buildGroundScatterForChunk(bounds) {
+        const objects = [];
+        const hash = (x, y, salt) => {
+            let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
+            h = ((h ^ (h >> 13)) * 1274126177) | 0;
+            return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+        };
+        const rocks = [];
+        const bushes = [];
+        for (let y = bounds.minY; y <= bounds.maxY; y++) {
+            for (let x = bounds.minX; x <= bounds.maxX; x++) {
+                const t = this.game.map.getTileAt(x, y);
+                const isGrass = t === TERRAIN_GRASS;
+                const isMtn = t === TERRAIN_MOUNTAIN;
+                if (!isGrass && !isMtn) continue;
+                const y0 = this._smoothTerrainY(x, y);
+                const wx = x - this._mapHalfW + 0.5;
+                const wz = y - this._mapHalfH + 0.5;
+                if (hash(x, y, 1) < (isMtn ? 0.32 : 0.05)) {
+                    rocks.push({ x: wx + (hash(x, y, 2) - 0.5) * 0.6, y: y0, z: wz + (hash(x, y, 3) - 0.5) * 0.6,
+                        s: 0.5 + hash(x, y, 4) * (isMtn ? 1.4 : 0.8), rx: hash(x, y, 5), ry: hash(x, y, 6), c: hash(x, y, 7) });
+                }
+                if (isGrass && hash(x, y, 10) < 0.07) {
+                    bushes.push({ x: wx + (hash(x, y, 11) - 0.5) * 0.6, y: y0, z: wz + (hash(x, y, 12) - 0.5) * 0.6,
+                        s: 0.6 + hash(x, y, 13) * 0.8, ry: hash(x, y, 14), c: hash(x, y, 15) });
+                }
+            }
+        }
+        const dummy = new THREE.Object3D();
+        const tmp = new THREE.Color();
+        if (rocks.length) {
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.96, metalness: 0.0, flatShading: true });
+            const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.11, 0), mat, rocks.length);
+            im.castShadow = true; im.receiveShadow = true;
+            for (let i = 0; i < rocks.length; i++) {
+                const r = rocks[i];
+                dummy.position.set(r.x, r.y + 0.03 * r.s, r.z);
+                dummy.rotation.set(r.rx * 6.283, r.ry * 6.283, r.rx * 3.14);
+                dummy.scale.set(r.s, r.s * 0.7, r.s);
+                dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
+                tmp.setHSL(0.09, 0.06, 0.42 + r.c * 0.16); // warm gray, slight value drift
+                im.setColorAt(i, tmp);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            if (im.instanceColor) im.instanceColor.needsUpdate = true;
+            objects.push(im);
+        }
+        if (bushes.length) {
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.9, metalness: 0.0, flatShading: true });
+            const im = new THREE.InstancedMesh(new THREE.IcosahedronGeometry(0.13, 1), mat, bushes.length);
+            im.castShadow = true; im.receiveShadow = true;
+            for (let i = 0; i < bushes.length; i++) {
+                const bsh = bushes[i];
+                dummy.position.set(bsh.x, bsh.y + 0.07 * bsh.s, bsh.z);
+                dummy.rotation.set(0, bsh.ry * 6.283, 0);
+                dummy.scale.set(bsh.s, bsh.s * 0.8, bsh.s);
+                dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
+                tmp.setHSL(0.28, 0.45, 0.30 + bsh.c * 0.12); // foliage green variation
+                im.setColorAt(i, tmp);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            if (im.instanceColor) im.instanceColor.needsUpdate = true;
+            objects.push(im);
+        }
+        return objects;
+    }
+
+    /**
      * Scatter urban detail props (awnings, parasols, fences) near commercial/residential buildings.
      */
     _buildDetailPropsForChunk(bounds, buildings) {
@@ -2962,6 +3034,12 @@ export class Renderer3D {
         // Vegetation (trees on forest/park tiles)
         const vegMeshes = this._buildVegetationForChunk(bounds);
         for (const mesh of vegMeshes) {
+            mesh.userData.kind = 'vegetation';
+            group.add(mesh);
+        }
+        // Ground scatter (instanced rocks + bushes) — natural ground detail
+        const scatterMeshes = this._buildGroundScatterForChunk(bounds);
+        for (const mesh of scatterMeshes) {
             mesh.userData.kind = 'vegetation';
             group.add(mesh);
         }
