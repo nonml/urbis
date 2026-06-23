@@ -116,6 +116,7 @@ export class Renderer3D {
         this.scene = new THREE.Scene();
         this.scene.background = new THREE.Color(0x4a8ab5);
         this.scene.fog = new THREE.FogExp2(0x7ab0d0, 0.006);
+        this._createSkyDome();
 
         // Camera rig (Ticket B-2: Orbit + Follow + Collision)
         this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 500);
@@ -419,6 +420,49 @@ export class Renderer3D {
         if (!this.testMode) this._initPostProcessing();
         // Async: load Kenney GLB models + terrain textures, then rebuild once ready
         this._preloadAssets();
+    }
+
+    /**
+     * Always-on gradient sky dome. Unlike the Preetham `_sky` (which lives in the
+     * post-processing path and is skipped under testMode / the low preset and
+     * hidden top-down in god mode), this renders in every mode and preset, so the
+     * sky is a proper zenith→horizon gradient instead of a flat fill color. The
+     * Preetham sky, when present, simply layers on top in street view.
+     */
+    _createSkyDome() {
+        const mat = new THREE.ShaderMaterial({
+            side: THREE.BackSide,
+            depthWrite: false,
+            fog: false,
+            uniforms: {
+                topColor:     { value: new THREE.Color(0x2c6bb0) }, // deep zenith blue
+                horizonColor: { value: new THREE.Color(0xbcd8ea) }, // pale horizon
+                exponent:     { value: 0.7 },
+            },
+            vertexShader: `
+                varying vec3 vDir;
+                void main() {
+                    vDir = position;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform vec3 topColor;
+                uniform vec3 horizonColor;
+                uniform float exponent;
+                varying vec3 vDir;
+                void main() {
+                    float h = clamp(normalize(vDir).y, 0.0, 1.0);
+                    vec3 col = mix(horizonColor, topColor, pow(h, exponent));
+                    gl_FragColor = vec4(col, 1.0);
+                }
+            `,
+        });
+        const dome = new THREE.Mesh(new THREE.SphereGeometry(480, 24, 16), mat);
+        dome.renderOrder = -10;
+        dome.frustumCulled = false;
+        this._skyDome = dome;
+        this.scene.add(dome);
     }
 
     /** 3-cascade CSM: replace single sun shadow with cascaded shadows */
@@ -1353,14 +1397,15 @@ export class Renderer3D {
             sky.renderOrder = -1; // Render before everything else
             this.scene.add(sky);
             this._sky = sky;
-            // Start hidden if in god mode (sky horizon looks washed out top-down)
+            // Preetham sky is street-only (washed out top-down); god mode + low
+            // preset rely on the always-on gradient dome instead.
             sky.visible = (this.cameraMode !== 'god');
 
             const skyUniforms = sky.material.uniforms;
-            skyUniforms['turbidity'].value = 2;        // cleaner sky, less horizon haze
-            skyUniforms['rayleigh'].value = 1.5;        // moderate scattering
-            skyUniforms['mieCoefficient'].value = 0.005;
-            skyUniforms['mieDirectionalG'].value = 0.8;
+            skyUniforms['turbidity'].value = 3.2;       // touch of horizon warmth, still clean
+            skyUniforms['rayleigh'].value = 2.6;        // deeper, richer blue zenith
+            skyUniforms['mieCoefficient'].value = 0.004;
+            skyUniforms['mieDirectionalG'].value = 0.78;
 
             // Initial sun position (will be updated by day/night cycle)
             this._updateSkyForTime(12); // noon
@@ -4175,7 +4220,6 @@ export class Renderer3D {
         if (this._player) {
             this._player.visible = (mode !== 'god');
         }
-        // Hide sky sphere in god mode — horizon haze looks washed out from top-down view
         if (this._sky) {
             this._sky.visible = (mode !== 'god');
         }
@@ -4373,6 +4417,9 @@ export class Renderer3D {
         // Lightning exposure decay
         this._updateLightningExposure();
 
+        // Keep the gradient sky dome centered on the camera so it never clips.
+        if (this._skyDome) this._skyDome.position.copy(this.camera.position);
+
         // Render via post-processing composer if available, else direct
         if (this.composer) {
             this.composer.render();
@@ -4495,6 +4542,16 @@ export class Renderer3D {
         }
         if (this.scene.fog && lighting.fogColor) {
             this.scene.fog.color.lerp(lighting.fogColor, 0.08);
+        }
+
+        // Gradient sky dome: horizon tracks the day/night sky tint, zenith is a
+        // deeper, bluer version of it so the gradient reads at every time of day.
+        if (this._skyDome && lighting.skyColor) {
+            const sc = lighting.skyColor; // plain {r,g,b} in 0..1, not a THREE.Color
+            const u = this._skyDome.material.uniforms;
+            u.horizonColor.value.lerp(sc, 0.08);
+            const top = new THREE.Color(sc.r, sc.g, sc.b).multiplyScalar(0.55).lerp(new THREE.Color(0x16345f), 0.45);
+            u.topColor.value.lerp(top, 0.08);
         }
 
         // Apply tint effect to ambient light for color grading
