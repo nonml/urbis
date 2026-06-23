@@ -2,7 +2,6 @@
 // Global error handler with crash recovery UX and debug bundle export
 
 import { VERSION, BUILD_TIMESTAMP, BUILD_NUMBER, getVersionInfo } from '../version.js';
-import { GameState } from '../game.js';
 
 /**
  * Error Bundle - Collects debug information for crash reports
