@@ -14,6 +14,13 @@ async function startGame(page) {
   await page.waitForSelector('#main-menu-overlay', { state: 'detached', timeout: 5000 })
     .catch(() => {});
   await page.waitForTimeout(SPAWN_DELAY);
+  // Dismiss the first-run tutorial — its full-screen dark scrim (rgba 0,0,0,0.7
+  // + spotlight cutout) otherwise dims every baseline by ~75%.
+  await page.evaluate(() => {
+    const t = window.game?.ui?.tutorial;
+    if (t) { t.isActive = false; t.destroy?.(); }
+    if (window.game?.state?.tutorial) window.game.state.tutorial.isFirstRun = false;
+  });
   // Q9: capture baselines at the "Performance" preset (the low quality tier,
   // which is the new default for most players).
   await page.evaluate(() => window.game?.ui?.renderer3d?.setPreset?.('low'));
@@ -22,6 +29,17 @@ async function startGame(page) {
 
 function shot(name) {
   return { path: join(BASELINE_DIR, `${name}.png`) };
+}
+
+// Drive the day/night lerps to steady state. Headless renders at ~2 fps, so a
+// short SETTLE only advances ~1 frame and the smooth lighting transitions never
+// converge — calling the update directly steps them to their target regardless.
+async function convergeLighting(page) {
+  await page.evaluate(() => {
+    const r = window.game?.ui?.renderer3d;
+    if (!r || typeof r._updateDayNightLighting !== 'function') return;
+    for (let i = 0; i < 200; i++) r._updateDayNightLighting();
+  });
 }
 
 test('@baseline main-menu', async ({ page }) => {
@@ -45,6 +63,7 @@ test('@baseline street-noon', async ({ page }) => {
     window.game.state.time.timeOfDay = 0.5;
     window.game.state.time.tick = Math.floor(tpd * 0.5);
   });
+  await convergeLighting(page);
   await page.waitForTimeout(SETTLE);
   await page.screenshot(shot('street-noon'));
 });
@@ -58,6 +77,7 @@ test('@baseline street-night', async ({ page }) => {
     window.game.state.time.timeOfDay = 0.875;
     window.game.state.time.tick = Math.floor(tpd * 0.875);
   });
+  await convergeLighting(page);
   await page.waitForTimeout(SETTLE);
   await page.screenshot(shot('street-night'));
 });
@@ -71,6 +91,7 @@ test('@baseline rain', async ({ page }) => {
     ws.state.intensity = 1.0;
     ws.state.duration = 60;
   });
+  await convergeLighting(page);
   await page.waitForTimeout(SETTLE);
   await page.screenshot(shot('rain'));
 });
