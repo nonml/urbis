@@ -2457,6 +2457,15 @@ export class Renderer3D {
                     const centerFactor = Math.max(0, 1.0 - distFromCenter / 18);
                     const heightMult = 0.55 + heightHash * 0.55 + centerFactor * 0.55;
                     clone.scale.setScalar(baseScale * heightMult);
+                } else {
+                    // Per-building proportional jitter so same-type rows (houses,
+                    // shops, farms) don't read as stamped clones. Deterministic
+                    // per tile; base stays grounded since models pivot at y=0.
+                    const j1 = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                    const j2 = (((b.x * 40503) ^ (b.y * 12289) ^ 0x9e3779b9) >>> 0) / 4294967296;
+                    clone.scale.x *= 0.90 + j1 * 0.20;          // ±10% width
+                    clone.scale.z *= 0.90 + (1 - j1) * 0.20;    // ±10% depth (anti-correlated)
+                    clone.scale.y *= 0.82 + j2 * 0.55;          // 0.82–1.37 height
                 }
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
