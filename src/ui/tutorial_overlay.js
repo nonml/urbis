@@ -336,6 +336,9 @@ export class TutorialOverlay {
      * Show current step
      */
     showStep() {
+        // A dismissed/completed tutorial must stay dismissed — game events
+        // (move, hack, enter vehicle) otherwise resurrect the overlay.
+        if (!this.isActive) return;
         const steps = Object.values(TUTORIAL_STEPS);
         if (this.currentStepIndex < 0 || this.currentStepIndex >= steps.length) {
             this.complete();
@@ -627,7 +630,13 @@ export class TutorialOverlay {
             this.tooltip.remove();
             this.tooltip = null;
         }
-        
+
+        // Defense-in-depth: sweep any stray tutorial DOM by id so a dark scrim
+        // can never outlive the tutorial (e.g. if an extra overlay was created).
+        for (const id of ['tutorial-overlay', 'tutorial-highlight', 'tutorial-tooltip']) {
+            document.getElementById(id)?.remove();
+        }
+
         this.currentStep = null;
         this.pendingBuildAction = null;
     }

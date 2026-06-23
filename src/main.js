@@ -313,45 +313,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     const menu = document.getElementById('main-menu-overlay');
     if (menu) menu.classList.remove('hidden');
 
-    // Set up start button click handler
-    const startBtn = document.getElementById('start-btn');
-    if (startBtn) {
-        startBtn.addEventListener('click', () => {
-            if (window.startGame) window.startGame();
-        });
-    }
-
-    // Set up restart button click handler
-    const restartBtn = document.getElementById('restart-btn');
-    if (restartBtn) {
-        restartBtn.addEventListener('click', () => {
-            if (window.restartGame) window.restartGame();
-        });
-    }
-
-    // Set up main menu button click handler (main menu screen)
-    const mainMenuBtn = document.getElementById('main-menu-btn');
-    if (mainMenuBtn) {
-        mainMenuBtn.addEventListener('click', () => {
-            if (window.showStartScreen) window.showStartScreen();
-        });
-    }
-
-    // Set up victory restart button click handler
-    const victoryRestartBtn = document.getElementById('victory-restart-btn');
-    if (victoryRestartBtn) {
-        victoryRestartBtn.addEventListener('click', () => {
-            if (window.restartGame) window.restartGame();
-        });
-    }
-
-    // Set up victory main menu button click handler
-    const victoryMainMenuBtn = document.getElementById('victory-main-menu-btn');
-    if (victoryMainMenuBtn) {
-        victoryMainMenuBtn.addEventListener('click', () => {
-            if (window.showStartScreen) window.showStartScreen();
-        });
-    }
+    // Menu buttons (start / restart / main-menu / victory-*) are wired via
+    // inline onclick in index.html. Do NOT also addEventListener here — that
+    // double-fires startGame(), spawning two Game instances and orphaning the
+    // first game's tutorial scrim (a permanent screen-dimming overlay).
 
     // Load quest content (async - don't block startup)
     await loadQuestContent();
