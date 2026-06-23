@@ -14,6 +14,10 @@ async function startGame(page) {
   await page.waitForSelector('#main-menu-overlay', { state: 'detached', timeout: 5000 })
     .catch(() => {});
   await page.waitForTimeout(SPAWN_DELAY);
+  // Q9: capture baselines at the "Performance" preset (the low quality tier,
+  // which is the new default for most players).
+  await page.evaluate(() => window.game?.ui?.renderer3d?.setPreset?.('low'));
+  await page.waitForTimeout(SETTLE);
 }
 
 function shot(name) {
