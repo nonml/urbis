@@ -730,6 +730,14 @@ export class Renderer3D {
         'university', 'airport', 'nuclear-plant',
     ]);
 
+    /** Building types that get procedural rooftop clutter (not homes/farms) */
+    static ROOFTOP_DETAIL_TYPES = new Set([
+        'market', 'shopping-mall', 'hotel', 'hospital', 'police-station',
+        'fire-station', 'school', 'library', 'courthouse', 'museum', 'theater',
+        'warehouse', 'factory', 'research-lab', 'university', 'town-hall',
+        'apartment', 'power-plant', 'water-treatment', 'recycling-plant',
+    ]);
+
     /** Variant models for 'house' type — all 21 kenney_suburban building types */
     static HOUSE_VARIANTS = [
         'assets/models/kenney_suburban/building-type-a.glb',
@@ -2525,6 +2533,12 @@ export class Renderer3D {
                 });
                 objects.push(clone);
 
+                // Rooftop clutter (AC units, vents, water tanks) enriches the
+                // skyline of commercial / civic / industrial buildings.
+                if (Renderer3D.ROOFTOP_DETAIL_TYPES.has(b.type)) {
+                    this._addRooftopProps(clone, b, objects);
+                }
+
                 // Add lit-window glow overlay to tall skyscraper buildings
                 if (useSkyscraperScale) {
                     const bbox = new THREE.Box3().setFromObject(clone);
@@ -2622,6 +2636,64 @@ export class Renderer3D {
             }
         }
         return objects;
+    }
+
+    /**
+     * Add deterministic rooftop clutter (AC units, a water tank, a vent) on top
+     * of a placed building. Props are world-space siblings pushed into `out`, so
+     * they dispose with the chunk group and aren't distorted by the building's
+     * per-instance scale. Shared geometry + materials keep them cheap.
+     */
+    _addRooftopProps(clone, b, out) {
+        const bbox = new THREE.Box3().setFromObject(clone);
+        const sx = bbox.max.x - bbox.min.x;
+        const sz = bbox.max.z - bbox.min.z;
+        const sy = bbox.max.y - bbox.min.y;
+        if (sy < 0.45 || sx < 0.25 || sz < 0.25) return; // too small to read
+        const topY = bbox.max.y;
+        const cx = (bbox.min.x + bbox.max.x) * 0.5;
+        const cz = (bbox.min.z + bbox.max.z) * 0.5;
+
+        if (!this._roofBoxGeo) {
+            this._roofBoxGeo = new THREE.BoxGeometry(1, 1, 1);
+            this._roofCylGeo = new THREE.CylinderGeometry(0.5, 0.5, 1, 10);
+            this._roofMetalMat = new THREE.MeshStandardMaterial({ color: 0x9097a0, roughness: 0.65, metalness: 0.35 });
+            this._roofDarkMat = new THREE.MeshStandardMaterial({ color: 0x565b63, roughness: 0.8, metalness: 0.2 });
+        }
+        const hash = (salt) => {
+            let h = ((b.x * 374761393 + b.y * 668265263 + salt * 2147483647) >>> 0);
+            h = ((h ^ (h >> 13)) * 1274126177) >>> 0;
+            return ((h ^ (h >> 16)) >>> 0) / 4294967296;
+        };
+        const insetX = sx * 0.32, insetZ = sz * 0.32;
+        const place = (geo, mat, px, pz, w, h, d) => {
+            const m = new THREE.Mesh(geo, mat);
+            m.position.set(cx + px, topY + h * 0.5, cz + pz);
+            m.scale.set(w, h, d);
+            m.castShadow = true; m.receiveShadow = true;
+            out.push(m);
+        };
+        // 1–3 AC units
+        const acN = 1 + Math.floor(hash(1) * 3);
+        for (let i = 0; i < acN; i++) {
+            const w = 0.10 + hash(i * 7 + 4) * 0.08;
+            place(this._roofBoxGeo, this._roofDarkMat,
+                (hash(i * 7 + 2) - 0.5) * insetX * 2, (hash(i * 7 + 3) - 0.5) * insetZ * 2,
+                w, 0.06 + hash(i * 7 + 5) * 0.05, w);
+        }
+        // Occasional water tank
+        if (hash(20) > 0.55) {
+            const r = 0.07 + hash(21) * 0.05;
+            place(this._roofCylGeo, this._roofMetalMat,
+                (hash(22) - 0.5) * insetX, (hash(23) - 0.5) * insetZ,
+                r * 2, 0.16 + hash(24) * 0.10, r * 2);
+        }
+        // Vent pipe
+        if (hash(30) > 0.4) {
+            place(this._roofBoxGeo, this._roofMetalMat,
+                (hash(31) - 0.5) * insetX, (hash(32) - 0.5) * insetZ,
+                0.04, 0.10 + hash(33) * 0.08, 0.04);
+        }
     }
 
     /**
