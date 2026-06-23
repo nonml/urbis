@@ -2067,6 +2067,7 @@ export class Renderer3D {
         const originX = bounds.minX - this._mapHalfW;
         const originZ = bounds.minY - this._mapHalfH;
         const dryColor = new THREE.Color(0xc2bd92); // pale, sun-dried tint for high ground
+        const meadowColor = new THREE.Color(0x6f9a48); // deeper meadow green for tonal patches
 
         for (let iz = 0; iz <= segsZ; iz++) {
             for (let ix = 0; ix <= segsX; ix++) {
@@ -2106,6 +2107,12 @@ export class Renderer3D {
                     const drift = 0.93 + this._valueNoise(gx / 13 + 50, gy / 13 + 50) * 0.14;
                     tmpColor.multiplyScalar(drift);
                     tmpColor.lerp(dryColor, Math.min(0.16, elev * 0.11));
+                    // Soft, large-scale meadow patches on planted ground so the
+                    // green has natural tonal variation instead of one flat hue.
+                    if (t === TERRAIN_GRASS || t === TERRAIN_FOREST || t === TERRAIN_PARK) {
+                        const patch = this._valueNoise(gx / 19 + 200, gy / 19 + 200);
+                        tmpColor.lerp(meadowColor, patch * 0.30);
+                    }
                 }
                 colors[vi * 3] = tmpColor.r;
                 colors[vi * 3 + 1] = tmpColor.g;
