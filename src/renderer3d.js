@@ -2658,14 +2658,16 @@ export class Renderer3D {
         const treeSmall = this._vegetationModels.get('tree-small');
         if (!treeLarge && !treeSmall) return objects;
 
-        // Collect forest/park tile positions
+        // Collect forest/park/grass tile positions
         const forestTiles = [];
         const parkTiles = [];
+        const grassTiles = [];
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const terrain = this.game.map.getTileAt(x, y);
                 if (terrain === TERRAIN_FOREST) forestTiles.push({ x, y });
                 else if (terrain === TERRAIN_PARK) parkTiles.push({ x, y });
+                else if (terrain === TERRAIN_GRASS) grassTiles.push({ x, y });
             }
         }
 
@@ -2740,7 +2742,7 @@ export class Renderer3D {
             const clone = model.clone(true);
             const offsetX = (hash(tile.x, tile.y, 120) - 0.5) * 0.4;
             const offsetZ = (hash(tile.x, tile.y, 130) - 0.5) * 0.4;
-            const parkY = Renderer3D.TERRAIN_HEIGHT[TERRAIN_PARK] ?? 0.06;
+            const parkY = this._smoothTerrainY(tile.x, tile.y);
             clone.position.set(wx + offsetX, parkY, wz + offsetZ);
             clone.rotation.y = hash(tile.x, tile.y, 140) * Math.PI * 2;
             clone.traverse((child) => {
@@ -2764,6 +2766,39 @@ export class Renderer3D {
                         }
                     }
                 }
+            });
+            objects.push(clone);
+        }
+
+        // Sparse trees dotting the open grassland — brings the rolling hills to
+        // life without the density (or draw cost) of a full forest.
+        const grassFoliage = [0x4e9a3a, 0x3f8a30, 0x57a544, 0x6aae4e];
+        for (const tile of grassTiles) {
+            if (hash(tile.x, tile.y, 200) > 0.05) continue; // ~5% of grass tiles
+            const model = hash(tile.x, tile.y, 210) > 0.45 ? treeLarge : treeSmall;
+            if (!model) continue;
+            const wx = tile.x - this._mapHalfW + 0.5;
+            const wz = tile.y - this._mapHalfH + 0.5;
+            const clone = model.clone(true);
+            const ox = (hash(tile.x, tile.y, 220) - 0.5) * 0.5;
+            const oz = (hash(tile.x, tile.y, 230) - 0.5) * 0.5;
+            clone.position.set(wx + ox, this._smoothTerrainY(tile.x, tile.y), wz + oz);
+            clone.rotation.y = hash(tile.x, tile.y, 240) * Math.PI * 2;
+            clone.scale.multiplyScalar(0.8 + hash(tile.x, tile.y, 250) * 0.7);
+            const foliageHex = grassFoliage[(tile.x * 5 + tile.y * 11) % grassFoliage.length];
+            clone.traverse((child) => {
+                if (!child.isMesh) return;
+                child.castShadow = true; child.receiveShadow = true;
+                if (!child.material) return;
+                const tint = (m) => {
+                    if (!m.color) return m;
+                    const nm = m.clone();
+                    const sz = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
+                    nm.color.setHex(sz.x < 0.25 && sz.z < 0.25 ? 0x6d4c3a : foliageHex);
+                    nm.roughness = 0.9; nm.metalness = 0.0;
+                    return nm;
+                };
+                child.material = Array.isArray(child.material) ? child.material.map(tint) : tint(child.material);
             });
             objects.push(clone);
         }
