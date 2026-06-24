@@ -299,6 +299,8 @@ export class Renderer3D {
         this._mouseNDC = new THREE.Vector2();
 
         this._chunkMeshes = new Map(); // chunkId -> { group, center, radius, terrainCount, buildingCount }
+        this._decalManager = null;
+        this._presetConfig = null;
         this._citizensMesh = null;
         this._player = null;
         this._buildGhost = null;
@@ -579,6 +581,9 @@ export class Renderer3D {
         // Map offsets
         this._mapHalfW = this.game.map.width / 2;
         this._mapHalfH = this.game.map.height / 2;
+
+        // Projected decal system (Q10)
+        this._initDecalManager();
 
         // Chunked terrain + buildings
         this._buildingsDirty = true;
@@ -3160,6 +3165,11 @@ export class Renderer3D {
                 }
             }
         }
+
+        if (this._decalManager) {
+            const activeSet = new Set(result.active);
+            this._decalManager.syncChunkVisibility(activeSet);
+        }
     }
 
     buildPlayer() {
@@ -3322,7 +3332,27 @@ export class Renderer3D {
         }
     }
 
+    async _initDecalManager() {
+        if (this._decalManager) {
+            this._decalManager.dispose();
+        }
+        const { DecalManager } = await import('./render/fx/decal_manager.js');
+        const preset = this._presetConfig || {};
+        this._decalManager = new DecalManager(THREE, this.scene, {
+            maxTotal: preset.decalCap ?? 512,
+            maxPerChunk: preset.decalPerChunkCap ?? 64,
+            chunkSize: this.game.map?.chunkManager?.chunkSize ?? 32,
+            mapHalfW: this._mapHalfW,
+            mapHalfH: this._mapHalfH,
+            elevFn: (wx, wz) => this._elevAtWorld(wx, wz),
+        });
+        if (this.fxSystem) {
+            this.fxSystem.setDecalManager(this._decalManager);
+        }
+    }
+
     _renderDecals() {
+        if (this._decalManager) return;
         const decals = this.fxSystem?.getDecals();
         if (!decals?.length) {
             if (this._decalMeshes?.length) {

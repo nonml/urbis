@@ -18,6 +18,8 @@ export const PRESETS = {
         envProbeInterval: 0,
         pixelRatio: 1.0,
         antialias: false,
+        decalCap: 128,
+        decalPerChunkCap: 16,
     },
     medium: {
         name: 'Medium',
@@ -32,6 +34,8 @@ export const PRESETS = {
         envProbeInterval: 60,
         pixelRatio: Math.min(1.5, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
         antialias: false,
+        decalCap: 256,
+        decalPerChunkCap: 32,
     },
     high: {
         name: 'High',
@@ -46,6 +50,8 @@ export const PRESETS = {
         envProbeInterval: 30,
         pixelRatio: Math.min(2.0, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
         antialias: true,
+        decalCap: 512,
+        decalPerChunkCap: 64,
     },
     ultra: {
         name: 'Ultra',
@@ -60,6 +66,8 @@ export const PRESETS = {
         envProbeInterval: 15,
         pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
         antialias: true,
+        decalCap: 1024,
+        decalPerChunkCap: 128,
     },
 };
 
@@ -121,4 +129,10 @@ export function applyPreset(renderer, presetName) {
     if (renderer._starPass) {
         renderer._starPass.visible = preset.starField;
     }
+
+    // Decal limits
+    if (renderer._decalManager) {
+        renderer._decalManager.setLimits(preset.decalCap, preset.decalPerChunkCap);
+    }
+    renderer._presetConfig = preset;
 }

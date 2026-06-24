@@ -300,8 +300,9 @@ export class FXSystem {
         // Tracers (bullet trails)
         this._tracers = [];
 
-        // Decals (blood splats, etc.)
+        // Decals — managed by DecalManager when attached
         this._decals = [];
+        this._decalManager = null;
 
         // Glass shatter animations
         this._glassAnimations = [];
@@ -446,8 +447,19 @@ export class FXSystem {
         }
     }
 
+    setDecalManager(dm) {
+        this._decalManager = dm;
+    }
+
     spawnDecal(x, y, z, color, duration) {
         if (!this.enabled || this.reducedMotion) return;
+        if (this._decalManager) {
+            this._decalManager.spawnGround(x, z, {
+                color: color || 0x880000,
+                duration: duration || 5000,
+            });
+            return;
+        }
         this._decals.push({ x, y, z, color: color || 0x880000, duration: duration || 5000, life: 0 });
     }
 
@@ -519,9 +531,13 @@ export class FXSystem {
         for (const t of this._tracers) t.life += dt;
         this._tracers = this._tracers.filter(t => t.life < t.duration);
 
-        // Update decals
-        for (const d of this._decals) d.life += dt;
-        this._decals = this._decals.filter(d => d.life < d.duration);
+        // Update decals — DecalManager handles its own if attached
+        if (this._decalManager) {
+            this._decalManager.update(dt);
+        } else {
+            for (const d of this._decals) d.life += dt;
+            this._decals = this._decals.filter(d => d.life < d.duration);
+        }
 
         // Update glass shatter animations
         this._glassAnimations = this._glassAnimations.filter(anim => {
