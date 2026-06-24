@@ -598,7 +598,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q10.E — GPU Particles
 
 - [x] `q10-gp-rain-snow` rain/snow on GPU (transform feedback or compute-emulated)
-- [ ] `q10-gp-sparks-smoke` sparks/smoke on GPU
+- [x] `q10-gp-sparks-smoke` sparks/smoke on GPU
 - [ ] `q10-gp-50x` 50× count-budget headroom at same frame cost vs current CPU particles
 
 ### Q10.F — TAA, GTAO, Anisotropy, Subsurface

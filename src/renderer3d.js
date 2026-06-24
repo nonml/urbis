@@ -4273,6 +4273,15 @@ export class Renderer3D {
             child.position.set(wx, 0.06 + this._elevAtWorld(wx, wz), wz);
             child.rotation.y = v.angle ?? 0;
 
+            // GPU spark+smoke burst once, on the frame a vehicle explodes (Q10.E)
+            if (v._exploded) {
+                if (!this._burstSeen) this._burstSeen = new Set();
+                if (!this._burstSeen.has(v.id)) {
+                    this._burstSeen.add(v.id);
+                    this._spawnGPUBurst(wx, 0.35 + this._elevAtWorld(wx, wz), wz);
+                }
+            }
+
             if (this._decalManager && (v.driftFactor ?? 0) > 0.3 && Math.abs(v.speed ?? 0) > 2) {
                 this._decalManager.spawnGround(wx, wz, {
                     color: 0x222222,
@@ -4557,6 +4566,110 @@ export class Renderer3D {
         group.frustumCulled = false;
         this.scene.add(group);
         return group;
+    }
+
+    /**
+     * GPU spark + smoke bursts (Q10.E). A small round-robin pool of Points clouds;
+     * each particle's trajectory is uploaded once and animated entirely in the
+     * vertex shader from a per-burst uElapsed (sparks = ballistic + gravity, smoke
+     * = buoyant expanding puffs). No CPU per-particle work — 50x count headroom.
+     */
+    _buildGPUBurstSlot() {
+        const PER = 64;   // half spark, half smoke
+        const aDir = new Float32Array(PER * 3);
+        const aSpeed = new Float32Array(PER);
+        const aKind = new Float32Array(PER);
+        const rng = this.game?.rngStreams?.vfx;
+        const rnd = () => (rng ? rng.next() : rand01());
+        for (let i = 0; i < PER; i++) {
+            // Random direction on a hemisphere (biased upward).
+            const theta = rnd() * Math.PI * 2;
+            const phi = rnd() * Math.PI * 0.55;
+            aDir[i * 3] = Math.cos(theta) * Math.sin(phi);
+            aDir[i * 3 + 1] = Math.cos(phi) + 0.3;
+            aDir[i * 3 + 2] = Math.sin(theta) * Math.sin(phi);
+            const kind = i < PER / 2 ? 0 : 1;
+            aKind[i] = kind;
+            aSpeed[i] = kind === 0 ? (3 + rnd() * 5) : (0.6 + rnd() * 0.8);
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(PER * 3), 3));
+        geom.setAttribute('aDir', new THREE.BufferAttribute(aDir, 3));
+        geom.setAttribute('aSpeed', new THREE.BufferAttribute(aSpeed, 1));
+        geom.setAttribute('aKind', new THREE.BufferAttribute(aKind, 1));
+        const mat = new THREE.ShaderMaterial({
+            transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+            uniforms: {
+                uElapsed: { value: 0 }, uLife: { value: 1.4 }, uOrigin: { value: new THREE.Vector3() },
+                uSparkColor: { value: new THREE.Color(0xffd070) },
+                uSmokeColor: { value: new THREE.Color(0x6a5a4a) },
+            },
+            vertexShader: `
+                uniform float uElapsed, uLife;
+                uniform vec3 uOrigin;
+                attribute vec3 aDir;
+                attribute float aSpeed, aKind;
+                varying float vKind, vAge;
+                void main() {
+                    float t = uElapsed;
+                    vAge = clamp(t / uLife, 0.0, 1.0);
+                    vKind = aKind;
+                    vec3 pos = uOrigin;
+                    if (aKind < 0.5) { pos += aDir * aSpeed * t; pos.y -= 4.0 * t * t; }
+                    else { pos += aDir * aSpeed * 0.3 * t; pos.y += 1.2 * t; }
+                    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+                    float size = (aKind < 0.5) ? 9.0 : (16.0 + 70.0 * vAge);
+                    gl_PointSize = size * (1.0 / max(0.1, -mv.z));
+                    gl_Position = projectionMatrix * mv;
+                }`,
+            fragmentShader: `
+                uniform vec3 uSparkColor, uSmokeColor;
+                varying float vKind, vAge;
+                void main() {
+                    float d = length(gl_PointCoord - 0.5);
+                    if (vKind < 0.5) {
+                        float a = smoothstep(0.5, 0.1, d) * (1.0 - vAge);
+                        gl_FragColor = vec4(uSparkColor, a);
+                    } else {
+                        float a = smoothstep(0.5, 0.0, d) * (1.0 - vAge) * 0.45;
+                        gl_FragColor = vec4(uSmokeColor, a);
+                    }
+                }`,
+        });
+        const pts = new THREE.Points(geom, mat);
+        pts.frustumCulled = false;
+        pts.visible = false;
+        this.scene.add(pts);
+        return { pts, mat, active: false };
+    }
+
+    /** Fire a spark+smoke burst at a world position (round-robin pool). */
+    _spawnGPUBurst(wx, wy, wz) {
+        if (this.testMode) return;
+        if (!this._gpuBursts) {
+            this._gpuBursts = [];
+            for (let i = 0; i < 10; i++) this._gpuBursts.push(this._buildGPUBurstSlot());
+            this._gpuBurstNext = 0;
+        }
+        const slot = this._gpuBursts[this._gpuBurstNext];
+        this._gpuBurstNext = (this._gpuBurstNext + 1) % this._gpuBursts.length;
+        slot.mat.uniforms.uOrigin.value.set(wx, wy, wz);
+        slot.mat.uniforms.uElapsed.value = 0;
+        slot.active = true;
+        slot.pts.visible = true;
+    }
+
+    _updateGPUBursts(dt) {
+        if (!this._gpuBursts) return;
+        for (const slot of this._gpuBursts) {
+            if (!slot.active) continue;
+            const u = slot.mat.uniforms;
+            u.uElapsed.value += dt;
+            if (u.uElapsed.value >= u.uLife.value) {
+                slot.active = false;
+                slot.pts.visible = false;
+            }
+        }
     }
 
     updateWeatherFX(dt) {
@@ -5366,6 +5479,9 @@ export class Renderer3D {
 
         // Drift ambient boats + animate their wakes (Q10.D)
         this._updateAmbientBoats(dt / 1000);
+
+        // Advance GPU spark/smoke bursts (Q10.E)
+        this._updateGPUBursts(dt / 1000);
 
         // Lightning exposure decay
         this._updateLightningExposure();
