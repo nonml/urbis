@@ -583,7 +583,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q10.C — Vegetation
 
 - [x] `q10-vg-tree-wind` tree vertex-shader wind sway
-- [ ] `q10-vg-grass-instanced` grass billboards via `InstancedMesh`, 1 draw per chunk
+- [x] `q10-vg-grass-instanced` grass billboards via `InstancedMesh`, 1 draw per chunk
 - [ ] `q10-vg-seasonal-tint` seasonal color tint (driven by in-game date if implemented, else flat)
 - [ ] `q10-vg-leaf-fall` leaf-fall particles in autumn districts
 

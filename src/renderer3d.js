@@ -2956,7 +2956,61 @@ export class Renderer3D {
             objects.push(clone);
         }
 
+        // Instanced grass billboards — 1 draw per chunk
+        const grassCandidates = [...grassTiles, ...parkTiles];
+        if (grassCandidates.length > 0) {
+            const blades = [];
+            for (const tile of grassCandidates) {
+                const count = 2 + Math.floor(hash(tile.x, tile.y, 300) * 4);
+                for (let i = 0; i < count; i++) {
+                    const ox = (hash(tile.x, tile.y, 310 + i) - 0.5) * 0.8;
+                    const oz = (hash(tile.x, tile.y, 320 + i) - 0.5) * 0.8;
+                    const rot = hash(tile.x, tile.y, 330 + i) * Math.PI;
+                    const h = 0.06 + hash(tile.x, tile.y, 340 + i) * 0.08;
+                    blades.push({ x: tile.x, y: tile.y, ox, oz, rot, h });
+                }
+            }
+            if (blades.length > 0) {
+                const grassMesh = this._buildGrassBillboards(blades, hash);
+                if (grassMesh) objects.push(grassMesh);
+            }
+        }
+
         return objects;
+    }
+
+    _buildGrassBillboards(blades, hash) {
+        if (!this._grassGeo) {
+            this._grassGeo = new THREE.PlaneGeometry(0.06, 0.1);
+            this._grassGeo.translate(0, 0.05, 0);
+        }
+        if (!this._grassMat) {
+            this._grassMat = new THREE.MeshStandardMaterial({
+                color: 0x4a8a3a,
+                roughness: 0.95,
+                metalness: 0.0,
+                side: THREE.DoubleSide,
+                alphaTest: 0.1,
+            });
+            this._applyTreeWindShader(this._grassMat);
+        }
+        const mesh = new THREE.InstancedMesh(this._grassGeo, this._grassMat, blades.length);
+        mesh.receiveShadow = true;
+        mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < blades.length; i++) {
+            const b = blades[i];
+            const wx = b.x - this._mapHalfW + 0.5 + b.ox;
+            const wz = b.y - this._mapHalfH + 0.5 + b.oz;
+            const gy = this._smoothTerrainY(b.x, b.y);
+            dummy.position.set(wx, gy, wz);
+            dummy.rotation.set(0, b.rot, 0);
+            dummy.scale.set(1, b.h / 0.1, 1);
+            dummy.updateMatrix();
+            mesh.setMatrixAt(i, dummy.matrix);
+        }
+        mesh.instanceMatrix.needsUpdate = true;
+        return mesh;
     }
 
     /**
