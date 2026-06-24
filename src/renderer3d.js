@@ -3159,14 +3159,14 @@ export class Renderer3D {
     }
 
     /** Recompute the GI probe grid irradiance from current lighting (Q10.G). */
-    _updateGI() {
+    _updateGI(dtSec = 0.033) {
         if (!this._gi) return;
         const sky = (this.scene.background && this.scene.background.isColor)
             ? this.scene.background : { r: 0.4, g: 0.6, b: 0.8 };
         const ground = this.hemiLight?.groundColor ?? { r: 0.4, g: 0.6, b: 0.4 };
         const sun = this.sunLight?.color ?? { r: 1, g: 1, b: 0.9 };
         const sunInt = Math.min(1, (this.sunLight?.intensity ?? 1.8) / 1.8);
-        this._gi.update(sky, ground, sun, sunInt, this._giDeltas);
+        this._gi.update(sky, ground, sun, sunInt, this._collectGIDeltas(dtSec));
     }
 
     _updateWindUniforms() {
@@ -4796,6 +4796,22 @@ export class Renderer3D {
         slot.mat.uniforms.uElapsed.value = 0;
         slot.active = true;
         slot.pts.visible = true;
+        // Explosions throw a warm light pulse into the GI grid (Q10.G delta).
+        if (!this._giPulses) this._giPulses = [];
+        this._giPulses.push({ wx, wz, radius: 7, color: { r: 1.0, g: 0.5, b: 0.18 }, base: 1.1, t: 0, life: 0.9 });
+    }
+
+    /** Advance + collect this frame's dynamic GI light deltas (Q10.G). */
+    _collectGIDeltas(dtSec) {
+        if (!this._giPulses || this._giPulses.length === 0) return null;
+        const out = [];
+        for (const p of this._giPulses) {
+            p.t += dtSec;
+            if (p.t >= p.life) continue;
+            out.push({ wx: p.wx, wz: p.wz, radius: p.radius, color: p.color, intensity: p.base * (1 - p.t / p.life) });
+        }
+        this._giPulses = this._giPulses.filter((p) => p.t < p.life);
+        return out.length ? out : null;
     }
 
     _updateGPUBursts(dt) {
@@ -5626,7 +5642,7 @@ export class Renderer3D {
         this._updateSubsurfaceLight();
 
         // Recompute the GI probe grid from current sky/sun (Q10.G dynamic delta)
-        this._updateGI();
+        this._updateGI(dt / 1000);
 
         // Lightning exposure decay
         this._updateLightningExposure();
