@@ -578,7 +578,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q10-wr-wetness-map` per-tile wetness map, weather + drainage driven
 - [x] `q10-wr-fresnel` proper Fresnel + roughness modulation
-- [ ] `q10-wr-puddle-ssr` puddle decals receive SSR
+- [x] `q10-wr-puddle-ssr` puddle decals receive SSR
 
 ### Q10.C — Vegetation
 

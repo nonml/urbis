@@ -41,12 +41,16 @@ export class DecalManager {
             rotation = 0,
             opacity = 1,
             weatherFade = false,
+            roughness,
+            metalness,
         } = opts;
 
         const y = this._elevFn ? this._elevFn(wx, wz) + 0.01 : 0.02;
         const mat = this._baseMat.clone();
         mat.color.setHex(color);
         mat.opacity = opacity;
+        if (roughness !== undefined) mat.roughness = roughness;
+        if (metalness !== undefined) mat.metalness = metalness;
 
         const mesh = new THREE.Mesh(this._groundGeo, mat);
         mesh.scale.set(size, 1, size);

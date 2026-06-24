@@ -4085,6 +4085,8 @@ export class Renderer3D {
                 duration: 30000 + rng.next() * 30000,
                 rotation: rng.next() * Math.PI * 2,
                 opacity: 0.35 + this._wetness * 0.35,
+                roughness: 0.15,
+                metalness: 0.5,
             });
         }
     }
