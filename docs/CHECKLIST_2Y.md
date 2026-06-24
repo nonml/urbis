@@ -591,7 +591,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q10-wt-planar-reflections` real-time planar reflections on canals/harbor
 - [x] `q10-wt-depth-color` depth-based color absorption
-- [ ] `q10-wt-foam` surface foam at obstacles
+- [x] `q10-wt-foam` surface foam at obstacles
 - [ ] `q10-wt-caustics` caustics at shallow depths
 - [ ] `q10-wt-boat-wake` wake from moving boats
 

@@ -1614,6 +1614,9 @@ export class Renderer3D {
                     '#include <common>',
                     `#include <common>
                     uniform float uTime;
+                    attribute vec4 aShore;
+                    varying vec4 vShore;
+                    varying vec2 vFoamUv;
                     varying vec3 vWaterWorldPos;`
                 );
                 shader.vertexShader = shader.vertexShader.replace(
@@ -1624,6 +1627,8 @@ export class Renderer3D {
                     float wave3 = cos((position.x + position.z) * 2.0 + uTime * 0.7) * 0.03;
                     float wave4 = sin(position.x * 6.0 - position.z * 3.0 + uTime * 2.0) * 0.015;
                     transformed.y += wave1 + wave2 + wave3 + wave4;
+                    vShore = aShore;
+                    vFoamUv = uv;
                     #ifdef USE_INSTANCING
                         vWaterWorldPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
                     #else
@@ -1633,10 +1638,13 @@ export class Renderer3D {
                 shader.fragmentShader = shader.fragmentShader.replace(
                     '#include <common>',
                     `#include <common>
+                    uniform float uTime;
                     uniform vec3 uShallowColor;
                     uniform vec3 uDeepColor;
                     uniform float uAbsorb;
                     uniform float uWaterDepth;
+                    varying vec4 vShore;
+                    varying vec2 vFoamUv;
                     varying vec3 vWaterWorldPos;`
                 );
                 shader.fragmentShader = shader.fragmentShader.replace(
@@ -1645,7 +1653,17 @@ export class Renderer3D {
                     float cosV = max(0.10, normalize(cameraPosition - vWaterWorldPos).y);
                     float pathLen = uWaterDepth / cosV;
                     float trans = clamp(exp(-pathLen * uAbsorb), 0.0, 1.0);
-                    diffuseColor.rgb = mix(uDeepColor, uShallowColor, trans);`
+                    diffuseColor.rgb = mix(uDeepColor, uShallowColor, trans);
+                    // Shoreline foam: animated band hugging the edges that touch land.
+                    float eN = vShore.x * smoothstep(0.32, 0.0, vFoamUv.y);
+                    float eS = vShore.z * smoothstep(0.68, 1.0, vFoamUv.y);
+                    float eW = vShore.w * smoothstep(0.32, 0.0, vFoamUv.x);
+                    float eE = vShore.y * smoothstep(0.68, 1.0, vFoamUv.x);
+                    float foam = max(max(eN, eS), max(eW, eE));
+                    float foamN = 0.5 + 0.5 * sin(vWaterWorldPos.x * 9.0 + uTime * 2.3)
+                                            * sin(vWaterWorldPos.z * 9.0 - uTime * 1.9);
+                    foam *= 0.55 + 0.45 * foamN;
+                    diffuseColor.rgb = mix(diffuseColor.rgb, vec3(0.93, 0.97, 1.0), clamp(foam, 0.0, 1.0) * 0.85);`
                 );
             };
         }
@@ -1655,6 +1673,11 @@ export class Renderer3D {
         instancedMesh.receiveShadow = true;
         instancedMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
 
+        // Per-instance shore-edge flags (N,E,S,W) drive the foam band where water
+        // meets land — 1 if that neighbour tile is not water (or off-map).
+        const map = this.game.map;
+        const isWater = (x, y) => map.getTileAt(x, y) === TERRAIN_WATER;
+        const shore = new Float32Array(tiles.length * 4);
         for (let i = 0; i < tiles.length; i++) {
             const tile = tiles[i];
             const wx = tile.x - this._mapHalfW + 0.5;
@@ -1662,7 +1685,12 @@ export class Renderer3D {
             dummy.position.set(wx, Renderer3D.WATER_PLANE_Y, wz);
             dummy.updateMatrix();
             instancedMesh.setMatrixAt(i, dummy.matrix);
+            shore[i * 4 + 0] = isWater(tile.x, tile.y - 1) ? 0 : 1; // N
+            shore[i * 4 + 1] = isWater(tile.x + 1, tile.y) ? 0 : 1; // E
+            shore[i * 4 + 2] = isWater(tile.x, tile.y + 1) ? 0 : 1; // S
+            shore[i * 4 + 3] = isWater(tile.x - 1, tile.y) ? 0 : 1; // W
         }
+        geom.setAttribute('aShore', new THREE.InstancedBufferAttribute(shore, 4));
         instancedMesh.instanceMatrix.needsUpdate = true;
         meshes.push(instancedMesh);
 
