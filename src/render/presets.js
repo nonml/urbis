@@ -13,6 +13,7 @@ export const PRESETS = {
         bloomStrength: 0.1,
         bloomThreshold: 0.9,
         ssrEnabled: false,
+        planarReflections: false,
         volumetricFog: false,
         starField: false,
         envProbeInterval: 0,
@@ -29,6 +30,7 @@ export const PRESETS = {
         bloomStrength: 0.2,
         bloomThreshold: 0.75,
         ssrEnabled: true,
+        planarReflections: false,
         volumetricFog: true,
         starField: true,
         envProbeInterval: 60,
@@ -45,6 +47,7 @@ export const PRESETS = {
         bloomStrength: 0.3,
         bloomThreshold: 0.6,
         ssrEnabled: true,
+        planarReflections: true,
         volumetricFog: true,
         starField: true,
         envProbeInterval: 30,
@@ -61,6 +64,7 @@ export const PRESETS = {
         bloomStrength: 0.4,
         bloomThreshold: 0.5,
         ssrEnabled: true,
+        planarReflections: true,
         volumetricFog: true,
         starField: true,
         envProbeInterval: 15,
@@ -118,6 +122,11 @@ export function applyPreset(renderer, presetName) {
     // SSR toggle
     if (renderer._ssrPass) {
         renderer._ssrPass.visible = preset.ssrEnabled;
+    }
+
+    // Planar water reflection toggle
+    if (renderer._waterReflector) {
+        renderer._waterReflector.visible = !!preset.planarReflections;
     }
 
     // Volumetric fog toggle

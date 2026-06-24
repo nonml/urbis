@@ -589,6 +589,9 @@ export class Renderer3D {
         this._buildingsDirty = true;
         this.syncChunkStreaming(true);
 
+        // Shared planar-reflection mirror for water (Q10.D)
+        this._buildWaterReflector().catch(() => {});
+
         // Citizens
         this._citizensDirty = true;
         this.rebuildCitizens();
@@ -1585,7 +1588,7 @@ export class Renderer3D {
             this._waterMaterial = new THREE.MeshPhysicalMaterial({
                 color: 0x3aa0e0,       // bright tropical blue
                 transparent: true,
-                opacity: 0.82,
+                opacity: 0.5,          // translucent so the planar mirror reads through the waves
                 roughness: 0.05,       // very reflective
                 metalness: 0.1,
                 transmission: 0.4,
@@ -1625,7 +1628,7 @@ export class Renderer3D {
             const tile = tiles[i];
             const wx = tile.x - this._mapHalfW + 0.5;
             const wz = tile.y - this._mapHalfH + 0.5;
-            dummy.position.set(wx, -0.35, wz);
+            dummy.position.set(wx, Renderer3D.WATER_PLANE_Y, wz);
             dummy.updateMatrix();
             instancedMesh.setMatrixAt(i, dummy.matrix);
         }
@@ -1637,6 +1640,52 @@ export class Renderer3D {
         this._waterMeshes.push(instancedMesh);
 
         return meshes;
+    }
+
+    /**
+     * Build one shared real-time planar reflection mirror for all water (Q10.D).
+     * A single flat Reflector at the water surface; land terrain sits above it and
+     * occludes it, so the mirror only reads over water tiles. The translucent
+     * animated wave plane blends on top. Skipped in test mode (the Reflector
+     * re-renders the whole scene from a mirrored camera — black under swiftshader)
+     * and toggled off on low presets via `planarReflections`.
+     */
+    async _buildWaterReflector() {
+        if (this._waterReflector) {
+            this.scene.remove(this._waterReflector);
+            this._waterReflector.dispose?.();
+            this._waterReflector.geometry?.dispose();
+            this._waterReflector = null;
+        }
+        if (this.testMode) return;
+
+        // Only pay for a reflector if the map actually has water.
+        const map = this.game.map;
+        let hasWater = false;
+        for (let y = 0; y < map.height && !hasWater; y++) {
+            for (let x = 0; x < map.width; x++) {
+                if (map.getTileAt(x, y) === TERRAIN_WATER) { hasWater = true; break; }
+            }
+        }
+        if (!hasWater) return;
+
+        const { Reflector } = await import('three/examples/jsm/objects/Reflector.js');
+        // Guard against a world rebuild that finished while the import was in flight.
+        if (this.game.map !== map) return;
+
+        const geom = new THREE.PlaneGeometry(map.width, map.height);
+        const reflector = new Reflector(geom, {
+            textureWidth: 512,
+            textureHeight: 512,
+            color: 0x4a6b7a,     // steel-blue tint pulls reflections toward water tone
+            clipBias: 0.003,
+        });
+        reflector.rotation.x = -Math.PI / 2;   // lay flat → reflection normal points +Y
+        reflector.position.set(0, Renderer3D.WATER_SURFACE_Y, 0);
+        reflector.renderOrder = -1;            // draw before the translucent wave plane
+        reflector.visible = this._presetConfig ? !!this._presetConfig.planarReflections : true;
+        this.scene.add(reflector);
+        this._waterReflector = reflector;
     }
 
     _createGlassMaterial() {
@@ -2400,6 +2449,11 @@ export class Renderer3D {
 
     /** Max added height (world units) of the rolling-hills field. */
     static ELEV_AMPLITUDE = 1.75;
+
+    /** Y of the shared planar-reflection mirror — just above the -0.2 water bed. */
+    static WATER_SURFACE_Y = -0.18;
+    /** Y of the translucent animated wave plane — sits just above the mirror. */
+    static WATER_PLANE_Y = -0.16;
 
     /** Integer hash → [0,1), seeded once from the world seed. */
     _elevHash(ix, iz) {

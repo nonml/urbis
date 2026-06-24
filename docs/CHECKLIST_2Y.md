@@ -589,7 +589,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q10.D — Water Upgrade
 
-- [ ] `q10-wt-planar-reflections` real-time planar reflections on canals/harbor
+- [x] `q10-wt-planar-reflections` real-time planar reflections on canals/harbor
 - [ ] `q10-wt-depth-color` depth-based color absorption
 - [ ] `q10-wt-foam` surface foam at obstacles
 - [ ] `q10-wt-caustics` caustics at shallow depths
