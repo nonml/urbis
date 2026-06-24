@@ -605,8 +605,8 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q10-aa-taa` TAA with temporal jitter, history reprojection, neighborhood clamp
 - [x] `q10-aa-fxaa-fallback` FXAA retained for "Performance" preset
-- [ ] `q10-ao-gtao` GTAO replaces SSAO at "High" and above (separable bilateral blur)
-- [ ] `q10-ao-ssao-fallback` SSAO retained for lower presets
+- [x] `q10-ao-gtao` GTAO replaces SSAO at "High" and above (separable bilateral blur)
+- [x] `q10-ao-ssao-fallback` SSAO retained for lower presets
 - [ ] `q10-sh-anisotropic` anisotropic specular for road, hair, brushed-metal vehicle paint
 - [ ] `q10-sh-subsurface` wrap-shading SSS for skin/foliage
 

@@ -17,6 +17,7 @@ export const PRESETS = {
         volumetricFog: false,
         starField: false,
         taa: false,
+        gtao: false,
         particleDensity: 0.5,
         envProbeInterval: 0,
         pixelRatio: 1.0,
@@ -36,6 +37,7 @@ export const PRESETS = {
         volumetricFog: true,
         starField: true,
         taa: false,
+        gtao: false,
         particleDensity: 1.0,
         envProbeInterval: 60,
         pixelRatio: Math.min(1.5, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
@@ -55,6 +57,7 @@ export const PRESETS = {
         volumetricFog: true,
         starField: true,
         taa: true,
+        gtao: true,
         particleDensity: 4.0,
         envProbeInterval: 30,
         pixelRatio: Math.min(2.0, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
@@ -74,6 +77,7 @@ export const PRESETS = {
         volumetricFog: true,
         starField: true,
         taa: true,
+        gtao: true,
         particleDensity: 12.0,
         envProbeInterval: 15,
         pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
@@ -116,9 +120,13 @@ export function applyPreset(renderer, presetName) {
         });
     }
 
-    // SSAO kernel radius
+    // Ambient occlusion: GTAO at high+, SSAO as the fallback. Never both.
     if (renderer._ssaoPass) {
         renderer._ssaoPass.kernelRadius = preset.ssaoKernelRadius;
+        renderer._ssaoPass.enabled = !preset.gtao;
+    }
+    if (renderer._gtaoPass) {
+        renderer._gtaoPass.enabled = !!preset.gtao;
     }
 
     // Bloom

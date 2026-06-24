@@ -1093,9 +1093,26 @@ export class Renderer3D {
                 ssaoPass.minDistance = 0.001;
                 ssaoPass.maxDistance = 0.15;
                 ssaoPass.output = SSAOPass.OUTPUT.Default;
+                // SSAO is the fallback occluder — disabled where GTAO is active.
+                ssaoPass.enabled = !this._presetConfig?.gtao;
                 this.composer.addPass(ssaoPass);
                 this._ssaoPass = ssaoPass;
             }
+
+            // GTAO — ground-truth ambient occlusion for high/ultra. Computes its
+            // own depth + normals and denoises with a separable poisson (bilateral)
+            // blur. Mutually exclusive with SSAO so AO is never applied twice.
+            try {
+                const { GTAOPass } = await import('three/addons/postprocessing/GTAOPass.js');
+                const gtaoPass = new GTAOPass(this.scene, this.camera, rect.width, rect.height, {},
+                    { radius: 0.25, distanceExponent: 1.0, thickness: 1.0, scale: 1.0, samples: 16, distanceFallOff: 1.0, screenSpaceRadius: false },
+                    { lumaPhi: 10, depthPhi: 2, normalPhi: 3, radius: 4, rings: 4, samples: 16 });
+                gtaoPass.output = GTAOPass.OUTPUT.Default;
+                gtaoPass.blendIntensity = 1.0;
+                gtaoPass.enabled = !!this._presetConfig?.gtao;
+                this.composer.addPass(gtaoPass);
+                this._gtaoPass = gtaoPass;
+            } catch { /* GTAO pass unavailable */ }
 
             // Bloom — subtle glow on bright surfaces (sun, water, street lights)
             // Volumetric fog — half-res raymarched light scattering
