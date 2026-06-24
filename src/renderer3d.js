@@ -3425,6 +3425,7 @@ export class Renderer3D {
         };
         const rocks = [];
         const bushes = [];
+        const tufts = [];
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const t = this.game.map.getTileAt(x, y);
@@ -3434,13 +3435,24 @@ export class Renderer3D {
                 const y0 = this._smoothTerrainY(x, y);
                 const wx = x - this._mapHalfW + 0.5;
                 const wz = y - this._mapHalfH + 0.5;
+                // Suburbs read as manicured lawn: denser shrubs + scattered grass tufts.
+                const isSuburb = isGrass &&
+                    this._districtThemes?.get(this.game.map.getDistrictAt(x, y)) === 'suburbs';
                 if (hash(x, y, 1) < (isMtn ? 0.32 : 0.05)) {
                     rocks.push({ x: wx + (hash(x, y, 2) - 0.5) * 0.6, y: y0, z: wz + (hash(x, y, 3) - 0.5) * 0.6,
                         s: 0.5 + hash(x, y, 4) * (isMtn ? 1.4 : 0.8), rx: hash(x, y, 5), ry: hash(x, y, 6), c: hash(x, y, 7) });
                 }
-                if (isGrass && hash(x, y, 10) < 0.07) {
+                if (isGrass && hash(x, y, 10) < (isSuburb ? 0.18 : 0.07)) {
                     bushes.push({ x: wx + (hash(x, y, 11) - 0.5) * 0.6, y: y0, z: wz + (hash(x, y, 12) - 0.5) * 0.6,
                         s: 0.6 + hash(x, y, 13) * 0.8, ry: hash(x, y, 14), c: hash(x, y, 15) });
+                }
+                // Lawn grass tufts — multiple per suburb tile so the ground reads as kept turf.
+                if (isSuburb) {
+                    for (let g = 0; g < 4; g++) {
+                        if (hash(x, y, 20 + g) > 0.6) continue;
+                        tufts.push({ x: wx + (hash(x, y, 30 + g) - 0.5) * 0.85, y: y0, z: wz + (hash(x, y, 40 + g) - 0.5) * 0.85,
+                            s: 0.7 + hash(x, y, 50 + g) * 0.7, ry: hash(x, y, 60 + g), c: hash(x, y, 70 + g) });
+                    }
                 }
             }
         }
@@ -3474,6 +3486,23 @@ export class Renderer3D {
                 dummy.scale.set(bsh.s, bsh.s * 0.8, bsh.s);
                 dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
                 tmp.setHSL(0.28, 0.45, 0.30 + bsh.c * 0.12); // foliage green variation
+                im.setColorAt(i, tmp);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            if (im.instanceColor) im.instanceColor.needsUpdate = true;
+            objects.push(im);
+        }
+        if (tufts.length) {
+            const mat = new THREE.MeshStandardMaterial({ roughness: 0.85, metalness: 0.0, flatShading: true });
+            const im = new THREE.InstancedMesh(new THREE.ConeGeometry(0.05, 0.22, 4), mat, tufts.length);
+            im.castShadow = true; im.receiveShadow = true;
+            for (let i = 0; i < tufts.length; i++) {
+                const tf = tufts[i];
+                dummy.position.set(tf.x, tf.y + 0.11 * tf.s, tf.z);
+                dummy.rotation.set(0, tf.ry * 6.283, 0);
+                dummy.scale.set(tf.s, tf.s, tf.s);
+                dummy.updateMatrix(); im.setMatrixAt(i, dummy.matrix);
+                tmp.setHSL(0.26, 0.55, 0.34 + tf.c * 0.1); // fresh lawn green
                 im.setColorAt(i, tmp);
             }
             im.instanceMatrix.needsUpdate = true;
