@@ -2472,6 +2472,23 @@ export class Renderer3D {
         terrainMesh.receiveShadow = true;
         meshes.push(terrainMesh);
 
+        // Bake GI bounce albedo for this chunk's probes from the ground tint
+        // beneath each one (Q10.G irradiance volumes, loaded at chunk-load).
+        if (this._gi) {
+            const giTmp = new THREE.Color();
+            this._gi.bakeRegion(
+                bounds.minX - this._mapHalfW, bounds.minY - this._mapHalfH,
+                bounds.maxX - this._mapHalfW + 1, bounds.maxY - this._mapHalfH + 1,
+                (wx, wz) => {
+                    const tx = Math.round(wx + this._mapHalfW - 0.5);
+                    const ty = Math.round(wz + this._mapHalfH - 0.5);
+                    const t = this.game.map.getTileAt(
+                        Math.max(0, Math.min(this.game.map.width - 1, tx)),
+                        Math.max(0, Math.min(this.game.map.height - 1, ty)));
+                    return giTmp.setHex(terrainTint(t));
+                });
+        }
+
         // Road fallback: flat asphalt slabs for roads when no GLTF models loaded
         if (roadTiles.length > 0 && this._roadModels.size === 0) {
             const roadGeom = new THREE.PlaneGeometry(1, 1);

@@ -613,7 +613,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q10.G — Realtime GI (Probe Grid)
 
 - [x] `q10-gi-probe-grid` light probe grid placed per chunk
-- [ ] `q10-gi-irradiance-volumes` baked irradiance volumes loaded at chunk-load
+- [x] `q10-gi-irradiance-volumes` baked irradiance volumes loaded at chunk-load
 - [ ] `q10-gi-dynamic-deltas` dynamic-light deltas applied per frame
 
 ### Q10.H — Per-District Art Direction
