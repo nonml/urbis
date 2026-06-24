@@ -592,6 +592,9 @@ export class Renderer3D {
         // Shared planar-reflection mirror for water (Q10.D)
         this._buildWaterReflector().catch(() => {});
 
+        // Ambient boats + wake on the harbor (Q10.D)
+        this._buildAmbientBoats();
+
         // Citizens
         this._citizensDirty = true;
         this.rebuildCitizens();
@@ -1752,6 +1755,138 @@ export class Renderer3D {
         reflector.visible = this._presetConfig ? !!this._presetConfig.planarReflections : true;
         this.scene.add(reflector);
         this._waterReflector = reflector;
+    }
+
+    /**
+     * Spawn a couple of render-only ambient boats drifting on the largest water
+     * body, each trailing an animated V-foam wake (Q10.D). Deterministic via the
+     * vfx RNG stream; no sim state — purely cosmetic life on the harbor.
+     */
+    _buildAmbientBoats() {
+        this._disposeAmbientBoats();
+
+        // Collect water tiles → bounding box of the water body.
+        const map = this.game.map;
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity, count = 0;
+        for (let y = 0; y < map.height; y++) {
+            for (let x = 0; x < map.width; x++) {
+                if (map.getTileAt(x, y) !== TERRAIN_WATER) continue;
+                count++;
+                if (x < minX) minX = x; if (x > maxX) maxX = x;
+                if (y < minY) minY = y; if (y > maxY) maxY = y;
+            }
+        }
+        // Need a real water body to be worth it.
+        if (count < 40 || (maxX - minX) < 6 || (maxY - minY) < 6) return;
+
+        const rng = this.game?.rngStreams?.vfx;
+        const rand = () => (rng ? rng.next() : 0.5);
+        const cx = (minX + maxX) / 2 - this._mapHalfW + 0.5;
+        const cz = (minY + maxY) / 2 - this._mapHalfH + 0.5;
+        const rx = Math.max(2, (maxX - minX) * 0.30);
+        const rz = Math.max(2, (maxY - minY) * 0.30);
+
+        this._ambientBoats = [];
+        const n = Math.min(2, 1 + Math.floor(rand() * 2));
+        for (let i = 0; i < n; i++) {
+            const group = new THREE.Group();
+            group.add(this._buildBoatHull());
+            const wake = this._buildBoatWake();
+            group.add(wake);
+            this.scene.add(group);
+            this._ambientBoats.push({
+                group, wakeMat: wake.material,
+                cx, cz, rx, rz,
+                phase: rand() * Math.PI * 2,
+                speed: 0.05 + rand() * 0.05,   // rad/s — slow drift
+                dir: rand() < 0.5 ? 1 : -1,
+            });
+        }
+    }
+
+    /** Simple low-poly hull + cabin, bow pointing local +Z. */
+    _buildBoatHull() {
+        const g = new THREE.Group();
+        const hullMat = new THREE.MeshStandardMaterial({ color: 0xe8ebee, roughness: 0.6, metalness: 0.1 });
+        const hull = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.18, 1.2), hullMat);
+        hull.position.y = 0.02;
+        g.add(hull);
+        const bow = new THREE.Mesh(new THREE.ConeGeometry(0.28, 0.5, 4), hullMat);
+        bow.rotation.x = Math.PI / 2;
+        bow.rotation.y = Math.PI / 4;
+        bow.position.set(0, 0.02, 0.75);
+        bow.scale.set(1, 0.36, 1);
+        g.add(bow);
+        const cabin = new THREE.Mesh(
+            new THREE.BoxGeometry(0.34, 0.2, 0.5),
+            new THREE.MeshStandardMaterial({ color: 0x5b7a8c, roughness: 0.5 })
+        );
+        cabin.position.set(0, 0.18, -0.1);
+        g.add(cabin);
+        return g;
+    }
+
+    /** Animated translucent V-wake trailing behind the stern (local -Z). */
+    _buildBoatWake() {
+        const geo = new THREE.PlaneGeometry(1.6, 5, 1, 1);
+        geo.rotateX(-Math.PI / 2);
+        const mat = new THREE.ShaderMaterial({
+            transparent: true,
+            depthWrite: false,
+            uniforms: { uTime: { value: 0 } },
+            vertexShader: `
+                varying vec2 vUv;
+                void main() {
+                    vUv = uv;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }`,
+            fragmentShader: `
+                uniform float uTime;
+                varying vec2 vUv;
+                void main() {
+                    float v = vUv.y;                       // 0 stern .. 1 tail
+                    float spread = mix(0.12, 0.95, v);     // V widens behind
+                    float dx = abs(vUv.x - 0.5) / 0.5;
+                    float arm = smoothstep(spread, spread - 0.22, dx);
+                    float churn = 0.5 + 0.5 * sin(vUv.x * 34.0 + v * 22.0 - uTime * 6.0);
+                    float a = arm * (1.0 - v) * (0.55 + 0.45 * churn);
+                    gl_FragColor = vec4(vec3(0.95, 0.98, 1.0), clamp(a, 0.0, 1.0) * 0.7);
+                }`,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(0, 0.03, -3.1);   // behind the stern, just above the wave plane
+        mesh.renderOrder = 2;
+        return mesh;
+    }
+
+    _updateAmbientBoats(dt) {
+        if (!this._ambientBoats?.length) return;
+        const y = Renderer3D.WATER_PLANE_Y + 0.04;
+        const t = performance.now() / 1000;
+        for (const b of this._ambientBoats) {
+            b.phase += b.dir * b.speed * dt;
+            const a = b.phase;
+            const x = b.cx + b.rx * Math.cos(a);
+            const z = b.cz + b.rz * Math.sin(a);
+            // Tangent (travel direction) for heading; local forward is +Z.
+            const vx = -b.rx * Math.sin(a) * b.dir;
+            const vz = b.rz * Math.cos(a) * b.dir;
+            b.group.position.set(x, y, z);
+            b.group.rotation.y = Math.atan2(vx, vz);
+            b.wakeMat.uniforms.uTime.value = t;
+        }
+    }
+
+    _disposeAmbientBoats() {
+        if (!this._ambientBoats) return;
+        for (const b of this._ambientBoats) {
+            this.scene.remove(b.group);
+            b.group.traverse((o) => {
+                if (o.geometry) o.geometry.dispose();
+                if (o.material) o.material.dispose();
+            });
+        }
+        this._ambientBoats = null;
     }
 
     _createGlassMaterial() {
@@ -5195,6 +5330,9 @@ export class Renderer3D {
         if (this._waterShaderRef) {
             this._waterShaderRef.uniforms.uTime.value = performance.now() / 1000;
         }
+
+        // Drift ambient boats + animate their wakes (Q10.D)
+        this._updateAmbientBoats(dt / 1000);
 
         // Lightning exposure decay
         this._updateLightningExposure();
