@@ -2380,6 +2380,7 @@ export class Renderer3D {
         const dryColor = new THREE.Color(0xc2bd92); // pale, sun-dried tint for high ground
         const meadowColor = new THREE.Color(0x6f9a48); // deeper meadow green for tonal patches
         const grimeColor = new THREE.Color(0x55605a); // wet, algae-grey film for the docks
+        const oilColor = new THREE.Color(0x231f1d); // scorched oil-stain near-black for industry
 
         for (let iz = 0; iz <= segsZ; iz++) {
             for (let ix = 0; ix <= segsX; ix++) {
@@ -2427,10 +2428,17 @@ export class Renderer3D {
                     }
                     // Docks bias (Q10.H): wet grime film — darkened ground broken up
                     // by puddle-shaped patches so the dockside reads damp and worked.
-                    if (this._districtThemes?.get(this.game.map.getDistrictAt(gx, gy)) === 'docks') {
+                    const districtTheme = this._districtThemes?.get(this.game.map.getDistrictAt(gx, gy));
+                    if (districtTheme === 'docks') {
                         const puddle = this._valueNoise(gx / 7 + 400, gy / 7 + 400);
                         tmpColor.lerp(grimeColor, 0.3 + puddle * 0.35);
                         tmpColor.multiplyScalar(0.82); // damp surfaces sit darker
+                    } else if (districtTheme === 'industrial') {
+                        // Industrial bias (Q10.H): scorch/oil staining — high-frequency
+                        // dark blotches where spills and burns have soaked the ground.
+                        const stain = this._valueNoise(gx / 5 + 600, gy / 5 + 600);
+                        if (stain > 0.5) tmpColor.lerp(oilColor, (stain - 0.5) * 1.4);
+                        tmpColor.multiplyScalar(0.88); // sooty, light-starved ground
                     }
                 }
                 colors[vi * 3] = tmpColor.r;
