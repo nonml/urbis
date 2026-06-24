@@ -4368,6 +4368,43 @@ export class Renderer3D {
             this._snowGroup.material.opacity = 0.5 + intensity * 0.4;
         }
 
+        // --- Leaf fall in autumn ---
+        const isAutumn = this.game?.weatherSystem?.state?.season === 'autumn';
+        if (this._leafGroup && !isAutumn) this._leafGroup.visible = false;
+        if (isAutumn) {
+            const LEAF_COUNT = 600;
+            if (!this._leafGroup) {
+                const positions = new Float32Array(LEAF_COUNT * 3);
+                for (let i = 0; i < LEAF_COUNT; i++) {
+                    positions[i * 3] = (rand01() - 0.5) * 40;
+                    positions[i * 3 + 1] = rand01() * 8;
+                    positions[i * 3 + 2] = (rand01() - 0.5) * 40;
+                }
+                const geom = new THREE.BufferGeometry();
+                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+                this._leafGroup = new THREE.Points(geom, new THREE.PointsMaterial({
+                    color: 0xcc8833, size: 0.04, transparent: true, opacity: 0.8, depthWrite: false,
+                }));
+                this.scene.add(this._leafGroup);
+            }
+            this._leafGroup.visible = true;
+            if (this._player) this._leafGroup.position.copy(this._player.position);
+            const lp = this._leafGroup.geometry.attributes.position.array;
+            const t = performance.now() / 1000;
+            for (let i = 0; i < LEAF_COUNT; i++) {
+                const j = i * 3;
+                lp[j + 1] -= 0.02 + Math.sin(t * 0.8 + i * 0.7) * 0.01;
+                lp[j] += Math.sin(t * 1.2 + i * 0.5) * 0.008 + Math.cos(windDir) * windSpeed * 0.004;
+                lp[j + 2] += Math.cos(t * 0.9 + i * 0.6) * 0.006 + Math.sin(windDir) * windSpeed * 0.004;
+                if (lp[j + 1] < 0) {
+                    lp[j] = (rand01() - 0.5) * 40;
+                    lp[j + 1] = 6 + rand01() * 4;
+                    lp[j + 2] = (rand01() - 0.5) * 40;
+                }
+            }
+            this._leafGroup.geometry.attributes.position.needsUpdate = true;
+        }
+
         // --- Lightning flashes during storms (with screen shake + thunder timing) ---
         if (isStorm && this.ambientLight) {
             if (!this._lightningTimer) this._lightningTimer = 5000;
