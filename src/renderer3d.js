@@ -1763,17 +1763,27 @@ export class Renderer3D {
                 clone.position.set(wx, 0.09, wz);
                 clone.rotation.y = rotation;
                 clone.traverse((child) => {
-                    if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+                    if (child.isMesh) {
+                        child.castShadow = true;
+                        child.receiveShadow = true;
+                        child.userData.isRoad = true;
+                        if (child.material?.isMeshStandardMaterial && !child.material.clearcoat) {
+                            child.material = new THREE.MeshPhysicalMaterial().copy(child.material);
+                            child.material.clearcoat = 0;
+                            child.material.clearcoatRoughness = 0.4;
+                        }
+                    }
                 });
                 objects.push(clone);
             } else {
                 // Fallback: flat gray box
                 const geom = new THREE.BoxGeometry(1, 0.18, 1);
-                const mat = new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0 });
+                const mat = new THREE.MeshPhysicalMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0, clearcoat: 0, clearcoatRoughness: 0.4 });
                 const mesh = new THREE.Mesh(geom, mat);
                 mesh.position.set(wx, 0.09, wz);
                 mesh.castShadow = true;
                 mesh.receiveShadow = true;
+                mesh.userData.isRoad = true;
                 objects.push(mesh);
             }
 
@@ -2168,16 +2178,18 @@ export class Renderer3D {
 
         // Road fallback: flat asphalt slabs for roads when no GLTF models loaded
         if (roadTiles.length > 0 && this._roadModels.size === 0) {
-            // Asphalt base — dark gray with slight roughness variation
             const roadGeom = new THREE.PlaneGeometry(1, 1);
             roadGeom.rotateX(-Math.PI / 2);
-            const roadMat = new THREE.MeshStandardMaterial({
-                color: 0x323232,  // dark asphalt
+            const roadMat = new THREE.MeshPhysicalMaterial({
+                color: 0x323232,
                 roughness: 0.95,
                 metalness: 0.0,
+                clearcoat: 0,
+                clearcoatRoughness: 0.4,
             });
             const roadMesh = new THREE.InstancedMesh(roadGeom, roadMat, roadTiles.length);
             roadMesh.receiveShadow = true;
+            roadMesh.userData.isRoad = true;
             roadMesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
             const dummy = new THREE.Object3D();
             for (let i = 0; i < roadTiles.length; i++) {
@@ -4097,16 +4109,19 @@ export class Renderer3D {
         // --- Per-tile wetness map (weather + drainage driven) ---
         this._updateWetnessMap(isRain || isStorm, intensity);
 
-        // Apply per-chunk average wetness to terrain materials
+        // Apply per-chunk average wetness to terrain materials (Fresnel via clearcoat on roads)
         if (this._wetness > 0.01 || this._prevWetness > 0.01) {
             for (const [chunkId, entry] of this._chunkMeshes) {
                 const chunkW = this._chunkAvgWetness(chunkId);
                 const targetMetal = chunkW * 0.45;
                 const targetRough = 1.0 - chunkW * 0.3;
                 entry.group.traverse((obj) => {
-                    if (obj.isMesh && obj.userData?.kind === 'terrain' && obj.material && !Array.isArray(obj.material)) {
-                        obj.material.metalness = THREE.MathUtils.lerp(obj.material.metalness, targetMetal, 0.1);
-                        obj.material.roughness = THREE.MathUtils.lerp(obj.material.roughness, targetRough, 0.1);
+                    if (!obj.isMesh || obj.userData?.kind !== 'terrain' || !obj.material || Array.isArray(obj.material)) return;
+                    obj.material.metalness = THREE.MathUtils.lerp(obj.material.metalness, targetMetal, 0.1);
+                    obj.material.roughness = THREE.MathUtils.lerp(obj.material.roughness, targetRough, 0.1);
+                    if (obj.userData.isRoad && obj.material.clearcoat !== undefined) {
+                        obj.material.clearcoat = THREE.MathUtils.lerp(obj.material.clearcoat, chunkW * 0.8, 0.1);
+                        obj.material.clearcoatRoughness = THREE.MathUtils.lerp(obj.material.clearcoatRoughness, 0.15 + (1 - chunkW) * 0.35, 0.1);
                     }
                 });
             }
