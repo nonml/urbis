@@ -959,6 +959,9 @@ export class Game {
             }
             this.heatSystem?.addHeat(10);
             this.ui?.showMessage?.('Vehicle exploded!', 'crisis');
+            if (typeof window !== 'undefined' && window.fxSystem) {
+                window.fxSystem.spawnScorch(v.x ?? 0, v.y ?? 0, 'explosion_gas');
+            }
         }
     }
 

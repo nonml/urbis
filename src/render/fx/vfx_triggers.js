@@ -208,6 +208,7 @@ export class VFXTriggerManager {
         this._onPlayerEnteredDistrict = this._onPlayerEnteredDistrict.bind(this);
         this._onPlayerInteract = this._onPlayerInteract.bind(this);
         this._onPlayerFiredWeapon = this._onPlayerFiredWeapon.bind(this);
+        this._onHackSuccess = this._onHackSuccess.bind(this);
         
         // Crisis events
         this._onCrisisStarted = this._onCrisisStarted.bind(this);
@@ -265,6 +266,7 @@ export class VFXTriggerManager {
         eventBus.on(EVENT_TYPES.PLAYER_ENTERED_DISTRICT, this._onPlayerEnteredDistrict);
         eventBus.on(EVENT_TYPES.PLAYER_INTERACT, this._onPlayerInteract);
         eventBus.on(EVENT_TYPES.PLAYER_FIRED_WEAPON, this._onPlayerFiredWeapon);
+        eventBus.on(EVENT_TYPES.HACK_SUCCESS, this._onHackSuccess);
 
         // Crisis events
         eventBus.on(EVENT_TYPES.CRISIS_STARTED, this._onCrisisStarted);
@@ -321,6 +323,7 @@ export class VFXTriggerManager {
         eventBus.off(EVENT_TYPES.PLAYER_ENTERED_DISTRICT, this._onPlayerEnteredDistrict);
         eventBus.off(EVENT_TYPES.PLAYER_INTERACT, this._onPlayerInteract);
         eventBus.off(EVENT_TYPES.PLAYER_FIRED_WEAPON, this._onPlayerFiredWeapon);
+        eventBus.off(EVENT_TYPES.HACK_SUCCESS, this._onHackSuccess);
         eventBus.off(EVENT_TYPES.CRISIS_STARTED, this._onCrisisStarted);
         eventBus.off(EVENT_TYPES.CRISIS_ESCALATED, this._onCrisisEscalated);
         eventBus.off(EVENT_TYPES.CRISIS_RESOLVED, this._onCrisisResolved);
@@ -506,8 +509,16 @@ export class VFXTriggerManager {
         }
     }
 
+    _onHackSuccess(data) {
+        if (!this.enabled) return;
+        if (!data?.type?.startsWith('explosion_')) return;
+        const pos = this._tileToWorldPosition(data.x, data.y);
+        if (!pos) return;
+        this.fxSystem.spawnScorch(pos.x, pos.z, data.type);
+    }
+
     // ==================== Crisis Event Handlers ====================
-    
+
     _onCrisisStarted(data) {
         if (!this.enabled || !data.crisis) return;
 

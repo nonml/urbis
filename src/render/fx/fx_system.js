@@ -465,6 +465,19 @@ export class FXSystem {
         this._decals.push({ x, y, z, color: color || 0x880000, duration: duration || 5000, life: 0 });
     }
 
+    spawnScorch(wx, wz, type) {
+        if (!this.enabled || this.reducedMotion || !this._decalManager) return;
+        const radiusMap = { explosion_steam: 0.5, explosion_electrical: 0.4, explosion_gas: 0.7 };
+        const size = (radiusMap[type] ?? 0.5) + 0.1;
+        this._decalManager.spawnGround(wx, wz, {
+            color: 0x1a1a18,
+            size,
+            duration: 60000,
+            weatherFade: true,
+            opacity: 0.7,
+        });
+    }
+
     getDecals() {
         return this._decals;
     }
