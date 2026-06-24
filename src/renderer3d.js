@@ -5722,6 +5722,13 @@ export class Renderer3D {
             } else {
                 u.tintColor.value.lerp(new THREE.Vector3(1.0, 0.98, 0.95), 0.04);
             }
+            // Weather grade: cool, desaturated overlay strengthens under bad weather.
+            const wType = this.game?.weatherSystem?.state?.type;
+            const wInten = this.game?.weatherSystem?.state?.intensity ?? 1;
+            const targetWeather = (wType === 'rain' || wType === 'storm') ? 0.35 * wInten
+                : (wType === 'snow') ? 0.22 * wInten
+                    : (wType === 'fog') ? 0.30 * wInten : 0.0;
+            u.weatherTintStrength.value = THREE.MathUtils.lerp(u.weatherTintStrength.value, targetWeather, 0.05);
         }
     }
 
