@@ -1345,6 +1345,8 @@ export class Renderer3D {
                     const { ShaderPass } = ShaderPassMod;
                     const fxaaPass = new ShaderPass(FXAAShader);
                     fxaaPass.material.uniforms['resolution'].value.set(1 / rect.width, 1 / rect.height);
+                    // FXAA is the fallback AA: active only when TAA is not (low/medium).
+                    fxaaPass.enabled = !this._presetConfig?.taa;
                     this.composer.addPass(fxaaPass);
                     this._fxaaPass = fxaaPass;
                 } catch { /* FXAA shader not available */ }

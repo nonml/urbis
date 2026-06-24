@@ -151,6 +151,10 @@ export function applyPreset(renderer, presetName) {
     if (renderer._taaPass) {
         renderer._taaPass.enabled = !!preset.taa;
     }
+    // FXAA fallback — active only when TAA is off, so AA is never doubled up.
+    if (renderer._fxaaPass) {
+        renderer._fxaaPass.enabled = !preset.taa;
+    }
 
     // Decal limits
     if (renderer._decalManager) {
