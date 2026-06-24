@@ -1598,14 +1598,23 @@ export class Renderer3D {
                 envMapIntensity: 1.5,
                 side: THREE.FrontSide,
             });
-            // Inject vertex displacement for waves
+            // Inject vertex displacement for waves + depth-based color absorption
             this._waterMaterial.onBeforeCompile = (shader) => {
                 shader.uniforms.uTime = { value: 0 };
+                // Depth-absorption palette (Q10.D): grazing views travel a longer
+                // path through the water and read darker/bluer; top-down reads as a
+                // bright turquoise shallow. Deep color keeps ~0.2 blue (WD
+                // MaxDepthDarknessFactor) so water never goes pure black.
+                shader.uniforms.uShallowColor = { value: new THREE.Color(0x46c2d8) };
+                shader.uniforms.uDeepColor = { value: new THREE.Color(0x0a3553) };
+                shader.uniforms.uAbsorb = { value: 0.85 };
+                shader.uniforms.uWaterDepth = { value: 1.15 };
                 this._waterShaderRef = shader;
                 shader.vertexShader = shader.vertexShader.replace(
                     '#include <common>',
                     `#include <common>
-                    uniform float uTime;`
+                    uniform float uTime;
+                    varying vec3 vWaterWorldPos;`
                 );
                 shader.vertexShader = shader.vertexShader.replace(
                     '#include <begin_vertex>',
@@ -1614,7 +1623,29 @@ export class Renderer3D {
                     float wave2 = sin(position.z * 2.5 + uTime * 0.9) * 0.05;
                     float wave3 = cos((position.x + position.z) * 2.0 + uTime * 0.7) * 0.03;
                     float wave4 = sin(position.x * 6.0 - position.z * 3.0 + uTime * 2.0) * 0.015;
-                    transformed.y += wave1 + wave2 + wave3 + wave4;`
+                    transformed.y += wave1 + wave2 + wave3 + wave4;
+                    #ifdef USE_INSTANCING
+                        vWaterWorldPos = (modelMatrix * instanceMatrix * vec4(transformed, 1.0)).xyz;
+                    #else
+                        vWaterWorldPos = (modelMatrix * vec4(transformed, 1.0)).xyz;
+                    #endif`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <common>',
+                    `#include <common>
+                    uniform vec3 uShallowColor;
+                    uniform vec3 uDeepColor;
+                    uniform float uAbsorb;
+                    uniform float uWaterDepth;
+                    varying vec3 vWaterWorldPos;`
+                );
+                shader.fragmentShader = shader.fragmentShader.replace(
+                    '#include <color_fragment>',
+                    `#include <color_fragment>
+                    float cosV = max(0.10, normalize(cameraPosition - vWaterWorldPos).y);
+                    float pathLen = uWaterDepth / cosV;
+                    float trans = clamp(exp(-pathLen * uAbsorb), 0.0, 1.0);
+                    diffuseColor.rgb = mix(uDeepColor, uShallowColor, trans);`
                 );
             };
         }
