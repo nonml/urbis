@@ -3110,6 +3110,49 @@ export class Renderer3D {
         entry.buildingCount = meshes.reduce((n, m) => n + (m.count ?? 1), 0);
     }
 
+    static GRIME_BIAS = {
+        industrial: 0.8, docks: 0.7, oldtown: 0.9, waterfront: 0.5,
+        commercial: 0.35, residential: 0.2, suburbs: 0.1, elite: 0.05,
+    };
+
+    _spawnGrimeForChunk(chunkId) {
+        if (!this._decalManager) return;
+        if (!this._grimeSpawnedChunks) this._grimeSpawnedChunks = new Set();
+        if (this._grimeSpawnedChunks.has(chunkId)) return;
+        this._grimeSpawnedChunks.add(chunkId);
+
+        const rng = this.game?.rngStreams?.vfx;
+        if (!rng) return;
+        const bounds = this.game.chunks.getChunkBounds(chunkId);
+        const allBuildings = this.game.buildings?.buildings ?? [];
+        const buildings = allBuildings.filter(
+            b => b.x >= bounds.minX && b.x <= bounds.maxX && b.y >= bounds.minY && b.y <= bounds.maxY
+        );
+
+        for (const b of buildings) {
+            const distId = this.game.map.getDistrictAt(b.x, b.y);
+            const dist = this.game.map.districts?.[distId];
+            const bias = Renderer3D.GRIME_BIAS[dist?.theme] ?? 0.3;
+            const cond = (b.condition ?? 100) / 100;
+            const grimeChance = bias * (1.2 - cond);
+            if (rng.next() > grimeChance) continue;
+            const wx = b.x - this._mapHalfW + 0.5;
+            const wz = b.y - this._mapHalfH + 0.5;
+            const count = 1 + Math.floor(rng.next() * (bias > 0.5 ? 3 : 2));
+            for (let i = 0; i < count; i++) {
+                const ox = (rng.next() - 0.5) * 0.8;
+                const oz = (rng.next() - 0.5) * 0.8;
+                this._decalManager.spawnGround(wx + ox, wz + oz, {
+                    color: rng.next() > 0.5 ? 0x2a2a22 : 0x33302a,
+                    size: 0.12 + rng.next() * 0.2,
+                    duration: Infinity,
+                    rotation: rng.next() * Math.PI * 2,
+                    opacity: 0.3 + bias * 0.4,
+                });
+            }
+        }
+    }
+
     syncChunkStreaming(forceInitial = false) {
         if (!this.game.chunks) return;
         const p = this.game.player;
@@ -3119,17 +3162,20 @@ export class Renderer3D {
         for (const chunkId of result.loadedNow) {
             const entry = this._createChunkEntry(chunkId);
             this._chunkMeshes.set(chunkId, entry);
+            this._spawnGrimeForChunk(chunkId);
         }
         for (const chunkId of result.unloadedNow) {
             const entry = this._chunkMeshes.get(chunkId);
             this._disposeChunkEntry(entry);
             this._chunkMeshes.delete(chunkId);
+            this._grimeSpawnedChunks?.delete(chunkId);
         }
         if (forceInitial) {
             for (const chunkId of result.active) {
                 if (!this._chunkMeshes.has(chunkId)) {
                     const entry = this._createChunkEntry(chunkId);
                     this._chunkMeshes.set(chunkId, entry);
+                    this._spawnGrimeForChunk(chunkId);
                 }
             }
         }
