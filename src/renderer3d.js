@@ -4639,10 +4639,10 @@ export class Renderer3D {
     // -----------------------------------------------------------------------
 
     static SEASON_PALETTES = {
-        spring: { sky: 0x5a9ac6, fog: 0x6aadcc, fogDensity: 0.005,  ambient: 0xffffff,  sun: 0xfff5e0 },
-        summer: { sky: 0x4a90b8, fog: 0x5aa0c0, fogDensity: 0.004,  ambient: 0xfff5e0,  sun: 0xffd87a },
-        autumn: { sky: 0x8a7060, fog: 0x9a8878, fogDensity: 0.006,  ambient: 0xffd090,  sun: 0xffa040 },
-        winter: { sky: 0x7088a0, fog: 0x8098ac, fogDensity: 0.007,  ambient: 0xd0e0ff,  sun: 0xffffff },
+        spring: { sky: 0x5a9ac6, fog: 0x6aadcc, fogDensity: 0.005, ambient: 0xffffff, sun: 0xfff5e0, vegTint: 0x55bb55 },
+        summer: { sky: 0x4a90b8, fog: 0x5aa0c0, fogDensity: 0.004, ambient: 0xfff5e0, sun: 0xffd87a, vegTint: 0x3a8a2a },
+        autumn: { sky: 0x8a7060, fog: 0x9a8878, fogDensity: 0.006, ambient: 0xffd090, sun: 0xffa040, vegTint: 0xbb8833 },
+        winter: { sky: 0x7088a0, fog: 0x8098ac, fogDensity: 0.007, ambient: 0xd0e0ff, sun: 0xffffff, vegTint: 0x667766 },
     };
 
     _applySeasonalColors(season) {
@@ -4657,6 +4657,24 @@ export class Renderer3D {
         }
         this.ambientLight.color.setHex(p.ambient);
         this.sunLight.color.setHex(p.sun);
+
+        if (p.vegTint) {
+            const tint = new THREE.Color(p.vegTint);
+            for (const [, entry] of this._chunkMeshes) {
+                entry.group.traverse((obj) => {
+                    if (!obj.isMesh) return;
+                    const k = obj.userData?.kind;
+                    if (k !== 'vegetation') return;
+                    const applyTint = (m) => {
+                        if (m.userData?.isTreeFoliage || m === this._grassMat) {
+                            m.color.lerp(tint, 0.4);
+                        }
+                    };
+                    if (Array.isArray(obj.material)) obj.material.forEach(applyTint);
+                    else applyTint(obj.material);
+                });
+            }
+        }
     }
 
     // -----------------------------------------------------------------------
