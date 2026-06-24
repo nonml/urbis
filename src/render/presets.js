@@ -16,6 +16,7 @@ export const PRESETS = {
         planarReflections: false,
         volumetricFog: false,
         starField: false,
+        taa: false,
         particleDensity: 0.5,
         envProbeInterval: 0,
         pixelRatio: 1.0,
@@ -34,6 +35,7 @@ export const PRESETS = {
         planarReflections: false,
         volumetricFog: true,
         starField: true,
+        taa: false,
         particleDensity: 1.0,
         envProbeInterval: 60,
         pixelRatio: Math.min(1.5, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
@@ -52,6 +54,7 @@ export const PRESETS = {
         planarReflections: true,
         volumetricFog: true,
         starField: true,
+        taa: true,
         particleDensity: 4.0,
         envProbeInterval: 30,
         pixelRatio: Math.min(2.0, typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1),
@@ -70,6 +73,7 @@ export const PRESETS = {
         planarReflections: true,
         volumetricFog: true,
         starField: true,
+        taa: true,
         particleDensity: 12.0,
         envProbeInterval: 15,
         pixelRatio: typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1,
@@ -141,6 +145,11 @@ export function applyPreset(renderer, presetName) {
     // Star field toggle
     if (renderer._starPass) {
         renderer._starPass.visible = preset.starField;
+    }
+
+    // TAA toggle (FXAA serves as the fallback on presets without TAA)
+    if (renderer._taaPass) {
+        renderer._taaPass.enabled = !!preset.taa;
     }
 
     // Decal limits

@@ -603,7 +603,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q10.F — TAA, GTAO, Anisotropy, Subsurface
 
-- [ ] `q10-aa-taa` TAA with temporal jitter, history reprojection, neighborhood clamp
+- [x] `q10-aa-taa` TAA with temporal jitter, history reprojection, neighborhood clamp
 - [ ] `q10-aa-fxaa-fallback` FXAA retained for "Performance" preset
 - [ ] `q10-ao-gtao` GTAO replaces SSAO at "High" and above (separable bilateral blur)
 - [ ] `q10-ao-ssao-fallback` SSAO retained for lower presets

@@ -1350,6 +1350,16 @@ export class Renderer3D {
                 } catch { /* FXAA shader not available */ }
             }
 
+            // TAA — temporal anti-aliasing (jitter + history + neighborhood clamp).
+            // Enabled on high/ultra; gated to off on lower presets (FXAA fallback).
+            try {
+                const { TAAPass } = await import('./render/taa_pass.js');
+                const taaPass = new TAAPass(rect.width, rect.height);
+                taaPass.enabled = !!this._presetConfig?.taa;
+                this.composer.addPass(taaPass);
+                this._taaPass = taaPass;
+            } catch { /* TAA pass unavailable */ }
+
             // Vignette + color grading (single custom pass)
             if (ShaderPassMod) {
                 const { ShaderPass } = ShaderPassMod;
@@ -1438,7 +1448,7 @@ export class Renderer3D {
                         varying vec2 vUv;
                         void main(){
                             vec4 col = texture2D(tDiffuse, vUv);
-                            if (nightFactor > 0.01 && starField) {
+                            if (nightFactor > 0.01) {
                                 vec3 stars = texture2D(starField, vUv).rgb;
                                 col.rgb += stars * nightFactor;
                             }
@@ -5494,9 +5504,14 @@ export class Renderer3D {
         // Keep the gradient sky dome centered on the camera so it never clips.
         if (this._skyDome) this._skyDome.position.copy(this.camera.position);
 
-        // Render via post-processing composer if available, else direct
+        // Render via post-processing composer if available, else direct.
+        // TAA jitters the camera projection per frame; restore it after so game
+        // logic (raycasts, picking) always sees the un-jittered projection.
         if (this.composer) {
+            const restoreJitter = (this._taaPass && this._taaPass.enabled)
+                ? this._taaPass.applyJitter(this.camera) : null;
             this.composer.render();
+            if (restoreJitter) restoreJitter();
         } else {
             this.renderer.render(this.scene, this.camera);
         }
