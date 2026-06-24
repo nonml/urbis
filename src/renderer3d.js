@@ -1361,6 +1361,8 @@ export class Renderer3D {
                         saturation: { value: 1.08 },
                         contrast: { value: 1.05 },
                         tintColor: { value: new THREE.Vector3(1.0, 0.98, 0.95) },
+                        weatherTint: { value: new THREE.Vector3(0.78, 0.82, 0.9) },
+                        weatherTintStrength: { value: 0.0 },
                     },
                     vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
                     fragmentShader: `
@@ -1370,6 +1372,8 @@ export class Renderer3D {
                         uniform float saturation;
                         uniform float contrast;
                         uniform vec3 tintColor;
+                        uniform vec3 weatherTint;
+                        uniform float weatherTintStrength;
                         varying vec2 vUv;
                         void main(){
                             vec4 col=texture2D(tDiffuse,vUv);
@@ -1383,12 +1387,10 @@ export class Renderer3D {
                             col.rgb=mix(vec3(lum),col.rgb,saturation);
                             // Contrast
                             col.rgb=(col.rgb-0.5)*contrast+0.5;
-                            // Tint
+                            // Time-of-day tint
                             col.rgb*=tintColor;
-                            // LUT-based color grading (per-time-of-day)
-                            col.rgb*=lutColor;
-                            // Weather tint overlay
-                            col.rgb=mix(col.rgb,weatherTint,weatherTintStrength);
+                            // Weather tint overlay (cool/desaturated under rain, snow, fog)
+                            col.rgb=mix(col.rgb,col.rgb*weatherTint,weatherTintStrength);
                             gl_FragColor=col;
                         }
                     `,
@@ -1396,16 +1398,6 @@ export class Renderer3D {
                 const vignettePass = new ShaderPass(VignetteColorGradeShader);
                 this.composer.addPass(vignettePass);
                 this._vignettePass = vignettePass;
-                // LUT color grades per time of day
-                this._lutGrades = {
-                    dawn:  { tint: new THREE.Color(1.1, 0.85, 0.7),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
-                    day:   { tint: new THREE.Color(1.0, 1.0, 0.95),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
-                    dusk:  { tint: new THREE.Color(1.15, 0.8, 0.65), weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
-                    night: { tint: new THREE.Color(0.7, 0.75, 1.0),  weatherTint: new THREE.Color(1.0, 1.0, 1.0) },
-                };
-                this._lutCurrent = new THREE.Color(1.0, 1.0, 1.0);
-                this._weatherTint = new THREE.Color(1.0, 1.0, 1.0);
-                this._weatherTintStrength = 0.0;
             }
 
             // --- Procedural Sky ---
@@ -4463,8 +4455,21 @@ export class Renderer3D {
      * giving the two LineSegments verts of each drop a shared phase but different
      * vertical offsets. WebGL2 equivalent of compute-emulated particles.
      */
+    /**
+     * Particle-count multiplier from the active quality preset (Q10.E "50x").
+     * Because every drop/flake animates closed-form in the vertex shader, the
+     * per-frame CPU cost is a single uTime uniform write regardless of count —
+     * so the count budget can scale 50x+ with zero frame-cost change. Clamped
+     * for sanity; an explicit override (verification/benchmark) wins.
+     */
+    _particleDensity() {
+        if (this._particleDensityOverride > 0) return this._particleDensityOverride;
+        const d = this._presetConfig?.particleDensity;
+        return Math.max(0.25, Math.min(60, typeof d === 'number' ? d : 1));
+    }
+
     _buildGPURain() {
-        const COUNT = 4000, AREA = 40, RANGE = 14;
+        const COUNT = Math.round(4000 * this._particleDensity()), AREA = 40, RANGE = 14;
         const verts = COUNT * 2;
         const aBase = new Float32Array(verts * 3);
         const aPhase = new Float32Array(verts);
@@ -4520,7 +4525,7 @@ export class Renderer3D {
      * wobble + wrap from uTime with no CPU loop. Soft round points via gl_PointCoord.
      */
     _buildGPUSnow() {
-        const COUNT = 2000, AREA = 40, RANGE = 14;
+        const COUNT = Math.round(2000 * this._particleDensity()), AREA = 40, RANGE = 14;
         const aBase = new Float32Array(COUNT * 3);
         const aPhase = new Float32Array(COUNT);
         for (let i = 0; i < COUNT; i++) {
