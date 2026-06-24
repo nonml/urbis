@@ -88,6 +88,7 @@ import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
 import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_night.js';
 import { PRESETS, DEFAULT_PRESET, applyPreset } from './render/presets.js';
+import { GIProbeGrid } from './render/gi_probe_grid.js';
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
@@ -580,6 +581,9 @@ export class Renderer3D {
         // Map offsets
         this._mapHalfW = this.game.map.width / 2;
         this._mapHalfH = this.game.map.height / 2;
+
+        // Realtime GI probe grid (Q10.G) — one per world, sized to the map.
+        this._gi = new GIProbeGrid(this.game.map.width, this.game.map.height, 4);
 
         // Projected decal system (Q10)
         this._initDecalManager();
@@ -2198,6 +2202,7 @@ export class Renderer3D {
                 // Ensure roughness/metalness defaults
                 if (mat.roughness === undefined) mat.roughness = 0.7;
                 if (mat.metalness === undefined) mat.metalness = 0.0;
+                if (this._gi) this._gi.applyTo(mat);
                 return;
             }
             // Convert non-PBR to MeshStandardMaterial
@@ -2213,6 +2218,7 @@ export class Renderer3D {
                 color, emissive, emissiveIntensity, transparent, opacity,
                 map, wireframe, side, roughness: 0.7, metalness: 0.0,
             });
+            if (this._gi) this._gi.applyTo(newMat);
             child.material = newMat;
         });
     }
@@ -2458,6 +2464,8 @@ export class Renderer3D {
             metalness: 0.0,
             envMapIntensity: 0.4,
         });
+        // Terrain is the dominant GI receiver — sample the bounce grid (Q10.G).
+        if (this._gi) this._gi.applyTo(mat);
 
         const terrainMesh = new THREE.Mesh(geom, mat);
         terrainMesh.castShadow = false;
@@ -3131,6 +3139,17 @@ export class Renderer3D {
     _updateSubsurfaceLight() {
         if (!this._sssLightDir || !this.sunLight) return;
         this._sssLightDir.value.copy(this.sunLight.position).transformDirection(this.camera.matrixWorldInverse);
+    }
+
+    /** Recompute the GI probe grid irradiance from current lighting (Q10.G). */
+    _updateGI() {
+        if (!this._gi) return;
+        const sky = (this.scene.background && this.scene.background.isColor)
+            ? this.scene.background : { r: 0.4, g: 0.6, b: 0.8 };
+        const ground = this.hemiLight?.groundColor ?? { r: 0.4, g: 0.6, b: 0.4 };
+        const sun = this.sunLight?.color ?? { r: 1, g: 1, b: 0.9 };
+        const sunInt = Math.min(1, (this.sunLight?.intensity ?? 1.8) / 1.8);
+        this._gi.update(sky, ground, sun, sunInt, this._giDeltas);
     }
 
     _updateWindUniforms() {
@@ -5588,6 +5607,9 @@ export class Renderer3D {
 
         // Refresh shared SSS light direction (skin/foliage translucency, Q10.F)
         this._updateSubsurfaceLight();
+
+        // Recompute the GI probe grid from current sky/sun (Q10.G dynamic delta)
+        this._updateGI();
 
         // Lightning exposure decay
         this._updateLightningExposure();
