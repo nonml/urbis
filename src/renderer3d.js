@@ -3673,9 +3673,12 @@ export class Renderer3D {
     };
 
     static POSTER_BIAS = {
-        commercial: 0.6, oldtown: 0.5, industrial: 0.3, docks: 0.25,
+        oldtown: 0.8, commercial: 0.6, industrial: 0.3, docks: 0.25,
         residential: 0.15, waterfront: 0.2, suburbs: 0.05, elite: 0.1,
     };
+
+    // Posters layered per building — oldtown walls plaster over with bills.
+    static POSTER_LAYERS = { oldtown: 3, commercial: 2 };
 
     static POSTER_COLORS = [0xcc4444, 0x44aacc, 0xcccc44, 0xcc8844, 0x8844cc, 0x44cc88];
 
@@ -3751,14 +3754,18 @@ export class Renderer3D {
             const wx = b.x - this._mapHalfW + 0.5;
             const wz = b.y - this._mapHalfH + 0.5;
             const terrainY = this._smoothTerrainY(b.x, b.y);
-            const face = normals[Math.floor(rng.next() * 4)];
-            const color = Renderer3D.POSTER_COLORS[Math.floor(rng.next() * Renderer3D.POSTER_COLORS.length)];
-            const wallY = terrainY + 0.15 + rng.next() * 0.3;
-            this._decalManager.spawnWall(
-                wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
-                face[0], face[1],
-                { color, width: 0.12 + rng.next() * 0.08, height: 0.1 + rng.next() * 0.08, duration: Infinity, opacity: 0.75 }
-            );
+            // Density bias: oldtown plasters layered bills over each wall (Q10.H).
+            const layers = Renderer3D.POSTER_LAYERS[dist?.theme] ?? 1;
+            for (let l = 0; l < layers; l++) {
+                const face = normals[Math.floor(rng.next() * 4)];
+                const color = Renderer3D.POSTER_COLORS[Math.floor(rng.next() * Renderer3D.POSTER_COLORS.length)];
+                const wallY = terrainY + 0.15 + rng.next() * 0.3;
+                this._decalManager.spawnWall(
+                    wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
+                    face[0], face[1],
+                    { color, width: 0.12 + rng.next() * 0.08, height: 0.1 + rng.next() * 0.08, duration: Infinity, opacity: 0.75 }
+                );
+            }
         }
     }
 

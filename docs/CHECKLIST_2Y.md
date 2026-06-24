@@ -621,7 +621,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q10-ad-docks` greenish-overcast tint + wet/grime bias for docks
 - [x] `q10-ad-industrial` smoggy haze + scorch/oil decal bias
 - [x] `q10-ad-suburbs` warm tint + lawn vegetation bias
-- [ ] `q10-ad-oldtown` saturated tint + poster/graffiti density bias
+- [x] `q10-ad-oldtown` saturated tint + poster/graffiti density bias
 - [ ] `q10-ad-screenshot-baselines` 4 district screenshot baselines re-captured
 
 ### Q10 — Definition of Done
