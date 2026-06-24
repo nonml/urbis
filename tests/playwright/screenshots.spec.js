@@ -42,6 +42,43 @@ async function convergeLighting(page) {
   });
 }
 
+// Move the god-mode camera over the centre of the first district matching a
+// theme so each per-district art-direction baseline (Q10.H) frames that
+// neighbourhood. Chunks stream in around the relocated player; the camera is
+// stepped directly because the headless render loop barely advances the lerp.
+async function gotoDistrict(page, theme) {
+  return page.evaluate((th) => {
+    const g = window.game;
+    const r = g?.ui?.renderer3d;
+    if (!g || !r) return false;
+    const d = (g.map.districts || []).find((x) => x.theme === th);
+    if (!d) return false;
+    const cx = Math.round(d.center.x), cy = Math.round(d.center.y);
+    g.player.x = cx; g.player.y = cy;
+    r.syncChunkStreaming?.(true);
+    const wx = cx - r._mapHalfW + 0.5, wz = cy - r._mapHalfH + 0.5;
+    const ty = r._smoothTerrainY ? r._smoothTerrainY(cx, cy) : 0;
+    if (r._player) r._player.position.set(wx, ty + 1, wz);
+    for (let i = 0; i < 80; i++) r.updateCamera();
+    return true;
+  }, theme);
+}
+
+for (const theme of ['docks', 'industrial', 'suburbs', 'oldtown']) {
+  test(`@baseline district-${theme}`, async ({ page }) => {
+    await startGame(page);
+    await page.evaluate(() => {
+      const tpd = window.game.state.time.tickPerDay || 24;
+      window.game.state.time.timeOfDay = 0.5;
+      window.game.state.time.tick = Math.floor(tpd * 0.5);
+    });
+    await gotoDistrict(page, theme);
+    await convergeLighting(page);
+    await page.waitForTimeout(SETTLE);
+    await page.screenshot(shot(`district-${theme}`));
+  });
+}
+
 test('@baseline main-menu', async ({ page }) => {
   await page.goto('http://localhost:4173/', { timeout: LOAD_TIMEOUT });
   await page.waitForSelector('#main-menu-overlay', { timeout: MENU_TIMEOUT });
