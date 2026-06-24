@@ -128,7 +128,12 @@ async function main() {
     serverProcess = execSync('npm run build', { cwd: ROOT, stdio: 'pipe' });
   }
 
-  const browser = await chromium.launch({ headless: true });
+  // Headless Chromium defaults to SwiftShader (software) WebGL, which produces
+  // meaningless ~1-2 fps numbers. Force ANGLE/D3D11 so the real GPU is used.
+  const browser = await chromium.launch({
+    headless: true,
+    args: ['--use-gl=angle', '--use-angle=d3d11', '--enable-gpu', '--ignore-gpu-blocklist'],
+  });
   const context = await browser.newContext({
     viewport: { width: 1280, height: 720 },
   });

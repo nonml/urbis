@@ -550,7 +550,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q9 — Definition of Done
 
 - [ ] Side-by-side screenshots of `street-noon` / `street-night` / `rain` / `interior-shop` vs `0.8.0.0` baseline are clearly better
-- [ ] Perf harness shows ≤ 15% regression on "High", 0% regression on "Performance" (new default)
+- [x] Perf harness shows ≤ 15% regression on "High", 0% regression on "Performance" (new default)
 - [x] All Q9.A–Q9.G items ticked
 - [ ] Operator approval `q9.json`
 - [ ] Tag `0.9.0.0`
@@ -627,7 +627,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q10 — Definition of Done
 
 - [ ] One block at noon / rain / night looks like three different places
-- [ ] Perf harness still on-budget at "High" preset
+- [x] Perf harness still on-budget at "High" preset
 - [x] All Q10.A–Q10.H items ticked
 - [ ] Operator approval `q10.json`
 - [ ] Tag `0.10.0.0`
