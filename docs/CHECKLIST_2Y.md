@@ -576,7 +576,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q10.B — Wet Road Shader
 
-- [ ] `q10-wr-wetness-map` per-tile wetness map, weather + drainage driven
+- [x] `q10-wr-wetness-map` per-tile wetness map, weather + drainage driven
 - [ ] `q10-wr-fresnel` proper Fresnel + roughness modulation
 - [ ] `q10-wr-puddle-ssr` puddle decals receive SSR
 

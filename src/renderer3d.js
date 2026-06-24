@@ -3972,6 +3972,77 @@ export class Renderer3D {
         }
     }
 
+    static WETNESS_ACCUM = {
+        [TERRAIN_ROAD]: 0.015, [TERRAIN_SIDEWALK]: 0.012, [TERRAIN_PARK]: 0.008,
+        [TERRAIN_GRASS]: 0.008, [TERRAIN_HIGHWAY]: 0.013, [TERRAIN_BRIDGE]: 0.010,
+        [TERRAIN_TUNNEL]: 0.004, [TERRAIN_FOREST]: 0.005, [TERRAIN_MOUNTAIN]: 0.003,
+        [TERRAIN_WATER]: 0,
+    };
+
+    static WETNESS_DRAIN = {
+        [TERRAIN_ROAD]: 0.003, [TERRAIN_SIDEWALK]: 0.004, [TERRAIN_PARK]: 0.006,
+        [TERRAIN_GRASS]: 0.006, [TERRAIN_HIGHWAY]: 0.004, [TERRAIN_BRIDGE]: 0.008,
+        [TERRAIN_TUNNEL]: 0.002, [TERRAIN_FOREST]: 0.010, [TERRAIN_MOUNTAIN]: 0.015,
+        [TERRAIN_WATER]: 0,
+    };
+
+    _updateWetnessMap(isRaining, intensity) {
+        const map = this.game?.map;
+        if (!map) return;
+        if (!this._wetnessMap) {
+            this._wetnessMap = new Float32Array(map.width * map.height);
+        }
+        if (!this._wetness) this._wetness = 0;
+
+        const wm = this._wetnessMap;
+        const w = map.width;
+        for (const [, entry] of this._chunkMeshes) {
+            const b = entry.bounds;
+            for (let ty = b.minY; ty <= b.maxY; ty++) {
+                for (let tx = b.minX; tx <= b.maxX; tx++) {
+                    const idx = ty * w + tx;
+                    const terrain = map.getTileAt(tx, ty);
+                    if (isRaining) {
+                        const acc = Renderer3D.WETNESS_ACCUM[terrain] ?? 0.005;
+                        wm[idx] = Math.min(1, wm[idx] + acc * intensity);
+                    } else {
+                        const drain = Renderer3D.WETNESS_DRAIN[terrain] ?? 0.005;
+                        wm[idx] = Math.max(0, wm[idx] - drain);
+                    }
+                }
+            }
+        }
+
+        if (isRaining) {
+            this._wetness = Math.min(1.0, this._wetness + 0.008 * intensity);
+        } else {
+            this._wetness = Math.max(0, this._wetness - 0.002);
+        }
+    }
+
+    _chunkAvgWetness(chunkId) {
+        if (!this._wetnessMap) return this._wetness ?? 0;
+        const entry = this._chunkMeshes.get(chunkId);
+        if (!entry) return this._wetness ?? 0;
+        const b = entry.bounds;
+        const w = this.game.map.width;
+        let sum = 0, count = 0;
+        for (let ty = b.minY; ty <= b.maxY; ty++) {
+            for (let tx = b.minX; tx <= b.maxX; tx++) {
+                sum += this._wetnessMap[ty * w + tx];
+                count++;
+            }
+        }
+        return count > 0 ? sum / count : 0;
+    }
+
+    getWetness(tx, ty) {
+        if (!this._wetnessMap) return this._wetness ?? 0;
+        const w = this.game?.map?.width ?? 0;
+        if (w === 0) return 0;
+        return this._wetnessMap[ty * w + tx] ?? 0;
+    }
+
     _spawnPuddleDecals(isRain, intensity) {
         if (!this._decalManager || !isRain || this._wetness < 0.3) return;
         if (!this._puddleTimer) this._puddleTimer = 0;
@@ -4023,19 +4094,15 @@ export class Renderer3D {
         if (this._rainGroup && !isRain) this._rainGroup.visible = false;
         if (this._snowGroup && !isSnow) this._snowGroup.visible = false;
 
-        // --- Wet ground accumulation (persists briefly after rain stops) ---
-        if (!this._wetness) this._wetness = 0;
-        if (isRain || isStorm) {
-            this._wetness = Math.min(1.0, this._wetness + 0.008 * intensity);
-        } else {
-            this._wetness = Math.max(0, this._wetness - 0.002); // slow dry
-        }
+        // --- Per-tile wetness map (weather + drainage driven) ---
+        this._updateWetnessMap(isRain || isStorm, intensity);
 
-        // Apply wetness to road/terrain materials in visible chunks
+        // Apply per-chunk average wetness to terrain materials
         if (this._wetness > 0.01 || this._prevWetness > 0.01) {
-            const targetMetal = this._wetness * 0.45;
-            const targetRough = 1.0 - this._wetness * 0.3;
-            for (const [, entry] of this._chunkMeshes) {
+            for (const [chunkId, entry] of this._chunkMeshes) {
+                const chunkW = this._chunkAvgWetness(chunkId);
+                const targetMetal = chunkW * 0.45;
+                const targetRough = 1.0 - chunkW * 0.3;
                 entry.group.traverse((obj) => {
                     if (obj.isMesh && obj.userData?.kind === 'terrain' && obj.material && !Array.isArray(obj.material)) {
                         obj.material.metalness = THREE.MathUtils.lerp(obj.material.metalness, targetMetal, 0.1);
