@@ -2379,6 +2379,7 @@ export class Renderer3D {
         const originZ = bounds.minY - this._mapHalfH;
         const dryColor = new THREE.Color(0xc2bd92); // pale, sun-dried tint for high ground
         const meadowColor = new THREE.Color(0x6f9a48); // deeper meadow green for tonal patches
+        const grimeColor = new THREE.Color(0x55605a); // wet, algae-grey film for the docks
 
         for (let iz = 0; iz <= segsZ; iz++) {
             for (let ix = 0; ix <= segsX; ix++) {
@@ -2423,6 +2424,13 @@ export class Renderer3D {
                     if (t === TERRAIN_GRASS || t === TERRAIN_FOREST || t === TERRAIN_PARK) {
                         const patch = this._valueNoise(gx / 19 + 200, gy / 19 + 200);
                         tmpColor.lerp(meadowColor, patch * 0.30);
+                    }
+                    // Docks bias (Q10.H): wet grime film — darkened ground broken up
+                    // by puddle-shaped patches so the dockside reads damp and worked.
+                    if (this._districtThemes?.get(this.game.map.getDistrictAt(gx, gy)) === 'docks') {
+                        const puddle = this._valueNoise(gx / 7 + 400, gy / 7 + 400);
+                        tmpColor.lerp(grimeColor, 0.3 + puddle * 0.35);
+                        tmpColor.multiplyScalar(0.82); // damp surfaces sit darker
                     }
                 }
                 colors[vi * 3] = tmpColor.r;
