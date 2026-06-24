@@ -568,7 +568,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q10-de-grime` per-district grime decals on aged buildings
 - [x] `q10-de-blood` combat blood decals with weather-driven fade
 - [x] `q10-de-scorch` explosion scorch marks
-- [ ] `q10-de-posters` per-district poster decals on tagged walls
+- [x] `q10-de-posters` per-district poster decals on tagged walls
 - [ ] `q10-de-graffiti` graffiti decals on tagged walls (faction-tagged)
 - [ ] `q10-de-tire-skids` vehicle tire skid decals
 - [ ] `q10-de-bullet-impacts` bullet impact decals on hard surfaces

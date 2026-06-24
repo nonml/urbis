@@ -60,6 +60,35 @@ export class DecalManager {
         });
     }
 
+    spawnWall(wx, y, wz, normalX, normalZ, opts = {}) {
+        const {
+            color = 0xcccccc,
+            width = 0.2,
+            height = 0.2,
+            duration = Infinity,
+            opacity = 1,
+            weatherFade = false,
+        } = opts;
+
+        if (!this._wallGeo) this._wallGeo = new THREE.PlaneGeometry(1, 1);
+
+        const mat = this._baseMat.clone();
+        mat.color.setHex(color);
+        mat.opacity = opacity;
+
+        const mesh = new THREE.Mesh(this._wallGeo, mat);
+        mesh.scale.set(width, height, 1);
+        const offset = 0.01;
+        mesh.position.set(wx + normalX * offset, y, wz + normalZ * offset);
+        mesh.lookAt(wx + normalX, y, wz + normalZ);
+        mesh.renderOrder = 1;
+
+        return this._register({
+            mesh, life: 0, duration, wx, wz,
+            baseOpacity: opacity, weatherFade,
+        });
+    }
+
     async spawnProjected(targetMesh, position, orientation, size, opts = {}) {
         const { color = 0x444444, duration = Infinity, opacity = 1 } = opts;
 
@@ -177,6 +206,7 @@ export class DecalManager {
             this._remove(this._allDecals[i]);
         }
         this._groundGeo.dispose();
+        this._wallGeo?.dispose();
         this._baseMat.dispose();
     }
 }

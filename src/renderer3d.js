@@ -3115,6 +3115,13 @@ export class Renderer3D {
         commercial: 0.35, residential: 0.2, suburbs: 0.1, elite: 0.05,
     };
 
+    static POSTER_BIAS = {
+        commercial: 0.6, oldtown: 0.5, industrial: 0.3, docks: 0.25,
+        residential: 0.15, waterfront: 0.2, suburbs: 0.05, elite: 0.1,
+    };
+
+    static POSTER_COLORS = [0xcc4444, 0x44aacc, 0xcccc44, 0xcc8844, 0x8844cc, 0x44cc88];
+
     _spawnGrimeForChunk(chunkId) {
         if (!this._decalManager) return;
         if (!this._grimeSpawnedChunks) this._grimeSpawnedChunks = new Set();
@@ -3153,6 +3160,40 @@ export class Renderer3D {
         }
     }
 
+    _spawnPostersForChunk(chunkId) {
+        if (!this._decalManager) return;
+        if (!this._posterSpawnedChunks) this._posterSpawnedChunks = new Set();
+        if (this._posterSpawnedChunks.has(chunkId)) return;
+        this._posterSpawnedChunks.add(chunkId);
+
+        const rng = this.game?.rngStreams?.vfx;
+        if (!rng) return;
+        const bounds = this.game.chunks.getChunkBounds(chunkId);
+        const allBuildings = this.game.buildings?.buildings ?? [];
+        const buildings = allBuildings.filter(
+            b => b.x >= bounds.minX && b.x <= bounds.maxX && b.y >= bounds.minY && b.y <= bounds.maxY
+        );
+
+        const normals = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (const b of buildings) {
+            const distId = this.game.map.getDistrictAt(b.x, b.y);
+            const dist = this.game.map.districts?.[distId];
+            const bias = Renderer3D.POSTER_BIAS[dist?.theme] ?? 0.2;
+            if (rng.next() > bias) continue;
+            const wx = b.x - this._mapHalfW + 0.5;
+            const wz = b.y - this._mapHalfH + 0.5;
+            const terrainY = this._smoothTerrainY(b.x, b.y);
+            const face = normals[Math.floor(rng.next() * 4)];
+            const color = Renderer3D.POSTER_COLORS[Math.floor(rng.next() * Renderer3D.POSTER_COLORS.length)];
+            const wallY = terrainY + 0.15 + rng.next() * 0.3;
+            this._decalManager.spawnWall(
+                wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
+                face[0], face[1],
+                { color, width: 0.12 + rng.next() * 0.08, height: 0.1 + rng.next() * 0.08, duration: Infinity, opacity: 0.75 }
+            );
+        }
+    }
+
     syncChunkStreaming(forceInitial = false) {
         if (!this.game.chunks) return;
         const p = this.game.player;
@@ -3163,12 +3204,14 @@ export class Renderer3D {
             const entry = this._createChunkEntry(chunkId);
             this._chunkMeshes.set(chunkId, entry);
             this._spawnGrimeForChunk(chunkId);
+            this._spawnPostersForChunk(chunkId);
         }
         for (const chunkId of result.unloadedNow) {
             const entry = this._chunkMeshes.get(chunkId);
             this._disposeChunkEntry(entry);
             this._chunkMeshes.delete(chunkId);
             this._grimeSpawnedChunks?.delete(chunkId);
+            this._posterSpawnedChunks?.delete(chunkId);
         }
         if (forceInitial) {
             for (const chunkId of result.active) {
@@ -3176,6 +3219,7 @@ export class Renderer3D {
                     const entry = this._createChunkEntry(chunkId);
                     this._chunkMeshes.set(chunkId, entry);
                     this._spawnGrimeForChunk(chunkId);
+                    this._spawnPostersForChunk(chunkId);
                 }
             }
         }
