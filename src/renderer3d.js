@@ -3895,7 +3895,7 @@ export class Renderer3D {
             }
         }
 
-        // Update positions every frame
+        // Update positions every frame + tire skid decals
         for (let i = 0; i < vehicles.length; i++) {
             const v = vehicles[i];
             const child = this._vehicleGroup.children[i];
@@ -3904,6 +3904,17 @@ export class Renderer3D {
             const wz = v.y - this._mapHalfH + 0.5;
             child.position.set(wx, 0.06 + this._elevAtWorld(wx, wz), wz);
             child.rotation.y = v.angle ?? 0;
+
+            if (this._decalManager && (v.driftFactor ?? 0) > 0.3 && Math.abs(v.speed ?? 0) > 2) {
+                this._decalManager.spawnGround(wx, wz, {
+                    color: 0x222222,
+                    size: 0.06,
+                    duration: 20000,
+                    rotation: v.angle ?? 0,
+                    opacity: Math.min(0.6, (v.driftFactor ?? 0) * 0.7),
+                    weatherFade: true,
+                });
+            }
         }
     }
 

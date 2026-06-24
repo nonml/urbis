@@ -570,7 +570,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q10-de-scorch` explosion scorch marks
 - [x] `q10-de-posters` per-district poster decals on tagged walls
 - [x] `q10-de-graffiti` graffiti decals on tagged walls (faction-tagged)
-- [ ] `q10-de-tire-skids` vehicle tire skid decals
+- [x] `q10-de-tire-skids` vehicle tire skid decals
 - [ ] `q10-de-bullet-impacts` bullet impact decals on hard surfaces
 - [ ] `q10-de-cap-lru` per-chunk decal cap with LRU eviction
 
