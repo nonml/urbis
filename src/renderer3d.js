@@ -3824,6 +3824,40 @@ export class Renderer3D {
         }
     }
 
+    _spawnPuddleDecals(isRain, intensity) {
+        if (!this._decalManager || !isRain || this._wetness < 0.3) return;
+        if (!this._puddleTimer) this._puddleTimer = 0;
+        this._puddleTimer++;
+        if (this._puddleTimer < 30) return;
+        this._puddleTimer = 0;
+
+        const p = this.game.player;
+        const rng = this.game?.rngStreams?.vfx;
+        if (!rng) return;
+        const radius = 8;
+        const puddleTerrain = new Set([TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK]);
+        const spawned = Math.min(3, Math.ceil(intensity * 4));
+
+        for (let n = 0; n < spawned; n++) {
+            const ox = Math.floor(rng.next() * radius * 2) - radius;
+            const oz = Math.floor(rng.next() * radius * 2) - radius;
+            const tx = Math.floor(p.x) + ox;
+            const ty = Math.floor(p.y) + oz;
+            const terrain = this.game.map.getTileAt(tx, ty);
+            if (!puddleTerrain.has(terrain)) continue;
+            const wx = tx - this._mapHalfW + 0.5 + (rng.next() - 0.5) * 0.6;
+            const wz = ty - this._mapHalfH + 0.5 + (rng.next() - 0.5) * 0.6;
+            const size = 0.25 + rng.next() * 0.35;
+            this._decalManager.spawnGround(wx, wz, {
+                color: 0x2a3a4a,
+                size,
+                duration: 30000 + rng.next() * 30000,
+                rotation: rng.next() * Math.PI * 2,
+                opacity: 0.35 + this._wetness * 0.35,
+            });
+        }
+    }
+
     updateWeatherFX(dt) {
         const ws = this.game?.weatherSystem;
         if (!ws) return;
@@ -3863,6 +3897,9 @@ export class Renderer3D {
             }
         }
         this._prevWetness = this._wetness;
+
+        // --- Puddle decals on flat ground during rain ---
+        this._spawnPuddleDecals(isRain, intensity);
 
         // --- Fog density adapts to weather ---
         if (this.scene.fog) {
