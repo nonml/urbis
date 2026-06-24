@@ -628,7 +628,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [ ] One block at noon / rain / night looks like three different places
 - [ ] Perf harness still on-budget at "High" preset
-- [ ] All Q10.A–Q10.H items ticked
+- [x] All Q10.A–Q10.H items ticked
 - [ ] Operator approval `q10.json`
 - [ ] Tag `0.10.0.0`
 
