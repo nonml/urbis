@@ -3122,6 +3122,17 @@ export class Renderer3D {
 
     static POSTER_COLORS = [0xcc4444, 0x44aacc, 0xcccc44, 0xcc8844, 0x8844cc, 0x44cc88];
 
+    static GRAFFITI_FACTION = {
+        industrial: { color: 0xcc3333, chance: 0.4 },
+        docks:      { color: 0xcc3333, chance: 0.35 },
+        oldtown:    { color: 0xcc5533, chance: 0.5 },
+        commercial: { color: 0x8888cc, chance: 0.15 },
+        residential:{ color: 0x44aa44, chance: 0.1 },
+        waterfront: { color: 0xcc5533, chance: 0.2 },
+        suburbs:    { color: 0x44aa44, chance: 0.05 },
+        elite:      { color: 0x8888cc, chance: 0.08 },
+    };
+
     _spawnGrimeForChunk(chunkId) {
         if (!this._decalManager) return;
         if (!this._grimeSpawnedChunks) this._grimeSpawnedChunks = new Set();
@@ -3194,6 +3205,39 @@ export class Renderer3D {
         }
     }
 
+    _spawnGraffitiForChunk(chunkId) {
+        if (!this._decalManager) return;
+        if (!this._graffitiSpawnedChunks) this._graffitiSpawnedChunks = new Set();
+        if (this._graffitiSpawnedChunks.has(chunkId)) return;
+        this._graffitiSpawnedChunks.add(chunkId);
+
+        const rng = this.game?.rngStreams?.vfx;
+        if (!rng) return;
+        const bounds = this.game.chunks.getChunkBounds(chunkId);
+        const allBuildings = this.game.buildings?.buildings ?? [];
+        const buildings = allBuildings.filter(
+            b => b.x >= bounds.minX && b.x <= bounds.maxX && b.y >= bounds.minY && b.y <= bounds.maxY
+        );
+
+        const normals = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+        for (const b of buildings) {
+            const distId = this.game.map.getDistrictAt(b.x, b.y);
+            const dist = this.game.map.districts?.[distId];
+            const cfg = Renderer3D.GRAFFITI_FACTION[dist?.theme];
+            if (!cfg || rng.next() > cfg.chance) continue;
+            const wx = b.x - this._mapHalfW + 0.5;
+            const wz = b.y - this._mapHalfH + 0.5;
+            const terrainY = this._smoothTerrainY(b.x, b.y);
+            const face = normals[Math.floor(rng.next() * 4)];
+            const wallY = terrainY + 0.08 + rng.next() * 0.25;
+            this._decalManager.spawnWall(
+                wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
+                face[0], face[1],
+                { color: cfg.color, width: 0.18 + rng.next() * 0.15, height: 0.12 + rng.next() * 0.1, duration: Infinity, opacity: 0.55 }
+            );
+        }
+    }
+
     syncChunkStreaming(forceInitial = false) {
         if (!this.game.chunks) return;
         const p = this.game.player;
@@ -3205,6 +3249,7 @@ export class Renderer3D {
             this._chunkMeshes.set(chunkId, entry);
             this._spawnGrimeForChunk(chunkId);
             this._spawnPostersForChunk(chunkId);
+            this._spawnGraffitiForChunk(chunkId);
         }
         for (const chunkId of result.unloadedNow) {
             const entry = this._chunkMeshes.get(chunkId);
@@ -3212,6 +3257,7 @@ export class Renderer3D {
             this._chunkMeshes.delete(chunkId);
             this._grimeSpawnedChunks?.delete(chunkId);
             this._posterSpawnedChunks?.delete(chunkId);
+            this._graffitiSpawnedChunks?.delete(chunkId);
         }
         if (forceInitial) {
             for (const chunkId of result.active) {
@@ -3220,6 +3266,7 @@ export class Renderer3D {
                     this._chunkMeshes.set(chunkId, entry);
                     this._spawnGrimeForChunk(chunkId);
                     this._spawnPostersForChunk(chunkId);
+                    this._spawnGraffitiForChunk(chunkId);
                 }
             }
         }
