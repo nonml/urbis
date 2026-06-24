@@ -3086,6 +3086,51 @@ export class Renderer3D {
             );
         };
         mat.customProgramCacheKey = () => 'tree_wind';
+        // Foliage gets translucent SSS on top of the wind sway; trunks don't.
+        if (mat.userData?.isTreeFoliage) this._applySubsurface(mat, 0x6abf3a, 0.22);
+    }
+
+    /**
+     * Wrap-shading subsurface scattering (Q10.F). Cheap translucency: a wrapped
+     * diffuse term lets light bleed around the terminator, and a view-aligned
+     * back-scatter term glows when the light is behind the surface — skin and
+     * leaves both light up at the edges. Composes with any existing
+     * onBeforeCompile (e.g. the tree wind sway) instead of replacing it.
+     * Reads a shared view-space light direction updated once per frame.
+     */
+    _applySubsurface(mat, colorHex, strength) {
+        if (!this._sssLightDir) this._sssLightDir = { value: new THREE.Vector3(0, 1, 0) };
+        const prevOBC = mat.onBeforeCompile;
+        const prevKey = mat.customProgramCacheKey ? mat.customProgramCacheKey() : '';
+        const lightDir = this._sssLightDir;
+        mat.onBeforeCompile = (shader, renderer) => {
+            if (prevOBC) prevOBC.call(mat, shader, renderer);
+            shader.uniforms.uSubColor = { value: new THREE.Color(colorHex) };
+            shader.uniforms.uSubStrength = { value: strength };
+            shader.uniforms.uSubLightDir = lightDir;
+            shader.fragmentShader = shader.fragmentShader.replace(
+                '#include <common>',
+                `#include <common>
+                uniform vec3 uSubColor; uniform float uSubStrength; uniform vec3 uSubLightDir;`
+            ).replace(
+                '#include <lights_fragment_end>',
+                `#include <lights_fragment_end>
+                {
+                    vec3 sssL = normalize(uSubLightDir);
+                    float wrap = clamp((dot(geometryNormal, sssL) + 0.5) / 1.5, 0.0, 1.0);
+                    float back = pow(clamp(dot(normalize(vViewPosition), -sssL), 0.0, 1.0), 3.0);
+                    reflectedLight.directDiffuse += uSubColor * uSubStrength * (wrap * 0.5 + back * 0.5) * diffuseColor.rgb;
+                }`
+            );
+        };
+        mat.customProgramCacheKey = () => `sss_${strength.toFixed(2)}_${prevKey}`;
+        mat.needsUpdate = true;
+    }
+
+    /** Refresh the shared SSS light direction (sun, in view space). */
+    _updateSubsurfaceLight() {
+        if (!this._sssLightDir || !this.sunLight) return;
+        this._sssLightDir.value.copy(this.sunLight.position).transformDirection(this.camera.matrixWorldInverse);
     }
 
     _updateWindUniforms() {
@@ -3741,6 +3786,8 @@ export class Renderer3D {
 
         // Head — small, proportional
         const headMat = new THREE.MeshPhysicalMaterial({ color: 0xd4a574, roughness: 0.55, metalness: 0.0, sheenRoughness: 0.6, sheenColor: new THREE.Color(0x332211), sheen: 1.0 });
+        // Skin translucency: warm back-scatter glow around the terminator/edges.
+        this._applySubsurface(headMat, 0xff6644, 0.16);
         const head = new THREE.Mesh(new THREE.SphereGeometry(0.10 * s, 10, 8), headMat);
         head.castShadow = true;
         head.position.y = 0.72 * s + 0.05;
@@ -5538,6 +5585,9 @@ export class Renderer3D {
 
         // Advance GPU spark/smoke bursts (Q10.E)
         this._updateGPUBursts(dt / 1000);
+
+        // Refresh shared SSS light direction (skin/foliage translucency, Q10.F)
+        this._updateSubsurfaceLight();
 
         // Lightning exposure decay
         this._updateLightningExposure();
