@@ -494,6 +494,14 @@ export class VFXTriggerManager {
             }
         }
 
+        // Bullet impact decals on hard surfaces (misses)
+        if (!isMelee && !data.hit && Number.isFinite(data.targetX)) {
+            const impactPos = this._tileToWorldPosition(data.targetX, data.targetY);
+            if (impactPos) {
+                this.fxSystem.spawnDecal(impactPos.x, 0.02, impactPos.z, 0x444444, 25000);
+            }
+        }
+
         // Melee hit effects
         if (isMelee && data.hit && data.hits) {
             for (const h of data.hits) {
