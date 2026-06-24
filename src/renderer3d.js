@@ -1654,6 +1654,13 @@ export class Renderer3D {
                     float pathLen = uWaterDepth / cosV;
                     float trans = clamp(exp(-pathLen * uAbsorb), 0.0, 1.0);
                     diffuseColor.rgb = mix(uDeepColor, uShallowColor, trans);
+                    // Caustics: animated interference web, brightest in shallow water
+                    // (trans high). Reads as sunlight refracting onto the bed.
+                    vec2 cp = vWaterWorldPos.xz * 1.6;
+                    float cw = abs(sin(cp.x * 3.0 + uTime * 1.3) * sin(cp.y * 3.0 - uTime * 1.1)
+                                   + sin((cp.x + cp.y) * 2.3 + uTime * 0.9) * 0.5);
+                    float caustic = pow(1.0 - clamp(cw * 0.6, 0.0, 1.0), 3.0);
+                    diffuseColor.rgb += caustic * trans * 0.28 * vec3(0.72, 0.95, 1.0);
                     // Shoreline foam: animated band hugging the edges that touch land.
                     float eN = vShore.x * smoothstep(0.32, 0.0, vFoamUv.y);
                     float eS = vShore.z * smoothstep(0.68, 1.0, vFoamUv.y);
