@@ -371,9 +371,8 @@ export class Renderer3D {
         this._policeGroup = new THREE.Group();
         this.scene.add(this._policeGroup);
 
-        // Weather FX: rain particles
+        // Weather FX: rain particles (GPU)
         this._rainGroup = null;
-        this._rainDrops = null;
         this._lightningTimer = 0;
         this._lightningFlash = 0;
 
@@ -4448,6 +4447,118 @@ export class Renderer3D {
         }
     }
 
+    /**
+     * GPU rain (Q10.E): per-drop attributes are uploaded once; the vertex shader
+     * evaluates fall + wind-slant + wrap as a closed-form function of uTime, so
+     * there is no per-frame CPU loop and no buffer re-upload. Streaks are kept by
+     * giving the two LineSegments verts of each drop a shared phase but different
+     * vertical offsets. WebGL2 equivalent of compute-emulated particles.
+     */
+    _buildGPURain() {
+        const COUNT = 4000, AREA = 40, RANGE = 14;
+        const verts = COUNT * 2;
+        const aBase = new Float32Array(verts * 3);
+        const aPhase = new Float32Array(verts);
+        const aVertOffset = new Float32Array(verts);
+        for (let i = 0; i < COUNT; i++) {
+            const bx = (rand01() - 0.5) * AREA;
+            const bz = (rand01() - 0.5) * AREA;
+            const phase = rand01() * RANGE;
+            const streak = 0.2 + rand01() * 0.35;
+            for (let v = 0; v < 2; v++) {
+                const k = (i * 2 + v) * 3;
+                aBase[k] = bx; aBase[k + 1] = 0; aBase[k + 2] = bz;
+                aPhase[i * 2 + v] = phase;
+                aVertOffset[i * 2 + v] = v === 0 ? 0 : streak; // top vs bottom of the streak
+            }
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(verts * 3), 3));
+        geom.setAttribute('aBase', new THREE.BufferAttribute(aBase, 3));
+        geom.setAttribute('aPhase', new THREE.BufferAttribute(aPhase, 1));
+        geom.setAttribute('aVertOffset', new THREE.BufferAttribute(aVertOffset, 1));
+        const mat = new THREE.ShaderMaterial({
+            transparent: true, depthWrite: false,
+            uniforms: {
+                uTime: { value: 0 }, uFallSpeed: { value: 8 }, uRange: { value: RANGE },
+                uWind: { value: new THREE.Vector2() }, uOpacity: { value: 0.5 },
+                uColor: { value: new THREE.Color(0x99bbdd) },
+            },
+            vertexShader: `
+                uniform float uTime, uFallSpeed, uRange;
+                uniform vec2 uWind;
+                attribute vec3 aBase;
+                attribute float aPhase, aVertOffset;
+                void main() {
+                    float yFall = mod(uFallSpeed * uTime + aPhase, uRange);
+                    vec3 pos = aBase;
+                    pos.y = uRange - yFall - aVertOffset;
+                    pos.xz = aBase.xz + uWind * yFall;
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+                }`,
+            fragmentShader: `
+                uniform vec3 uColor; uniform float uOpacity;
+                void main() { gl_FragColor = vec4(uColor, uOpacity); }`,
+        });
+        const group = new THREE.LineSegments(geom, mat);
+        group.frustumCulled = false;
+        this.scene.add(group);
+        return group;
+    }
+
+    /**
+     * GPU snow (Q10.E): static per-flake attributes; the vertex shader does fall +
+     * wobble + wrap from uTime with no CPU loop. Soft round points via gl_PointCoord.
+     */
+    _buildGPUSnow() {
+        const COUNT = 2000, AREA = 40, RANGE = 14;
+        const aBase = new Float32Array(COUNT * 3);
+        const aPhase = new Float32Array(COUNT);
+        for (let i = 0; i < COUNT; i++) {
+            aBase[i * 3] = (rand01() - 0.5) * AREA;
+            aBase[i * 3 + 1] = 0;
+            aBase[i * 3 + 2] = (rand01() - 0.5) * AREA;
+            aPhase[i] = rand01() * RANGE;
+        }
+        const geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.BufferAttribute(new Float32Array(COUNT * 3), 3));
+        geom.setAttribute('aBase', new THREE.BufferAttribute(aBase, 3));
+        geom.setAttribute('aPhase', new THREE.BufferAttribute(aPhase, 1));
+        const mat = new THREE.ShaderMaterial({
+            transparent: true, depthWrite: false,
+            uniforms: {
+                uTime: { value: 0 }, uFallSpeed: { value: 1.4 }, uRange: { value: RANGE },
+                uWind: { value: new THREE.Vector2() }, uOpacity: { value: 0.85 },
+                uSize: { value: 14 }, uColor: { value: new THREE.Color(0xeeeeff) },
+            },
+            vertexShader: `
+                uniform float uTime, uFallSpeed, uRange, uSize;
+                uniform vec2 uWind;
+                attribute vec3 aBase;
+                attribute float aPhase;
+                void main() {
+                    float yFall = mod(uFallSpeed * uTime + aPhase, uRange);
+                    vec3 pos = aBase;
+                    pos.y = uRange - yFall;
+                    pos.x = aBase.x + sin(uTime * 0.5 + aPhase * 6.0) * 0.4 + uWind.x * yFall;
+                    pos.z = aBase.z + cos(uTime * 0.4 + aPhase * 6.0) * 0.4 + uWind.y * yFall;
+                    vec4 mv = modelViewMatrix * vec4(pos, 1.0);
+                    gl_PointSize = uSize * (1.0 / max(0.1, -mv.z));
+                    gl_Position = projectionMatrix * mv;
+                }`,
+            fragmentShader: `
+                uniform vec3 uColor; uniform float uOpacity;
+                void main() {
+                    float d = smoothstep(0.5, 0.1, length(gl_PointCoord - 0.5));
+                    gl_FragColor = vec4(uColor, uOpacity * d);
+                }`,
+        });
+        const group = new THREE.Points(geom, mat);
+        group.frustumCulled = false;
+        this.scene.add(group);
+        return group;
+    }
+
     updateWeatherFX(dt) {
         const ws = this.game?.weatherSystem;
         if (!ws) return;
@@ -4521,106 +4632,28 @@ export class Renderer3D {
 
         // --- Rain particle system (streaks with wind) ---
         if (isRain) {
-            const RAIN_COUNT = 4000;
-            if (!this._rainGroup) {
-                const positions = new Float32Array(RAIN_COUNT * 6); // line segments: start+end per drop
-                for (let i = 0; i < RAIN_COUNT; i++) {
-                    const bx = (rand01() - 0.5) * 40;
-                    const by = rand01() * 12;
-                    const bz = (rand01() - 0.5) * 40;
-                    const streakLen = 0.15 + rand01() * 0.2;
-                    const j = i * 6;
-                    positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
-                    positions[j + 3] = bx; positions[j + 4] = by - streakLen; positions[j + 5] = bz;
-                }
-                const geom = new THREE.BufferGeometry();
-                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                const mat = new THREE.LineBasicMaterial({
-                    color: 0x99bbdd,
-                    transparent: true,
-                    opacity: 0.5,
-                    linewidth: 1,
-                });
-                this._rainGroup = new THREE.LineSegments(geom, mat);
-                this._rainDrops = positions;
-                this._rainStreakLens = new Float32Array(RAIN_COUNT);
-                for (let i = 0; i < RAIN_COUNT; i++) this._rainStreakLens[i] = 0.15 + rand01() * 0.2;
-                this.scene.add(this._rainGroup);
-            }
-
+            if (!this._rainGroup) this._rainGroup = this._buildGPURain();
             this._rainGroup.visible = true;
             const p = this._player?.position;
             if (p) this._rainGroup.position.set(p.x, 0, p.z);
-
-            const positions = this._rainDrops;
-            const fallSpeed = (isStorm ? 0.45 : 0.25) * intensity;
-            const windX = Math.cos(windDir) * windSpeed * 0.02;
-            const windZ = Math.sin(windDir) * windSpeed * 0.02;
-            for (let i = 0; i < RAIN_COUNT; i++) {
-                const j = i * 6;
-                positions[j + 1] -= fallSpeed;
-                positions[j + 4] -= fallSpeed;
-                positions[j] += windX;
-                positions[j + 3] += windX;
-                positions[j + 2] += windZ;
-                positions[j + 5] += windZ;
-                if (positions[j + 4] < 0) {
-                    const bx = (rand01() - 0.5) * 40;
-                    const by = 10 + rand01() * 3;
-                    const bz = (rand01() - 0.5) * 40;
-                    const len = this._rainStreakLens[i];
-                    positions[j] = bx; positions[j + 1] = by; positions[j + 2] = bz;
-                    positions[j + 3] = bx; positions[j + 4] = by - len; positions[j + 5] = bz;
-                }
-            }
-            this._rainGroup.geometry.attributes.position.needsUpdate = true;
-            this._rainGroup.material.opacity = 0.25 + intensity * 0.45;
+            const u = this._rainGroup.material.uniforms;
+            u.uTime.value = performance.now() / 1000;
+            u.uFallSpeed.value = (isStorm ? 14.0 : 8.0) * Math.max(0.2, intensity);
+            u.uWind.value.set(Math.cos(windDir) * windSpeed * 0.06, Math.sin(windDir) * windSpeed * 0.06);
+            u.uOpacity.value = 0.25 + intensity * 0.45;
         }
 
-        // --- Snow particle system ---
+        // --- Snow particle system (GPU) ---
         if (isSnow) {
-            const SNOW_COUNT = 2000;
-            if (!this._snowGroup) {
-                const positions = new Float32Array(SNOW_COUNT * 3);
-                for (let i = 0; i < SNOW_COUNT; i++) {
-                    positions[i * 3] = (rand01() - 0.5) * 40;
-                    positions[i * 3 + 1] = rand01() * 12;
-                    positions[i * 3 + 2] = (rand01() - 0.5) * 40;
-                }
-                const geom = new THREE.BufferGeometry();
-                geom.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-                const mat = new THREE.PointsMaterial({
-                    color: 0xeeeeff,
-                    size: 0.06,
-                    transparent: true,
-                    opacity: 0.85,
-                });
-                this._snowGroup = new THREE.Points(geom, mat);
-                this._snowDrops = positions;
-                this.scene.add(this._snowGroup);
-            }
-
+            if (!this._snowGroup) this._snowGroup = this._buildGPUSnow();
             this._snowGroup.visible = true;
             const p = this._player?.position;
             if (p) this._snowGroup.position.set(p.x, 0, p.z);
-
-            const positions = this._snowDrops;
-            const t = performance.now() * 0.001;
-            const fallSpeed = 0.04 * intensity;
-            for (let i = 0; i < SNOW_COUNT; i++) {
-                const j = i * 3;
-                // Gentle wobble drift
-                positions[j] += Math.sin(t + i * 0.7) * 0.003 + Math.cos(windDir) * windSpeed * 0.005;
-                positions[j + 1] -= fallSpeed;
-                positions[j + 2] += Math.cos(t + i * 1.1) * 0.003 + Math.sin(windDir) * windSpeed * 0.005;
-                if (positions[j + 1] < 0) {
-                    positions[j] = (rand01() - 0.5) * 40;
-                    positions[j + 1] = 10 + rand01() * 3;
-                    positions[j + 2] = (rand01() - 0.5) * 40;
-                }
-            }
-            this._snowGroup.geometry.attributes.position.needsUpdate = true;
-            this._snowGroup.material.opacity = 0.5 + intensity * 0.4;
+            const u = this._snowGroup.material.uniforms;
+            u.uTime.value = performance.now() / 1000;
+            u.uFallSpeed.value = 1.4 * Math.max(0.2, intensity);
+            u.uWind.value.set(Math.cos(windDir) * windSpeed * 0.05, Math.sin(windDir) * windSpeed * 0.05);
+            u.uOpacity.value = 0.5 + intensity * 0.4;
         }
 
         // --- Leaf fall in autumn ---
