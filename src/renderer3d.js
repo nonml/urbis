@@ -2126,12 +2126,30 @@ export class Renderer3D {
         return objects;
     }
 
+    /**
+     * Brushed-metal car-paint material (Q10.F). A metallic flake base under a
+     * clearcoat with anisotropic specular, so the highlight streaks along the
+     * body instead of forming a round hotspot — the signature look of
+     * automotive paint and brushed metal.
+     */
+    _carPaintMaterial(hex, { roughness = 0.4, metalness = 0.55 } = {}) {
+        return new THREE.MeshPhysicalMaterial({
+            color: hex,
+            roughness,
+            metalness,
+            clearcoat: 0.6,
+            clearcoatRoughness: 0.2,
+            anisotropy: 0.5,
+            anisotropyRotation: Math.PI / 2,
+        });
+    }
+
     /** Procedural city bus model built from THREE primitives */
     _createProceduralBus() {
         const group = new THREE.Group();
         // Main body — elongated box
         const bodyGeom = new THREE.BoxGeometry(0.38, 0.22, 0.88);
-        const bodyMat = new THREE.MeshStandardMaterial({ color: 0x1a4a8a, roughness: 0.6, metalness: 0.05 });
+        const bodyMat = this._carPaintMaterial(0x1a4a8a, { roughness: 0.5, metalness: 0.35 });
         const body = new THREE.Mesh(bodyGeom, bodyMat);
         body.position.set(0, 0.14, 0);
         body.castShadow = true;
@@ -2452,10 +2470,14 @@ export class Renderer3D {
             roadGeom.rotateX(-Math.PI / 2);
             const roadMat = new THREE.MeshPhysicalMaterial({
                 color: 0x323232,
-                roughness: 0.95,
+                roughness: 0.9,
                 metalness: 0.0,
                 clearcoat: 0,
                 clearcoatRoughness: 0.4,
+                // Anisotropic specular (Q10.F): asphalt aggregate streaks the
+                // highlight lengthwise down the road, strongest when wet.
+                anisotropy: 0.55,
+                anisotropyRotation: Math.PI / 2,
             });
             const roadMesh = new THREE.InstancedMesh(roadGeom, roadMat, roadTiles.length);
             roadMesh.receiveShadow = true;
@@ -4332,7 +4354,7 @@ export class Renderer3D {
             this._policeGroup.clear();
             if (!this._policeBodyGeo) {
                 this._policeBodyGeo = new THREE.BoxGeometry(0.45, 0.15, 0.22);
-                this._policeBodyMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.3, metalness: 0.4 });
+                this._policeBodyMat = this._carPaintMaterial(0xffffff, { roughness: 0.3, metalness: 0.4 });
                 this._policeLightGeo = new THREE.BoxGeometry(0.2, 0.06, 0.22);
             }
             for (const u of units) {
