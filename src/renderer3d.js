@@ -584,6 +584,8 @@ export class Renderer3D {
 
         // Realtime GI probe grid (Q10.G) — one per world, sized to the map.
         this._gi = new GIProbeGrid(this.game.map.width, this.game.map.height, 4);
+        // District theme lookup for per-district GI mood tints (Q10.H).
+        this._districtThemes = new Map((this.game.map.districts || []).map((d) => [d.id, d.theme]));
 
         // Projected decal system (Q10)
         this._initDecalManager();
@@ -2476,16 +2478,21 @@ export class Renderer3D {
         // beneath each one (Q10.G irradiance volumes, loaded at chunk-load).
         if (this._gi) {
             const giTmp = new THREE.Color();
+            const moodTmp = new THREE.Color();
             this._gi.bakeRegion(
                 bounds.minX - this._mapHalfW, bounds.minY - this._mapHalfH,
                 bounds.maxX - this._mapHalfW + 1, bounds.maxY - this._mapHalfH + 1,
                 (wx, wz) => {
                     const tx = Math.round(wx + this._mapHalfW - 0.5);
                     const ty = Math.round(wz + this._mapHalfH - 0.5);
-                    const t = this.game.map.getTileAt(
-                        Math.max(0, Math.min(this.game.map.width - 1, tx)),
-                        Math.max(0, Math.min(this.game.map.height - 1, ty)));
-                    return giTmp.setHex(terrainTint(t));
+                    const cx = Math.max(0, Math.min(this.game.map.width - 1, tx));
+                    const cy = Math.max(0, Math.min(this.game.map.height - 1, ty));
+                    giTmp.setHex(terrainTint(this.game.map.getTileAt(cx, cy)));
+                    // Pull the bounce toward this district's mood colour (Q10.H).
+                    const theme = this._districtThemes?.get(this.game.map.getDistrictAt(cx, cy));
+                    const tint = theme && Renderer3D.DISTRICT_GI_TINT[theme];
+                    if (tint) giTmp.lerp(moodTmp.setHex(tint.hex), tint.amt);
+                    return giTmp;
                 });
         }
 
@@ -2722,6 +2729,19 @@ export class Renderer3D {
     static WATER_SURFACE_Y = -0.18;
     /** Y of the translucent animated wave plane — sits just above the mirror. */
     static WATER_PLANE_Y = -0.16;
+
+    /**
+     * Per-district art-direction mood tint (Q10.H), baked into the GI bounce so
+     * each district reads as its own place: docks greenish-overcast, industrial
+     * smoggy, suburbs warm-lawn, oldtown saturated-warm stone. `amt` is how far
+     * the local ground albedo is pulled toward the mood colour.
+     */
+    static DISTRICT_GI_TINT = {
+        docks: { hex: 0x8fa39a, amt: 0.38 },
+        industrial: { hex: 0x9a8d77, amt: 0.38 },
+        suburbs: { hex: 0xd7c886, amt: 0.32 },
+        oldtown: { hex: 0xc78a52, amt: 0.34 },
+    };
 
     /** Integer hash → [0,1), seeded once from the world seed. */
     _elevHash(ix, iz) {
