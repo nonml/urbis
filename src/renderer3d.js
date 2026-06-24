@@ -2043,10 +2043,15 @@ export class Renderer3D {
                         child.castShadow = true;
                         child.receiveShadow = true;
                         child.userData.isRoad = true;
-                        if (child.material?.isMeshStandardMaterial && !child.material.clearcoat) {
-                            child.material = new THREE.MeshPhysicalMaterial().copy(child.material);
-                            child.material.clearcoat = 0;
-                            child.material.clearcoatRoughness = 0.4;
+                        if (child.material?.isMeshStandardMaterial && !child.material.isMeshPhysicalMaterial) {
+                            // Promote to physical so wet weather can raise road clearcoat.
+                            // Copy at the *standard* level — MeshPhysicalMaterial.copy()
+                            // reads clearcoat vectors the source lacks and would crash.
+                            const phys = new THREE.MeshPhysicalMaterial();
+                            THREE.MeshStandardMaterial.prototype.copy.call(phys, child.material);
+                            phys.clearcoat = 0;
+                            phys.clearcoatRoughness = 0.4;
+                            child.material = phys;
                         }
                     }
                 });
