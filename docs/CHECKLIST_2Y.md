@@ -566,7 +566,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q10-de-projector` projected decal system (deferred or projector-mesh)
 - [x] `q10-de-puddles` rain produces puddle decals on flat low ground
 - [x] `q10-de-grime` per-district grime decals on aged buildings
-- [ ] `q10-de-blood` combat blood decals with weather-driven fade
+- [x] `q10-de-blood` combat blood decals with weather-driven fade
 - [ ] `q10-de-scorch` explosion scorch marks
 - [ ] `q10-de-posters` per-district poster decals on tagged walls
 - [ ] `q10-de-graffiti` graffiti decals on tagged walls (faction-tagged)

@@ -4697,7 +4697,11 @@ export class Renderer3D {
         // Update VFX systems
         this.updateVFX();
         if (this.fxSystem) {
-            this.fxSystem.update();
+            const ws = this.game?.weatherSystem?.state;
+            const rainMult = (ws?.type === 'rain' || ws?.type === 'storm')
+                ? 1 + (ws.intensity || 0) * 2 : 1;
+            if (this._decalManager) this._decalManager._weatherFadeMult = rainMult;
+            this.fxSystem.update(dt);
             this._renderTracers();
             this._renderDecals();
         }

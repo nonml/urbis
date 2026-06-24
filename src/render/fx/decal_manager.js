@@ -16,6 +16,7 @@ export class DecalManager {
         this._chunks = new Map();
         this._allDecals = [];
         this._DecalGeometry = null;
+        this._weatherFadeMult = 1;
 
         this._groundGeo = new THREE.PlaneGeometry(1, 1);
         this._groundGeo.rotateX(-Math.PI / 2);
@@ -39,6 +40,7 @@ export class DecalManager {
             duration = 5000,
             rotation = 0,
             opacity = 1,
+            weatherFade = false,
         } = opts;
 
         const y = this._elevFn ? this._elevFn(wx, wz) + 0.01 : 0.02;
@@ -52,7 +54,10 @@ export class DecalManager {
         mesh.rotation.y = rotation;
         mesh.renderOrder = 1;
 
-        return this._register({ mesh, life: 0, duration, wx, wz });
+        return this._register({
+            mesh, life: 0, duration, wx, wz,
+            baseOpacity: opacity, weatherFade,
+        });
     }
 
     async spawnProjected(targetMesh, position, orientation, size, opts = {}) {
@@ -78,6 +83,8 @@ export class DecalManager {
             wx: position.x,
             wz: position.z,
             projected: true,
+            baseOpacity: opacity,
+            weatherFade: false,
         });
     }
 
@@ -125,10 +132,13 @@ export class DecalManager {
     }
 
     update(dt) {
+        if (!dt || dt <= 0) return;
+        const wfm = this._weatherFadeMult ?? 1;
         for (let i = this._allDecals.length - 1; i >= 0; i--) {
             const d = this._allDecals[i];
             if (!Number.isFinite(d.duration)) continue;
-            d.life += dt;
+            const mult = d.weatherFade ? wfm : 1;
+            d.life += dt * mult;
             if (d.life >= d.duration) {
                 this._remove(d);
                 continue;
@@ -136,7 +146,7 @@ export class DecalManager {
             const fadeStart = d.duration * (1 - FADE_FRACTION);
             if (d.life > fadeStart) {
                 d.mesh.material.opacity =
-                    1 - (d.life - fadeStart) / (d.duration * FADE_FRACTION);
+                    d.baseOpacity * (1 - (d.life - fadeStart) / (d.duration * FADE_FRACTION));
             }
         }
     }

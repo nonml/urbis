@@ -456,7 +456,9 @@ export class FXSystem {
         if (this._decalManager) {
             this._decalManager.spawnGround(x, z, {
                 color: color || 0x880000,
-                duration: duration || 5000,
+                duration: duration || 15000,
+                weatherFade: true,
+                size: 0.12 + (typeof crypto !== 'undefined' ? crypto.getRandomValues(new Uint8Array(1))[0] / 255 : 0.5) * 0.1,
             });
             return;
         }
