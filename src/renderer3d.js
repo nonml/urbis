@@ -2757,6 +2757,50 @@ export class Renderer3D {
      * Build instanced vegetation (trees) for forest and park tiles in a chunk.
      * Uses a deterministic seeded RNG based on tile coordinates for consistency.
      */
+    _applyTreeWindShader(mat) {
+        if (!this._windUniforms) {
+            this._windUniforms = {
+                uWindTime: { value: 0 },
+                uWindStrength: { value: 0.02 },
+                uWindDir: { value: new THREE.Vector2(1, 0) },
+            };
+        }
+        const uniforms = this._windUniforms;
+        mat.onBeforeCompile = (shader) => {
+            shader.uniforms.uWindTime = uniforms.uWindTime;
+            shader.uniforms.uWindStrength = uniforms.uWindStrength;
+            shader.uniforms.uWindDir = uniforms.uWindDir;
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <common>',
+                `#include <common>
+                uniform float uWindTime;
+                uniform float uWindStrength;
+                uniform vec2 uWindDir;`
+            );
+            shader.vertexShader = shader.vertexShader.replace(
+                '#include <begin_vertex>',
+                `#include <begin_vertex>
+                float heightFactor = max(0.0, transformed.y) * 2.0;
+                float phase = dot(vec2(modelMatrix[3][0], modelMatrix[3][2]), uWindDir) * 3.0;
+                float sway = sin(uWindTime * 2.5 + phase) * uWindStrength * heightFactor;
+                float gust = sin(uWindTime * 5.7 + phase * 1.3) * uWindStrength * 0.3 * heightFactor;
+                transformed.x += (sway + gust) * uWindDir.x;
+                transformed.z += (sway + gust) * uWindDir.y;`
+            );
+        };
+        mat.customProgramCacheKey = () => 'tree_wind';
+    }
+
+    _updateWindUniforms() {
+        if (!this._windUniforms) return;
+        const ws = this.game?.weatherSystem?.state;
+        const speed = ws?.windSpeed ?? 1;
+        const dir = ws?.windDirection ?? 0;
+        this._windUniforms.uWindTime.value = performance.now() / 1000;
+        this._windUniforms.uWindStrength.value = 0.01 + speed * 0.03;
+        this._windUniforms.uWindDir.value.set(Math.cos(dir), Math.sin(dir)).normalize();
+    }
+
     _buildVegetationForChunk(bounds) {
         const objects = [];
         const treeLarge = this._vegetationModels.get('tree-large');
@@ -2820,9 +2864,11 @@ export class Renderer3D {
                                     nm.color.setHex(trunkColor); // trunk
                                 } else {
                                     nm.color.setHex(foliageHex); // foliage
+                                    nm.userData.isTreeFoliage = true;
                                 }
                                 nm.roughness = 0.9;
                                 nm.metalness = 0.0;
+                                this._applyTreeWindShader(nm);
                                 return nm;
                             };
                             if (Array.isArray(child.material)) {
@@ -2862,6 +2908,7 @@ export class Renderer3D {
                             const size = box.getSize(new THREE.Vector3());
                             nm.color.setHex(size.x < 0.25 && size.z < 0.25 ? 0x6d4c3a : 0x4caf50);
                             nm.roughness = 0.9; nm.metalness = 0.0;
+                            this._applyTreeWindShader(nm);
                             return nm;
                         };
                         if (Array.isArray(child.material)) {
@@ -2901,6 +2948,7 @@ export class Renderer3D {
                     const sz = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
                     nm.color.setHex(sz.x < 0.25 && sz.z < 0.25 ? 0x6d4c3a : foliageHex);
                     nm.roughness = 0.9; nm.metalness = 0.0;
+                    this._applyTreeWindShader(nm);
                     return nm;
                 };
                 child.material = Array.isArray(child.material) ? child.material.map(tint) : tint(child.material);
@@ -4812,6 +4860,7 @@ export class Renderer3D {
         // Update day/night cycle lighting
         this._updateDayNightLighting();
         this._captureEnvProbe();
+        this._updateWindUniforms();
 
         if (this._citizensDirty) this.rebuildCitizens();
         else this.updateCitizens();
