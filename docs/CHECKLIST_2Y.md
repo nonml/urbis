@@ -640,9 +640,9 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11.A — WebGPU Evaluation
 
-- [ ] `q11-wg-spike-branch` spike branch tested on Chromium-stable
-- [ ] `q11-wg-decision` go / wait / no decision recorded in `docs/retros/2026-10-webgpu.md`
-- [ ] `q11-wg-easy-wins` if go: GPU compute particles + GPU culling ported
+- [x] `q11-wg-spike-branch` spike branch tested on Chromium-stable
+- [x] `q11-wg-decision` go / wait / no decision recorded in `docs/retros/2026-10-webgpu.md`
+- [x] `q11-wg-easy-wins` if go: GPU compute particles + GPU culling ported
 
 ### Q11.B — GPU-Driven Culling
 
