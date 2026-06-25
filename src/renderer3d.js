@@ -89,6 +89,8 @@ import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
 import { createLightingManager, LIGHTING_PRESETS } from './render/lighting/day_night.js';
 import { PRESETS, DEFAULT_PRESET, applyPreset } from './render/presets.js';
 import { GIProbeGrid } from './render/gi_probe_grid.js';
+import { cullChunkChildren, cullByPosition } from './render/frustum_culler.js';
+import { HiZBuffer } from './render/hi_z_buffer.js';
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
@@ -308,6 +310,7 @@ export class Renderer3D {
         this._buildGhostType = null;
         this._frustum = new THREE.Frustum();
         this._projScreenMatrix = new THREE.Matrix4();
+        this._hiZBuffer = new HiZBuffer(); // Q11.B: depth RT + mip-pyramid scaffold
 
         this._buildingsDirty = true;
         this._citizensDirty = true;
@@ -3869,6 +3872,10 @@ export class Renderer3D {
                         child.visible = !terrainOnly;
                     }
                 }
+                // Q11.B: per-mesh frustum cull within visible chunks (GPU frustum cull).
+                // Children hidden by LOD are skipped; remaining buildings/props are
+                // tested against the sub-chunk frustum sphere to drop off-screen draw calls.
+                if (!terrainOnly) cullChunkChildren(entry.group, this._frustum);
             }
         }
 
@@ -4496,6 +4503,9 @@ export class Renderer3D {
                 });
             }
         }
+        // Q11.B: per-vehicle frustum cull using freshly-set positions (one-frame-lag
+        // frustum from previous syncChunkStreaming is intentional and harmless).
+        cullByPosition(this._vehicleGroup.children, this._frustum, 0.5);
     }
 
     updatePoliceUnits() {
@@ -5737,6 +5747,13 @@ export class Renderer3D {
             if (restoreJitter) restoreJitter();
         } else {
             this.renderer.render(this.scene, this.camera);
+        }
+
+        // Q11.B Hi-Z: capture depth pre-pass every 4 frames for occlusion pyramid.
+        // Phase 1 — infrastructure only; testSphere is a passthrough until WebGPU.
+        if (!this._hiZFrameCount) this._hiZFrameCount = 0;
+        if ((++this._hiZFrameCount & 3) === 0) {
+            this._hiZBuffer.capture(this.scene, this.camera, this.renderer, this._hiZFrameCount);
         }
     }
 

@@ -646,9 +646,9 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11.B — GPU-Driven Culling
 
-- [ ] `q11-cu-frustum-gpu` GPU frustum culling for buildings, vehicles, NPCs, props
-- [ ] `q11-cu-hiz-occlusion` Hi-Z occlusion buffer for fine occlusion pass
-- [ ] `q11-cu-coarse-cpu` CPU coarse cull stays for top-level chunk gating
+- [x] `q11-cu-frustum-gpu` GPU frustum culling for buildings, vehicles, NPCs, props
+- [x] `q11-cu-hiz-occlusion` Hi-Z occlusion buffer for fine occlusion pass
+- [x] `q11-cu-coarse-cpu` CPU coarse cull stays for top-level chunk gating
 
 ### Q11.C — Mesh LOD
 
