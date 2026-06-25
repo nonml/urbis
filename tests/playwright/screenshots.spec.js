@@ -64,6 +64,46 @@ async function gotoDistrict(page, theme) {
   }, theme);
 }
 
+// Q10 DoD — same docks block at noon / rain / night looks like three different places
+for (const [label, setup] of [
+  ['noon', async (page) => {
+    await page.evaluate(() => {
+      const tpd = window.game.state.time.tickPerDay || 24;
+      window.game.state.time.timeOfDay = 0.5;
+      window.game.state.time.tick = Math.floor(tpd * 0.5);
+      const ws = window.game.weatherSystem;
+      if (ws) { ws.state.type = 'clear'; ws.state.intensity = 0; }
+    });
+  }],
+  ['rain', async (page) => {
+    await page.evaluate(() => {
+      const tpd = window.game.state.time.tickPerDay || 24;
+      window.game.state.time.timeOfDay = 0.4;
+      window.game.state.time.tick = Math.floor(tpd * 0.4);
+      const ws = window.game.weatherSystem;
+      if (ws) { ws.transitionQueue = []; ws.state.type = 'rain'; ws.state.intensity = 1.0; ws.state.duration = 60; }
+    });
+  }],
+  ['night', async (page) => {
+    await page.evaluate(() => {
+      const tpd = window.game.state.time.tickPerDay || 24;
+      window.game.state.time.timeOfDay = 0.875;
+      window.game.state.time.tick = Math.floor(tpd * 0.875);
+      const ws = window.game.weatherSystem;
+      if (ws) { ws.state.type = 'clear'; ws.state.intensity = 0; }
+    });
+  }],
+]) {
+  test(`@baseline q10-tod-docks-${label}`, async ({ page }) => {
+    await startGame(page);
+    await gotoDistrict(page, 'docks');
+    await setup(page);
+    await convergeLighting(page);
+    await page.waitForTimeout(SETTLE);
+    await page.screenshot(shot(`q10-tod-docks-${label}`));
+  });
+}
+
 for (const theme of ['docks', 'industrial', 'suburbs', 'oldtown']) {
   test(`@baseline district-${theme}`, async ({ page }) => {
     await startGame(page);
@@ -241,4 +281,44 @@ test('@baseline victory-screen', async ({ page }) => {
   });
   await page.waitForTimeout(300);
   await page.screenshot(shot('victory-screen'));
+});
+
+// Q9 DoD — interior-shop at Performance preset with PBR materials + HDR pipeline
+test('@baseline interior-shop', async ({ page }) => {
+  await startGame(page);
+  await page.evaluate(() => {
+    const r = window.game?.ui?.renderer3d;
+    if (!r) return;
+    // Noon lighting so the interior point lights read against ambient.
+    const tpd = window.game.state.time.tickPerDay || 24;
+    window.game.state.time.timeOfDay = 0.5;
+    window.game.state.time.tick = Math.floor(tpd * 0.5);
+    // Patch syncChunkStreaming so newly-streamed-in chunks don't override the
+    // indoor visibility state set by enterInterior().
+    const origSync = r.syncChunkStreaming.bind(r);
+    r._syncChunkStreamingOrig = origSync;
+    r.syncChunkStreaming = () => {};
+    r.enterInterior('shop');
+    // Lock camera via photo-mode so updateCamera() is a no-op.
+    r._photoMode = true;
+    // Position inside the 10×10×3 room near the entrance, looking in.
+    if (r.camera) {
+      r.camera.position.set(0, 1.5, 4);
+      r.camera.lookAt(0, 1.2, -2);
+    }
+  });
+  await convergeLighting(page);
+  await page.waitForTimeout(SETTLE);
+  await page.screenshot(shot('interior-shop'));
+  // Restore: exit interior, release photo-mode, re-enable chunk streaming.
+  await page.evaluate(() => {
+    const r = window.game?.ui?.renderer3d;
+    if (!r) return;
+    r._photoMode = false;
+    if (r._syncChunkStreamingOrig) {
+      r.syncChunkStreaming = r._syncChunkStreamingOrig;
+      delete r._syncChunkStreamingOrig;
+    }
+    r.exitInterior();
+  });
 });
