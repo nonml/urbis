@@ -652,11 +652,11 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11.C — Mesh LOD
 
-- [ ] `q11-lod-buildings` 4-tier LODs (LOD0/1/2/imposter) for buildings
-- [ ] `q11-lod-vehicles` 4-tier LODs for vehicles
-- [ ] `q11-lod-characters` 4-tier LODs for characters
-- [ ] `q11-lod-imposters-baked` build-time imposter generation
-- [ ] `q11-lod-thresholds` per-category LOD distance thresholds tuned
+- [x] `q11-lod-buildings` 4-tier LODs (LOD0/1/2/imposter) for buildings
+- [x] `q11-lod-vehicles` 4-tier LODs for vehicles
+- [x] `q11-lod-characters` 4-tier LODs for characters
+- [x] `q11-lod-imposters-baked` build-time imposter generation
+- [x] `q11-lod-thresholds` per-category LOD distance thresholds tuned
 
 ### Q11.D — Instancing & Atlasing
 

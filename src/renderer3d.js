@@ -91,6 +91,7 @@ import { PRESETS, DEFAULT_PRESET, applyPreset } from './render/presets.js';
 import { GIProbeGrid } from './render/gi_probe_grid.js';
 import { cullChunkChildren, cullByPosition } from './render/frustum_culler.js';
 import { HiZBuffer } from './render/hi_z_buffer.js';
+import { LOD_DIST, createVehicleLOD, createChunkImposter, buildChunkLOD1Proxies } from './render/lod_system.js';
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
@@ -1602,6 +1603,18 @@ export class Renderer3D {
                 obj.material?.dispose?.();
             }
         });
+        // Q11.C: dispose LOD1 box proxies and imposter sprite
+        if (entry.lod1Group) {
+            this.scene.remove(entry.lod1Group);
+            entry.lod1Group.traverse((obj) => {
+                if (obj.isMesh) { obj.geometry?.dispose?.(); obj.material?.dispose?.(); }
+            });
+        }
+        if (entry.imposter) {
+            this.scene.remove(entry.imposter);
+            entry.imposter.material?.map?.dispose?.();
+            entry.imposter.material?.dispose?.();
+        }
     }
 
     /**
@@ -3636,12 +3649,27 @@ export class Renderer3D {
         const height = (bounds.maxY - bounds.minY + 1);
         const radius = Math.sqrt(width * width + height * height) * 0.75;
 
+        // Q11.C LOD1: box-proxy group shown at mid distance (no shadows, flat mats)
+        const lod1Group = buildChunkLOD1Proxies(
+            bounds, this.game.buildings.buildings,
+            this._mapHalfW, this._mapHalfH, (wx, wz) => this._smoothTerrainY(wx + this._mapHalfW - 0.5, wz + this._mapHalfH - 0.5)
+        );
+        lod1Group.visible = false;
+        this.scene.add(lod1Group);
+
+        // Q11.C LOD imposter: billboard sprite shown at far distance
+        const imposter = createChunkImposter(center, 0x886644, Math.max(width, height));
+        imposter.visible = false;
+        this.scene.add(imposter);
+
         this.scene.add(group);
         return {
             group,
             bounds,
             center,
             radius,
+            lod1Group,
+            imposter,
             terrainCount: terrainMeshes.reduce((n, mesh) => n + mesh.count, 0),
             buildingCount: buildingMeshes.reduce((n, m) => n + (m.count ?? 1), 0),
         };
@@ -3856,26 +3884,57 @@ export class Renderer3D {
         for (const entry of this._chunkMeshes.values()) {
             const sphere = new THREE.Sphere(entry.center, entry.radius);
             const inFrustum = this._frustum.intersectsSphere(sphere);
+            const lod1 = entry.lod1Group ?? null;
+            const imp  = entry.imposter   ?? null;
+
             if (!inFrustum) {
                 entry.group.visible = false;
+                if (lod1) lod1.visible = false;
+                if (imp)  imp.visible  = false;
                 continue;
             }
-            // Distance-based LOD: hide buildings on distant chunks to reduce draw calls
+
             const dist = camPos.distanceTo(entry.center);
+
             if (dist > this.LOD_TERRAIN_ONLY_DIST) {
+                // Tier 4: chunk fully hidden
                 entry.group.visible = false;
-            } else {
+                if (lod1) lod1.visible = false;
+                if (imp)  imp.visible  = false;
+            } else if (dist > LOD_DIST.buildings.imposter) {
+                // Tier 3: terrain + billboard imposter only
                 entry.group.visible = true;
-                const terrainOnly = dist > this.LOD_FULL_DIST;
                 for (const child of entry.group.children) {
-                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') {
-                        child.visible = !terrainOnly;
-                    }
+                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') child.visible = false;
                 }
-                // Q11.B: per-mesh frustum cull within visible chunks (GPU frustum cull).
-                // Children hidden by LOD are skipped; remaining buildings/props are
-                // tested against the sub-chunk frustum sphere to drop off-screen draw calls.
-                if (!terrainOnly) cullChunkChildren(entry.group, this._frustum);
+                if (lod1) lod1.visible = false;
+                if (imp)  imp.visible  = true;
+            } else if (dist > LOD_DIST.buildings.lod2) {
+                // Tier 2: terrain + LOD1 box proxies, no imposter
+                entry.group.visible = true;
+                for (const child of entry.group.children) {
+                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') child.visible = false;
+                }
+                if (lod1) lod1.visible = true;
+                if (imp)  imp.visible  = false;
+            } else if (dist > LOD_DIST.buildings.lod1) {
+                // Tier 1: full group but skip per-mesh cull (close enough for simple test)
+                entry.group.visible = true;
+                for (const child of entry.group.children) {
+                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') child.visible = true;
+                }
+                if (lod1) lod1.visible = false;
+                if (imp)  imp.visible  = false;
+            } else {
+                // Tier 0: full detail with per-mesh frustum cull
+                entry.group.visible = true;
+                for (const child of entry.group.children) {
+                    if (child.userData?.kind === 'building' || child.userData?.kind === 'vegetation') child.visible = true;
+                }
+                if (lod1) lod1.visible = false;
+                if (imp)  imp.visible  = false;
+                // Q11.B per-mesh frustum cull — only within close range where it matters
+                cullChunkChildren(entry.group, this._frustum);
             }
         }
 
@@ -4407,6 +4466,24 @@ export class Renderer3D {
                              (currentTime - cp.moveStartTime) < 0.5;
             cp.isMoving = isMoving;
 
+            // Q11.C: character LOD — 4 tiers by camera distance.
+            // LOD0 (<8): DetailedCharacter from CharacterPool (handled below via _detailedCitizenSet)
+            // LOD1 (8-20): capsule with full walk animation (current)
+            // LOD2 (20-40): capsule in static T-pose (skip anim calc)
+            // LOD3 (>40): hidden
+            const cwx = cp.dispX - this._mapHalfW + 0.5;
+            const cwz = cp.dispY - this._mapHalfH + 0.5;
+            const camDist = this.camera
+                ? Math.sqrt((this.camera.position.x - cwx) ** 2 + (this.camera.position.z - cwz) ** 2)
+                : 0;
+
+            if (camDist > LOD_DIST.characters.far) {
+                // LOD3: hidden beyond far threshold
+                dummy.position.set(0, -10, 0); dummy.scale.set(0, 0, 0);
+                dummy.updateMatrix(); this._citizensMesh.setMatrixAt(i, dummy.matrix);
+                continue;
+            }
+
             // Hide instanced capsule if this citizen has a detailed character model
             if (this._detailedCitizenSet?.has(i)) {
                 dummy.position.set(0, -10, 0);
@@ -4418,11 +4495,13 @@ export class Renderer3D {
 
             // Capsule rendering for far citizens
             dummy.scale.set(1, 1, 1);
-            const wx = cp.dispX - this._mapHalfW + 0.5;
-            const wz = cp.dispY - this._mapHalfH + 0.5;
+            const wx = cwx;
+            const wz = cwz;
             const groundY = this._elevAtWorld(wx, wz);
 
-            if (anim) {
+            const useLOD2 = camDist > LOD_DIST.characters.mid;
+            if (!useLOD2 && anim) {
+                // LOD1: full walk animation
                 if (isMoving) {
                     const walkSpeed = anim.speed * 2.5;
                     const stride = Math.sin(currentTime * walkSpeed + anim.phase);
@@ -4436,8 +4515,9 @@ export class Renderer3D {
                     dummy.rotation.set(0, cp.heading, 0);
                 }
             } else {
+                // LOD2: static T-pose, no animation calc
                 dummy.position.set(wx, 0.12 + groundY, wz);
-                dummy.rotation.set(0, 0, 0);
+                dummy.rotation.set(0, cp.heading, 0);
             }
 
             dummy.updateMatrix();
@@ -4458,17 +4538,20 @@ export class Renderer3D {
                 const model = this._vehicleModels.get(v.type);
                 if (model) {
                     const clone = model.clone(true);
-                    clone.userData.vehicleId = v.id;
-                    this._vehicleGroup.add(clone);
+                    // Q11.C: wrap in 4-tier LOD (full model → box → tiny box → hidden)
+                    const lodNode = createVehicleLOD(clone, v.color ?? 0x607d8b);
+                    lodNode.userData.vehicleId = v.id;
+                    this._vehicleGroup.add(lodNode);
                 } else {
-                    // Fallback: colored box
+                    // Fallback: colored box wrapped in LOD
                     const mesh = new THREE.Mesh(
                         new THREE.BoxGeometry(0.45, 0.18, 0.22),
-                        new THREE.MeshStandardMaterial({ color: 0x607d8b, roughness: 0.4, metalness: 0.3 })
+                        new THREE.MeshStandardMaterial({ color: v.color ?? 0x607d8b, roughness: 0.4, metalness: 0.3 })
                     );
                     mesh.castShadow = true;
-                    mesh.userData.vehicleId = v.id;
-                    this._vehicleGroup.add(mesh);
+                    const lodNode = createVehicleLOD(mesh, v.color ?? 0x607d8b);
+                    lodNode.userData.vehicleId = v.id;
+                    this._vehicleGroup.add(lodNode);
                 }
             }
         }
