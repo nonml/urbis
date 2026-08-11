@@ -30,14 +30,12 @@ const CI_MODE = process.argv.includes('--ci');
 // BatchedMesh conversion pass (q11-in-instancedmesh-pass). Exempted so CI
 // fails only on NEW uninstanced duplicates; each entry is a reason to fix.
 const CI_EXEMPTIONS = {
-    'src/renderer3d.js:2939': 'building model clone — candidate for building InstancedMesh',
-    'src/renderer3d.js:3048': 'building window-glow quads (4 faces × buildings) — candidate for InstancedMesh',
-    'src/renderer3d.js:4225': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
-    'src/renderer3d.js:4615': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4622': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4689': 'police unit body — candidate for InstancedMesh',
-    'src/renderer3d.js:4690': 'police unit light — candidate for InstancedMesh',
-    'src/renderer3d.js:4694': 'police unit group — candidate for InstancedMesh',
+    'src/renderer3d.js:4275': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
+    'src/renderer3d.js:4665': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4672': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4739': 'police unit body — candidate for InstancedMesh',
+    'src/renderer3d.js:4740': 'police unit light — candidate for InstancedMesh',
+    'src/renderer3d.js:4744': 'police unit group — candidate for InstancedMesh',
 };
 
 // Non-instanced constructors that signal one drawable per loop iteration.

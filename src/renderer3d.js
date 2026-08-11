@@ -2919,6 +2919,10 @@ export class Renderer3D {
     _buildBuildingMeshesForChunk(bounds, buildings) {
         const objects = [];
         const boxGroups = new Map(); // type -> building[]
+        // Variant -> instance records for the instanced build (Q11.D).
+        const buildingInstances = new Map();
+        const glowBuildings = []; // world bboxes of tall skyscrapers for window glow
+        const dummy = new THREE.Object3D();
 
         for (const b of buildings) {
             if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
@@ -2936,120 +2940,53 @@ export class Renderer3D {
                 if (variantModel) { model = variantModel; useSkyscraperScale = true; }
             }
             if (model) {
-                const clone = model.clone(true);
-                // Skyscraper variants load at scale=1.0; apply type scale here
-                if (useSkyscraperScale) {
-                    const baseScale = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
-                    // Per-building height variation — CBD pyramid profile: taller downtown, shorter suburbs
-                    const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
-                    const distFromCenter = Math.sqrt(
-                        (b.x - this._mapHalfW) ** 2 + (b.y - this._mapHalfH) ** 2
-                    );
-                    const centerFactor = Math.max(0, 1.0 - distFromCenter / 18);
-                    const heightMult = 0.55 + heightHash * 0.55 + centerFactor * 0.55;
-                    clone.scale.setScalar(baseScale * heightMult);
-                } else {
-                    // Per-building proportional jitter so same-type rows (houses,
-                    // shops, farms) don't read as stamped clones. Deterministic
-                    // per tile; base stays grounded since models pivot at y=0.
-                    const j1 = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
-                    const j2 = (((b.x * 40503) ^ (b.y * 12289) ^ 0x9e3779b9) >>> 0) / 4294967296;
-                    clone.scale.x *= 0.90 + j1 * 0.20;          // ±10% width
-                    clone.scale.z *= 0.90 + (1 - j1) * 0.20;    // ±10% depth (anti-correlated)
-                    clone.scale.y *= 0.82 + j2 * 0.55;          // 0.82–1.37 height
-                }
                 const wx = b.x - this._mapHalfW + 0.5;
                 const wz = b.y - this._mapHalfH + 0.5;
                 const terrainY = this._smoothTerrainY(b.x, b.y);
-                clone.position.set(wx, terrainY, wz);
-                clone.rotation.y = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
+                const rotY = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
                 const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
-                // Darker roof — avoids washout under bright sun
                 const roofColor = bldColor.clone().multiplyScalar(0.62);
-                // Glass/steel buildings get more reflective material
                 const isGlassType = Renderer3D.SKYSCRAPER_TYPES.has(b.type);
-                clone.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        if (child.material) {
-                            const applyMat = (m) => {
-                                if (!m.color) return m;
-                                const nm = m.clone();
-                                // Recolor all light-colored (non-dark) meshes
-                                const brightness = nm.color.r * 0.299 + nm.color.g * 0.587 + nm.color.b * 0.114;
-                                if (brightness > 0.25) {
-                                    // Assign palette color based on mesh role
-                                    const box = new THREE.Box3().setFromObject(child);
-                                    const size = box.getSize(new THREE.Vector3());
-                                    const isSmall = size.x < 0.15 && size.z < 0.15;
-                                    if (isSmall) {
-                                        // Window: emissive warm glow (intensity driven by day/night)
-                                        nm.color.set(0xffee88);
-                                        nm.emissive = new THREE.Color(0xffcc44);
-                                        nm.emissiveIntensity = 0.8;
-                                        nm.roughness = 0.1;
-                                        nm.metalness = 0.0;
-                                        nm.userData = { isWindow: true };
-                                    } else if (size.y < 0.08) {
-                                        // Flat/roof mesh
-                                        nm.color.set(roofColor);
-                                        nm.roughness = 0.85;
-                                        nm.metalness = 0.0;
-                                    } else {
-                                        nm.color.set(bldColor);
-                                        // Glass/steel tower facades get a reflective sheen
-                                        nm.roughness = isGlassType ? 0.35 : 0.65;
-                                        nm.metalness = isGlassType ? 0.18 : 0.03;
-                                    }
-                                    nm.envMapIntensity = isGlassType ? 1.2 : 0.6;
-                                }
-                                return nm;
-                            };
-                            if (Array.isArray(child.material)) {
-                                child.material = child.material.map(applyMat);
-                            } else {
-                                child.material = applyMat(child.material);
-                            }
-                        }
-                    }
-                });
-                objects.push(clone);
 
-                // Rooftop clutter (AC units, vents, water tanks) enriches the
-                // skyline of commercial / civic / industrial buildings.
-                if (Renderer3D.ROOFTOP_DETAIL_TYPES.has(b.type)) {
-                    this._addRooftopProps(clone, b, objects);
-                }
-
-                // Add lit-window glow overlay to tall skyscraper buildings
+                dummy.position.set(wx, terrainY, wz);
+                dummy.rotation.y = rotY;
                 if (useSkyscraperScale) {
-                    const bbox = new THREE.Box3().setFromObject(clone);
-                    const bs = bbox.getSize(new THREE.Vector3());
-                    if (bs.y > 1.2) {
-                        const bc = bbox.getCenter(new THREE.Vector3());
-                        const winTex = this._getWindowTexture();
-                        const winMat = new THREE.MeshBasicMaterial({
-                            map: winTex,
-                            transparent: true,
-                            depthWrite: false,
-                            blending: THREE.AdditiveBlending,
-                            opacity: 0.55,
-                        });
-                        // Four cardinal faces: +Z -Z +X -X
-                        const faces = [
-                            [bs.x * 0.88, bs.y * 0.90, bc.x, bc.y, bbox.max.z + 0.018, 0, 0],
-                            [bs.x * 0.88, bs.y * 0.90, bc.x, bc.y, bbox.min.z - 0.018, 0, Math.PI],
-                            [bs.z * 0.88, bs.y * 0.90, bbox.max.x + 0.018, bc.y, bc.z, 0, Math.PI / 2],
-                            [bs.z * 0.88, bs.y * 0.90, bbox.min.x - 0.018, bc.y, bc.z, 0, -Math.PI / 2],
-                        ];
-                        for (const [pw, ph, px, py, pz, rx, ry] of faces) {
-                            const g = new THREE.PlaneGeometry(pw, ph);
-                            const m = new THREE.Mesh(g, winMat.clone());
-                            m.position.set(px, py, pz);
-                            m.rotation.set(rx, ry, 0);
-                            objects.push(m);
-                        }
+                    const baseScale = Renderer3D.MODEL_SCALE[b.type] ?? Renderer3D.MODEL_SCALE.default;
+                    // CBD pyramid: taller downtown, shorter suburbs
+                    const heightHash = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                    const distFromCenter = Math.sqrt((b.x - this._mapHalfW) ** 2 + (b.y - this._mapHalfH) ** 2);
+                    const centerFactor = Math.max(0, 1.0 - distFromCenter / 18);
+                    dummy.scale.setScalar(baseScale * (0.55 + heightHash * 0.55 + centerFactor * 0.55));
+                } else {
+                    // Per-building proportional jitter (deterministic per tile) so
+                    // same-type rows don't read as stamped clones.
+                    const j1 = (((b.x * 2654435761) ^ (b.y * 2246822519)) >>> 0) / 4294967296;
+                    const j2 = (((b.x * 40503) ^ (b.y * 12289) ^ 0x9e3779b9) >>> 0) / 4294967296;
+                    dummy.scale.set(
+                        model.scale.x * (0.90 + j1 * 0.20),
+                        model.scale.y * (0.82 + j2 * 0.55),
+                        model.scale.z * (0.90 + (1 - j1) * 0.20)
+                    );
+                }
+                dummy.updateMatrix();
+
+                if (!buildingInstances.has(model)) buildingInstances.set(model, []);
+                buildingInstances.get(model).push({ matrix: dummy.matrix.clone(), bldColor, roofColor, isGlassType });
+
+                // Rooftop clutter + lit-window glow derive from the world bbox.
+                if (Renderer3D.ROOFTOP_DETAIL_TYPES.has(b.type) || useSkyscraperScale) {
+                    if (!this._buildingModelBoxes) this._buildingModelBoxes = new Map();
+                    let modelBox = this._buildingModelBoxes.get(model);
+                    if (!modelBox) {
+                        modelBox = new THREE.Box3().setFromObject(model);
+                        this._buildingModelBoxes.set(model, modelBox);
+                    }
+                    const worldBox = modelBox.clone().applyMatrix4(dummy.matrix);
+                    if (Renderer3D.ROOFTOP_DETAIL_TYPES.has(b.type)) {
+                        this._addRooftopPropsForBox(worldBox, b, objects);
+                    }
+                    if (useSkyscraperScale && worldBox.getSize(new THREE.Vector3()).y > 1.2) {
+                        glowBuildings.push(worldBox);
                     }
                 }
             } else {
@@ -3058,8 +2995,17 @@ export class Renderer3D {
             }
         }
 
+        // Instance each building variant — one InstancedMesh per part per chunk
+        // replaces per-building clones (Q11.D).
+        for (const [model, instances] of buildingInstances) {
+            objects.push(...this._buildInstancedBuildingModel(model, instances));
+        }
+        if (glowBuildings.length > 0) {
+            const glow = this._buildInstancedWindowGlow(glowBuildings);
+            if (glow) objects.push(glow);
+        }
+
         // Box instanced mesh fallback for types without a loaded model
-        const dummy = new THREE.Object3D();
         const winTex = this._getWindowTexture();
         for (const [type, arr] of boxGroups.entries()) {
             if (arr.length === 0) continue;
@@ -3127,8 +3073,7 @@ export class Renderer3D {
      * they dispose with the chunk group and aren't distorted by the building's
      * per-instance scale. Shared geometry + materials keep them cheap.
      */
-    _addRooftopProps(clone, b, out) {
-        const bbox = new THREE.Box3().setFromObject(clone);
+    _addRooftopPropsForBox(bbox, b, out) {
         const sx = bbox.max.x - bbox.min.x;
         const sz = bbox.max.z - bbox.min.z;
         const sy = bbox.max.y - bbox.min.y;
@@ -3177,6 +3122,111 @@ export class Renderer3D {
                 (hash(31) - 0.5) * insetX, (hash(32) - 0.5) * insetZ,
                 0.04, 0.10 + hash(33) * 0.08, 0.04);
         }
+    }
+
+    // Building part role: the per-building recolor logic (brightness gate then
+    // size class) is replayed per variant once; per-building colours land in
+    // instanceColor so one InstancedMesh serves many buildings.
+    _classifyBuildingPart(baseMat, child) {
+        if (!baseMat.color) return 'keep';
+        const lum = baseMat.color.r * 0.299 + baseMat.color.g * 0.587 + baseMat.color.b * 0.114;
+        if (lum <= 0.25) return 'keep';
+        const size = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
+        if (size.x < 0.15 && size.z < 0.15) return 'window';
+        if (size.y < 0.08) return 'roof';
+        return 'facade';
+    }
+
+    _makeBuildingRoleMaterial(baseMat, role, isGlass) {
+        const m = baseMat.clone();
+        if (role === 'window') {
+            m.color.set(0xffee88);
+            m.emissive = new THREE.Color(0xffcc44);
+            m.emissiveIntensity = 0.8;
+            m.roughness = 0.1;
+            m.metalness = 0.0;
+        } else if (role === 'roof') {
+            m.color.set(0xffffff); // tinted via instanceColor (bldColor * 0.62)
+            m.roughness = 0.85;
+            m.metalness = 0.0;
+        } else if (role === 'facade') {
+            m.color.set(0xffffff); // tinted via instanceColor (palette colour)
+            m.roughness = isGlass ? 0.35 : 0.65;
+            m.metalness = isGlass ? 0.18 : 0.03;
+            m.envMapIntensity = isGlass ? 1.2 : 0.6;
+        }
+        return m;
+    }
+
+    _buildInstancedBuildingModel(model, instances) {
+        const isGlass = instances[0].isGlassType;
+        model.updateWorldMatrix(true, false);
+        const color = new THREE.Color();
+        const meshes = [];
+
+        model.traverse((child) => {
+            if (!child.isMesh || !child.geometry) return;
+            const baseMat = Array.isArray(child.material) ? child.material[0] : child.material;
+            if (!baseMat) return;
+            const role = this._classifyBuildingPart(baseMat, child);
+            const geo = child.geometry.clone();
+            geo.applyMatrix4(child.matrixWorld);
+            const mat = this._makeBuildingRoleMaterial(baseMat, role, isGlass);
+            const im = new THREE.InstancedMesh(geo, mat, instances.length);
+            im.castShadow = true;
+            im.receiveShadow = true;
+            for (let i = 0; i < instances.length; i++) {
+                const t = instances[i];
+                im.setMatrixAt(i, t.matrix);
+                if (role === 'facade') color.copy(t.bldColor);
+                else if (role === 'roof') color.copy(t.roofColor);
+                else continue; // keep/window use a fixed material colour
+                im.setColorAt(i, color);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            if (im.instanceColor) im.instanceColor.needsUpdate = true;
+            im.computeBoundingSphere();
+            meshes.push(im);
+        });
+
+        return meshes;
+    }
+
+    _buildInstancedWindowGlow(glowBoxes) {
+        const geo = new THREE.PlaneGeometry(1, 1);
+        const winMat = new THREE.MeshBasicMaterial({
+            map: this._getWindowTexture(),
+            transparent: true,
+            depthWrite: false,
+            blending: THREE.AdditiveBlending,
+            opacity: 0.55,
+        });
+        const im = new THREE.InstancedMesh(geo, winMat, glowBoxes.length * 4);
+        const dummy = new THREE.Object3D();
+        const c = new THREE.Vector3();
+        const s = new THREE.Vector3();
+        let idx = 0;
+        for (const box of glowBoxes) {
+            c.copy(box.min).add(box.max).multiplyScalar(0.5);
+            s.subVectors(box.max, box.min);
+            // +Z, -Z, +X, -X cardinal faces, scaled to the building's extent.
+            const faces = [
+                [c.x, c.y, box.max.z + 0.018, 0, 0, s.x, s.y],
+                [c.x, c.y, box.min.z - 0.018, 0, Math.PI, s.x, s.y],
+                [box.max.x + 0.018, c.y, c.z, 0, Math.PI / 2, s.z, s.y],
+                [box.min.x - 0.018, c.y, c.z, 0, -Math.PI / 2, s.z, s.y],
+            ];
+            for (const [px, py, pz, rx, ry, w, h] of faces) {
+                dummy.position.set(px, py, pz);
+                dummy.rotation.set(rx, ry, 0);
+                dummy.scale.set(w * 0.88, h * 0.90, 1);
+                dummy.updateMatrix();
+                im.setMatrixAt(idx++, dummy.matrix);
+            }
+        }
+        im.instanceMatrix.needsUpdate = true;
+        im.computeBoundingSphere();
+        return im;
     }
 
     /**
