@@ -30,12 +30,18 @@ const CI_MODE = process.argv.includes('--ci');
 // BatchedMesh conversion pass (q11-in-instancedmesh-pass). Exempted so CI
 // fails only on NEW uninstanced duplicates; each entry is a reason to fix.
 const CI_EXEMPTIONS = {
-    'src/renderer3d.js:4531': 'legacy decal fallback pool — active path uses DecalManager (fx/decal_manager.js)',
-    'src/renderer3d.js:4921': 'vehicles keep per-vehicle LOD (createVehicleLOD); instancing would drop LOD fidelity for ~dozens of moving objects',
-    'src/renderer3d.js:4928': 'vehicle fallback box — same per-vehicle LOD reasoning',
-    'src/renderer3d.js:4995': 'police units are few (≤ ~20); per-unit blue/red pursuit flash needs a custom per-instance emissive shader',
-    'src/renderer3d.js:4996': 'police unit light — same per-unit emissive reasoning',
-    'src/renderer3d.js:5000': 'police unit group — same reasoning',
+    'src/renderer3d.js:_renderDecals:new-mesh:new THREE.Mesh(this._decalGeo, mat)':
+        'legacy decal fallback pool — active path uses DecalManager (fx/decal_manager.js)',
+    'src/renderer3d.js:updateVehicles:clone:model.clone(true)':
+        'vehicles keep per-vehicle LOD (createVehicleLOD); instancing would drop LOD fidelity for ~dozens of moving objects',
+    'src/renderer3d.js:updateVehicles:new-mesh:new THREE.Mesh( new THREE.BoxGeometry(0.45, 0.18':
+        'vehicle fallback box — same per-vehicle LOD reasoning',
+    'src/renderer3d.js:updatePoliceUnits:new-mesh:new THREE.Mesh(this._policeBodyGeo, this._police':
+        'police units are few (≤ ~20); per-unit blue/red pursuit flash needs a custom per-instance emissive shader',
+    'src/renderer3d.js:updatePoliceUnits:new-mesh:new THREE.Mesh(this._policeLightGeo, new THREE.M':
+        'police unit light — same per-unit emissive reasoning',
+    'src/renderer3d.js:updatePoliceUnits:new-mesh:new THREE.Group()':
+        'police unit group — same reasoning',
 };
 
 // Non-instanced constructors that signal one drawable per loop iteration.
@@ -150,6 +156,18 @@ function scanFile(filePath, source, root) {
     const findings = [];
     const stack = [];
     const scopes = [];
+    const fnStack = ['top'];
+
+    // Enclosing function/method name — part of a line-shift-stable exemption key.
+    const fnName = (node) => {
+        if (node.type === 'FunctionDeclaration') return node.id?.name ?? null;
+        if (node.type === 'MethodDefinition' || node.type === 'PropertyDefinition' || node.type === 'ClassMethod') {
+            if (node.key?.type === 'Identifier') return node.key.name;
+            if (node.key?.type === 'Literal') return String(node.key.value);
+        }
+        return null;
+    };
+    const currentFn = () => [...fnStack].reverse().find((n) => n) ?? 'top';
 
     const isCloneSite = (node) =>
         node.type === 'CallExpression' &&
@@ -177,6 +195,16 @@ function scanFile(filePath, source, root) {
             scopes.push(collectArrayDecls(stmts));
         }
 
+        let pushedFn = false;
+        const name = fnName(node);
+        if (name) {
+            fnStack.push(name);
+            pushedFn = true;
+        } else if (isFn && node.type !== 'Program') {
+            fnStack.push(null);
+            pushedFn = true;
+        }
+
         if (
             node.type === 'ForStatement' || node.type === 'ForInStatement' ||
             node.type === 'ForOfStatement' || node.type === 'WhileStatement' ||
@@ -202,13 +230,17 @@ function scanFile(filePath, source, root) {
             const bulk = frames.some((f) => f.bulk);
             const allSmall = frames.every((f) => f.small);
             const info = stack[stack.length - 1];
+            const kind = isCloneSite(node) ? 'clone' : 'new-mesh';
+            const context = nodeText(source, node).replace(/\s+/g, ' ').trim().slice(0, 48);
             findings.push({
                 file: filePath,
                 line: node.loc.start.line,
-                kind: isCloneSite(node) ? 'clone' : 'new-mesh',
+                fn: currentFn(),
+                kind,
                 class: bulk ? 'BULK' : allSmall ? 'SMALL' : 'UNKNOWN',
                 iterable: info.iterable ? info.iterable.slice(0, 60) : '(none)',
-                context: nodeText(source, node).slice(0, 80),
+                context,
+                sig: `${filePath}:${currentFn()}:${kind}:${context}`,
             });
         }
 
@@ -234,6 +266,7 @@ function scanFile(filePath, source, root) {
         }
 
         if (isFn) scopes.pop();
+        if (pushedFn) fnStack.pop();
     };
 
     walk(root);
@@ -305,14 +338,14 @@ function main() {
     }
 
     if (CI_MODE) {
-        const unexempted = bulk.filter((f) => !CI_EXEMPTIONS[`${f.file}:${f.line}`]);
+        const unexempted = bulk.filter((f) => !CI_EXEMPTIONS[f.sig]);
         if (unexempted.length === 0) {
-            console.log(`[32m[PASS][0m CI instancing audit: no new >8× uninstanced meshes. (${bulk.length} known/exempted)`);
+            console.log(`[PASS] CI instancing audit: no new >8× uninstanced meshes. (${bulk.length} known/exempted)`);
             process.exit(0);
         } else {
-            console.log(`[31m[FAIL][0m CI instancing audit: ${unexempted.length} un-exempted >8× mesh duplication(s):\n`);
+            console.log(`[FAIL] CI instancing audit: ${unexempted.length} un-exempted >8× mesh duplication(s):\n`);
             for (const f of unexempted) {
-                console.log(`  ${f.file}:${f.line}  [${f.kind}]  iterable: ${f.iterable}`);
+                console.log(`  ${f.sig}`);
             }
             console.log('\nAdd to CI_EXEMPTIONS in tools/audit_instancing.mjs only if already tracked for q11-in-instancedmesh-pass.');
             process.exit(1);
