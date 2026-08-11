@@ -660,7 +660,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11.D — Instancing & Atlasing
 
-- [ ] `q11-in-audit` audit script lists meshes duplicated > 8× without instancing
+- [x] `q11-in-audit` audit script lists meshes duplicated > 8× without instancing
 - [ ] `q11-in-instancedmesh-pass` move duplicates to `InstancedMesh` / `BatchedMesh`
 - [ ] `q11-in-ci-check` CI fails on new non-instanced duplicates
 - [ ] `q11-tx-atlas-buildings` building texture atlas
