@@ -92,6 +92,7 @@ import { GIProbeGrid } from './render/gi_probe_grid.js';
 import { cullChunkChildren, cullByPosition } from './render/frustum_culler.js';
 import { HiZBuffer } from './render/hi_z_buffer.js';
 import { LOD_DIST, createVehicleLOD, createChunkImposter, buildChunkLOD1Proxies } from './render/lod_system.js';
+import { VEHICLE_TYPES } from './vehicles/vehicle_state.js';
 import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
@@ -899,7 +900,9 @@ export class Renderer3D {
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
                     this._enforcePBR(root);
+                    this._applyVehicleAtlas(root);
                     this._vehicleModels.set(type, root);
+                    this._vehicleModelsDirty = true;
                     resolve();
                 }, undefined, () => resolve());
             });
@@ -3163,17 +3166,15 @@ export class Renderer3D {
         return m;
     }
 
-    // Replace a facade part's UVs with a box projection into its atlas tile:
-    // the dominant normal axis picks the projection plane, so each face samples
-    // the tile continuously and the per-building palette tint still reads.
-    _regenerateFacadeUVs(geo, tileIndex) {
-        const grid = Renderer3D.FACADE_ATLAS_GRID;
+    // Replace a part's UVs with a box projection into its atlas tile: the
+    // dominant normal axis picks the projection plane, so each face samples the
+    // tile continuously. Used for building facades and vehicle surfaces.
+    _regenerateBoxUVs(geo, tileIndex, grid, freq) {
         const pos = geo.getAttribute('position');
         const norm = geo.getAttribute('normal');
         if (!pos || !norm) return;
         const tw = 1 / grid, th = 1 / grid;
         const tx = tileIndex % grid, ty = Math.floor(tileIndex / grid);
-        const freq = 2.5;
         const uvs = new Float32Array(pos.count * 2);
         for (let i = 0; i < pos.count; i++) {
             const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
@@ -3186,6 +3187,114 @@ export class Renderer3D {
             uvs[i * 2 + 1] = ty * th + (v * freq - Math.floor(v * freq)) * th;
         }
         geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
+    }
+
+    /** Number of vehicle-atlas tiles along each axis (2×2 grid). */
+    static VEHICLE_ATLAS_GRID = 2;
+
+    /** Shared vehicle-surface atlas (q11-tx-atlas-vehicles): paint/tire/glass/chrome. */
+    _getVehicleAtlas() {
+        if (this._vehicleAtlas) return this._vehicleAtlas;
+        const grid = Renderer3D.VEHICLE_ATLAS_GRID;
+        const size = 256;
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = grid * size;
+        const ctx = cv.getContext('2d');
+        for (let i = 0; i < grid * grid; i++) {
+            const tx = i % grid, ty = Math.floor(i / grid);
+            ctx.save();
+            ctx.translate(tx * size, ty * size);
+            this._drawVehicleTile(ctx, size, i);
+            ctx.restore();
+        }
+        this._vehicleAtlas = new THREE.CanvasTexture(cv);
+        this._vehicleAtlas.anisotropy = 4;
+        return this._vehicleAtlas;
+    }
+
+    _drawVehicleTile(ctx, s, idx) {
+        const h2 = (x, y) => {
+            let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) >>> 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+            return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+        };
+        const fill = (x, y, w, h, c) => { ctx.fillStyle = c; ctx.fillRect(x, y, w, h); };
+        const noise = (x, y, amp) => (h2(Math.floor(x), Math.floor(y)) - 0.5) * amp;
+
+        if (idx === 0) {
+            // Car paint: subtle metallic noise + horizontal sheen streak.
+            fill(0, 0, s, s, '#9aa0a8');
+            for (let y = 0; y < s; y += 3) {
+                for (let x = 0; x < s; x += 3) {
+                    const n = noise(x, y, 10);
+                    fill(x, y, 3, 3, `rgba(${160 + n | 0},${166 + n | 0},${176 + n | 0},0.6)`);
+                }
+            }
+            const g = ctx.createLinearGradient(0, s * 0.25, 0, s * 0.55);
+            g.addColorStop(0, 'rgba(255,255,255,0.16)');
+            g.addColorStop(1, 'rgba(255,255,255,0)');
+            fill(0, 0, s, s, 'rgba(0,0,0,0)');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, s * 0.2, s, s * 0.4);
+        } else if (idx === 1) {
+            // Tire: near-black rubber with vertical ribs.
+            fill(0, 0, s, s, '#1a1a1c');
+            const ribs = 12, rw = s / ribs;
+            for (let i = 0; i < ribs; i++) {
+                const shade = (h2(i, 31) - 0.5) * 14;
+                fill(i * rw, 0, rw, s, `rgb(${30 + shade | 0},${30 + shade | 0},${33 + shade | 0})`);
+            }
+            fill(0, 0, s, 3, 'rgba(0,0,0,0.5)');
+        } else if (idx === 2) {
+            // Glass: dark tinted with a faint window grid.
+            fill(0, 0, s, s, '#1c2630');
+            const step = s / 5;
+            for (let r = 0; r < 5; r++) {
+                for (let c = 0; c < 5; c++) {
+                    const sh = (h2(r * 3 + c, 7) - 0.5) * 12;
+                    fill(c * step + 2, r * step + 2, step - 4, step - 4, `rgb(${34 + sh | 0},${46 + sh | 0},${58 + sh | 0})`);
+                }
+            }
+            ctx.fillStyle = 'rgba(8,12,18,0.8)';
+            for (let i = 0; i <= 5; i++) {
+                ctx.fillRect(i * step - 1, 0, 2, s);
+                ctx.fillRect(0, i * step - 1, s, 2);
+            }
+        } else {
+            // Chrome trim: light metal with vertical streaks.
+            fill(0, 0, s, s, '#c6ccd4');
+            const bands = 10, bw = s / bands;
+            for (let i = 0; i < bands; i++) {
+                const sh = (h2(i, 41) - 0.5) * 30;
+                fill(i * bw, 0, bw, s, `rgb(${198 + sh | 0},${204 + sh | 0},${212 + sh | 0})`);
+            }
+        }
+    }
+
+    // Vehicle part role → atlas tile, by node name (Kenney nodes are named:
+    // "body", "wheel-front-right", "grill", …). Wheels → tire; everything else
+    // → car paint, tinted per-vehicle.
+    _applyVehicleAtlas(root) {
+        const atlas = this._getVehicleAtlas();
+        const grid = Renderer3D.VEHICLE_ATLAS_GRID;
+        root.traverse((child) => {
+            if (!child.isMesh || !child.geometry) return;
+            const name = (child.name || '').toLowerCase();
+            const tile = name.includes('wheel') ? 1 : 0;
+            this._regenerateBoxUVs(child.geometry, tile, grid, 2);
+            const mat = Array.isArray(child.material) ? child.material[0] : child.material;
+            if (mat) mat.map = atlas;
+        });
+    }
+
+    // Deterministic car colour per vehicle (id hash → palette) so the fleet
+    // isn't one shade of grey; explicit v.color wins.
+    _vehicleColor(v) {
+        if (v.color) return v.color;
+        const id = v.id || String(v.type);
+        let h = 0;
+        for (let i = 0; i < id.length; i++) h = (Math.imul(h, 31) + id.charCodeAt(i)) >>> 0;
+        return Renderer3D.CAR_COLORS[h % Renderer3D.CAR_COLORS.length];
     }
 
     _buildInstancedBuildingModel(model, instances) {
@@ -3201,7 +3310,7 @@ export class Renderer3D {
             const role = this._classifyBuildingPart(baseMat, child);
             const geo = child.geometry.clone();
             geo.applyMatrix4(child.matrixWorld);
-            if (role === 'facade') this._regenerateFacadeUVs(geo, instances[0].facadeTile);
+            if (role === 'facade') this._regenerateBoxUVs(geo, instances[0].facadeTile, Renderer3D.FACADE_ATLAS_GRID, 2.5);
             const mat = this._makeBuildingRoleMaterial(baseMat, role, isGlass);
             const im = new THREE.InstancedMesh(geo, mat, instances.length);
             im.castShadow = true;
@@ -4562,6 +4671,13 @@ export class Renderer3D {
         0xcddc39, 0xf44336, 0x009688, 0xffc107, 0x673ab7,
     ];
 
+    /** Car-paint palette for vehicles without an explicit colour. */
+    static CAR_COLORS = [
+        0xcc3333, 0x3366cc, 0x339933, 0xf0a030, 0x666699,
+        0x2a6b6b, 0x884444, 0x777788, 0x8833aa, 0x334455,
+        0xb0b0c0, 0xbb6622, 0x446644, 0x9955aa, 0x222244,
+    ];
+
     rebuildCitizens() {
         if (this._citizensMesh) {
             this.scene.remove(this._citizensMesh);
@@ -4912,25 +5028,41 @@ export class Renderer3D {
         if (!vs) return;
         const vehicles = vs.vehicles;
 
-        // Rebuild vehicle group when count changes
-        if (this._vehicleGroup.children.length !== vehicles.length) {
+        // Rebuild when count changes or when a model finished loading late
+        // (vehicles can spawn before the GLBs resolve, leaving box fallbacks).
+        if (this._vehicleModelsDirty || this._vehicleGroup.children.length !== vehicles.length) {
+            this._vehicleModelsDirty = false;
             this._vehicleGroup.clear();
             for (const v of vehicles) {
-                const model = this._vehicleModels.get(v.type);
+                // System type (PASSENGER…) → model key (sedan…) via VEHICLE_TYPES.
+                const model = this._vehicleModels.get(VEHICLE_TYPES[v.type]?.modelKey ?? v.type);
                 if (model) {
                     const clone = model.clone(true);
+                    // Q11.D: per-vehicle paint tint. The atlas map + box-projected
+                    // UVs are baked into the shared model; clone the material so
+                    // each vehicle's colour doesn't bleed across the fleet.
+                    const paint = this._vehicleColor(v);
+                    clone.traverse((child) => {
+                        if (!child.isMesh || !child.material) return;
+                        const base = Array.isArray(child.material) ? child.material[0] : child.material;
+                        if (!base) return;
+                        const m = base.clone();
+                        m.color.set(((child.name || '').toLowerCase().includes('wheel')) ? 0x1a1a1c : paint);
+                        child.material = m;
+                    });
                     // Q11.C: wrap in 4-tier LOD (full model → box → tiny box → hidden)
-                    const lodNode = createVehicleLOD(clone, v.color ?? 0x607d8b);
+                    const lodNode = createVehicleLOD(clone, paint);
                     lodNode.userData.vehicleId = v.id;
                     this._vehicleGroup.add(lodNode);
                 } else {
-                    // Fallback: colored box wrapped in LOD
+                    // Fallback: colored box wrapped in LOD (no model for this type)
+                    const paint = this._vehicleColor(v);
                     const mesh = new THREE.Mesh(
                         new THREE.BoxGeometry(0.45, 0.18, 0.22),
-                        new THREE.MeshStandardMaterial({ color: v.color ?? 0x607d8b, roughness: 0.4, metalness: 0.3 })
+                        new THREE.MeshStandardMaterial({ color: paint, roughness: 0.4, metalness: 0.3 })
                     );
                     mesh.castShadow = true;
-                    const lodNode = createVehicleLOD(mesh, v.color ?? 0x607d8b);
+                    const lodNode = createVehicleLOD(mesh, paint);
                     lodNode.userData.vehicleId = v.id;
                     this._vehicleGroup.add(lodNode);
                 }
