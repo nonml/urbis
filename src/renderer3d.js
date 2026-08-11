@@ -2109,14 +2109,14 @@ export class Renderer3D {
         // Instance the collected road variants + street lights (Q11.D).
         for (const [modelName, insts] of roadInstances) {
             const model = this._roadModels.get(modelName);
-            objects.push(...this._buildInstancedRoadModel(model, insts));
+            objects.push(...this._buildInstancedModelParts(model, insts));
         }
         if (fallbackRoads.length > 0) {
             objects.push(this._buildInstancedRoadFallback(fallbackRoads));
         }
         if (streetLights.length > 0) {
             const lightModel = this._propModels.get('light-square');
-            objects.push(...this._buildInstancedRoadModel(lightModel, streetLights, { promote: false, isRoad: false }));
+            objects.push(...this._buildInstancedModelParts(lightModel, streetLights, { promote: false, isRoad: false }));
             objects.push(this._buildInstancedGlowSphere(lightGlows));
         }
         if (fallbackPoles.length > 0) {
@@ -2141,7 +2141,7 @@ export class Renderer3D {
         return mat.clone();
     }
 
-    _buildInstancedRoadModel(model, instances, { promote = true, isRoad = true } = {}) {
+    _buildInstancedModelParts(model, instances, { promote = true, isRoad = true, receiveShadow } = {}) {
         model.updateWorldMatrix(true, false);
         const dummy = new THREE.Object3D();
         const meshes = [];
@@ -2155,7 +2155,7 @@ export class Renderer3D {
             const mat = promote ? this._promoteRoadMaterial(baseMat) : baseMat.clone();
             const im = new THREE.InstancedMesh(geo, mat, instances.length);
             im.castShadow = true;
-            im.receiveShadow = isRoad;
+            im.receiveShadow = receiveShadow ?? isRoad;
             if (isRoad) im.userData.isRoad = true;
             for (let i = 0; i < instances.length; i++) {
                 const t = instances[i];
@@ -3639,6 +3639,9 @@ export class Renderer3D {
             'house', 'apartment', 'farm',
         ]);
 
+        // Collect per-variant detail props, then instance them (Q11.D).
+        const detailInstances = new Map();
+
         for (const b of buildings) {
             if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
             const h = hash(b.x, b.y, 500);
@@ -3664,14 +3667,18 @@ export class Renderer3D {
             if (!modelName) continue;
             const model = this._detailModels.get(modelName);
             if (!model) continue;
-
-            const clone = model.clone(true);
-            clone.position.set(wx + side * Math.cos(rotY), terrainY, wz + side * Math.sin(rotY));
-            clone.rotation.y = rotY + (hash(b.x, b.y, 530) - 0.5) * 0.3;
-            clone.traverse((child) => {
-                if (child.isMesh) { child.castShadow = true; child.receiveShadow = true; }
+            if (!detailInstances.has(modelName)) detailInstances.set(modelName, []);
+            detailInstances.get(modelName).push({
+                x: wx + side * Math.cos(rotY),
+                y: terrainY,
+                z: wz + side * Math.sin(rotY),
+                rotY: rotY + (hash(b.x, b.y, 530) - 0.5) * 0.3,
             });
-            objects.push(clone);
+        }
+
+        for (const [modelName, instances] of detailInstances) {
+            const model = this._detailModels.get(modelName);
+            objects.push(...this._buildInstancedModelParts(model, instances, { promote: false, isRoad: false, receiveShadow: true }));
         }
         return objects;
     }
