@@ -3313,7 +3313,9 @@ export class Renderer3D {
             const role = this._classifyBuildingPart(baseMat, child);
             const geo = child.geometry.clone();
             geo.applyMatrix4(child.matrixWorld);
-            if (role === 'facade') this._regenerateBoxUVs(geo, instances[0].facadeTile, Renderer3D.FACADE_ATLAS_GRID, 3);
+            // Low tiling frequency so bricks/windows are coarse enough to
+            // resolve at city camera distances (fine patterns wash to flat).
+            if (role === 'facade') this._regenerateBoxUVs(geo, instances[0].facadeTile, Renderer3D.FACADE_ATLAS_GRID, 1.25);
             const mat = this._makeBuildingRoleMaterial(baseMat, role, isGlass);
             const im = new THREE.InstancedMesh(geo, mat, instances.length);
             im.castShadow = true;
