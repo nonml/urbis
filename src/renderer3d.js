@@ -2948,7 +2948,6 @@ export class Renderer3D {
                 const terrainY = this._smoothTerrainY(b.x, b.y);
                 const rotY = ((b.rotation ?? ((b.id || 0) % 4)) % 4) * (Math.PI / 2);
                 const bldColor = new THREE.Color(buildingPaletteColor(b.type, b.id));
-                const roofColor = bldColor.clone().multiplyScalar(0.62);
                 const isGlassType = Renderer3D.SKYSCRAPER_TYPES.has(b.type);
 
                 dummy.position.set(wx, terrainY, wz);
@@ -2976,7 +2975,7 @@ export class Renderer3D {
                 if (!buildingInstances.has(model)) buildingInstances.set(model, []);
                 buildingInstances.get(model).push({
                     matrix: dummy.matrix.clone(),
-                    bldColor, roofColor, isGlassType,
+                    bldColor, isGlassType,
                     facadeTile: Renderer3D.FACADE_TILE[b.type] ?? 2,
                 });
 
@@ -3314,7 +3313,7 @@ export class Renderer3D {
             const role = this._classifyBuildingPart(baseMat, child);
             const geo = child.geometry.clone();
             geo.applyMatrix4(child.matrixWorld);
-            if (role === 'facade') this._regenerateBoxUVs(geo, instances[0].facadeTile, Renderer3D.FACADE_ATLAS_GRID, 2.5);
+            if (role === 'facade') this._regenerateBoxUVs(geo, instances[0].facadeTile, Renderer3D.FACADE_ATLAS_GRID, 3);
             const mat = this._makeBuildingRoleMaterial(baseMat, role, isGlass);
             const im = new THREE.InstancedMesh(geo, mat, instances.length);
             im.castShadow = true;
@@ -3323,7 +3322,7 @@ export class Renderer3D {
                 const t = instances[i];
                 im.setMatrixAt(i, t.matrix);
                 if (role === 'facade') color.copy(t.bldColor);
-                else if (role === 'roof') color.copy(t.roofColor);
+                else if (role === 'roof') color.copy(Renderer3D.ROOF_COLOR);
                 else continue; // keep/window use a fixed material colour
                 im.setColorAt(i, color);
             }
@@ -3607,8 +3606,8 @@ export class Renderer3D {
 
         // Tile → pattern (index stable so the atlas is deterministic).
         switch (idx) {
-            case 0: brick(204, '#d9cbb4'); break;        // red brick
-            case 1: brick(216, '#e2d8c4'); break;        // tan brick
+            case 0: brick(206, '#b5a287'); break;        // red brick
+            case 1: brick(216, '#c4b394'); break;        // tan brick
             case 2: concrete(220, true); break;          // gray concrete
             case 3: concrete(238, false); break;         // white concrete
             case 4: glass(64, true); break;              // blue glass
@@ -3618,7 +3617,7 @@ export class Renderer3D {
             case 8: corrugated(204); break;               // warehouse corrugated
             case 9: corrugated(168); break;               // ribbed panel
             case 10: stucco(226, 198, 160); break;        // warm stucco
-            case 11: brick(212, '#cdb895'); break;        // terracotta
+            case 11: brick(214, '#a89270'); break;        // terracotta
             case 12: office(); break;                      // office window grid
             case 13: metal(); break;                       // metal clad
             case 14: stone(228); break;                    // limestone
@@ -4679,6 +4678,10 @@ export class Renderer3D {
         0x00bcd4, 0xff5722, 0x607d8b, 0x795548, 0x3f51b5,
         0xcddc39, 0xf44336, 0x009688, 0xffc107, 0x673ab7,
     ];
+
+    /** Neutral slate for roofs — kept out of the per-building palette tint so
+     * walls and roofs separate instead of being the same muddy colour. */
+    static ROOF_COLOR = 0x4a4e55;
 
     /** Car-paint palette for vehicles without an explicit colour. */
     static CAR_COLORS = [
