@@ -30,7 +30,6 @@ const CI_MODE = process.argv.includes('--ci');
 // BatchedMesh conversion pass (q11-in-instancedmesh-pass). Exempted so CI
 // fails only on NEW uninstanced duplicates; each entry is a reason to fix.
 const CI_EXEMPTIONS = {
-    'src/render/lod_system.js:98': 'LOD1 building proxy boxes — convert to InstancedMesh',
     'src/renderer3d.js:2939': 'building model clone — candidate for building InstancedMesh',
     'src/renderer3d.js:3048': 'building window-glow quads (4 faces × buildings) — candidate for InstancedMesh',
     'src/renderer3d.js:3668': 'building detail-prop clone (awning/fence/parasol) — candidate for InstancedMesh',

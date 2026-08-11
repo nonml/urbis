@@ -85,21 +85,32 @@ export function createChunkImposter(center, color = 0x886644, size = 8) {
  * @returns {THREE.Group}
  */
 export function buildChunkLOD1Proxies(bounds, buildings, mapHalfW, mapHalfH, elevFn) {
-    const group = new THREE.Group();
     const HEIGHTS = { house: 0.22, farm: 0.14, market: 0.32, 'town-hall': 0.55,
         warehouse: 0.30, barracks: 0.35, school: 0.30, 'bus-depot': 0.70,
         'metro-station': 0.90, skyscraper: 1.6, factory: 0.4, 'lumber-mill': 0.28 };
 
-    for (const b of buildings) {
-        if (b.x < bounds.minX || b.x > bounds.maxX || b.y < bounds.minY || b.y > bounds.maxY) continue;
+    const inBounds = buildings.filter(
+        (b) => b.x >= bounds.minX && b.x <= bounds.maxX && b.y >= bounds.minY && b.y <= bounds.maxY
+    );
+    if (inBounds.length === 0) return new THREE.Group();
+
+    // One InstancedMesh per chunk: unit-height box scaled per building type
+    // (Q11.D). A 1×h×1 instance scale reproduces each per-type proxy height.
+    const geo = new THREE.BoxGeometry(0.7, 1, 0.7);
+    const mat = new THREE.MeshBasicMaterial({ color: 0x888888 });
+    const im = new THREE.InstancedMesh(geo, mat, inBounds.length);
+    const dummy = new THREE.Object3D();
+    for (let i = 0; i < inBounds.length; i++) {
+        const b = inBounds[i];
         const h = HEIGHTS[b.type] ?? 0.25;
-        const geo = new THREE.BoxGeometry(0.7, h, 0.7);
-        const mat = new THREE.MeshBasicMaterial({ color: 0x888888 });
-        const mesh = new THREE.Mesh(geo, mat);
         const wx = b.x - mapHalfW + 0.5;
         const wz = b.y - mapHalfH + 0.5;
-        mesh.position.set(wx, (elevFn ? elevFn(wx, wz) : 0) + h * 0.5, wz);
-        group.add(mesh);
+        dummy.position.set(wx, (elevFn ? elevFn(wx, wz) : 0) + h * 0.5, wz);
+        dummy.scale.set(1, h, 1);
+        dummy.updateMatrix();
+        im.setMatrixAt(i, dummy.matrix);
     }
-    return group;
+    im.instanceMatrix.needsUpdate = true;
+    im.computeBoundingSphere();
+    return im;
 }
