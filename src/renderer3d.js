@@ -3242,10 +3242,8 @@ export class Renderer3D {
         const treeSmall = this._vegetationModels.get('tree-small');
         if (!treeLarge && !treeSmall) return objects;
 
-        // Collect forest/park/grass tile positions
-        const forestTiles = [];
-        const parkTiles = [];
-        const grassTiles = [];
+        // Collect tile positions by terrain type
+        const forestTiles = [], parkTiles = [], grassTiles = [];
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const terrain = this.game.map.getTileAt(x, y);
@@ -3255,140 +3253,82 @@ export class Renderer3D {
             }
         }
 
-        // Simple deterministic hash for seeded pseudo-random per tile
+        // Deterministic hash per tile
         const hash = (x, y, salt) => {
             let h = (x * 374761393 + y * 668265263 + salt * 2147483647) | 0;
             h = ((h ^ (h >> 13)) * 1274126177) | 0;
             return ((h ^ (h >> 16)) >>> 0) / 4294967296;
         };
 
-        // Place trees on forest tiles (1-3 per tile)
+        // Collect tree instances (variant + transform + foliage tint). Trees are
+        // instanced (Q11.D) instead of cloned: a handful of InstancedMesh per
+        // chunk replaces hundreds of per-tree clones, with identical placement.
+        const treeInstances = [];
+        const FOLIAGE = {
+            forest: [0x2d8a2d, 0x1e7a1e, 0x3a9a3a, 0x2e7d32, 0x388e3c],
+            park: [0x4caf50],
+            grass: [0x4e9a3a, 0x3f8a30, 0x57a544, 0x6aae4e],
+        };
+
+        // Forest tiles (1-3 trees per tile)
         for (const tile of forestTiles) {
             const wx = tile.x - this._mapHalfW + 0.5;
             const wz = tile.y - this._mapHalfH + 0.5;
-            const treeCount = 1 + Math.floor(hash(tile.x, tile.y, 0) * 3); // 1-3 trees
+            const treeCount = 1 + Math.floor(hash(tile.x, tile.y, 0) * 3);
 
             for (let t = 0; t < treeCount; t++) {
                 const model = hash(tile.x, tile.y, t + 10) > 0.4 ? treeLarge : treeSmall;
                 if (!model) continue;
-                const clone = model.clone(true);
-                const offsetX = (hash(tile.x, tile.y, t + 20) - 0.5) * 0.6;
-                const offsetZ = (hash(tile.x, tile.y, t + 30) - 0.5) * 0.6;
-                const rotY = hash(tile.x, tile.y, t + 40) * Math.PI * 2;
-                const scale = 0.7 + hash(tile.x, tile.y, t + 50) * 0.8; // 0.7-1.5x
-                const treeY = this._smoothTerrainY(tile.x, tile.y);
-                clone.position.set(wx + offsetX, treeY, wz + offsetZ);
-                clone.rotation.y = rotY;
-                clone.scale.multiplyScalar(scale);
-                // Color the tree: foliage green, trunk brown
-                const foliageColors = [0x2d8a2d, 0x1e7a1e, 0x3a9a3a, 0x2e7d32, 0x388e3c];
-                const trunkColor = 0x6d4c3a;
-                const foliageHex = foliageColors[(tile.x * 7 + tile.y * 13 + t * 3) % foliageColors.length];
-                clone.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        if (child.material) {
-                            const applyTreeColor = (m) => {
-                                if (!m.color) return m;
-                                const nm = m.clone();
-                                const box = new THREE.Box3().setFromObject(child);
-                                const size = box.getSize(new THREE.Vector3());
-                                // Trunk: narrow cylinder, Foliage: wider cone/sphere
-                                if (size.x < 0.25 && size.z < 0.25) {
-                                    nm.color.setHex(trunkColor); // trunk
-                                } else {
-                                    nm.color.setHex(foliageHex); // foliage
-                                    nm.userData.isTreeFoliage = true;
-                                }
-                                nm.roughness = 0.9;
-                                nm.metalness = 0.0;
-                                this._applyTreeWindShader(nm);
-                                return nm;
-                            };
-                            if (Array.isArray(child.material)) {
-                                child.material = child.material.map(applyTreeColor);
-                            } else {
-                                child.material = applyTreeColor(child.material);
-                            }
-                        }
-                    }
+                treeInstances.push({
+                    model,
+                    x: wx + (hash(tile.x, tile.y, t + 20) - 0.5) * 0.6,
+                    z: wz + (hash(tile.x, tile.y, t + 30) - 0.5) * 0.6,
+                    y: this._smoothTerrainY(tile.x, tile.y),
+                    rotY: hash(tile.x, tile.y, t + 40) * Math.PI * 2,
+                    scale: 0.7 + hash(tile.x, tile.y, t + 50) * 0.8,
+                    foliageHex: FOLIAGE.forest[(tile.x * 7 + tile.y * 13 + t * 3) % FOLIAGE.forest.length],
                 });
-                objects.push(clone);
             }
         }
 
-        // Place trees on park tiles (0-1 per tile + some open space)
+        // Park tiles (0-1 per tile, ~40% get one)
         for (const tile of parkTiles) {
-            if (hash(tile.x, tile.y, 100) > 0.6) continue; // 60% of park tiles get a tree
-            const wx = tile.x - this._mapHalfW + 0.5;
-            const wz = tile.y - this._mapHalfH + 0.5;
+            if (hash(tile.x, tile.y, 100) > 0.6) continue;
             const model = hash(tile.x, tile.y, 110) > 0.5 ? treeLarge : treeSmall;
             if (!model) continue;
-            const clone = model.clone(true);
-            const offsetX = (hash(tile.x, tile.y, 120) - 0.5) * 0.4;
-            const offsetZ = (hash(tile.x, tile.y, 130) - 0.5) * 0.4;
-            const parkY = this._smoothTerrainY(tile.x, tile.y);
-            clone.position.set(wx + offsetX, parkY, wz + offsetZ);
-            clone.rotation.y = hash(tile.x, tile.y, 140) * Math.PI * 2;
-            clone.traverse((child) => {
-                if (child.isMesh) {
-                    child.castShadow = true;
-                    child.receiveShadow = true;
-                    if (child.material) {
-                        const applyParkTreeColor = (m) => {
-                            if (!m.color) return m;
-                            const nm = m.clone();
-                            const box = new THREE.Box3().setFromObject(child);
-                            const size = box.getSize(new THREE.Vector3());
-                            nm.color.setHex(size.x < 0.25 && size.z < 0.25 ? 0x6d4c3a : 0x4caf50);
-                            nm.roughness = 0.9; nm.metalness = 0.0;
-                            this._applyTreeWindShader(nm);
-                            return nm;
-                        };
-                        if (Array.isArray(child.material)) {
-                            child.material = child.material.map(applyParkTreeColor);
-                        } else {
-                            child.material = applyParkTreeColor(child.material);
-                        }
-                    }
-                }
+            treeInstances.push({
+                model,
+                x: tile.x - this._mapHalfW + 0.5 + (hash(tile.x, tile.y, 120) - 0.5) * 0.4,
+                z: tile.y - this._mapHalfH + 0.5 + (hash(tile.x, tile.y, 130) - 0.5) * 0.4,
+                y: this._smoothTerrainY(tile.x, tile.y),
+                rotY: hash(tile.x, tile.y, 140) * Math.PI * 2,
+                scale: 1,
+                foliageHex: FOLIAGE.park[0],
             });
-            objects.push(clone);
         }
 
-        // Sparse trees dotting the open grassland — brings the rolling hills to
-        // life without the density (or draw cost) of a full forest.
-        const grassFoliage = [0x4e9a3a, 0x3f8a30, 0x57a544, 0x6aae4e];
+        // Sparse trees dotting the open grassland — ~5% of grass tiles
         for (const tile of grassTiles) {
-            if (hash(tile.x, tile.y, 200) > 0.05) continue; // ~5% of grass tiles
+            if (hash(tile.x, tile.y, 200) > 0.05) continue;
             const model = hash(tile.x, tile.y, 210) > 0.45 ? treeLarge : treeSmall;
             if (!model) continue;
-            const wx = tile.x - this._mapHalfW + 0.5;
-            const wz = tile.y - this._mapHalfH + 0.5;
-            const clone = model.clone(true);
-            const ox = (hash(tile.x, tile.y, 220) - 0.5) * 0.5;
-            const oz = (hash(tile.x, tile.y, 230) - 0.5) * 0.5;
-            clone.position.set(wx + ox, this._smoothTerrainY(tile.x, tile.y), wz + oz);
-            clone.rotation.y = hash(tile.x, tile.y, 240) * Math.PI * 2;
-            clone.scale.multiplyScalar(0.8 + hash(tile.x, tile.y, 250) * 0.7);
-            const foliageHex = grassFoliage[(tile.x * 5 + tile.y * 11) % grassFoliage.length];
-            clone.traverse((child) => {
-                if (!child.isMesh) return;
-                child.castShadow = true; child.receiveShadow = true;
-                if (!child.material) return;
-                const tint = (m) => {
-                    if (!m.color) return m;
-                    const nm = m.clone();
-                    const sz = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
-                    nm.color.setHex(sz.x < 0.25 && sz.z < 0.25 ? 0x6d4c3a : foliageHex);
-                    nm.roughness = 0.9; nm.metalness = 0.0;
-                    this._applyTreeWindShader(nm);
-                    return nm;
-                };
-                child.material = Array.isArray(child.material) ? child.material.map(tint) : tint(child.material);
+            treeInstances.push({
+                model,
+                x: tile.x - this._mapHalfW + 0.5 + (hash(tile.x, tile.y, 220) - 0.5) * 0.5,
+                z: tile.y - this._mapHalfH + 0.5 + (hash(tile.x, tile.y, 230) - 0.5) * 0.5,
+                y: this._smoothTerrainY(tile.x, tile.y),
+                rotY: hash(tile.x, tile.y, 240) * Math.PI * 2,
+                scale: 0.8 + hash(tile.x, tile.y, 250) * 0.7,
+                foliageHex: FOLIAGE.grass[(tile.x * 5 + tile.y * 11) % FOLIAGE.grass.length],
             });
-            objects.push(clone);
+        }
+
+        // Instance per variant so a chunk renders all its trees in ~2 draws.
+        for (const model of [treeLarge, treeSmall]) {
+            if (!model) continue;
+            const instances = treeInstances.filter((t) => t.model === model);
+            if (instances.length === 0) continue;
+            objects.push(...this._buildInstancedTrees(model, instances));
         }
 
         // Instanced grass billboards — 1 draw per chunk
@@ -3412,6 +3352,54 @@ export class Renderer3D {
         }
 
         return objects;
+    }
+
+    _buildInstancedTrees(model, instances) {
+        // Flatten the tree model into per-mesh InstancedMesh so a chunk draws
+        // all its trees of this variant in a handful of draw calls. Each part's
+        // local transform is baked into its geometry; per-tree placement lands
+        // in the instance matrix and the foliage tint in instanceColor.
+        model.updateWorldMatrix(true, false);
+        const dummy = new THREE.Object3D();
+        const meshes = [];
+
+        model.traverse((child) => {
+            if (!child.isMesh || !child.geometry) return;
+            const size = new THREE.Box3().setFromObject(child).getSize(new THREE.Vector3());
+            const isFoliage = !(size.x < 0.25 && size.z < 0.25);
+            const baseMat = Array.isArray(child.material) ? child.material[0] : child.material;
+            if (!baseMat || !baseMat.color) return;
+
+            const geo = child.geometry.clone();
+            geo.applyMatrix4(child.matrixWorld);
+            const mat = baseMat.clone();
+            mat.color.setHex(0xffffff); // tint via instanceColor so textures keep detail
+            mat.roughness = 0.9;
+            mat.metalness = 0.0;
+            if (isFoliage) mat.userData.isTreeFoliage = true;
+
+            const im = new THREE.InstancedMesh(geo, mat, instances.length);
+            im.castShadow = true;
+            im.receiveShadow = true;
+            const color = new THREE.Color();
+            for (let i = 0; i < instances.length; i++) {
+                const t = instances[i];
+                dummy.position.set(t.x, t.y, t.z);
+                dummy.rotation.y = t.rotY;
+                dummy.scale.setScalar(t.scale);
+                dummy.updateMatrix();
+                im.setMatrixAt(i, dummy.matrix);
+                color.setHex(isFoliage ? t.foliageHex : 0x6d4c3a);
+                im.setColorAt(i, color);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            if (im.instanceColor) im.instanceColor.needsUpdate = true;
+            im.computeBoundingSphere();
+            this._applyTreeWindShader(mat);
+            meshes.push(im);
+        });
+
+        return meshes;
     }
 
     _buildGrassBillboards(blades, hash) {

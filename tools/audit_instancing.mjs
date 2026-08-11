@@ -39,16 +39,13 @@ const CI_EXEMPTIONS = {
     'src/renderer3d.js:2131': 'street-light glow fallback — candidate for InstancedMesh',
     'src/renderer3d.js:2859': 'building model clone — candidate for building InstancedMesh',
     'src/renderer3d.js:2968': 'building window-glow quads (4 faces × buildings) — candidate for InstancedMesh',
-    'src/renderer3d.js:3272': 'forest tree clone — candidate for vegetation InstancedMesh',
-    'src/renderer3d.js:3326': 'park tree clone — candidate for vegetation InstancedMesh',
-    'src/renderer3d.js:3367': 'grass tree clone — candidate for vegetation InstancedMesh',
-    'src/renderer3d.js:3598': 'building detail-prop clone (awning/fence/parasol) — candidate for InstancedMesh',
-    'src/renderer3d.js:4148': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
-    'src/renderer3d.js:4538': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4545': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4612': 'police unit body — candidate for InstancedMesh',
-    'src/renderer3d.js:4613': 'police unit light — candidate for InstancedMesh',
-    'src/renderer3d.js:4617': 'police unit group — candidate for InstancedMesh',
+    'src/renderer3d.js:3588': 'building detail-prop clone (awning/fence/parasol) — candidate for InstancedMesh',
+    'src/renderer3d.js:4138': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
+    'src/renderer3d.js:4528': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4535': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4602': 'police unit body — candidate for InstancedMesh',
+    'src/renderer3d.js:4603': 'police unit light — candidate for InstancedMesh',
+    'src/renderer3d.js:4607': 'police unit group — candidate for InstancedMesh',
 };
 
 // Non-instanced constructors that signal one drawable per loop iteration.

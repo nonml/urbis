@@ -19,10 +19,23 @@ export function cullChunkChildren(group, frustum) {
 
         const geom = child.geometry;
         if (!geom) continue;
-        if (!geom.boundingSphere) geom.computeBoundingSphere();
-        if (!geom.boundingSphere) continue;
 
-        _sphere.copy(geom.boundingSphere).applyMatrix4(child.matrixWorld);
+        // An InstancedMesh's bounding sphere is computed over all instances
+        // (computeBoundingSphere), whereas a plain Mesh uses its geometry's
+        // local sphere. Use the instance-space sphere when present so instanced
+        // children aren't culled against a tiny origin-centred sphere.
+        let sphere = child.isInstancedMesh ? child.boundingSphere : null;
+        if (!sphere && child.isInstancedMesh) {
+            child.computeBoundingSphere();
+            sphere = child.boundingSphere;
+        }
+        if (!sphere) {
+            if (!geom.boundingSphere) geom.computeBoundingSphere();
+            sphere = geom.boundingSphere;
+        }
+        if (!sphere) continue;
+
+        _sphere.copy(sphere).applyMatrix4(child.matrixWorld);
         if (!frustum.intersectsSphere(_sphere)) child.visible = false;
     }
 }
