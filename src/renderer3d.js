@@ -3222,20 +3222,24 @@ export class Renderer3D {
         const noise = (x, y, amp) => (h2(Math.floor(x), Math.floor(y)) - 0.5) * amp;
 
         if (idx === 0) {
-            // Car paint: subtle metallic noise + horizontal sheen streak.
-            fill(0, 0, s, s, '#9aa0a8');
+            // Car paint: light metallic base (tinted per vehicle) with panel
+            // seams and a sheen so bodies don't read as flat plastic.
+            fill(0, 0, s, s, '#c8cdd4');
             for (let y = 0; y < s; y += 3) {
                 for (let x = 0; x < s; x += 3) {
-                    const n = noise(x, y, 10);
-                    fill(x, y, 3, 3, `rgba(${160 + n | 0},${166 + n | 0},${176 + n | 0},0.6)`);
+                    const n = noise(x, y, 12);
+                    fill(x, y, 3, 3, `rgba(${200 + n | 0},${206 + n | 0},${214 + n | 0},0.6)`);
                 }
             }
-            const g = ctx.createLinearGradient(0, s * 0.25, 0, s * 0.55);
-            g.addColorStop(0, 'rgba(255,255,255,0.16)');
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
+            for (const px of [s * 0.2, s * 0.6]) ctx.fillRect(px, 0, 2, s);
+            ctx.fillRect(s * 0.4 - 2, 0, 2, s);
+            ctx.fillRect(s * 0.4, s * 0.5, s * 0.2, 2);
+            const g = ctx.createLinearGradient(0, s * 0.18, 0, s * 0.5);
+            g.addColorStop(0, 'rgba(255,255,255,0.28)');
             g.addColorStop(1, 'rgba(255,255,255,0)');
-            fill(0, 0, s, s, 'rgba(0,0,0,0)');
             ctx.fillStyle = g;
-            ctx.fillRect(0, s * 0.2, s, s * 0.4);
+            ctx.fillRect(0, s * 0.12, s, s * 0.45);
         } else if (idx === 1) {
             // Tire: near-black rubber with vertical ribs.
             fill(0, 0, s, s, '#1a1a1c');
@@ -3443,17 +3447,20 @@ export class Renderer3D {
             ctx.fillStyle = color;
             ctx.fillRect(x, y, w, h);
         };
+        // Tiles are light-based (near-white base with dark architectural detail)
+        // so the per-building palette instanceColor tint reads as a colour wash
+        // that keeps windows/mortar/seams, instead of muddying a mid-grey tile.
         // eslint-disable-next-line no-unused-vars
         const brick = (base, mortar) => {
-            const rows = 8, cols = 6, mh = 6;
+            const rows = 8, cols = 6, mh = 5;
             fillRect(0, 0, s, s, mortar);
             for (let r = 0; r < rows; r++) {
                 const off = (r % 2) * (s / cols / 2);
                 const y = r * (s / rows);
                 for (let c = 0; c <= cols; c++) {
                     const x = c * (s / cols) - off;
-                    const shade = (h2(r * 7 + c * 13, 3) - 0.5) * 26;
-                    fillRect(x, y + mh / 2, s / cols + 1, s / rows - mh, `rgb(${base + shade | 0},${base * 0.5 + shade | 0},${base * 0.36 + shade | 0})`);
+                    const shade = (h2(r * 7 + c * 13, 3) - 0.5) * 30;
+                    fillRect(x, y + mh / 2, s / cols + 1, s / rows - mh, `rgb(${base + shade | 0},${base * 0.62 + shade | 0},${base * 0.5 + shade | 0})`);
                 }
             }
         };
@@ -3462,14 +3469,14 @@ export class Renderer3D {
             fillRect(0, 0, s, s, `rgb(${base},${base},${base})`);
             for (let y = 0; y < s; y += 4) {
                 for (let x = 0; x < s; x += 4) {
-                    const n = noise(x, y, 14);
+                    const n = noise(x, y, 16);
                     ctx.fillStyle = `rgba(${base + n | 0},${base + n | 0},${base + n | 0},0.5)`;
                     ctx.fillRect(x, y, 4, 4);
                 }
             }
             if (seams) {
-                ctx.strokeStyle = `rgba(0,0,0,0.18)`;
-                ctx.lineWidth = 2;
+                ctx.strokeStyle = 'rgba(0,0,0,0.22)';
+                ctx.lineWidth = 3;
                 const step = s / 4;
                 for (let i = 0; i <= 4; i++) {
                     ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, s); ctx.stroke();
@@ -3479,22 +3486,22 @@ export class Renderer3D {
         };
         // eslint-disable-next-line no-unused-vars
         const glass = (base, gridLines) => {
-            fillRect(0, 0, s, s, `rgb(${base},${base + 8},${base + 16})`);
-            const step = s / 6;
-            for (let r = 0; r < 6; r++) {
-                for (let c = 0; c < 6; c++) {
+            fillRect(0, 0, s, s, `rgb(${base},${base + 10},${base + 20})`);
+            const step = s / 8;
+            for (let r = 0; r < 8; r++) {
+                for (let c = 0; c < 8; c++) {
                     const g = ctx.createLinearGradient(0, r * step, 0, r * step + step);
-                    const shade = (h2(r * 5 + c, 7) - 0.5) * 20;
-                    g.addColorStop(0, `rgb(${base + 24 + shade | 0},${base + 30 + shade | 0},${base + 42 + shade | 0})`);
-                    g.addColorStop(1, `rgb(${base - 6 + shade | 0},${base + 2 + shade | 0},${base + 12 + shade | 0})`);
+                    const shade = (h2(r * 5 + c, 7) - 0.5) * 28;
+                    g.addColorStop(0, `rgb(${base + 32 + shade | 0},${base + 42 + shade | 0},${base + 56 + shade | 0})`);
+                    g.addColorStop(1, `rgb(${base - 4 + shade | 0},${base + 6 + shade | 0},${base + 18 + shade | 0})`);
                     ctx.fillStyle = g;
                     ctx.fillRect(c * step + 2, r * step + 2, step - 4, step - 4);
                 }
             }
             if (gridLines) {
-                ctx.strokeStyle = 'rgba(10,15,25,0.7)';
+                ctx.strokeStyle = 'rgba(12,18,30,0.85)';
                 ctx.lineWidth = 3;
-                for (let i = 0; i <= 6; i++) {
+                for (let i = 0; i <= 8; i++) {
                     ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, s); ctx.stroke();
                     ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(s, i * step); ctx.stroke();
                 }
@@ -3502,20 +3509,19 @@ export class Renderer3D {
         };
         // eslint-disable-next-line no-unused-vars
         const wood = () => {
-            fillRect(0, 0, s, s, '#7a5230');
+            fillRect(0, 0, s, s, '#c9a878');
             const planks = 10, ph = s / planks;
             for (let p = 0; p < planks; p++) {
-                const shade = (h2(p, 11) - 0.5) * 30;
-                const base = 122 + shade | 0;
-                fillRect(0, p * ph, s, ph, `rgb(${base},${base * 0.66 | 0},${base * 0.39 | 0})`);
-                // grain streaks
+                const shade = (h2(p, 11) - 0.5) * 28;
+                const base = 208 + shade | 0;
+                fillRect(0, p * ph, s, ph, `rgb(${base},${base * 0.78 | 0},${base * 0.52 | 0})`);
                 for (let g = 0; g < 8; g++) {
                     const gy = p * ph + h2(p * 3 + g, 12) * ph;
-                    ctx.fillStyle = `rgba(40,22,8,${0.08 + h2(p + g, 13) * 0.12})`;
+                    ctx.fillStyle = `rgba(60,34,12,${0.08 + h2(p + g, 13) * 0.12})`;
                     ctx.fillRect(0, gy, s, 1 + h2(p * 5 + g, 14) * 2);
                 }
             }
-            ctx.strokeStyle = 'rgba(30,16,6,0.7)';
+            ctx.strokeStyle = 'rgba(45,26,10,0.7)';
             ctx.lineWidth = 2;
             for (let p = 1; p < planks; p++) {
                 ctx.beginPath(); ctx.moveTo(0, p * ph); ctx.lineTo(s, p * ph); ctx.stroke();
@@ -3529,11 +3535,11 @@ export class Renderer3D {
                 const off = (r % 2) * (s / cols / 2);
                 for (let c = 0; c <= cols; c++) {
                     const x = c * (s / cols) - off;
-                    const shade = (h2(r * 11 + c * 17, 5) - 0.5) * 24;
+                    const shade = (h2(r * 11 + c * 17, 5) - 0.5) * 26;
                     fillRect(x + mw / 2, r * (s / rows) + mh / 2, s / cols - mw, s / rows - mh, `rgb(${base + shade | 0},${base + shade | 0},${base + shade | 0})`);
                 }
             }
-            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.strokeStyle = 'rgba(0,0,0,0.3)';
             ctx.lineWidth = 3;
             for (let r = 0; r <= rows; r++) {
                 ctx.beginPath(); ctx.moveTo(0, r * (s / rows)); ctx.lineTo(s, r * (s / rows)); ctx.stroke();
@@ -3547,10 +3553,10 @@ export class Renderer3D {
             fillRect(0, 0, s, s, `rgb(${base},${base},${base})`);
             const ribs = 16, rw = s / ribs;
             for (let i = 0; i < ribs; i++) {
-                const shade = Math.sin(i * 0.9) * 22;
+                const shade = Math.sin(i * 0.9) * 26;
                 fillRect(i * rw, 0, rw + 1, s, `rgb(${base + shade | 0},${base + shade | 0},${base + shade | 0})`);
             }
-            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillStyle = 'rgba(0,0,0,0.18)';
             ctx.fillRect(0, 0, s, 2);
         };
         // eslint-disable-next-line no-unused-vars
@@ -3566,55 +3572,58 @@ export class Renderer3D {
         };
         // eslint-disable-next-line no-unused-vars
         const office = () => {
-            fillRect(0, 0, s, s, '#1a2233');
-            const rows = 10, cols = 6, step = s / cols, ph = s / rows;
+            // Light tintable facade between a fine dark window grid.
+            fillRect(0, 0, s, s, '#e6e6e6');
+            const rows = 14, cols = 9, cw = s / cols, rh = s / rows;
+            ctx.fillStyle = 'rgba(28,34,46,0.88)';
+            for (let r = 0; r <= rows; r++) ctx.fillRect(0, r * rh - 1, s, 2);
+            for (let c = 0; c <= cols; c++) ctx.fillRect(c * cw - 1, 0, 2, s);
             for (let r = 0; r < rows; r++) {
                 for (let c = 0; c < cols; c++) {
                     const seed = h2(r * 13 + c * 7, 9);
-                    if (seed > 0.25) {
-                        const warm = seed > 0.6;
+                    if (seed > 0.22) {
+                        const warm = seed > 0.65;
                         const glow = warm
-                            ? `rgb(${200 + seed * 40 | 0},${180 + seed * 30 | 0},${110 + seed * 20 | 0})`
-                            : `rgb(${120 + seed * 30 | 0},${160 + seed * 20 | 0},${200 + seed * 20 | 0})`;
-                        fillRect(c * step + 3, r * ph + 2, step - 6, ph - 4, glow);
+                            ? `rgb(${232 + seed * 18 | 0},${206 + seed * 12 | 0},${140 + seed * 8 | 0})`
+                            : `rgb(${148 + seed * 28 | 0},${184 + seed * 16 | 0},${222 + seed * 12 | 0})`;
+                        fillRect(c * cw + 2, r * rh + 2, cw - 4, rh - 4, glow);
+                    } else {
+                        fillRect(c * cw + 2, r * rh + 2, cw - 4, rh - 4, 'rgba(40,50,66,0.85)');
                     }
                 }
             }
-            ctx.fillStyle = 'rgba(8,12,20,0.9)';
-            for (let r = 0; r <= rows; r++) ctx.fillRect(0, r * ph - 1, s, 3);
-            for (let c = 0; c <= cols; c++) ctx.fillRect(c * step - 1, 0, 3, s);
         };
         // eslint-disable-next-line no-unused-vars
         const metal = () => {
-            fillRect(0, 0, s, s, '#3a3f46');
+            fillRect(0, 0, s, s, '#aeb4bc');
             const bands = 12, bh = s / bands;
             for (let b = 0; b < bands; b++) {
-                const shade = (h2(b, 15) - 0.5) * 20;
-                fillRect(0, b * bh, s, bh, `rgb(${58 + shade | 0},${63 + shade | 0},${70 + shade | 0})`);
+                const shade = (h2(b, 15) - 0.5) * 18;
+                fillRect(0, b * bh, s, bh, `rgb(${178 + shade | 0},${184 + shade | 0},${192 + shade | 0})`);
             }
-            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            ctx.fillStyle = 'rgba(0,0,0,0.28)';
             for (let b = 1; b < bands; b++) ctx.fillRect(0, b * bh, s, 2);
         };
 
         // Tile → pattern (index stable so the atlas is deterministic).
         switch (idx) {
-            case 0: brick(160, '#4a2a1c'); break;        // red brick
-            case 1: brick(186, '#c9b69a'); break;        // tan brick
-            case 2: concrete(150, true); break;          // gray concrete
-            case 3: concrete(196, false); break;         // white concrete
-            case 4: glass(52, true); break;              // blue glass
-            case 5: glass(28, true); break;              // dark glass
+            case 0: brick(204, '#d9cbb4'); break;        // red brick
+            case 1: brick(216, '#e2d8c4'); break;        // tan brick
+            case 2: concrete(220, true); break;          // gray concrete
+            case 3: concrete(238, false); break;         // white concrete
+            case 4: glass(64, true); break;              // blue glass
+            case 5: glass(42, true); break;              // dark glass
             case 6: wood(); break;                        // house wood
-            case 7: stone(140); break;                    // ashlar stone
-            case 8: corrugated(128); break;               // warehouse corrugated
-            case 9: corrugated(96); break;                // ribbed panel (dark)
-            case 10: stucco(196, 166, 126); break;        // warm stucco
-            case 11: brick(178, '#6b4a2a'); break;        // terracotta
+            case 7: stone(216); break;                    // ashlar stone
+            case 8: corrugated(204); break;               // warehouse corrugated
+            case 9: corrugated(168); break;               // ribbed panel
+            case 10: stucco(226, 198, 160); break;        // warm stucco
+            case 11: brick(212, '#cdb895'); break;        // terracotta
             case 12: office(); break;                      // office window grid
             case 13: metal(); break;                       // metal clad
-            case 14: stone(172); break;                    // limestone
-            case 15: concrete(180, false); break;          // light panel
-            default: concrete(150, true); break;
+            case 14: stone(228); break;                    // limestone
+            case 15: concrete(234, false); break;          // light panel
+            default: concrete(220, true); break;
         }
     }
 
