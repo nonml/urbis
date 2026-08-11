@@ -1999,6 +1999,15 @@ export class Renderer3D {
             return ((h ^ (h >> 16)) >>> 0) / 4294967296;
         };
 
+        // Collect per-variant road tiles and street lights, then instance them
+        // (Q11.D): one InstancedMesh per road variant replaces per-tile clones.
+        const roadInstances = new Map();
+        const fallbackRoads = [];
+        const streetLights = [];
+        const lightGlows = [];
+        const fallbackPoles = [];
+        const fallbackGlows = [];
+
         for (const tile of tiles) {
             const wx = tile.x - this._mapHalfW + 0.5;
             const wz = tile.y - this._mapHalfH + 0.5;
@@ -2051,37 +2060,10 @@ export class Renderer3D {
 
             const model = this._roadModels.get(modelName);
             if (model) {
-                const clone = model.clone(true);
-                clone.position.set(wx, 0.09, wz);
-                clone.rotation.y = rotation;
-                clone.traverse((child) => {
-                    if (child.isMesh) {
-                        child.castShadow = true;
-                        child.receiveShadow = true;
-                        child.userData.isRoad = true;
-                        if (child.material?.isMeshStandardMaterial && !child.material.isMeshPhysicalMaterial) {
-                            // Promote to physical so wet weather can raise road clearcoat.
-                            // Copy at the *standard* level — MeshPhysicalMaterial.copy()
-                            // reads clearcoat vectors the source lacks and would crash.
-                            const phys = new THREE.MeshPhysicalMaterial();
-                            THREE.MeshStandardMaterial.prototype.copy.call(phys, child.material);
-                            phys.clearcoat = 0;
-                            phys.clearcoatRoughness = 0.4;
-                            child.material = phys;
-                        }
-                    }
-                });
-                objects.push(clone);
+                if (!roadInstances.has(modelName)) roadInstances.set(modelName, []);
+                roadInstances.get(modelName).push({ x: wx, y: 0.09, z: wz, rotY: rotation });
             } else {
-                // Fallback: flat gray box
-                const geom = new THREE.BoxGeometry(1, 0.18, 1);
-                const mat = new THREE.MeshPhysicalMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0, clearcoat: 0, clearcoatRoughness: 0.4 });
-                const mesh = new THREE.Mesh(geom, mat);
-                mesh.position.set(wx, 0.09, wz);
-                mesh.castShadow = true;
-                mesh.receiveShadow = true;
-                mesh.userData.isRoad = true;
-                objects.push(mesh);
+                fallbackRoads.push({ x: wx, z: wz });
             }
 
             // Street props: only in urban core (radius ≤ 14 from map center)
@@ -2091,46 +2073,19 @@ export class Renderer3D {
                 const lightModel = this._propModels.get('light-square');
                 const side = hash(tile.x, tile.y, 210) > 0.5 ? 1 : -1;
                 const terrainYL = this._smoothTerrainY(tile.x, tile.y);
+                const px = wx + side * 0.42;
+                const pz = wz;
                 if (lightModel) {
-                    const lightClone = lightModel.clone(true);
-                    const px = wx + side * 0.42;
-                    const pz = wz;
-                    lightClone.position.set(px, terrainYL, pz);
-                    // Orient arm toward road center
-                    lightClone.rotation.y = side > 0 ? -Math.PI / 2 : Math.PI / 2;
-                    lightClone.traverse((child) => {
-                        if (child.isMesh) { child.castShadow = true; }
+                    streetLights.push({
+                        x: px, y: terrainYL, z: pz,
+                        rotY: side > 0 ? -Math.PI / 2 : Math.PI / 2,
                     });
-                    objects.push(lightClone);
-                    // Glowing lamp-head sphere
-                    const bbox = new THREE.Box3();
-                    bbox.setFromObject(lightModel);
-                    const lampTopY = terrainYL + bbox.max.y * 0.60;
-                    const glowGeom = new THREE.SphereGeometry(0.042, 6, 4);
-                    const glowMat = new THREE.MeshStandardMaterial({
-                        color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
-                        roughness: 0.4, metalness: 0.0,
-                    });
-                    const glowSphere = new THREE.Mesh(glowGeom, glowMat);
-                    glowSphere.position.set(px, lampTopY, pz);
-                    objects.push(glowSphere);
+                    const headH = this._lightHeadTop ?? (this._lightHeadTop = new THREE.Box3().setFromObject(lightModel).max.y * 0.60);
+                    lightGlows.push({ x: px, y: terrainYL + headH, z: pz });
                 } else {
-                    // Fallback: pole + glow sphere
-                    const terrainYL2 = this._smoothTerrainY(tile.x, tile.y);
-                    const px = wx + side * 0.42;
-                    const pz = wz;
-                    const poleGeom = new THREE.CylinderGeometry(0.022, 0.022, 0.75, 5);
-                    const poleMat = new THREE.MeshStandardMaterial({ color: 0x303030, roughness: 0.7 });
-                    const pole = new THREE.Mesh(poleGeom, poleMat);
-                    pole.position.set(px, terrainYL2 + 0.375, pz);
-                    objects.push(pole);
-                    const glowGeom = new THREE.SphereGeometry(0.042, 6, 4);
-                    const glowMat = new THREE.MeshStandardMaterial({
-                        color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
-                    });
-                    const glowSphere = new THREE.Mesh(glowGeom, glowMat);
-                    glowSphere.position.set(px, terrainYL2 + 0.78, pz);
-                    objects.push(glowSphere);
+                    // Fallback: pole + glow sphere (only when the light model is missing)
+                    fallbackPoles.push({ x: px, y: terrainYL + 0.375, z: pz });
+                    fallbackGlows.push({ x: px, y: terrainYL + 0.78, z: pz });
                 }
             }
 
@@ -2150,7 +2105,132 @@ export class Renderer3D {
                 }
             }
         }
+
+        // Instance the collected road variants + street lights (Q11.D).
+        for (const [modelName, insts] of roadInstances) {
+            const model = this._roadModels.get(modelName);
+            objects.push(...this._buildInstancedRoadModel(model, insts));
+        }
+        if (fallbackRoads.length > 0) {
+            objects.push(this._buildInstancedRoadFallback(fallbackRoads));
+        }
+        if (streetLights.length > 0) {
+            const lightModel = this._propModels.get('light-square');
+            objects.push(...this._buildInstancedRoadModel(lightModel, streetLights, { promote: false, isRoad: false }));
+            objects.push(this._buildInstancedGlowSphere(lightGlows));
+        }
+        if (fallbackPoles.length > 0) {
+            objects.push(this._buildInstancedPole(fallbackPoles));
+            objects.push(this._buildInstancedGlowSphere(fallbackGlows));
+        }
+
         return objects;
+    }
+
+    _promoteRoadMaterial(mat) {
+        if (mat.isMeshStandardMaterial && !mat.isMeshPhysicalMaterial) {
+            // Promote to physical so wet weather can raise road clearcoat.
+            // Copy at the *standard* level — MeshPhysicalMaterial.copy()
+            // reads clearcoat vectors the source lacks and would crash.
+            const phys = new THREE.MeshPhysicalMaterial();
+            THREE.MeshStandardMaterial.prototype.copy.call(phys, mat);
+            phys.clearcoat = 0;
+            phys.clearcoatRoughness = 0.4;
+            return phys;
+        }
+        return mat.clone();
+    }
+
+    _buildInstancedRoadModel(model, instances, { promote = true, isRoad = true } = {}) {
+        model.updateWorldMatrix(true, false);
+        const dummy = new THREE.Object3D();
+        const meshes = [];
+
+        model.traverse((child) => {
+            if (!child.isMesh || !child.geometry) return;
+            const baseMat = Array.isArray(child.material) ? child.material[0] : child.material;
+            if (!baseMat) return;
+            const geo = child.geometry.clone();
+            geo.applyMatrix4(child.matrixWorld);
+            const mat = promote ? this._promoteRoadMaterial(baseMat) : baseMat.clone();
+            const im = new THREE.InstancedMesh(geo, mat, instances.length);
+            im.castShadow = true;
+            im.receiveShadow = isRoad;
+            if (isRoad) im.userData.isRoad = true;
+            for (let i = 0; i < instances.length; i++) {
+                const t = instances[i];
+                dummy.position.set(t.x, t.y, t.z);
+                dummy.rotation.y = t.rotY;
+                dummy.scale.setScalar(1);
+                dummy.updateMatrix();
+                im.setMatrixAt(i, dummy.matrix);
+            }
+            im.instanceMatrix.needsUpdate = true;
+            im.computeBoundingSphere();
+            meshes.push(im);
+        });
+
+        return meshes;
+    }
+
+    _buildInstancedRoadFallback(instances) {
+        const geo = new THREE.BoxGeometry(1, 0.18, 1);
+        const mat = new THREE.MeshPhysicalMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0, clearcoat: 0, clearcoatRoughness: 0.4 });
+        const im = new THREE.InstancedMesh(geo, mat, instances.length);
+        im.castShadow = true;
+        im.receiveShadow = true;
+        im.userData.isRoad = true;
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < instances.length; i++) {
+            const t = instances[i];
+            dummy.position.set(t.x, 0.09, t.z);
+            dummy.rotation.set(0, 0, 0);
+            dummy.scale.setScalar(1);
+            dummy.updateMatrix();
+            im.setMatrixAt(i, dummy.matrix);
+        }
+        im.instanceMatrix.needsUpdate = true;
+        im.computeBoundingSphere();
+        return im;
+    }
+
+    _buildInstancedGlowSphere(instances) {
+        const geo = new THREE.SphereGeometry(0.042, 6, 4);
+        const mat = new THREE.MeshStandardMaterial({
+            color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
+            roughness: 0.4, metalness: 0.0,
+        });
+        const im = new THREE.InstancedMesh(geo, mat, instances.length);
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < instances.length; i++) {
+            const t = instances[i];
+            dummy.position.set(t.x, t.y, t.z);
+            dummy.rotation.set(0, 0, 0);
+            dummy.scale.setScalar(1);
+            dummy.updateMatrix();
+            im.setMatrixAt(i, dummy.matrix);
+        }
+        im.instanceMatrix.needsUpdate = true;
+        im.computeBoundingSphere();
+        return im;
+    }
+
+    _buildInstancedPole(instances) {
+        const geo = new THREE.CylinderGeometry(0.022, 0.022, 0.75, 5);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x303030, roughness: 0.7 });
+        const im = new THREE.InstancedMesh(geo, mat, instances.length);
+        const dummy = new THREE.Object3D();
+        for (let i = 0; i < instances.length; i++) {
+            const t = instances[i];
+            dummy.position.set(t.x, t.y, t.z);
+            dummy.rotation.set(0, 0, 0);
+            dummy.scale.setScalar(1);
+            dummy.updateMatrix();
+            im.setMatrixAt(i, dummy.matrix);
+        }
+        im.instanceMatrix.needsUpdate = true;
+        im.computeBoundingSphere();
+        return im;
     }
 
     /**

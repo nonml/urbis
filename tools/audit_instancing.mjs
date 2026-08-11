@@ -31,21 +31,15 @@ const CI_MODE = process.argv.includes('--ci');
 // fails only on NEW uninstanced duplicates; each entry is a reason to fix.
 const CI_EXEMPTIONS = {
     'src/render/lod_system.js:98': 'LOD1 building proxy boxes — convert to InstancedMesh',
-    'src/renderer3d.js:2054': 'road tile model clone — candidate for road InstancedMesh',
-    'src/renderer3d.js:2079': 'road fallback gray box — candidate for road InstancedMesh',
-    'src/renderer3d.js:2095': 'street-light model clone — candidate for InstancedMesh',
-    'src/renderer3d.js:2114': 'street-light glow sphere — candidate for InstancedMesh',
-    'src/renderer3d.js:2124': 'street-light pole fallback — candidate for InstancedMesh',
-    'src/renderer3d.js:2131': 'street-light glow fallback — candidate for InstancedMesh',
-    'src/renderer3d.js:2859': 'building model clone — candidate for building InstancedMesh',
-    'src/renderer3d.js:2968': 'building window-glow quads (4 faces × buildings) — candidate for InstancedMesh',
-    'src/renderer3d.js:3588': 'building detail-prop clone (awning/fence/parasol) — candidate for InstancedMesh',
-    'src/renderer3d.js:4138': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
-    'src/renderer3d.js:4528': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4535': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
-    'src/renderer3d.js:4602': 'police unit body — candidate for InstancedMesh',
-    'src/renderer3d.js:4603': 'police unit light — candidate for InstancedMesh',
-    'src/renderer3d.js:4607': 'police unit group — candidate for InstancedMesh',
+    'src/renderer3d.js:2939': 'building model clone — candidate for building InstancedMesh',
+    'src/renderer3d.js:3048': 'building window-glow quads (4 faces × buildings) — candidate for InstancedMesh',
+    'src/renderer3d.js:3668': 'building detail-prop clone (awning/fence/parasol) — candidate for InstancedMesh',
+    'src/renderer3d.js:4218': 'decal quad pool (shared geo, per-decal Mesh) — candidate for InstancedMesh',
+    'src/renderer3d.js:4608': 'vehicle model clone — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4615': 'vehicle fallback box — candidate for InstancedMesh (keep per-vehicle LOD)',
+    'src/renderer3d.js:4682': 'police unit body — candidate for InstancedMesh',
+    'src/renderer3d.js:4683': 'police unit light — candidate for InstancedMesh',
+    'src/renderer3d.js:4687': 'police unit group — candidate for InstancedMesh',
 };
 
 // Non-instanced constructors that signal one drawable per loop iteration.
