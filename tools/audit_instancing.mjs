@@ -30,12 +30,12 @@ const CI_MODE = process.argv.includes('--ci');
 // BatchedMesh conversion pass (q11-in-instancedmesh-pass). Exempted so CI
 // fails only on NEW uninstanced duplicates; each entry is a reason to fix.
 const CI_EXEMPTIONS = {
-    'src/renderer3d.js:4275': 'legacy decal fallback pool — active path uses DecalManager (fx/decal_manager.js)',
-    'src/renderer3d.js:4665': 'vehicles keep per-vehicle LOD (createVehicleLOD); instancing would drop LOD fidelity for ~dozens of moving objects',
-    'src/renderer3d.js:4672': 'vehicle fallback box — same per-vehicle LOD reasoning',
-    'src/renderer3d.js:4739': 'police units are few (≤ ~20); per-unit blue/red pursuit flash needs a custom per-instance emissive shader',
-    'src/renderer3d.js:4740': 'police unit light — same per-unit emissive reasoning',
-    'src/renderer3d.js:4744': 'police unit group — same reasoning',
+    'src/renderer3d.js:4531': 'legacy decal fallback pool — active path uses DecalManager (fx/decal_manager.js)',
+    'src/renderer3d.js:4921': 'vehicles keep per-vehicle LOD (createVehicleLOD); instancing would drop LOD fidelity for ~dozens of moving objects',
+    'src/renderer3d.js:4928': 'vehicle fallback box — same per-vehicle LOD reasoning',
+    'src/renderer3d.js:4995': 'police units are few (≤ ~20); per-unit blue/red pursuit flash needs a custom per-instance emissive shader',
+    'src/renderer3d.js:4996': 'police unit light — same per-unit emissive reasoning',
+    'src/renderer3d.js:5000': 'police unit group — same reasoning',
 };
 
 // Non-instanced constructors that signal one drawable per loop iteration.

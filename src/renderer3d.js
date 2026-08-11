@@ -2971,7 +2971,11 @@ export class Renderer3D {
                 dummy.updateMatrix();
 
                 if (!buildingInstances.has(model)) buildingInstances.set(model, []);
-                buildingInstances.get(model).push({ matrix: dummy.matrix.clone(), bldColor, roofColor, isGlassType });
+                buildingInstances.get(model).push({
+                    matrix: dummy.matrix.clone(),
+                    bldColor, roofColor, isGlassType,
+                    facadeTile: Renderer3D.FACADE_TILE[b.type] ?? 2,
+                });
 
                 // Rooftop clutter + lit-window glow derive from the world bbox.
                 if (Renderer3D.ROOFTOP_DETAIL_TYPES.has(b.type) || useSkyscraperScale) {
@@ -3151,11 +3155,37 @@ export class Renderer3D {
             m.metalness = 0.0;
         } else if (role === 'facade') {
             m.color.set(0xffffff); // tinted via instanceColor (palette colour)
+            m.map = this._getFacadeAtlas();
             m.roughness = isGlass ? 0.35 : 0.65;
             m.metalness = isGlass ? 0.18 : 0.03;
             m.envMapIntensity = isGlass ? 1.2 : 0.6;
         }
         return m;
+    }
+
+    // Replace a facade part's UVs with a box projection into its atlas tile:
+    // the dominant normal axis picks the projection plane, so each face samples
+    // the tile continuously and the per-building palette tint still reads.
+    _regenerateFacadeUVs(geo, tileIndex) {
+        const grid = Renderer3D.FACADE_ATLAS_GRID;
+        const pos = geo.getAttribute('position');
+        const norm = geo.getAttribute('normal');
+        if (!pos || !norm) return;
+        const tw = 1 / grid, th = 1 / grid;
+        const tx = tileIndex % grid, ty = Math.floor(tileIndex / grid);
+        const freq = 2.5;
+        const uvs = new Float32Array(pos.count * 2);
+        for (let i = 0; i < pos.count; i++) {
+            const x = pos.getX(i), y = pos.getY(i), z = pos.getZ(i);
+            const ax = Math.abs(norm.getX(i)), ay = Math.abs(norm.getY(i)), az = Math.abs(norm.getZ(i));
+            let u, v;
+            if (ax >= ay && ax >= az) { u = z; v = y; }
+            else if (az >= ay && az >= ax) { u = x; v = y; }
+            else { u = x; v = z; }
+            uvs[i * 2] = tx * tw + (u * freq - Math.floor(u * freq)) * tw;
+            uvs[i * 2 + 1] = ty * th + (v * freq - Math.floor(v * freq)) * th;
+        }
+        geo.setAttribute('uv', new THREE.BufferAttribute(uvs, 2));
     }
 
     _buildInstancedBuildingModel(model, instances) {
@@ -3171,6 +3201,7 @@ export class Renderer3D {
             const role = this._classifyBuildingPart(baseMat, child);
             const geo = child.geometry.clone();
             geo.applyMatrix4(child.matrixWorld);
+            if (role === 'facade') this._regenerateFacadeUVs(geo, instances[0].facadeTile);
             const mat = this._makeBuildingRoleMaterial(baseMat, role, isGlass);
             const im = new THREE.InstancedMesh(geo, mat, instances.length);
             im.castShadow = true;
@@ -3261,6 +3292,231 @@ export class Renderer3D {
         this._windowTexture = new THREE.CanvasTexture(cv);
         return this._windowTexture;
     }
+
+    /** Number of facade-atlas tiles along each axis (4×4 grid). */
+    static FACADE_ATLAS_GRID = 4;
+
+    /**
+     * Shared building-facade texture atlas (q11-tx-atlas-buildings). One
+     * 1024×1024 canvas holds a 4×4 grid of seamless facade patterns; instanced
+     * building facade parts regenerate their UVs (box projection) into the tile
+     * for their type, so every building binds this single texture. Kept in
+     * muted tones so the per-building palette instanceColor tint still reads.
+     */
+    _getFacadeAtlas() {
+        if (this._facadeAtlas) return this._facadeAtlas;
+        const grid = Renderer3D.FACADE_ATLAS_GRID;
+        const size = 256;
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = grid * size;
+        const ctx = cv.getContext('2d');
+        const h2 = (x, y) => {
+            let h = (Math.imul(x | 0, 374761393) + Math.imul(y | 0, 668265263)) >>> 0;
+            h = Math.imul(h ^ (h >>> 13), 1274126177) >>> 0;
+            return ((h ^ (h >>> 16)) >>> 0) / 4294967296;
+        };
+        const noise = (x, y, amp) => (h2(Math.floor(x), Math.floor(y)) - 0.5) * amp;
+
+        for (let i = 0; i < grid * grid; i++) {
+            const tx = i % grid, ty = Math.floor(i / grid);
+            ctx.save();
+            ctx.translate(tx * size, ty * size);
+            this._drawFacadeTile(ctx, size, i, h2, noise);
+            ctx.restore();
+        }
+        this._facadeAtlas = new THREE.CanvasTexture(cv);
+        this._facadeAtlas.anisotropy = 4;
+        return this._facadeAtlas;
+    }
+
+    _drawFacadeTile(ctx, s, idx, h2, noise) {
+        const fillRect = (x, y, w, h, color) => {
+            ctx.fillStyle = color;
+            ctx.fillRect(x, y, w, h);
+        };
+        // eslint-disable-next-line no-unused-vars
+        const brick = (base, mortar) => {
+            const rows = 8, cols = 6, mh = 6;
+            fillRect(0, 0, s, s, mortar);
+            for (let r = 0; r < rows; r++) {
+                const off = (r % 2) * (s / cols / 2);
+                const y = r * (s / rows);
+                for (let c = 0; c <= cols; c++) {
+                    const x = c * (s / cols) - off;
+                    const shade = (h2(r * 7 + c * 13, 3) - 0.5) * 26;
+                    fillRect(x, y + mh / 2, s / cols + 1, s / rows - mh, `rgb(${base + shade | 0},${base * 0.5 + shade | 0},${base * 0.36 + shade | 0})`);
+                }
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const concrete = (base, seams) => {
+            fillRect(0, 0, s, s, `rgb(${base},${base},${base})`);
+            for (let y = 0; y < s; y += 4) {
+                for (let x = 0; x < s; x += 4) {
+                    const n = noise(x, y, 14);
+                    ctx.fillStyle = `rgba(${base + n | 0},${base + n | 0},${base + n | 0},0.5)`;
+                    ctx.fillRect(x, y, 4, 4);
+                }
+            }
+            if (seams) {
+                ctx.strokeStyle = `rgba(0,0,0,0.18)`;
+                ctx.lineWidth = 2;
+                const step = s / 4;
+                for (let i = 0; i <= 4; i++) {
+                    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, s); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(s, i * step); ctx.stroke();
+                }
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const glass = (base, gridLines) => {
+            fillRect(0, 0, s, s, `rgb(${base},${base + 8},${base + 16})`);
+            const step = s / 6;
+            for (let r = 0; r < 6; r++) {
+                for (let c = 0; c < 6; c++) {
+                    const g = ctx.createLinearGradient(0, r * step, 0, r * step + step);
+                    const shade = (h2(r * 5 + c, 7) - 0.5) * 20;
+                    g.addColorStop(0, `rgb(${base + 24 + shade | 0},${base + 30 + shade | 0},${base + 42 + shade | 0})`);
+                    g.addColorStop(1, `rgb(${base - 6 + shade | 0},${base + 2 + shade | 0},${base + 12 + shade | 0})`);
+                    ctx.fillStyle = g;
+                    ctx.fillRect(c * step + 2, r * step + 2, step - 4, step - 4);
+                }
+            }
+            if (gridLines) {
+                ctx.strokeStyle = 'rgba(10,15,25,0.7)';
+                ctx.lineWidth = 3;
+                for (let i = 0; i <= 6; i++) {
+                    ctx.beginPath(); ctx.moveTo(i * step, 0); ctx.lineTo(i * step, s); ctx.stroke();
+                    ctx.beginPath(); ctx.moveTo(0, i * step); ctx.lineTo(s, i * step); ctx.stroke();
+                }
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const wood = () => {
+            fillRect(0, 0, s, s, '#7a5230');
+            const planks = 10, ph = s / planks;
+            for (let p = 0; p < planks; p++) {
+                const shade = (h2(p, 11) - 0.5) * 30;
+                const base = 122 + shade | 0;
+                fillRect(0, p * ph, s, ph, `rgb(${base},${base * 0.66 | 0},${base * 0.39 | 0})`);
+                // grain streaks
+                for (let g = 0; g < 8; g++) {
+                    const gy = p * ph + h2(p * 3 + g, 12) * ph;
+                    ctx.fillStyle = `rgba(40,22,8,${0.08 + h2(p + g, 13) * 0.12})`;
+                    ctx.fillRect(0, gy, s, 1 + h2(p * 5 + g, 14) * 2);
+                }
+            }
+            ctx.strokeStyle = 'rgba(30,16,6,0.7)';
+            ctx.lineWidth = 2;
+            for (let p = 1; p < planks; p++) {
+                ctx.beginPath(); ctx.moveTo(0, p * ph); ctx.lineTo(s, p * ph); ctx.stroke();
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const stone = (base) => {
+            fillRect(0, 0, s, s, `rgb(${base},${base},${base})`);
+            const rows = 5, cols = 4, mw = 5, mh = 5;
+            for (let r = 0; r < rows; r++) {
+                const off = (r % 2) * (s / cols / 2);
+                for (let c = 0; c <= cols; c++) {
+                    const x = c * (s / cols) - off;
+                    const shade = (h2(r * 11 + c * 17, 5) - 0.5) * 24;
+                    fillRect(x + mw / 2, r * (s / rows) + mh / 2, s / cols - mw, s / rows - mh, `rgb(${base + shade | 0},${base + shade | 0},${base + shade | 0})`);
+                }
+            }
+            ctx.strokeStyle = 'rgba(0,0,0,0.25)';
+            ctx.lineWidth = 3;
+            for (let r = 0; r <= rows; r++) {
+                ctx.beginPath(); ctx.moveTo(0, r * (s / rows)); ctx.lineTo(s, r * (s / rows)); ctx.stroke();
+            }
+            for (let c = 0; c <= cols; c++) {
+                ctx.beginPath(); ctx.moveTo(c * (s / cols), 0); ctx.lineTo(c * (s / cols), s); ctx.stroke();
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const corrugated = (base) => {
+            fillRect(0, 0, s, s, `rgb(${base},${base},${base})`);
+            const ribs = 16, rw = s / ribs;
+            for (let i = 0; i < ribs; i++) {
+                const shade = Math.sin(i * 0.9) * 22;
+                fillRect(i * rw, 0, rw + 1, s, `rgb(${base + shade | 0},${base + shade | 0},${base + shade | 0})`);
+            }
+            ctx.fillStyle = 'rgba(0,0,0,0.15)';
+            ctx.fillRect(0, 0, s, 2);
+        };
+        // eslint-disable-next-line no-unused-vars
+        const stucco = (r, g, b) => {
+            fillRect(0, 0, s, s, `rgb(${r},${g},${b})`);
+            for (let y = 0; y < s; y += 4) {
+                for (let x = 0; x < s; x += 4) {
+                    const n = noise(x, y, 16);
+                    ctx.fillStyle = `rgba(${r + n | 0},${g + n | 0},${b + n | 0},0.6)`;
+                    ctx.fillRect(x, y, 4, 4);
+                }
+            }
+        };
+        // eslint-disable-next-line no-unused-vars
+        const office = () => {
+            fillRect(0, 0, s, s, '#1a2233');
+            const rows = 10, cols = 6, step = s / cols, ph = s / rows;
+            for (let r = 0; r < rows; r++) {
+                for (let c = 0; c < cols; c++) {
+                    const seed = h2(r * 13 + c * 7, 9);
+                    if (seed > 0.25) {
+                        const warm = seed > 0.6;
+                        const glow = warm
+                            ? `rgb(${200 + seed * 40 | 0},${180 + seed * 30 | 0},${110 + seed * 20 | 0})`
+                            : `rgb(${120 + seed * 30 | 0},${160 + seed * 20 | 0},${200 + seed * 20 | 0})`;
+                        fillRect(c * step + 3, r * ph + 2, step - 6, ph - 4, glow);
+                    }
+                }
+            }
+            ctx.fillStyle = 'rgba(8,12,20,0.9)';
+            for (let r = 0; r <= rows; r++) ctx.fillRect(0, r * ph - 1, s, 3);
+            for (let c = 0; c <= cols; c++) ctx.fillRect(c * step - 1, 0, 3, s);
+        };
+        // eslint-disable-next-line no-unused-vars
+        const metal = () => {
+            fillRect(0, 0, s, s, '#3a3f46');
+            const bands = 12, bh = s / bands;
+            for (let b = 0; b < bands; b++) {
+                const shade = (h2(b, 15) - 0.5) * 20;
+                fillRect(0, b * bh, s, bh, `rgb(${58 + shade | 0},${63 + shade | 0},${70 + shade | 0})`);
+            }
+            ctx.fillStyle = 'rgba(0,0,0,0.35)';
+            for (let b = 1; b < bands; b++) ctx.fillRect(0, b * bh, s, 2);
+        };
+
+        // Tile → pattern (index stable so the atlas is deterministic).
+        switch (idx) {
+            case 0: brick(160, '#4a2a1c'); break;        // red brick
+            case 1: brick(186, '#c9b69a'); break;        // tan brick
+            case 2: concrete(150, true); break;          // gray concrete
+            case 3: concrete(196, false); break;         // white concrete
+            case 4: glass(52, true); break;              // blue glass
+            case 5: glass(28, true); break;              // dark glass
+            case 6: wood(); break;                        // house wood
+            case 7: stone(140); break;                    // ashlar stone
+            case 8: corrugated(128); break;               // warehouse corrugated
+            case 9: corrugated(96); break;                // ribbed panel (dark)
+            case 10: stucco(196, 166, 126); break;        // warm stucco
+            case 11: brick(178, '#6b4a2a'); break;        // terracotta
+            case 12: office(); break;                      // office window grid
+            case 13: metal(); break;                       // metal clad
+            case 14: stone(172); break;                    // limestone
+            case 15: concrete(180, false); break;          // light panel
+            default: concrete(150, true); break;
+        }
+    }
+
+    /** Map building type → facade-atlas tile index (q11-tx-atlas-buildings). */
+    static FACADE_TILE = {
+        house: 6, apartment: 2, farm: 6, market: 0, restaurant: 10,
+        hotel: 4, 'shopping-mall': 3, theater: 12, museum: 7, library: 14,
+        hospital: 3, 'town-hall': 14, warehouse: 8, barracks: 13, school: 7,
+        factory: 9, 'lumber-mill': 9, 'bus-depot': 2, 'metro-station': 2,
+        skyscraper: 4, office: 12, nightclub: 13, penthouse: 5,
+    };
 
     /**
      * Build instanced vegetation (trees) for forest and park tiles in a chunk.
