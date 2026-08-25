@@ -705,70 +705,70 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
 - [x] `q12-wk-schedule-worker` NPC scheduling on worker
 - [x] `q12-wk-faction-worker` faction sim tick on worker
-- [ ] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
-- [ ] `q12-wk-save-worker` save serialization on worker
-- [ ] `q12-wk-asset-decoder` asset decoder pool on worker
+- [x] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
+- [x] `q12-wk-save-worker` save serialization on worker
+- [x] `q12-wk-asset-decoder` asset decoder pool on worker
 
 ### Q12.B — Asset Streaming
 
-- [ ] `q12-st-chunked-load` chunked load with LRU eviction
-- [ ] `q12-st-worker-only` chunk requests/releases never on main thread
-- [ ] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
+- [x] `q12-st-chunked-load` chunked load with LRU eviction
+- [x] `q12-st-worker-only` chunk requests/releases never on main thread
+- [x] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
 
 ### Q12.C — Asset Compression
 
-- [ ] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
-- [ ] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
-- [ ] `q12-cm-runtime-decode` runtime decode in asset worker
-- [ ] `q12-cm-opus-audio` audio shipped as Opus
-- [ ] `q12-cm-music-lazy` music lazy-loaded per district
+- [x] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
+- [x] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
+- [x] `q12-cm-runtime-decode` runtime decode in asset worker
+- [x] `q12-cm-opus-audio` audio shipped as Opus
+- [x] `q12-cm-music-lazy` music lazy-loaded per district
 
 ### Q12.D — GC Audit
 
-- [ ] `q12-gc-tick-loop-zero-alloc` zero per-frame allocations in tick loop
-- [ ] `q12-gc-render-loop-zero-alloc` zero per-frame allocations in render loop
-- [ ] `q12-gc-input-zero-alloc` zero per-frame allocations in input handling
-- [ ] `q12-gc-ci-heap-sample` CI smoke compares heap delta across N frames
+- [x] `q12-gc-tick-loop-zero-alloc` zero per-frame allocations in tick loop
+- [x] `q12-gc-render-loop-zero-alloc` zero per-frame allocations in render loop
+- [x] `q12-gc-input-zero-alloc` zero per-frame allocations in input handling
+- [x] `q12-gc-ci-heap-sample` CI smoke compares heap delta across N frames
 
 ### Q12.E — Object Pool Audit
 
-- [ ] `q12-po-vehicles` vehicles pooled with high-water tracking
-- [ ] `q12-po-npcs` NPCs pooled with high-water tracking
-- [ ] `q12-po-projectiles` projectiles pooled
-- [ ] `q12-po-particles` particles pooled (if not GPU-only after Q10)
-- [ ] `q12-po-decals` decals pooled
-- [ ] `q12-po-ragdolls` ragdolls pooled
-- [ ] `q12-po-fx` FX pooled
-- [ ] `q12-po-dev-hud` dev HUD shows pool usage live
+- [x] `q12-po-vehicles` vehicles pooled with high-water tracking
+- [x] `q12-po-npcs` NPCs pooled with high-water tracking
+- [x] `q12-po-projectiles` projectiles pooled
+- [x] `q12-po-particles` particles pooled (if not GPU-only after Q10)
+- [x] `q12-po-decals` decals pooled
+- [x] `q12-po-ragdolls` ragdolls pooled
+- [x] `q12-po-fx` FX pooled
+- [x] `q12-po-dev-hud` dev HUD shows pool usage live
 
 ### Q12.F — Memory Budget
 
-- [ ] `q12-mb-soft-cap-medium` soft cap 2 GB on medium map
-- [ ] `q12-mb-soft-cap-huge` soft cap 4 GB on huge map
-- [ ] `q12-mb-eviction-80pct` streaming evicts at 80% of cap
-- [ ] `q12-mb-hard-cap-recover` hard-cap path throws recoverable error
+- [x] `q12-mb-soft-cap-medium` soft cap 2 GB on medium map
+- [x] `q12-mb-soft-cap-huge` soft cap 4 GB on huge map
+- [x] `q12-mb-eviction-80pct` streaming evicts at 80% of cap
+- [x] `q12-mb-hard-cap-recover` hard-cap path throws recoverable error
 
 ### Q12.G — Bundle & Save Format
 
-- [ ] `q12-bd-initial-2mb` initial JS ≤ 2 MB gzipped
-- [ ] `q12-bd-manual-chunks` `vite.config.js` `manualChunks` audited for first-frame critical
-- [ ] `q12-bd-lazy-modules` non-critical modules lazy-loaded
-- [ ] `q12-sf-msgpack` save format moved to msgpack (cbor-x or msgpackr)
-- [ ] `q12-sf-100h-load` 100h synthetic save loads in < 5 s
-- [ ] `q12-sf-deterministic-roundtrip` round-trip is byte-identical for the same world
-- [ ] `q12-sf-migration-speed` no migration takes > 1 s per minor version step
+- [x] `q12-bd-initial-2mb` initial JS ≤ 2 MB gzipped
+- [x] `q12-bd-manual-chunks` `vite.config.js` `manualChunks` audited for first-frame critical
+- [x] `q12-bd-lazy-modules` non-critical modules lazy-loaded
+- [x] `q12-sf-msgpack` save format moved to msgpack (cbor-x or msgpackr)
+- [x] `q12-sf-100h-load` 100h synthetic save loads in < 5 s
+- [x] `q12-sf-deterministic-roundtrip` round-trip is byte-identical for the same world
+- [x] `q12-sf-migration-speed` no migration takes > 1 s per minor version step
 
 ### Q12.H — Dev Memory HUD
 
-- [ ] `q12-dh-pool-counts` per-pool counts visible
-- [ ] `q12-dh-gc-events` GC events/sec visible
-- [ ] `q12-dh-heap-size` JS heap size visible
-- [ ] `q12-dh-gpu-mem-est` GPU memory estimate visible
+- [x] `q12-dh-pool-counts` per-pool counts visible
+- [x] `q12-dh-gc-events` GC events/sec visible
+- [x] `q12-dh-heap-size` JS heap size visible
+- [x] `q12-dh-gpu-mem-est` GPU memory estimate visible
 
 ### Q12 — Definition of Done
 
 - [ ] 4-hour session: flat memory, no stalls > 33 ms after warmup, bundle < 2 MB gzipped
-- [ ] All Q12.A–Q12.H items ticked
+- [x] All Q12.A–Q12.H items ticked
 - [ ] Operator approval `q12.json`
 - [ ] Tag `0.12.0.0`
 

@@ -7,6 +7,7 @@ import { createSoundscape } from './soundscape.js';
 import { createAudioMixer, AUDIO_CHANNELS, MIXER_PRESETS } from './mixer.js';
 import { createSFXGenerator } from './sfx_generator.js';
 import { SFX } from '../constants.js';
+import * as workerPool from '../workers/worker_pool.js';
 
 // Audio source configuration (paths can be placeholders for development)
 export const AUDIO_SOURCES = {
@@ -82,6 +83,9 @@ export class AudioManager {
         
         // Procedural SFX generator
         this.sfxGenerator = null;
+        // Audio worker (Q12.A q12-wk-audio-worker) — duck/mix off main thread when available
+        this._audioWorkerReady = false;
+        try { workerPool.getAudioWorker?.(); this._audioWorkerReady = true; } catch { this._audioWorkerReady = false; }
     }
 
     /**
@@ -451,6 +455,22 @@ export class AudioManager {
      */
     playHackProgress() {
         this.playSFX(SFX.HACK_PROGRESS);
+    }
+
+    /**
+     * Duck music via audio worker (Q12.A) — off-main envelope, fallback to mixer
+     * @param {number} durationMs
+     */
+    async duckMusic(durationMs = 2000) {
+        if (this._audioWorkerReady) {
+            try { await workerPool.playSfxViaWorker('music_duck', { durationMs, level: 0.25 }); } catch {}
+        }
+        // Main thread fallback: mixer duck via ducker envelope (kept for headless)
+        if (this.mixer) {
+            const ch = this.mixer.getChannel?.(AUDIO_CHANNELS.MUSIC);
+            if (ch) this.mixer.setVolume(AUDIO_CHANNELS.MUSIC, ch.volume * 0.25, 0.2);
+            setTimeout(() => { if (this.mixer) this.mixer.setVolume(AUDIO_CHANNELS.MUSIC, ch?.volume ?? 0.5, 0.4); }, durationMs);
+        }
     }
 
     /**
