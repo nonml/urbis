@@ -1581,9 +1581,9 @@ export class Renderer3D {
             }
         }
         if (this._windowGlowMeshes) {
-            const wantOpacity = 0.22 + nightT * 0.58;
+            const wantOpacity = 0.04 + nightT * 0.76;
             for (const m of this._windowGlowMeshes) {
-                m.material.opacity += (wantOpacity - m.material.opacity) * 0.04;
+                m.material.opacity += (wantOpacity - m.material.opacity) * 0.06;
             }
         }
         if (this.scene?.fog) {
@@ -2103,7 +2103,7 @@ export class Renderer3D {
             // Street props: only in urban core (radius ≤ 14 from map center)
             const dcx = tile.x - this._mapHalfW, dcz = tile.y - this._mapHalfH;
             const distFromCenter = Math.sqrt(dcx * dcx + dcz * dcz);
-            if (distFromCenter <= 14 && hash(tile.x, tile.y, 200) < 0.18) {
+            if (distFromCenter <= 14 && hash(tile.x, tile.y, 200) < 0.28) {
                 const lightModel = this._propModels.get('light-square');
                 const side = hash(tile.x, tile.y, 210) > 0.5 ? 1 : -1;
                 const terrainYL = this._smoothTerrainY(tile.x, tile.y);
@@ -2238,7 +2238,7 @@ export class Renderer3D {
     _buildInstancedGlowSphere(instances) {
         const geo = new THREE.SphereGeometry(0.042, 6, 4);
         const mat = new THREE.MeshStandardMaterial({
-            color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.65,
+            color: 0xffd060, emissive: 0xffaa20, emissiveIntensity: 0.92,
             roughness: 0.4, metalness: 0.0,
         });
         const im = new THREE.InstancedMesh(geo, mat, instances.length);
