@@ -193,8 +193,8 @@ await page.evaluate(() => {
   r.LOD_FULL_DIST = 9999;
   r.LOD_TERRAIN_ONLY_DIST = 9999;
 
-  // Use flat dark-asphalt road tiles instead of GLTF road models (no white crosswalk glare)
-  r._roadModels.clear();
+  // Keep GLTF road models — new renderer uses roadMap so GTA intersections render correctly.
+  // Do NOT clear _roadModels; the models are dimmed in renderer to avoid white glare.
 
   // Full world rebuild
   r.rebuildWorld();

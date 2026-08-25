@@ -2015,11 +2015,12 @@ export class Renderer3D {
             const wx = tile.x - this._mapHalfW + 0.5;
             const wz = tile.y - this._mapHalfH + 0.5;
 
-            // Calculate connectivity bitmask from neighbors
-            const n = this.game.map.getTileAt(tile.x, tile.y - 1) === TERRAIN_ROAD ? 1 : 0;
-            const e = this.game.map.getTileAt(tile.x + 1, tile.y) === TERRAIN_ROAD ? 2 : 0;
-            const s = this.game.map.getTileAt(tile.x, tile.y + 1) === TERRAIN_ROAD ? 4 : 0;
-            const w = this.game.map.getTileAt(tile.x - 1, tile.y) === TERRAIN_ROAD ? 8 : 0;
+            // Calculate connectivity bitmask from neighbors — roadMap OR terrain
+            const isRoadAt = (x, y) => this.game.map.getTileAt(x, y) === TERRAIN_ROAD || this.game.map.roadMap?.[y * this.game.map.width + x] === 1;
+            const n = isRoadAt(tile.x, tile.y - 1) ? 1 : 0;
+            const e = isRoadAt(tile.x + 1, tile.y) ? 2 : 0;
+            const s = isRoadAt(tile.x, tile.y + 1) ? 4 : 0;
+            const w = isRoadAt(tile.x - 1, tile.y) ? 8 : 0;
             const mask = n | e | s | w;
             const count = ((mask & 1) + ((mask >> 1) & 1) + ((mask >> 2) & 1) + ((mask >> 3) & 1));
 
@@ -2092,15 +2093,14 @@ export class Renderer3D {
                 }
             }
 
-            // Traffic lights at 4-way road intersections
+            // Traffic lights at 4-way road intersections — check both terrain and roadMap
             {
-                const n  = this.game.map.getTileAt(tile.x,     tile.y - 1);
-                const s  = this.game.map.getTileAt(tile.x,     tile.y + 1);
-                const e  = this.game.map.getTileAt(tile.x + 1, tile.y    );
-                const w  = this.game.map.getTileAt(tile.x - 1, tile.y    );
-                const isIntersection = [n, s, e, w].every(t =>
-                    t === TERRAIN_ROAD || t === TERRAIN_HIGHWAY
-                );
+                const isRoadAt2 = (x, y) => {
+                    const t = this.game.map.getTileAt(x, y);
+                    return t === TERRAIN_ROAD || t === TERRAIN_HIGHWAY || this.game.map.roadMap?.[y * this.game.map.width + x] === 1;
+                };
+                const isIntersection = isRoadAt2(tile.x, tile.y - 1) && isRoadAt2(tile.x, tile.y + 1)
+                    && isRoadAt2(tile.x + 1, tile.y) && isRoadAt2(tile.x - 1, tile.y);
                 if (isIntersection && hash(tile.x, tile.y, 300) < 0.5) {
                     const terrainY = this._smoothTerrainY(tile.x, tile.y);
                     const tl = this._buildTrafficLight(wx + 0.45, terrainY, wz + 0.45);
@@ -2425,18 +2425,28 @@ export class Renderer3D {
 
         // Collect water/road tiles separately; build a smooth heightmap for the rest
         const tileGrid = [];
+        const mapW = this.game.map.width;
         for (let y = bounds.minY; y <= bounds.maxY; y++) {
             const row = [];
             for (let x = bounds.minX; x <= bounds.maxX; x++) {
                 const terrain = this.game.map.getTileAt(x, y);
                 row.push(terrain);
                 if (terrain === TERRAIN_WATER) waterTiles.push({ x, y });
-                if (terrain === TERRAIN_ROAD) roadTiles.push({ x, y });
+                // Real city grid lives in roadMap — terrain is all grass in new urban maps.
+                const onRoadMap = this.game.map.roadMap?.[y * mapW + x] === 1;
+                if (terrain === TERRAIN_ROAD || onRoadMap) roadTiles.push({ x, y });
                 if (terrain === TERRAIN_HIGHWAY) highwayTiles.push({ x: x, y: y });
                 if (terrain === TERRAIN_BRIDGE) bridgeTiles.push({ x: x, y: y });
                 if (terrain === TERRAIN_TUNNEL) tunnelTiles.push({ x: x, y: y });
             }
             tileGrid.push(row);
+        }
+        // De-duplicate (roadMap+terrain overlap)
+        if (roadTiles.length > 1) {
+            const seen = new Set();
+            const uniq = [];
+            for (const t of roadTiles) { const k = `${t.x},${t.y}`; if (!seen.has(k)) { seen.add(k); uniq.push(t); } }
+            roadTiles.length = 0; roadTiles.push(...uniq);
         }
 
         // Water: animated plane
