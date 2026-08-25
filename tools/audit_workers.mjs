@@ -57,13 +57,21 @@ check('worker_pool has serializeSaveViaWorker', pool.includes('serializeSaveViaW
 check('worker_pool has decodeAssetViaWorker', pool.includes('decodeAssetViaWorker'), 'missing decodeAssetViaWorker');
 check('worker_pool has requestScheduleTargetViaWorker', pool.includes('requestScheduleTargetViaWorker'), 'missing schedule request');
 
-// 3. PathfindingProxy fully worker
+// 3. PathfindingProxy fully worker — worker owns the grid, no SAB, no main-thread rebuild
 const proxy = read('src/sim/nav/pathfinding_proxy.js');
+const worker = read('src/workers/pathfinding_worker.js');
 check('pathfinding_proxy has isWorkerActive()', proxy.includes('isWorkerActive'), 'missing isWorkerActive()');
-check('pathfinding_proxy has SharedArrayBuffer SAB', proxy.includes('SharedArrayBuffer') && proxy.includes('_sab'), 'missing SAB init');
-check('pathfinding_proxy handles INIT/FIND/RESULT', proxy.includes("type === 'INIT'") || proxy.includes('INIT'), 'proxy missing INIT handling');
-check('pathfinding_proxy handles RESULT cache', proxy.includes('_cache.set') && proxy.includes('RESULT'), 'proxy missing RESULT cache');
-check('pathfinding_worker exists handler', read('src/workers/pathfinding_worker.js').includes("type === 'FIND'") || read('src/workers/pathfinding_worker.js').includes('FIND'), 'pathfinding_worker missing FIND handler');
+check('pathfinding_proxy spawns new Worker', proxy.includes('new Worker('), 'missing new Worker spawn');
+check('proxy sends INIT with terrain', proxy.includes("type: 'INIT'") && proxy.includes('terrain'), 'proxy missing terrain INIT');
+check('proxy flushes blocked tiles via UPDATE', proxy.includes("type: 'UPDATE'") && proxy.includes('blocked'), 'proxy missing blocked UPDATE');
+check('proxy has no main-thread grid rebuild', !proxy.includes('_buildWalkability'), 'proxy still builds walkability grid on main thread');
+check('proxy has no SAB dependency', !proxy.includes('new SharedArrayBuffer('), 'proxy still depends on SharedArrayBuffer (fails without COOP/COEP headers)');
+check('proxy guards stale results by epoch', proxy.includes('_epoch'), 'proxy missing epoch guard');
+check('proxy caches no-path results', proxy.includes('_noPath'), 'proxy missing no-path cache');
+check('worker exports buildGrid (owns grid)', worker.includes('export function buildGrid'), 'worker does not build its own grid');
+check('worker exports solveWalkable (pure A*)', worker.includes('export function solveWalkable'), 'worker missing pure A* core');
+check('worker applies blocked in UPDATE', worker.includes('e.data.blocked'), 'worker ignores blocked updates');
+check('worker has FIND handler', worker.includes("type === 'FIND'"), 'worker missing FIND handler');
 
 // 4. ScheduleManager worker-only when active (no sync block)
 const sched = read('src/sim/schedule.js');

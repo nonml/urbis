@@ -2,19 +2,21 @@
  * PathfindingProxy
  *
  * Integrates WebWorker A* into the synchronous citizen movement loop via a
- * per-citizen path cache.  The main thread never blocks:
+ * per-citizen path cache. The main thread never blocks:
  *
  *   1. `updateCitizenSchedule` calls `consumeStep(citizenId, start, target)`:
  *      - Cache HIT  → returns next {x,y} from the worker-computed path.
- *      - Cache MISS → returns null (caller falls back to sync NavGrid).
+ *      - Cache MISS → returns null (caller stalls one tick).
  *        Also fires a prefetch to the worker so the next call is a hit.
  *
- *   2. After a sync NavGrid move, caller should call
- *      `prefetch(citizenId, nextPos, target)` to warm the cache for the
- *      following tick.
+ *   2. After a worker move, the caller calls `prefetch(citizenId, nextPos, target)`
+ *      to warm the cache for the following tick.
  *
- * The SAB walkability grid is rebuilt lazily (on invalidate → next prefetch).
- * Falls back silently to sync mode when SharedArrayBuffer is unavailable.
+ * The worker owns the walkability grid. The main thread sends the terrain
+ * snapshot once (INIT) and only hands over the blocked-tile list when
+ * buildings change (UPDATE). No SharedArrayBuffer is required — the worker
+ * works on any host, with or without cross-origin isolation headers.
+ * Falls back to sync NavGrid when `Worker` is unavailable (headless Node).
  */
 
 export class PathfindingProxy {
@@ -23,23 +25,25 @@ export class PathfindingProxy {
      * @param {Object} map  game map (.width, .height)
      */
     constructor(navGrid, map) {
-        this._nav    = navGrid;
-        this._map    = map;
+        this._nav = navGrid;
+        this._map = map;
         this._worker = null;
-        this._ready  = false;
+        this._ready = false;
         this._fallback = false;
-        this._dirty  = true;
-        this._sab    = null;
-        this._shared = null;
+        this._dirty = true;
+        this._epoch = 0;
+        this._terrain = null;
 
         // id → { resolve }
         this._pending = new Map();
-        this._nextId  = 1;
+        this._nextId = 1;
 
         // citizenId → { path: [{x,y}], step: number, tx, ty }
         this._cache = new Map();
         // citizenIds with an in-flight worker request
         this._inflight = new Set();
+        // citizenId → { sx, sy, tx, ty } — last request that had no path
+        this._noPath = new Map();
 
         this.ready = this._init();
     }
@@ -47,51 +51,56 @@ export class PathfindingProxy {
     // ── Initialisation ────────────────────────────────────────────────────────
 
     async _init() {
-        if (typeof SharedArrayBuffer === 'undefined') {
+        if (typeof Worker === 'undefined') {
             this._fallback = true;
             return;
         }
         const W = this._map.width;
         const H = this._map.height;
-        this._sab    = new SharedArrayBuffer(W * H);
-        this._shared = new Uint8Array(this._sab);
-        this._buildWalkability();
+        this._terrain = this._buildTerrain(W, H);
 
-        this._worker = new Worker(
-            new URL('../../workers/pathfinding_worker.js', import.meta.url),
-            { type: 'module' }
-        );
-
-        await new Promise((resolve) => {
+        try {
+            this._worker = new Worker(
+                new URL('../../workers/pathfinding_worker.js', import.meta.url),
+                { type: 'module' }
+            );
             this._worker.onmessage = (e) => {
                 if (e.data.type === 'READY') {
                     this._ready = true;
-                    this._worker.onmessage = (ev) => this._onMessage(ev);
-                    resolve();
                 }
+                this._onMessage(e);
             };
-            this._worker.postMessage({ type: 'INIT', sab: this._sab, width: W, height: H });
-        });
+            this._worker.postMessage(
+                { type: 'INIT', width: W, height: H, terrain: this._terrain },
+                [this._terrain.buffer]
+            );
+        } catch {
+            this._fallback = true;
+            if (this._worker) this._worker.terminate();
+            this._worker = null;
+        }
     }
 
-    _buildWalkability() {
-        if (!this._shared) return;
+    _buildTerrain(W, H) {
         const nav = this._nav;
-        const W = this._map.width;
-        for (let y = 0; y < this._map.height; y++) {
+        const terrain = new Uint8Array(W * H);
+        for (let y = 0; y < H; y++) {
             for (let x = 0; x < W; x++) {
-                this._shared[y * W + x] = nav.isWalkable(x, y) ? 1 : 0;
+                terrain[y * W + x] = nav.isWalkable(x, y) ? 1 : 0;
             }
         }
-        this._dirty = false;
+        return terrain;
     }
 
-    _pushUpdate() {
-        if (!this._worker || !this._shared) return;
-        this._buildWalkability();
-        // SAB is already shared — worker reads updated data automatically.
-        // Sending UPDATE is a no-op hint so the worker can clear its own caches.
-        this._worker.postMessage({ type: 'UPDATE', data: null });
+    _flushDirty() {
+        if (!this._dirty) return;
+        this._dirty = false;
+        const blocked = [];
+        for (const key of this._nav.blockedTiles) {
+            const [x, y] = key.split(',').map(Number);
+            blocked.push([x, y]);
+        }
+        this._worker.postMessage({ type: 'UPDATE', blocked });
     }
 
     isWorkerActive() {
@@ -99,8 +108,9 @@ export class PathfindingProxy {
     }
 
     _onMessage(e) {
-        const { type, id, path, citizenId } = e.data;
+        const { type, id, epoch, path, citizenId } = e.data;
         if (type !== 'RESULT') return;
+        if (epoch !== undefined && epoch !== this._epoch) return;
 
         // Resolve any promise-based callers
         const prom = this._pending.get(id);
@@ -109,23 +119,33 @@ export class PathfindingProxy {
             prom.resolve({ path: path ?? [], success: !!path?.length });
         }
 
-        // Store in per-citizen cache
-        if (citizenId !== undefined && path?.length) {
-            this._cache.set(citizenId, { path, step: 0, tx: path[path.length - 1].x, ty: path[path.length - 1].y });
+        if (citizenId === undefined) return;
+        this._inflight.delete(citizenId);
+
+        if (path?.length) {
+            this._noPath.delete(citizenId);
+            const last = path[path.length - 1];
+            this._cache.set(citizenId, { path, step: 0, tx: last.x, ty: last.y });
+        } else {
+            this._noPath.set(citizenId, {
+                sx: e.data.sx, sy: e.data.sy,
+                tx: e.data.tx, ty: e.data.ty,
+            });
         }
-        if (citizenId !== undefined) this._inflight.delete(citizenId);
     }
 
     // ── Public API for citizen movement ──────────────────────────────────────
 
     /**
      * Mark walkability dirty (call after building placement/demolition).
-     * Clears citizen path cache so stale paths aren't used.
+     * Clears caches and invalidates in-flight results via epoch bump.
      */
     invalidate() {
         this._dirty = true;
+        this._epoch++;
         this._cache.clear();
         this._inflight.clear();
+        this._noPath.clear();
     }
 
     /**
@@ -137,6 +157,9 @@ export class PathfindingProxy {
      * @param {{x:number,y:number}} target
      */
     consumeStep(citizenId, start, target) {
+        const noPath = this._noPath.get(citizenId);
+        if (noPath && noPath.tx === target.x && noPath.ty === target.y) return null;
+
         const entry = this._cache.get(citizenId);
         if (!entry) return null;
 
@@ -163,8 +186,8 @@ export class PathfindingProxy {
     }
 
     /**
-     * Fire a worker path request for a citizen (does nothing if already in-flight
-     * or worker not ready).
+     * Fire a worker path request for a citizen (does nothing if already in-flight,
+     * worker not ready, or the same request was already answered with no path).
      *
      * @param {number} citizenId
      * @param {{x:number,y:number}} from
@@ -174,12 +197,18 @@ export class PathfindingProxy {
         if (this._fallback || !this._ready) return;
         if (this._inflight.has(citizenId)) return;
 
-        if (this._dirty) this._pushUpdate();
+        const noPath = this._noPath.get(citizenId);
+        if (noPath && noPath.sx === from.x && noPath.sy === from.y &&
+            noPath.tx === to.x && noPath.ty === to.y) {
+            return;
+        }
+
+        if (this._dirty) this._flushDirty();
 
         this._inflight.add(citizenId);
         const id = this._nextId++;
         this._worker.postMessage({
-            type: 'FIND', id, citizenId,
+            type: 'FIND', id, epoch: this._epoch, citizenId,
             sx: from.x, sy: from.y,
             tx: to.x,   ty: to.y,
         });
@@ -190,13 +219,17 @@ export class PathfindingProxy {
      */
     findPath(a, b) {
         if (this._fallback || !this._ready) {
-            return Promise.resolve({ path: this._nav.findPath(a, b) ?? [], success: false });
+            const path = this._nav.findPath(a, b) ?? [];
+            return Promise.resolve({ path, success: path.length > 0 });
         }
-        if (this._dirty) this._pushUpdate();
+        if (this._dirty) this._flushDirty();
         const id = this._nextId++;
         return new Promise((resolve) => {
             this._pending.set(id, { resolve });
-            this._worker.postMessage({ type: 'FIND', id, sx: a.x, sy: a.y, tx: b.x, ty: b.y });
+            this._worker.postMessage({
+                type: 'FIND', id, epoch: this._epoch,
+                sx: a.x, sy: a.y, tx: b.x, ty: b.y,
+            });
         });
     }
 

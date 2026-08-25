@@ -42,6 +42,7 @@ import { CameraNetwork } from '../src/sim/camera_network.js';
 import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
+import { buildGrid as buildPathGrid, solveWalkable } from '../src/workers/pathfinding_worker.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -287,6 +288,43 @@ testCoverSnapController();
 testCoverBlindfire();
 testCoverNpcUse();
 testBehaviorTreeLibrary();
+testPathfindingWorkerCore();
+
+function testPathfindingWorkerCore() {
+    console.log('\n[48] Pathfinding Worker Core (Q12.A — q12-wk-pathfind-worker)');
+    try {
+        const W = 10;
+        const H = 10;
+        const terrain = new Uint8Array(W * H).fill(1);
+
+        const open = buildPathGrid(W, H, terrain, []);
+        const path = solveWalkable(open, W, H, 0, 0, 9, 9);
+        assert(path !== null, 'Open grid finds a path');
+        assert(path[0].x === 0 && path[0].y === 0, 'Path starts at start tile');
+        assert(path[path.length - 1].x === 9 && path[path.length - 1].y === 9, 'Path ends at target tile');
+        assert(path.length > 1, 'Path has steps');
+
+        const wall = buildPathGrid(W, H, terrain, Array.from({ length: H - 1 }, (_, y) => [3, y + 1]));
+        const detour = solveWalkable(wall, W, H, 0, 5, 9, 5);
+        assert(detour !== null, 'Path exists around wall with top gap');
+        assert(detour.some(p => p.x === 3 && p.y === 0), 'Detour passes through the wall gap');
+
+        const boxed = buildPathGrid(W, H, terrain, [[1, 0], [0, 1], [1, 1]]);
+        assert(solveWalkable(boxed, W, H, 0, 0, 9, 9) === null, 'Enclosed start returns null');
+
+        const blockedTarget = buildPathGrid(W, H, terrain, [[9, 9]]);
+        assert(solveWalkable(blockedTarget, W, H, 0, 0, 9, 9) === null, 'Blocked target returns null');
+        assert(blockedTarget[9 * W + 9] === 0, 'buildGrid marks blocked tile unwalkable');
+
+        const p1 = solveWalkable(open, W, H, 0, 0, 9, 9);
+        const p2 = solveWalkable(open, W, H, 0, 0, 9, 9);
+        assert(JSON.stringify(p1) === JSON.stringify(p2), 'Worker A* is deterministic');
+    } catch (e) {
+        console.log(`  ✗ Pathfinding worker core test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
 
 function testCoverBlindfire() {
     console.log('\n[45] Cover System — Blindfire Aim Penalty Curve');

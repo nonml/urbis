@@ -1,36 +1,40 @@
 /**
- * Pathfinding Worker — A* off the main thread.
+ * Pathfinding Worker — A* fully off the main thread.
  *
- * Protocol:
- *   INIT    → { type:'INIT', sab: SharedArrayBuffer, width: number, height: number }
- *             The SAB contains a Uint8Array where 0=blocked, 1=walkable.
+ * The worker owns the walkability grid. The main thread only sends:
+ *   INIT    → { type:'INIT', width, height, terrain: Uint8Array }
+ *             terrain[i] = 1 when the tile is terrain-walkable (road/sidewalk/park).
+ *             The buffer is transferred once — the worker keeps it.
  *
- *   UPDATE  → { type:'UPDATE', blocked: Uint8Array }
- *             Bulk-copy new walkability data (e.g. after buildings change).
+ *   UPDATE  → { type:'UPDATE', blocked: Array<[x, y]> }
+ *             Rebuilds the grid off-main-thread after building changes.
  *
- *   FIND    → { type:'FIND', id: number, sx: number, sy: number, tx: number, ty: number }
+ *   FIND    → { type:'FIND', id, epoch, citizenId, sx, sy, tx, ty }
  *
  * Responses:
- *   RESULT  → { type:'RESULT', id: number, path: Array<{x,y}> | null }
+ *   READY   → after INIT (grid allocated)
+ *   RESULT  → { type:'RESULT', id, epoch, citizenId, sx, sy, tx, ty, path|null }
+ *
+ * No SharedArrayBuffer: this worker runs on any host, with or without
+ * cross-origin isolation headers. The pure core (buildGrid/solveWalkable)
+ * is exported for headless unit tests and imported with a `self` guard.
  */
 
-const ORTH  = 1;
-const DIAG  = 1.4142135623730951;
+const ORTH = 1;
+const DIAG = 1.4142135623730951;
 
 const DIRS = [
-    [ 1,  0, ORTH], [-1,  0, ORTH],
-    [ 0,  1, ORTH], [ 0, -1, ORTH],
-    [ 1,  1, DIAG], [ 1, -1, DIAG],
-    [-1,  1, DIAG], [-1, -1, DIAG],
+    [1, 0, ORTH], [-1, 0, ORTH],
+    [0, 1, ORTH], [0, -1, ORTH],
+    [1, 1, DIAG], [1, -1, DIAG],
+    [-1, 1, DIAG], [-1, -1, DIAG],
 ];
 
-let walkable = null; // Uint8Array backed by SharedArrayBuffer
-let WIDTH  = 0;
-let HEIGHT = 0;
+const MAX_ITER = 1 << 20;
 
-function isWalkable(x, y) {
-    if (x < 0 || y < 0 || x >= WIDTH || y >= HEIGHT) return false;
-    return walkable[y * WIDTH + x] !== 0;
+function isWalkable(grid, w, h, x, y) {
+    if (x < 0 || y < 0 || x >= w || y >= h) return false;
+    return grid[y * w + x] === 1;
 }
 
 function octile(x1, y1, x2, y2) {
@@ -39,98 +43,153 @@ function octile(x1, y1, x2, y2) {
     return (dx + dy) + (DIAG - 2) * Math.min(dx, dy);
 }
 
-function aStar(sx, sy, tx, ty) {
-    if (!isWalkable(tx, ty)) return null;
+/**
+ * Build the walkability grid from terrain + blocked tiles. Pure.
+ * @param {number} w
+ * @param {number} h
+ * @param {Uint8Array} terrain  1 = terrain-walkable
+ * @param {Array<[number, number]>} blockedList  tile coords to exclude
+ * @returns {Uint8Array} 1 = fully walkable
+ */
+export function buildGrid(w, h, terrain, blockedList) {
+    const blocked = new Set();
+    for (const [bx, by] of blockedList) {
+        if (bx >= 0 && by >= 0 && bx < w && by < h) blocked.add(by * w + bx);
+    }
+    const grid = new Uint8Array(w * h);
+    for (let i = 0; i < w * h; i++) {
+        grid[i] = terrain[i] && !blocked.has(i) ? 1 : 0;
+    }
+    return grid;
+}
 
-    // Encode (x,y) as a single integer for fast map keys
-    const encode = (x, y) => y * WIDTH + x;
+/**
+ * Binary min-heap A* over a walkability grid. Pure and deterministic.
+ * @param {Uint8Array} grid
+ * @param {number} w
+ * @param {number} h
+ * @param {number} sx start x
+ * @param {number} sy start y
+ * @param {number} tx target x
+ * @param {number} ty target y
+ * @returns {Array<{x:number,y:number}> | null}
+ */
+export function solveWalkable(grid, w, h, sx, sy, tx, ty, maxIter = MAX_ITER) {
+    if (!isWalkable(grid, w, h, tx, ty)) return null;
+    if (!isWalkable(grid, w, h, sx, sy)) return null;
 
-    const open     = new Float64Array(WIDTH * HEIGHT * 2); // heap: [f, node] pairs
-    const gScore   = new Float32Array(WIDTH * HEIGHT).fill(Infinity);
-    const parent   = new Int32Array(WIDTH * HEIGHT).fill(-1);
-    const inClosed = new Uint8Array(WIDTH * HEIGHT);
-    let openLen = 0;
+    const size = w * h;
+    const encode = (x, y) => y * w + x;
+    const start = encode(sx, sy);
 
-    const startEnc = encode(sx, sy);
-    const targetEnc = encode(tx, ty);
+    const gScore = new Float32Array(size).fill(Infinity);
+    const parent = new Int32Array(size).fill(-1);
+    const inClosed = new Uint8Array(size);
+    const heapF = new Float64Array(size);
+    const heapN = new Int32Array(size);
+    let heapLen = 0;
 
-    gScore[startEnc] = 0;
-    // Min-heap push
-    open[openLen * 2]     = octile(sx, sy, tx, ty);
-    open[openLen * 2 + 1] = startEnc;
-    openLen++;
+    function swap(i, j) {
+        const f = heapF[i]; heapF[i] = heapF[j]; heapF[j] = f;
+        const n = heapN[i]; heapN[i] = heapN[j]; heapN[j] = n;
+    }
 
-    const MAX_ITER = 4096;
+    function push(f, node) {
+        let i = heapLen++;
+        heapF[i] = f;
+        heapN[i] = node;
+        while (i > 0) {
+            const p = (i - 1) >> 1;
+            if (heapF[p] <= heapF[i]) break;
+            swap(i, p);
+            i = p;
+        }
+    }
+
+    function pop() {
+        const f = heapF[0];
+        const n = heapN[0];
+        heapLen--;
+        heapF[0] = heapF[heapLen];
+        heapN[0] = heapN[heapLen];
+        let i = 0;
+        for (;;) {
+            const l = i * 2 + 1;
+            const r = l + 1;
+            let m = i;
+            if (l < heapLen && heapF[l] < heapF[m]) m = l;
+            if (r < heapLen && heapF[r] < heapF[m]) m = r;
+            if (m === i) break;
+            swap(i, m);
+            i = m;
+        }
+        return [f, n];
+    }
+
+    gScore[start] = 0;
+    push(octile(sx, sy, tx, ty), start);
+
+    const target = encode(tx, ty);
     let iter = 0;
 
-    while (openLen > 0 && iter++ < MAX_ITER) {
-        // Pop minimum
-        let minIdx = 0;
-        for (let i = 1; i < openLen; i++) {
-            if (open[i * 2] < open[minIdx * 2]) minIdx = i;
-        }
-        const f   = open[minIdx * 2];
-        const cur = open[minIdx * 2 + 1];
-        // Remove from open array (swap with last)
-        open[minIdx * 2]     = open[(openLen - 1) * 2];
-        open[minIdx * 2 + 1] = open[(openLen - 1) * 2 + 1];
-        openLen--;
-
-        if (cur === targetEnc) {
-            // Reconstruct
+    while (heapLen > 0 && iter++ < maxIter) {
+        const [f, cur] = pop();
+        if (cur === target) {
             const path = [];
             let node = cur;
             while (node !== -1) {
-                path.push({ x: node % WIDTH, y: Math.floor(node / WIDTH) });
+                path.push({ x: node % w, y: Math.floor(node / w) });
                 node = parent[node];
             }
             path.reverse();
             return path;
         }
-
+        if (inClosed[cur]) continue;
         inClosed[cur] = 1;
-        const cx = cur % WIDTH;
-        const cy = Math.floor(cur / WIDTH);
 
+        const cx = cur % w;
+        const cy = Math.floor(cur / w);
         for (const [dx, dy, cost] of DIRS) {
             const nx = cx + dx;
             const ny = cy + dy;
-            if (!isWalkable(nx, ny)) continue;
+            if (!isWalkable(grid, w, h, nx, ny)) continue;
             const nc = encode(nx, ny);
             if (inClosed[nc]) continue;
-
             const tentG = gScore[cur] + cost;
-            if (tentG < gScore[nc]) {
-                gScore[nc] = tentG;
-                parent[nc] = cur;
-                const h = octile(nx, ny, tx, ty);
-                open[openLen * 2]     = tentG + h;
-                open[openLen * 2 + 1] = nc;
-                openLen++;
-            }
+            if (tentG >= gScore[nc]) continue;
+            gScore[nc] = tentG;
+            parent[nc] = cur;
+            push(tentG + octile(nx, ny, tx, ty), nc);
         }
     }
 
-    return null; // no path
+    return null;
 }
 
-self.onmessage = function(e) {
+let terrainArr = null;
+let walkableGrid = null;
+let gridW = 0;
+let gridH = 0;
+
+function handleMessage(e) {
     const { type } = e.data;
-
     if (type === 'INIT') {
-        WIDTH  = e.data.width;
-        HEIGHT = e.data.height;
-        walkable = new Uint8Array(e.data.sab);
+        gridW = e.data.width;
+        gridH = e.data.height;
+        terrainArr = e.data.terrain;
+        walkableGrid = buildGrid(gridW, gridH, terrainArr, []);
         self.postMessage({ type: 'READY' });
-
     } else if (type === 'UPDATE') {
-        // SAB is already shared — no copy needed. Re-create the view in case
-        // the buffer reference was lost (shouldn't happen, but defensive).
-        if (e.data.sab) walkable = new Uint8Array(e.data.sab);
-
+        if (!terrainArr) return;
+        walkableGrid = buildGrid(gridW, gridH, terrainArr, e.data.blocked || []);
     } else if (type === 'FIND') {
-        const { id, citizenId, sx, sy, tx, ty } = e.data;
-        const path = aStar(sx, sy, tx, ty);
-        self.postMessage({ type: 'RESULT', id, citizenId, path });
+        if (!walkableGrid) return;
+        const { id, epoch, citizenId, sx, sy, tx, ty } = e.data;
+        const path = solveWalkable(walkableGrid, gridW, gridH, sx, sy, tx, ty);
+        self.postMessage({ type: 'RESULT', id, epoch, citizenId, sx, sy, tx, ty, path });
     }
-};
+}
+
+if (typeof self !== 'undefined') {
+    self.onmessage = handleMessage;
+}
