@@ -665,7 +665,7 @@ Verify the autonomous Roo loop works end-to-end.
 - [x] `q11-in-ci-check` CI fails on new non-instanced duplicates
 - [x] `q11-tx-atlas-buildings` building texture atlas
 - [x] `q11-tx-atlas-vehicles` vehicle texture atlas
-- [ ] `q11-tx-array-decals` decal atlas via array texture
+- [x] `q11-tx-array-decals` decal atlas via array texture
 
 ### Q11.E — Shaders & Render Graph
 
