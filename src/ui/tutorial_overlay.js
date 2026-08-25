@@ -214,6 +214,10 @@ export class TutorialOverlay {
         
         // Build action tracking
         this.pendingBuildAction = null;
+
+        // Bound Escape handler — lets the player bail out of the tutorial at any
+        // step. Attached while active, removed on destroy.
+        this._escHandler = null;
     }
 
     /**
@@ -231,7 +235,11 @@ export class TutorialOverlay {
         this.createOverlay();
         this.createHighlight();
         this.createTooltip();
-        
+
+        // Escape dismisses the entire tutorial.
+        this._escHandler = (e) => { if (e.key === 'Escape') this.complete(); };
+        window.addEventListener('keydown', this._escHandler);
+
         // Show first step
         this.showStep();
     }
@@ -308,7 +316,7 @@ export class TutorialOverlay {
             <div id="tutorial-tooltip-footer" style="display: flex; justify-content: space-between; align-items: center;">
                 <span id="tutorial-tooltip-progress" style="color: #888; font-size: 0.9em;"></span>
                 <div style="display: flex; gap: 10px;">
-                    <button id="tutorial-skip-btn" style="display: none; padding: 8px 16px; background: #666; border: none; border-radius: 4px; color: white; cursor: pointer;">Skip</button>
+                    <button id="tutorial-skip-btn" style="padding: 8px 16px; background: #666; border: none; border-radius: 4px; color: white; cursor: pointer;">Skip Tutorial</button>
                     <button id="tutorial-prev-btn" style="padding: 8px 16px; background: #4a90d9; border: none; border-radius: 4px; color: white; cursor: pointer;">Previous</button>
                     <button id="tutorial-next-btn" style="padding: 8px 16px; background: #4a90d9; border: none; border-radius: 4px; color: white; cursor: pointer;">Next</button>
                     <button id="tutorial-close-btn" style="display: none; padding: 8px 16px; background: #4caf50; border: none; border-radius: 4px; color: white; cursor: pointer;">Got it!</button>
@@ -328,7 +336,10 @@ export class TutorialOverlay {
     setupButtonHandlers() {
         document.getElementById('tutorial-next-btn')?.addEventListener('click', () => this.next());
         document.getElementById('tutorial-prev-btn')?.addEventListener('click', () => this.previous());
-        document.getElementById('tutorial-skip-btn')?.addEventListener('click', () => this.skip());
+        // "Skip Tutorial" always ends the whole tutorial, not just one step —
+        // several steps are non-skippable and gate on actions the current 3D
+        // game can't satisfy, so per-step skip would trap the player.
+        document.getElementById('tutorial-skip-btn')?.addEventListener('click', () => this.complete());
         document.getElementById('tutorial-close-btn')?.addEventListener('click', () => this.complete());
     }
 
@@ -390,7 +401,8 @@ export class TutorialOverlay {
         // Button visibility
         if (nextBtn) nextBtn.style.display = this.currentStep.isComplete ? 'none' : 'block';
         if (prevBtn) prevBtn.style.display = this.currentStepIndex === 0 ? 'none' : 'block';
-        if (skipBtn) skipBtn.style.display = this.currentStep.skipable ? 'block' : 'none';
+        // Always offer an escape hatch from the tutorial.
+        if (skipBtn) skipBtn.style.display = 'block';
         if (closeBtn) closeBtn.style.display = this.currentStep.isComplete ? 'block' : 'none';
     }
 
@@ -406,13 +418,10 @@ export class TutorialOverlay {
         
         const targetEl = document.querySelector(this.currentStep.target);
         if (!targetEl) {
-            // Target not found - center highlight
-            this.highlight.style.display = 'block';
-            this.highlight.style.left = '50%';
-            this.highlight.style.top = '50%';
-            this.highlight.style.width = '200px';
-            this.highlight.style.height = '200px';
-            this.highlight.style.transform = 'translate(-50%, -50%)';
+            // Target element is gone (stale tutorial targeting old 2D UI).
+            // Hiding the highlight avoids the 9999px box-shadow blacking out
+            // the whole viewport around an empty centred box.
+            this.highlight.style.display = 'none';
             return;
         }
         
@@ -617,7 +626,12 @@ export class TutorialOverlay {
             clearTimeout(this.advanceTimer);
             this.advanceTimer = null;
         }
-        
+
+        if (this._escHandler) {
+            window.removeEventListener('keydown', this._escHandler);
+            this._escHandler = null;
+        }
+
         if (this.overlay) {
             this.overlay.remove();
             this.overlay = null;

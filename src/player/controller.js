@@ -41,8 +41,10 @@ export function updatePlayerMovement(dt, input, yaw, map, player, playerState) {
 
     if (input.w) forwardInput -= 1;
     if (input.s) forwardInput += 1;
-    if (input.a) rightInput -= 1;
-    if (input.d) rightInput += 1;
+    // The follow camera sits behind the player looking toward +Z, so screen-right
+    // is world -X. A → screen-left (+X), D → screen-right (-X).
+    if (input.a) rightInput += 1;
+    if (input.d) rightInput -= 1;
 
     // Handle sprint
     const wasSprinting = playerState.isSprinting;

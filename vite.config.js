@@ -10,7 +10,20 @@ export default defineConfig({
         emptyOutDir: true,
         manifest: true,
         rollupOptions: {
-            input: 'index.html'
+            input: 'index.html',
+            output: {
+                manualChunks: {
+                    three: ['three'],
+                    three_addons: [
+                        'three/addons/postprocessing/EffectComposer.js',
+                        'three/addons/postprocessing/RenderPass.js',
+                        'three/addons/postprocessing/UnrealBloomPass.js',
+                        'three/addons/objects/Sky.js',
+                    ],
+                    rapier: ['@dimforge/rapier3d-compat'],
+                    svelte: ['svelte'],
+                },
+            },
         }
     },
     server: {

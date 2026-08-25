@@ -75,11 +75,14 @@ export const LIGHTING_PRESETS = {
 export const DEFAULT_LIGHTING_CONFIG = {
     cycleLength: 24, // Game hours per full cycle
     transitionSmoothing: 0.05, // Lerp factor for smooth transitions
+    // Hours 0–5 are the darkest part of the night, NOT dawn. _getPhaseForHour
+    // returns 'night' for any hour outside the ranges below, so 20:00–05:00 all
+    // read as night. Dawn/dusk are the short twilight bands around sunrise/sunset.
     phases: {
-        dawn: { start: 0, end: 6 },
-        day: { start: 6, end: 18 },
-        dusk: { start: 18, end: 21 },
-        night: { start: 21, end: 24 }
+        dawn: { start: 5, end: 7 },
+        day: { start: 7, end: 18 },
+        dusk: { start: 18, end: 20 },
+        night: { start: 20, end: 24 }
     }
 };
 

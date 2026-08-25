@@ -97,6 +97,9 @@ import { createFXSystem } from './render/fx/fx_system.js';
 import { createVFXTriggerManager, setVFXTriggerManager } from './render/fx/vfx_triggers.js';
 import { createParticleSystem } from './world/particle_pool.js';
 import { CharacterPool } from './render/character_pool.js';
+import { RenderGraph } from './render/graph/render_graph.js';
+import { createCSM, updateCSM } from './render/graph/csm.js';
+import { createSkyDome, updateSkyDomeForPhase } from './render/graph/sky.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -429,106 +432,22 @@ export class Renderer3D {
         this._preloadAssets();
     }
 
-    /**
-     * Always-on gradient sky dome. Unlike the Preetham `_sky` (which lives in the
-     * post-processing path and is skipped under testMode / the low preset and
-     * hidden top-down in god mode), this renders in every mode and preset, so the
-     * sky is a proper zenith→horizon gradient instead of a flat fill color. The
-     * Preetham sky, when present, simply layers on top in street view.
-     */
     _createSkyDome() {
-        const mat = new THREE.ShaderMaterial({
-            side: THREE.BackSide,
-            depthWrite: false,
-            fog: false,
-            uniforms: {
-                topColor:     { value: new THREE.Color(0x2c6bb0) }, // deep zenith blue
-                horizonColor: { value: new THREE.Color(0xbcd8ea) }, // pale horizon
-                exponent:     { value: 0.7 },
-            },
-            vertexShader: `
-                varying vec3 vDir;
-                void main() {
-                    vDir = position;
-                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-                }
-            `,
-            fragmentShader: `
-                uniform vec3 topColor;
-                uniform vec3 horizonColor;
-                uniform float exponent;
-                varying vec3 vDir;
-                void main() {
-                    float h = clamp(normalize(vDir).y, 0.0, 1.0);
-                    vec3 col = mix(horizonColor, topColor, pow(h, exponent));
-                    gl_FragColor = vec4(col, 1.0);
-                }
-            `,
-        });
-        const dome = new THREE.Mesh(new THREE.SphereGeometry(480, 24, 16), mat);
-        dome.renderOrder = -10;
-        dome.frustumCulled = false;
+        const dome = createSkyDome(THREE);
         this._skyDome = dome;
         this.scene.add(dome);
     }
 
-    /** 3-cascade CSM: replace single sun shadow with cascaded shadows */
     _setupCSM() {
-        // Disable single shadow on sun light; use cascades instead
-        this.sunLight.castShadow = false;
-        this.sunLight.shadow.mapSize.width = 0;
-        this.sunLight.shadow.mapSize.height = 0;
-
-        // Cascade config: [near, far, resolution]
-        const cascades = [
-            { near: 1, far: 25, res: 1024 },   // Close: high detail
-            { near: 25, far: 75, res: 512 },    // Mid: medium detail
-            { near: 75, far: 150, res: 256 },   // Far: low detail
-        ];
-
-        this._csmLights = [];
-        this._csmCameras = [];
-
-        for (let i = 0; i < cascades.length; i++) {
-            const c = cascades[i];
-            const light = new THREE.DirectionalLight(0xfffbe0, 1.8 / (i + 1));
-            light.position.copy(this.sunLight.position);
-            light.castShadow = true;
-            light.shadow.mapSize.width = c.res;
-            light.shadow.mapSize.height = c.res;
-            light.shadow.camera.near = c.near;
-            light.shadow.camera.far = c.far;
-            light.shadow.camera.left = -50 * (i + 1);
-            light.shadow.camera.right = 50 * (i + 1);
-            light.shadow.camera.top = 50 * (i + 1);
-            light.shadow.camera.bottom = -50 * (i + 1);
-            light.shadow.bias = -0.001;
-            light.shadow.normalBias = 0.02;
-            light.shadow.radius = 2; // PCF soft
-            this.scene.add(light);
-            this._csmLights.push(light);
-            this._csmCameras.push(light.shadow.camera);
-        }
+        const { lights, cams } = createCSM(THREE, this.scene, this.sunLight);
+        this._csmLights = lights;
+        this._csmCameras = cams;
+        this._csm = { lights, cams };
     }
 
-    /** Update CSM frustums based on camera position */
     _updateCSM() {
         if (!this._csmLights || this._csmLights.length === 0) return;
-
-        const camPos = this.camera.position;
-        const sunDir = this.sunLight.position.clone().normalize();
-
-        for (let i = 0; i < this._csmLights.length; i++) {
-            const light = this._csmLights[i];
-            const cam = this._csmCameras[i];
-
-            // Position light to follow sun direction relative to camera
-            const offset = sunDir.clone().multiplyScalar(30 + i * 10);
-            light.position.copy(camPos).add(offset);
-            light.target.position.copy(camPos);
-            light.target.updateMatrix();
-            cam.updateMatrixWorld();
-        }
+        updateCSM(this._csm, this.camera, this.sunLight);
     }
 
     resize() {
@@ -1493,6 +1412,25 @@ export class Renderer3D {
                 this._starPass = starPass;
             }
 
+            // --- Render Graph: explicit ordering + dependency tracking (Q11.E) ---
+            try {
+                this._renderGraph = new RenderGraph(this.composer);
+                this._renderGraph.add('render', renderPass);
+                if (this._ssaoPass) this._renderGraph.add('ssao', this._ssaoPass);
+                if (this._gtaoPass) this._renderGraph.add('gtao', this._gtaoPass);
+                if (this._volFogPass) this._renderGraph.add('volumetric', this._volFogPass);
+                if (this._ssrPass) this._renderGraph.add('ssr', this._ssrPass);
+                this._renderGraph.add('bloom', bloomPass);
+                if (this._taaPass) this._renderGraph.add('taa', this._taaPass);
+                if (this._fxaaPass) this._renderGraph.add('fxaa', this._fxaaPass);
+                if (this._vignettePass) this._renderGraph.add('vignette', this._vignettePass);
+                if (this._starPass) this._renderGraph.add('starfield', this._starPass);
+                this._renderGraph.validate();
+                this._renderGraph.applyOrder();
+            } catch (e) {
+                console.warn('[RenderGraph]', e.message);
+            }
+
             // --- Lightning exposure spike ---
             this._lightningExposure = 1.0;
             this._lightningFlashTime = 0;
@@ -1561,30 +1499,35 @@ export class Renderer3D {
 
     /**
      * Update procedural sky sun position based on time of day (0-24).
+     * Also drives the always-on dome so night stays deep navy even when
+     * the Preetham sky is hidden (god mode / low preset).
      */
     _updateSkyForTime(timeOfDay) {
-        if (!this._sky) return;
-
-        // Map time (0-24h) to sun elevation angle
-        // Sun rises at 6h, peaks at 12h, sets at 18h
-        const sunPhase = ((timeOfDay - 6) / 12) * Math.PI; // 0 at 6h, PI at 18h
-        const elevation = Math.sin(sunPhase); // -1..1, peaks at noon
-        const azimuth = 0.25; // fixed azimuth for consistent shadow direction
-
-        // Below horizon at night
-        const phi = THREE.MathUtils.degToRad(90 - elevation * 60); // 30° to 150° range
+        const sunPhase = ((timeOfDay - 6) / 12) * Math.PI;
+        const elevation = Math.sin(sunPhase);
+        const azimuth = 0.25;
+        const phi = THREE.MathUtils.degToRad(90 - elevation * 60);
         const theta = THREE.MathUtils.degToRad(180 * azimuth);
-
         this._sunPosition.setFromSphericalCoords(1, phi, theta);
-        this._sky.material.uniforms['sunPosition'].value.copy(this._sunPosition);
 
-        // Also move the directional lights to match sky sun position
+        if (this._sky) {
+            this._sky.material.uniforms['sunPosition'].value.copy(this._sunPosition);
+        }
+
+        if (this._skyDome) {
+            let phase = 'night';
+            if (timeOfDay >= 5 && timeOfDay < 7) phase = 'dawn';
+            else if (timeOfDay >= 7 && timeOfDay < 18) phase = 'day';
+            else if (timeOfDay >= 18 && timeOfDay < 20) phase = 'dusk';
+            updateSkyDomeForPhase(this._skyDome, phase);
+        }
+
         if (this.sunLight) {
             const lightDist = 40;
             this.sunLight.position.set(
                 this._sunPosition.x * lightDist,
                 Math.max(5, this._sunPosition.y * lightDist),
-                this._sunPosition.z * lightDist
+                this._sunPosition.z * lightDist,
             );
         }
         if (this.sunLightFar) {
@@ -1592,8 +1535,34 @@ export class Renderer3D {
             this.sunLightFar.position.set(
                 this._sunPosition.x * lightDist,
                 Math.max(5, this._sunPosition.y * lightDist),
-                this._sunPosition.z * lightDist
+                this._sunPosition.z * lightDist,
             );
+        }
+
+        const dayBright = 1.15;
+        const nightBright = 0.62;
+        const isNight = timeOfDay < 5 || timeOfDay >= 20;
+        const isDay = timeOfDay >= 7 && timeOfDay < 18;
+        let target = dayBright;
+        if (isNight) target = nightBright;
+        else if (!isDay) target = (dayBright + nightBright) * 0.5;
+        if (timeOfDay >= 18 && timeOfDay < 20) {
+            const u = (timeOfDay - 18) / 2;
+            target = dayBright + (nightBright - dayBright) * u;
+        } else if (timeOfDay >= 5 && timeOfDay < 7) {
+            const u = (timeOfDay - 5) / 2;
+            target = nightBright + (dayBright - nightBright) * u;
+        }
+        if (this.renderer) {
+            const cur = this.renderer.toneMappingExposure;
+            this.renderer.toneMappingExposure = cur + (target - cur) * 0.04;
+        }
+        if (isNight && this._bloomPass) {
+            this._bloomPass.strength += (this._bloomNightStrength - this._bloomPass.strength) * 0.02;
+            this._bloomPass.threshold += (this._bloomNightThreshold - this._bloomPass.threshold) * 0.02;
+        } else if (!isNight && this._bloomPass) {
+            this._bloomPass.strength += (this._bloomDayStrength - this._bloomPass.strength) * 0.02;
+            this._bloomPass.threshold += (this._bloomDayThreshold - this._bloomPass.threshold) * 0.02;
         }
     }
 
