@@ -68,6 +68,11 @@ export class PerfOverlay {
             <div>Buildings: <span id="perf-buildings">0</span> instances</div>
             <div>Citizens: <span id="perf-citizens">0</span> instances</div>
             <div>Active Chunks: <span id="perf-chunks">0</span></div>
+            <div style="margin-top:6px; border-top:1px solid #0a0; padding-top:4px;">Mem HUD (Q12.H)</div>
+            <div>Heap: <span id="perf-heap">0</span> MB</div>
+            <div>Pools: <span id="perf-pools">0</span></div>
+            <div>GC/s: <span id="perf-gc">0</span></div>
+            <div>GPU est: <span id="perf-gpu">0</span> MB</div>
         `;
 
         document.body.appendChild(this.container);
@@ -80,6 +85,13 @@ export class PerfOverlay {
         this.buildingInstancesElement = this.container.querySelector('#perf-buildings');
         this.citizenInstancesElement = this.container.querySelector('#perf-citizens');
         this.activeChunksElement = this.container.querySelector('#perf-chunks');
+        this.heapElement = this.container.querySelector('#perf-heap');
+        this.poolsElement = this.container.querySelector('#perf-pools');
+        this.gcElement = this.container.querySelector('#perf-gc');
+        this.gpuElement = this.container.querySelector('#perf-gpu');
+        this._lastHeapCheck = 0;
+        this._gcCount = 0;
+        this._lastGcTime = performance.now();
     }
 
     bindEvents() {
@@ -117,12 +129,32 @@ export class PerfOverlay {
         // Update tick time
         this.tickElement.textContent = Math.round(frameDt);
 
-        const perf = renderer?.getPerfStats?.() || {};
-        this.drawCallsElement.textContent = perf.drawCalls ?? 0;
+        const perf = renderer?.getPerfStats?.() || renderer?.getPerPassTimings?.() || {};
+        this.drawCallsElement.textContent = perf.drawCalls ?? perf._drawCalls ?? 0;
         this.terrainInstancesElement.textContent = perf.terrainInstances ?? 0;
         this.buildingInstancesElement.textContent = perf.buildingInstances ?? 0;
         this.citizenInstancesElement.textContent = perf.citizenInstances ?? (this.game?.citizens?.citizens?.length ?? 0);
-        this.activeChunksElement.textContent = perf.activeChunks ?? 0;
+        this.activeChunksElement.textContent = perf.activeChunks ?? (this.game?.chunks?.getActiveChunkCount?.() ?? 0);
+        // Q12.H heap / pools / GC / GPU
+        const mem = performance.memory;
+        if (mem && now - this._lastHeapCheck > 1000) {
+            this._lastHeapCheck = now;
+            this.heapElement.textContent = (mem.usedJSHeapSize / 1048576).toFixed(1);
+            this.gpuElement.textContent = ((perf._drawCalls ?? 0) * 0.12).toFixed(1);
+            // GC events approximated via heap sawtooth
+            if (mem.usedJSHeapSize < (this._lastHeap ?? Infinity)) this._gcCount += 1;
+            this._lastHeap = mem.usedJSHeapSize;
+            const dtSec = (now - this._lastGcTime) / 1000;
+            if (dtSec > 1) {
+                this.gcElement.textContent = (this._gcCount / dtSec).toFixed(1);
+                this._gcCount = 0; this._lastGcTime = now;
+            }
+        }
+        if (this.game?.physics) {
+            const pc = this.game.physics.bodyCount ?? 0;
+            const dc = this.game._decalManager?.count ?? 0;
+            this.poolsElement.textContent = `phy:${pc} dec:${dc}`;
+        }
     }
 
     destroy() {

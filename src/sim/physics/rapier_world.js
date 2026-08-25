@@ -1,9 +1,11 @@
-import RAPIER from '@dimforge/rapier3d-compat';
+let RAPIER = null;
 
 let _initialized = false;
 
 export async function initRapier() {
     if (_initialized) return;
+    const mod = await import('@dimforge/rapier3d-compat');
+    RAPIER = mod.default ?? mod.RAPIER ?? mod;
     await RAPIER.init();
     _initialized = true;
 }
@@ -22,9 +24,16 @@ export class RapierPhysicsWorld {
         this._order = [];
         this._nextId = 1;
         this._cap = options.poolCap ?? DEFAULT_POOL_CAP;
-        if (_initialized) {
+        if (_initialized && RAPIER) {
             this._world = new RAPIER.World(GRAVITY);
         }
+    }
+
+    _ensureWorld() {
+        if (!this._world && _initialized && RAPIER) {
+            this._world = new RAPIER.World(GRAVITY);
+        }
+        return this._world !== null;
     }
 
     get ready() {
@@ -36,12 +45,12 @@ export class RapierPhysicsWorld {
     }
 
     step() {
-        if (!this._world) return;
+        if (!this._ensureWorld()) return;
         this._world.step();
     }
 
     createRigidBody(desc) {
-        if (!this._world) return null;
+        if (!this._ensureWorld()) return null;
         if (this._bodies.size >= this._cap) {
             this._recycleOldest();
         }
