@@ -249,16 +249,16 @@ export function generateDistricts(width, height, seed, districtCount = 3) {
  */
 function getBuildingPools(theme) {
     const pools = {
-        residential: ['house', 'farm', 'school', 'town-hall'],
-        commercial: ['market', 'warehouse', 'town-hall', 'school'],
-        industrial: ['lumber-mill', 'warehouse', 'town-hall'],
-        waterfront: ['market', 'warehouse', 'town-hall', 'farm'],
-        elite: ['house', 'market', 'town-hall', 'school'],
-        docks: ['warehouse', 'port', 'market', 'lumber-mill'],
-        suburbs: ['house', 'farm', 'school', 'park'],
-        oldtown: ['house', 'market', 'library', 'museum', 'restaurant'],
+        residential: ['house', 'apartment', 'school', 'market', 'clinic'],
+        commercial: ['market', 'shopping-mall', 'hotel', 'town-hall', 'apartment'],
+        industrial: ['factory', 'warehouse', 'lumber-mill', 'garage', 'power-plant'],
+        waterfront: ['hotel', 'market', 'restaurant', 'marina', 'apartment'],
+        elite: ['apartment', 'hotel', 'shopping-mall', 'town-hall', 'courthouse'],
+        docks: ['warehouse', 'port', 'factory', 'market', 'container-yard'],
+        suburbs: ['house', 'house', 'farm', 'school', 'park'],
+        oldtown: ['house', 'market', 'library', 'museum', 'restaurant', 'theater'],
     };
-    return pools[theme] || ['house', 'farm', 'market', 'warehouse', 'town-hall'];
+    return pools[theme] || ['house', 'apartment', 'market', 'warehouse', 'town-hall'];
 }
 
 /**

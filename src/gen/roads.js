@@ -1,4 +1,4 @@
-// Road network generator - creates roads and block partitioning
+// Road network generator - GTA/Watch Dogs hierarchical Manhattan grid
 import { RNG } from '../rng.js';
 
 // Road tile types
@@ -13,7 +13,10 @@ export const ROAD_COLORS = {
 };
 
 /**
- * Generates a road network connecting district centers using MST
+ * Generates a real city street grid — not a toy MST.
+ * Every city gets a dense Manhattan grid so you see roads even in screenshots.
+ * Water/mountain in the core is already flattened by Map, so every grid line
+ * lands on buildable land. A ring highway frames the city like GTA.
  * @param {Map} map - Map object with districts
  * @param {number} seed - Random seed
  * @returns {Object} Road network data
@@ -23,77 +26,96 @@ export function generateRoads(map, seed) {
     const width = map.width;
     const height = map.height;
 
-    // Initialize road map
     const roadMap = new Uint8Array(width * height).fill(0);
     const sidewalkMap = new Uint8Array(width * height).fill(0);
-
-    // Get district centers
-    const centers = map.districts.map(d => ({ x: d.center.x, y: d.center.y, id: d.id }));
-
-    // Build MST using Prim's algorithm for guaranteed connectivity
     const roads = [];
-    const connected = new Set();
-    const unconnected = new Set(centers.map(c => c.id));
 
-    // Start from the first district
-    connected.add(centers[0].id);
-    unconnected.delete(centers[0].id);
+    // Spacing tuned so BLOCK count never overflows Uint8 (255 sentinel) and road ratio ~20% (GTA).
+    // SMALL 40 -> 8  =>  ~5x5, CITY 96 -> 12 => ~8x8, MEGA 256 -> 18 => 14x14
+    const spacing = width < 50 ? 8 : width < 100 ? 12 : 18;
+    const avenueEvery = 4; // every 4th line is an avenue (2 tiles wide) — less asphalt
 
-    // Prim's MST: repeatedly add the closest unconnected center
-    while (unconnected.size > 0) {
-        let bestFrom = null;
-        let bestTo = null;
-        let bestDist = Infinity;
+    function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
-        // Find the closest pair (connected, unconnected)
-        for (const connId of connected) {
-            const from = centers.find(c => c.id === connId);
-            if (!from) continue;
+    // --- Horizontal streets (east-west) ---
+    let hIndex = 0;
+    for (let baseY = 3; baseY < height - 3; baseY += spacing) {
+        const jitter = rng.int(-1, 1);
+        const y0 = clamp(baseY + jitter, 2, height - 3);
+        const isAvenue = (hIndex % avenueEvery) === 0;
+        const lanes = isAvenue ? 2 : 1;
+        for (let dy = 0; dy < lanes; dy++) {
+            const y = clamp(y0 + dy, 2, height - 3);
+            // Organic kink every ~12 tiles
+            const road = drawAxisRoad(roadMap, sidewalkMap, width, height,
+                { x: 2, y }, { x: width - 3, y }, rng);
+            roads.push(road);
+        }
+        hIndex++;
+    }
 
-            for (const unconnId of unconnected) {
-                const to = centers.find(c => c.id === unconnId);
-                if (!to) continue;
+    // --- Vertical streets (north-south) ---
+    let vIndex = 0;
+    for (let baseX = 3; baseX < width - 3; baseX += spacing) {
+        const jitter = rng.int(-1, 1);
+        const x0 = clamp(baseX + jitter, 2, width - 3);
+        const isAvenue = (vIndex % avenueEvery) === 0;
+        const lanes = isAvenue ? 2 : 1;
+        for (let dx = 0; dx < lanes; dx++) {
+            const x = clamp(x0 + dx, 2, width - 3);
+            const road = drawAxisRoad(roadMap, sidewalkMap, width, height,
+                { x, y: 2 }, { x, y: height - 3 }, rng);
+            roads.push(road);
+        }
+        vIndex++;
+    }
 
-                // Manhattan distance
-                const dist = Math.abs(from.x - to.x) + Math.abs(from.y - to.y);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestFrom = from;
-                    bestTo = to;
-                }
+    // --- Ring highway (boxed, 2-tile thick) inset 2 from map border ---
+    const inset = 2;
+    const ringYs = [inset, inset + 1, height - 3, height - 2];
+    const ringXs = [inset, inset + 1, width - 3, width - 2];
+    for (const y of ringYs) {
+        if (y < 0 || y >= height) continue;
+        const r = drawRoad(roadMap, sidewalkMap, width, height, { x: inset, y }, { x: width - 1 - inset, y });
+        roads.push(r);
+    }
+    for (const x of ringXs) {
+        if (x < 0 || x >= width) continue;
+        const r = drawRoad(roadMap, sidewalkMap, width, height, { x, y: inset }, { x, y: height - 1 - inset });
+        roads.push(r);
+    }
+
+    // --- Spur every district center to the nearest grid road (guarantees every district is on the grid) ---
+    const centers = map.districts.map(d => ({ x: d.center.x, y: d.center.y, id: d.id }));
+    for (const c of centers) {
+        if (roadMap[c.y * width + c.x] === 1) continue;
+        const nearest = nearestRoadTile(roadMap, width, height, c.x, c.y, 10);
+        if (nearest) {
+            const r = drawManhattan(roadMap, sidewalkMap, width, height, c, nearest);
+            roads.push(r);
+        }
+    }
+
+    // --- 18% of blocks get a mid-block alley (breaks up 8x8 blocks, Watch Dogs texture) ---
+    for (let by = 3 + spacing / 2 | 0; by < height - 3; by += spacing) {
+        for (let bx = 3 + spacing / 2 | 0; bx < width - 3; bx += spacing) {
+            if (rng.next() > 0.18) continue;
+            if (rng.next() < 0.5) {
+                const y = clamp(by + rng.int(-1, 1), 3, height - 4);
+                const x0 = clamp(bx - Math.floor(spacing / 2) + 1, 2, width - 3);
+                const x1 = clamp(bx + Math.floor(spacing / 2) - 1, 2, width - 3);
+                const r = drawRoad(roadMap, sidewalkMap, width, height, { x: x0, y }, { x: x1, y });
+                roads.push(r);
+            } else {
+                const x = clamp(bx + rng.int(-1, 1), 3, width - 4);
+                const y0 = clamp(by - Math.floor(spacing / 2) + 1, 2, height - 3);
+                const y1 = clamp(by + Math.floor(spacing / 2) - 1, 2, height - 3);
+                const r = drawRoad(roadMap, sidewalkMap, width, height, { x, y: y0 }, { x, y: y1 });
+                roads.push(r);
             }
         }
-
-        if (bestFrom && bestTo) {
-            const road = drawRoad(roadMap, sidewalkMap, width, height, bestFrom, bestTo);
-            roads.push(road);
-            connected.add(bestTo.id);
-            unconnected.delete(bestTo.id);
-        } else {
-            break; // Should not happen
-        }
     }
 
-    // Add extra road edges for loops (less for smaller maps to preserve blocks)
-    // SMALL (<50): 10%, CITY (50-100): 20%, MEGA (>100): 30%
-    const extraFactor = width < 50 ? 0.1 : width < 100 ? 0.2 : 0.3;
-    const extraEdges = Math.floor(roads.length * extraFactor);
-    let attempts = 0;
-    let added = 0;
-
-    while (added < extraEdges && attempts < roads.length * 10) {
-        attempts++;
-        const i = rng.int(0, centers.length - 1);
-        const j = rng.int(0, centers.length - 1);
-        if (i !== j) {
-            // Only add if it creates a loop (both already connected)
-            const road = drawRoad(roadMap, sidewalkMap, width, height, centers[i], centers[j]);
-            roads.push(road);
-            added++;
-        }
-    }
-
-    // Create block map (flood fill ignoring road tiles)
     const blockMap = generateBlocks(roadMap, sidewalkMap, width, height);
 
     return {
@@ -102,6 +124,67 @@ export function generateRoads(map, seed) {
         blockMap,
         roads,
         totalRoads: roads.length
+    };
+}
+
+/**
+ * Axis road with one subtle 1-tile kink mid-span so the grid feels hand-laid, not laser-perfect.
+ */
+function drawAxisRoad(roadMap, sidewalkMap, width, height, from, to, rng) {
+    // 35% chance of a single kink
+    if (rng.next() < 0.35 && Math.abs(to.x - from.x) > 12) {
+        const midX = Math.floor((from.x + to.x) / 2) + rng.int(-2, 2);
+        const kinkY = from.y + (rng.next() < 0.5 ? 1 : -1);
+        const ky = Math.max(2, Math.min(height - 3, kinkY));
+        // Only kink if kink keeps roads inside bounds and doesn't create duplicate
+        const a = drawRoad(roadMap, sidewalkMap, width, height, from, { x: midX, y: from.y });
+        const b = drawRoad(roadMap, sidewalkMap, width, height, { x: midX, y: from.y }, { x: midX, y: ky });
+        const c = drawRoad(roadMap, sidewalkMap, width, height, { x: midX, y: ky }, to);
+        // Merge
+        return {
+            from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y },
+            tiles: [...a.tiles, ...b.tiles, ...c.tiles],
+            sidewalks: [...a.sidewalks, ...b.sidewalks, ...c.sidewalks]
+        };
+    }
+    if (rng.next() < 0.35 && Math.abs(to.y - from.y) > 12) {
+        const midY = Math.floor((from.y + to.y) / 2) + rng.int(-2, 2);
+        const kinkX = from.x + (rng.next() < 0.5 ? 1 : -1);
+        const kx = Math.max(2, Math.min(width - 3, kinkX));
+        const a = drawRoad(roadMap, sidewalkMap, width, height, from, { x: from.x, y: midY });
+        const b = drawRoad(roadMap, sidewalkMap, width, height, { x: from.x, y: midY }, { x: kx, y: midY });
+        const c = drawRoad(roadMap, sidewalkMap, width, height, { x: kx, y: midY }, to);
+        return {
+            from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y },
+            tiles: [...a.tiles, ...b.tiles, ...c.tiles],
+            sidewalks: [...a.sidewalks, ...b.sidewalks, ...c.sidewalks]
+        };
+    }
+    return drawRoad(roadMap, sidewalkMap, width, height, from, to);
+}
+
+function nearestRoadTile(roadMap, width, height, x, y, radius) {
+    for (let r = 1; r <= radius; r++) {
+        for (let dy = -r; dy <= r; dy++) {
+            for (let dx = -r; dx <= r; dx++) {
+                if (Math.abs(dx) !== r && Math.abs(dy) !== r) continue;
+                const nx = x + dx, ny = y + dy;
+                if (nx < 0 || nx >= width || ny < 0 || ny >= height) continue;
+                if (roadMap[ny * width + nx] === 1) return { x: nx, y: ny };
+            }
+        }
+    }
+    return null;
+}
+
+function drawManhattan(roadMap, sidewalkMap, width, height, from, to) {
+    const mid = { x: to.x, y: from.y };
+    const a = drawRoad(roadMap, sidewalkMap, width, height, from, mid);
+    const b = drawRoad(roadMap, sidewalkMap, width, height, mid, to);
+    return {
+        from: { x: from.x, y: from.y }, to: { x: to.x, y: to.y },
+        tiles: [...a.tiles, ...b.tiles],
+        sidewalks: [...a.sidewalks, ...b.sidewalks]
     };
 }
 

@@ -2,7 +2,7 @@
 import { chromium } from '@playwright/test';
 
 const PORT = 5200;
-const BASE = `http://localhost:${PORT}/`;
+const BASE = `http://127.0.0.1:${PORT}/`;
 const W = 1920, H = 1080;
 
 const browser = await chromium.launch({ headless: true, args: ['--use-gl=angle'] });
@@ -91,52 +91,18 @@ await page.evaluate(() => {
 
   if (game.player) { game.player.x = cx; game.player.y = cy; }
 
-  // --- Flatten city area to grass and add road grid ---
+  // Real GTA city now ships with a dense Manhattan grid (Map.generate → roads.js grid, 12-tile spacing, 2-tile avenues).
+  // We no longer flatten the terrain nor stamp a fake every-4 grid — we build on top of the real street network.
+  const FLATTEN_R = 20;
   const TERRAIN_GRASS = 1;
   const TERRAIN_ROAD = 4;
-  const TERRAIN_HIGHWAY = 7;
-  const TERRAIN_BRIDGE  = 8;
-  const TERRAIN_TUNNEL  = 9;
-  const FLATTEN_R = 20;
-  for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
-    for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
-      const x = cx + dx, y = cy + dy;
-      if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) continue;
-      if (dx*dx + dy*dy > FLATTEN_R*FLATTEN_R) continue;
-      const isRoadX = (Math.abs(dx) % 4 === 0);
-      const isRoadY = (Math.abs(dy) % 4 === 0);
-      game.map.setTileAt(x, y, (isRoadX || isRoadY) ? TERRAIN_ROAD : TERRAIN_GRASS);
-    }
-  }
-
-  // Highway ring: a box of highway tiles at radius 14-15
-  for (let side = -14; side <= 14; side++) {
-    [
-      // North side
-      [cx + side, cy - 14], [cx + side, cy - 15],
-      // South side
-      [cx + side, cy + 14], [cx + side, cy + 15],
-      // East side
-      [cx + 14, cy + side], [cx + 15, cy + side],
-      // West side
-      [cx - 14, cy + side], [cx - 15, cy + side],
-    ].forEach(([hx, hy]) => {
-      if (hx < 1 || hy < 1 || hx >= game.map.width-1 || hy >= game.map.height-1) return;
-      const t = game.map.getTileAt(hx, hy);
-      if (t === 0 /* water */) {
-        game.map.setTileAt(hx, hy, TERRAIN_BRIDGE);
-      } else if (t === 3 /* mountain */) {
-        game.map.setTileAt(hx, hy, TERRAIN_TUNNEL);
-      } else {
-        game.map.setTileAt(hx, hy, TERRAIN_HIGHWAY);
-      }
-    });
-  }
 
   const canBuild = (x, y) => {
     if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) return false;
+    const idx = y * game.map.width + x;
+    if (game.map.roadMap?.[idx] === 1 || game.map.sidewalkMap?.[idx] === 1) return false;
     const t = game.map.getTileAt(x, y);
-    return t === TERRAIN_GRASS; // only on grass — not road, park, water, mountain
+    return t === TERRAIN_GRASS || t === 6; // grass or park (forest) — not road/water/mountain
   };
 
   // Downtown core: landmark tall buildings, deliberately varied colors
@@ -202,7 +168,7 @@ await page.evaluate(() => {
       addBuilding(cx+dx, cy+dy, OUTER[oi++ % OUTER.length]);
     }
 
-  // Tree-lined road edges: set empty grass tiles adjacent to roads → TERRAIN_PARK
+  // Tree-lined road edges: set empty grass tiles adjacent to real roads → TERRAIN_PARK
   const TERRAIN_PARK_T = 6;
   for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
     for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
@@ -210,11 +176,15 @@ await page.evaluate(() => {
       if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) continue;
       if (game.map.getTileAt(x, y) !== TERRAIN_GRASS) continue;
       if (game.buildings.getBuildingsAt(x, y).length > 0) continue;
-      // Check if any of the 4 cardinal neighbors is TERRAIN_ROAD
-      const isRoadAdj = [
-        game.map.getTileAt(x-1, y), game.map.getTileAt(x+1, y),
-        game.map.getTileAt(x, y-1), game.map.getTileAt(x, y+1),
-      ].some(t => t === TERRAIN_ROAD);
+      const idx = y * game.map.width + x;
+      // Adjacent to a real roadMap tile?
+      const nIdx = (nx, ny) => ny * game.map.width + nx;
+      const isRoadAdj = (
+        (x > 0 && game.map.roadMap?.[nIdx(x - 1, y)] === 1) ||
+        (x < game.map.width - 1 && game.map.roadMap?.[nIdx(x + 1, y)] === 1) ||
+        (y > 0 && game.map.roadMap?.[nIdx(x, y - 1)] === 1) ||
+        (y < game.map.height - 1 && game.map.roadMap?.[nIdx(x, y + 1)] === 1)
+      );
       if (isRoadAdj) game.map.setTileAt(x, y, TERRAIN_PARK_T);
     }
   }
@@ -235,11 +205,10 @@ await page.evaluate(() => {
 
 await page.waitForTimeout(5000); // wait for rebuild + GLTF loading
 
-// Add parked cars along road corridors
+// Add parked cars along real road corridors (roadMap, not terrain)
 await page.evaluate(() => {
   const r = window.game.ui.renderer3d;
   const game = window.game;
-  const TERRAIN_ROAD = 4;
   const carTypes = ['sedan', 'taxi', 'suv', 'van', 'truck', 'hatchback-sports', 'delivery', 'police', 'firetruck', 'garbage-truck', 'bus'];
   const rng = (x, y, s) => {
     let h = (x * 374761393 + y * 668265263 + s * 1274126177) | 0;
@@ -248,14 +217,15 @@ await page.evaluate(() => {
   };
   let carsPlaced = 0;
   const hw = r._mapHalfW, hh = r._mapHalfH;
+  const isRoad = (x, y) => y >= 0 && y < game.map.height && x >= 0 && x < game.map.width && game.map.roadMap?.[y * game.map.width + x] === 1;
   for (let y = 0; y < game.map.height; y++) {
     for (let x = 0; x < game.map.width; x++) {
-      if (game.map.getTileAt(x, y) !== TERRAIN_ROAD) continue;
+      if (!isRoad(x, y)) continue;
       if (rng(x, y, 0) > 0.30) continue; // ~30% of road tiles get a parked car
       const carType = carTypes[Math.floor(rng(x, y, 1) * carTypes.length)];
       const model = r._vehicleModels.get(carType);
       if (!model) continue;
-      const isNS = game.map.getTileAt(x, y - 1) === TERRAIN_ROAD || game.map.getTileAt(x, y + 1) === TERRAIN_ROAD;
+      const isNS = isRoad(x, y - 1) || isRoad(x, y + 1);
       const clone = model.clone(true);
       const wx = x - hw + 0.5;
       const wz = y - hh + 0.5;
@@ -397,9 +367,10 @@ async function shot(name, setup) {
   });
   const base64 = dataUrl.replace(/^data:image\/png;base64,/, '');
   const buf = Buffer.from(base64, 'base64');
-  const { writeFileSync } = await import('fs');
-  writeFileSync(`c:/Users/nonta/Desktop/game/${name}.png`, buf);
-  console.log('Saved', name + '.png');
+  const { writeFileSync, mkdirSync } = await import('fs');
+  mkdirSync('screenshots', { recursive: true });
+  writeFileSync(`screenshots/${name}.png`, buf);
+  console.log('Saved', `screenshots/${name}.png`);
 }
 
 // Camera angles — world (0,0,0) is map center

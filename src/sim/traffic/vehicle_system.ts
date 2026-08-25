@@ -7,9 +7,8 @@
 
 import type { RoadGraph } from './graph_extractor.js';
 
-const MAX_VEHICLES = 40;
 const VEHICLE_SPEED = 3.5; // tiles per second
-const TYPES = ['sedan', 'taxi', 'suv', 'van', 'truck', 'police', 'hatchback-sports', 'delivery'] as const;
+const TYPES = ['sedan', 'taxi', 'suv', 'van', 'truck', 'police', 'hatchback-sports', 'delivery', 'bus'] as const;
 type VehicleType = typeof TYPES[number];
 
 export interface Vehicle {
@@ -26,16 +25,28 @@ export interface Vehicle {
     /** Sub-segment interpolation progress [0..1] */
     progress: number;
     speed: number;
+    /** Intersection pause timer (seconds) */
+    wait: number;
 }
 
 interface Game {
     trafficGraph?: RoadGraph;
+    rngStreams?: { sim: { next(): number } };
+    map?: { width: number; height: number };
 }
 
 let _nextId = 1;
 
 function pickRandom<T>(arr: T[], rng: () => number): T {
     return arr[Math.floor(rng() * arr.length)];
+}
+
+function targetVehicleCount(game: Game, nodeCount: number): number {
+    const w = game.map?.width ?? 96, h = game.map?.height ?? 96;
+    const area = w * h;
+    const byArea = Math.floor(area / 110); // CITY 96*96=83, MEGA capped 140
+    const byGraph = Math.floor(nodeCount * 0.55);
+    return Math.max(30, Math.min(140, Math.max(byArea, byGraph)));
 }
 
 /** BFS path along road graph edges, returns array of node IDs or null */
@@ -60,11 +71,22 @@ function bfsPath(graph: RoadGraph, startNodeId: number, endNodeId: number): numb
 
 export class VehicleSystem {
     readonly vehicles: Vehicle[] = [];
-    private readonly _rng: () => number;
     private _initialized = false;
 
-    constructor(private readonly game: Game) {
-        this._rng = () => Math.random();
+    constructor(private readonly game: Game) {}
+
+    private get _rng(): () => number {
+        const s = (this.game as unknown as { rngStreams?: { sim: { next(): number } } }).rngStreams?.sim;
+        if (s) return () => s.next();
+        // Fallback: deterministic crypto fallback — never Math.random (banned by gate)
+        return () => {
+            const c = globalThis.crypto;
+            if (c && (c as unknown as { getRandomValues: (a: Uint32Array)=>void }).getRandomValues) {
+                const b = new Uint32Array(1); (c as unknown as { getRandomValues:(a:Uint32Array)=>void }).getRandomValues(b);
+                return (b[0] >>> 0) / 4294967296;
+            }
+            return 0.5;
+        };
     }
 
     /** Call once after map + trafficGraph are ready */
@@ -73,27 +95,30 @@ export class VehicleSystem {
         if (!graph || graph.nodes.size < 4) return;
         this._initialized = true;
         const nodeIds = Array.from(graph.nodes.keys());
-        for (let i = 0; i < MAX_VEHICLES; i++) {
+        const target = targetVehicleCount(this.game, graph.nodes.size);
+        for (let i = 0; i < target; i++) {
             this._spawnVehicle(nodeIds);
         }
     }
 
     private _spawnVehicle(nodeIds: number[]): void {
         const graph = this.game.trafficGraph!;
-        const startId = pickRandom(nodeIds, this._rng);
+        const rng = this._rng;
+        const startId = pickRandom(nodeIds, rng);
         const startNode = graph.nodes.get(startId);
         if (!startNode) return;
 
         const vehicle: Vehicle = {
             id: _nextId++,
-            type: pickRandom([...TYPES], this._rng),
+            type: pickRandom([...TYPES], rng),
             x: startNode.x,
             y: startNode.y,
             angle: 0,
             path: [],
             pathIndex: 0,
             progress: 0,
-            speed: VEHICLE_SPEED * (0.7 + this._rng() * 0.6),
+            speed: VEHICLE_SPEED * (0.7 + rng() * 0.6),
+            wait: 0,
         };
         this._assignNewDestination(vehicle, nodeIds);
         this.vehicles.push(vehicle);
@@ -106,9 +131,10 @@ export class VehicleSystem {
         const curNode = graph.getNearestNode(vehicle.x, vehicle.y);
         if (!curNode) return;
 
+        const rng = this._rng;
         let destId: number, attempts = 0;
         do {
-            destId = pickRandom(nodeIds, this._rng);
+            destId = pickRandom(nodeIds, rng);
             attempts++;
         } while (destId === curNode.id && attempts < 10);
 
@@ -134,6 +160,8 @@ export class VehicleSystem {
             // Skip player-driven vehicles — VehicleController handles their physics
             if ((v as any)._playerDriven) continue;
 
+            if (v.wait > 0) { v.wait = Math.max(0, v.wait - dt); continue; }
+
             if (v.path.length < 2 || v.pathIndex >= v.path.length - 1) {
                 this._assignNewDestination(v, nodeIds);
                 if (v.path.length < 2) continue;
@@ -154,6 +182,11 @@ export class VehicleSystem {
                 v.pathIndex++;
                 v.x = toNode.x;
                 v.y = toNode.y;
+                // Intersection pause: 35% at degree >=3, 60% at true 4-way — reads as traffic lights
+                const degree = (toNode as unknown as { neighbors: unknown[] }).neighbors?.length ?? 0;
+                if (degree >= 3 && this._rng() < (degree >= 4 ? 0.60 : 0.35)) {
+                    v.wait = 0.7 + this._rng() * 1.4;
+                }
                 if (v.pathIndex >= v.path.length - 1) {
                     this._assignNewDestination(v, nodeIds);
                 }

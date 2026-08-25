@@ -136,7 +136,8 @@ export class RoadGraph {
 }
 
 /**
- * Extract road graph from map
+ * Extract road graph from map — intersection graph so every 4-way is one node.
+ * Vehicles see a real street network (degree = 2,3,4) and pause at degree ≥3.
  * @param {Object} map - Map object with roadMap
  * @param {Object} [options] - Extraction options
  * @param {number} [options.minRoadLength=2] - Minimum consecutive road tiles
@@ -147,82 +148,101 @@ export function extractRoadGraph(map, options = {}) {
     const width = map.width;
     const height = map.height;
     const roadMap = map.roadMap || new Uint8Array(width * height);
-    const visited = new Set();
     const graph = new RoadGraph(width, height);
+    const isRoad = (x, y) => x >= 0 && y >= 0 && x < width && y < height && roadMap[y * width + x] === 1;
+    const cardinal = [{dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
+    const degree = (x, y) => cardinal.reduce((c, d) => c + (isRoad(x + d.dx, y + d.dy) ? 1 : 0), 0);
 
-    // Directions: 8-connected (including diagonals)
-    const directions = [
-        { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
-        { dx: 0, dy: 1 }, { dx: 0, dy: -1 },
-        { dx: 1, dy: 1 }, { dx: 1, dy: -1 },
-        { dx: -1, dy: 1 }, { dx: -1, dy: -1 }
-    ];
+    // 1) Collect intersection / endpoint nodes (degree != 2) — the Watch Dogs street graph
+    const nodeAt = new Map(); // key -> RoadGraphNode
+    for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+        if (!isRoad(x, y)) continue;
+        const deg = degree(x, y);
+        if (deg !== 2) {
+            const n = graph.getOrCreateNode(x, y);
+            nodeAt.set(`${x},${y}`, n);
+        }
+    }
+    // No intersections (single straight line) -> keep endpoints so graph not empty
+    if (nodeAt.size === 0) {
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) if (isRoad(x, y)) {
+            const first = graph.getOrCreateNode(x, y);
+            nodeAt.set(`${x},${y}`, first);
+            break;
+        }
+    }
 
-    /**
-     * DFS to find connected road segments
-     */
-    function findRoadSegment(startX, startY, segment) {
-        const stack = [{ x: startX, y: startY }];
-        const segmentVisited = new Set();
-        segmentVisited.add(`${startX},${startY}`);
+    // 2) Walk from every node along each cardinal ray until next node, create edge
+    const visitedEdge = new Set();
+    for (const [key, node] of nodeAt) {
+        const [sx, sy] = key.split(',').map(Number);
+        for (const dir of cardinal) {
+            const nx = sx + dir.dx, ny = sy + dir.dy;
+            if (!isRoad(nx, ny)) continue;
+            const edgeKey = `${sx},${sy}->${dir.dx},${dir.dy}`;
+            if (visitedEdge.has(edgeKey)) continue;
+            // Walk until next intersection or dead end
+            let cx = nx, cy = ny, steps = 1;
+            let targetKey = null;
+            const trail = [{x: sx, y: sy}];
+            while (true) {
+                const deg = degree(cx, cy);
+                trail.push({x: cx, y: cy});
+                if (deg !== 2 || nodeAt.has(`${cx},${cy}`)) { targetKey = `${cx},${cy}`; break; }
+                // Continue straight-ish: pick the neighbor that isn't the previous tile
+                let next = null;
+                for (const d of cardinal) {
+                    const tx = cx + d.dx, ty = cy + d.dy;
+                    if (!isRoad(tx, ty)) continue;
+                    // avoid going back
+                    const prev = trail[trail.length - 2];
+                    if (prev && tx === prev.x && ty === prev.y) continue;
+                    next = { x: tx, y: ty }; break;
+                }
+                if (!next) break;
+                cx = next.x; cy = next.y;
+                steps++;
+                if (steps > 500) break;
+            }
+            if (!targetKey) continue;
+            let target = nodeAt.get(targetKey);
+            if (!target) { target = graph.getOrCreateNode(cx, cy); nodeAt.set(targetKey, target); }
+            if (target.id === node.id) continue;
+            const fwd = `${sx},${sy}->${cx},${cy}`;
+            const rev = `${cx},${cy}->${sx},${sy}`;
+            if (visitedEdge.has(fwd) || visitedEdge.has(rev)) continue;
+            graph.connectNodes(node, target);
+            visitedEdge.add(fwd); visitedEdge.add(rev);
+        }
+    }
 
-        while (stack.length > 0) {
-            const current = stack.pop();
-            segment.push(current);
-
-            for (const dir of directions) {
-                const nx = current.x + dir.dx;
-                const ny = current.y + dir.dy;
-                const key = `${nx},${ny}`;
-
-                if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-                if (segmentVisited.has(key)) continue;
-
-                const idx = ny * width + nx;
-                if (roadMap[idx] === 1) {
-                    segmentVisited.add(key);
-                    stack.push({ x: nx, y: ny });
+    // 3) Isolated straight segments (no intersections) — keep as single edge
+    if (graph.nodes.size === 0) {
+        const visited = new Set();
+        const dirs4 = cardinal;
+        function dfs(sx, sy, seg) {
+            const stack = [{x: sx, y: sy}]; visited.add(`${sx},${sy}`);
+            while (stack.length) {
+                const cur = stack.pop(); seg.push(cur);
+                for (const d of dirs4) {
+                    const nx = cur.x + d.dx, ny = cur.y + d.dy;
+                    const k = `${nx},${ny}`;
+                    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+                    if (visited.has(k)) continue;
+                    if (!isRoad(nx, ny)) continue;
+                    visited.add(k); stack.push({x: nx, y: ny});
                 }
             }
         }
-
-        return segment;
-    }
-
-    // Find all connected road segments
-    const roadSegments = [];
-    for (let y = 0; y < height; y++) {
-        for (let x = 0; x < width; x++) {
-            const idx = y * width + x;
-            if (roadMap[idx] === 1 && !visited.has(`${x},${y}`)) {
-                const segment = findRoadSegment(x, y, []);
-                if (segment.length >= minRoadLength) {
-                    roadSegments.push(segment);
-                    for (const p of segment) {
-                        visited.add(`${p.x},${p.y}`);
-                    }
-                }
-            }
+        for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+            if (!isRoad(x, y) || visited.has(`${x},${y}`)) continue;
+            const seg = []; dfs(x, y, seg);
+            if (seg.length < minRoadLength) continue;
+            const nodes = seg.map(p => graph.getOrCreateNode(p.x, p.y));
+            for (let i = 0; i < nodes.length - 1; i++) graph.connectNodes(nodes[i], nodes[i+1]);
         }
+        mergeNearbyNodes(graph, 2);
     }
-
-    // Build graph from segments
-    for (const segment of roadSegments) {
-        // Create nodes for each tile in segment
-        const nodesInSegment = [];
-        for (const pos of segment) {
-            const node = graph.getOrCreateNode(pos.x, pos.y);
-            nodesInSegment.push(node);
-        }
-
-        // Connect consecutive nodes
-        for (let i = 0; i < nodesInSegment.length - 1; i++) {
-            graph.connectNodes(nodesInSegment[i], nodesInSegment[i + 1]);
-        }
-    }
-
-    // Merge nearby nodes (simplify graph)
-    mergeNearbyNodes(graph, 2);
 
     graph.isDirty = false;
     return graph;

@@ -65,13 +65,18 @@ export class Map {
 
     generate() {
         // Generate terrain grid
+        const urban = this.width >= 40; // every preset is a city now — never a swamp
         for (let y = 0; y < this.height; y++) {
             const row = [];
             for (let x = 0; x < this.width; x++) {
-                // Use noise for terrain generation
+                // Use noise for terrain generation — but for urban maps flatten hard.
+                // GTA/Watch Dogs have a river/corridor, not random scattered lakes/mountains.
                 const noiseValue = this.noise.noise(x * 0.08, y * 0.08);
                 let terrain;
-                if (noiseValue < -0.3) {
+                if (urban) {
+                    // Pure urban slab — 100% buildable. Water/forest only via _carveUrbanCanals + park groves.
+                    terrain = TERRAIN_GRASS;
+                } else if (noiseValue < -0.3) {
                     terrain = TERRAIN_WATER;
                 } else if (noiseValue < -0.1) {
                     terrain = TERRAIN_GRASS;
@@ -85,11 +90,27 @@ export class Map {
             this.grid.push(row);
         }
 
-        // Place resource clusters
-        this.placeResourceClusters();
+        // Place resource clusters (urban: parks only, no random lakes)
+        if (!urban) this.placeResourceClusters();
+        else {
+            // Urban parks: 4 small groves away from core, for visual break
+            for (let i = 0; i < 4; i++) {
+                const cx = this.rng.int(0, this.width - 1);
+                const cy = this.rng.int(0, this.height - 1);
+                const dist = Math.hypot(cx - this.width / 2, cy - this.height / 2);
+                if (dist < this.width * 0.35) continue;
+                for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+                    if (this.rng.next() > 0.45) continue;
+                    const nx = Math.max(0, Math.min(this.width - 1, cx + dx));
+                    const ny = Math.max(0, Math.min(this.height - 1, cy + dy));
+                    if (this.grid[ny][nx] === TERRAIN_GRASS) this.grid[ny][nx] = TERRAIN_FOREST;
+                }
+            }
+        }
 
         // Ensure starting area is accessible (grass/plain)
         this.createStartingArea();
+        if (urban) this._carveUrbanCanals();
 
         // Generate districts
         this.generateDistricts();
@@ -120,6 +141,32 @@ export class Map {
         const result = generateDistricts(this.width, this.height, this.seed + 1, districtCount);
         this.districts = result.districts;
         this.districtMap = result.districtMap;
+        // Geography pass: re-theme districts so downtown is elite/commercial,
+        // harbor edge is docks/waterfront, rim is industrial. Prevents toy-town random colors.
+        const cx = this.width / 2, cy = this.height / 2;
+        const maxDist = Math.hypot(cx, cy) || 1;
+        const harborEdge = this.width - 6;
+        for (const d of this.districts) {
+            const dcx = d.center.x, dcy = d.center.y;
+            const distNorm = Math.hypot(dcx - cx, dcy - cy) / maxDist;
+            const nearHarbor = (harborEdge - dcx) < 10 && dcy > this.height * 0.45 && dcy < this.height * 0.85;
+            let theme = d.theme;
+            if (nearHarbor) theme = distNorm < 0.35 ? 'waterfront' : 'docks';
+            else if (distNorm < 0.22) theme = this.rng.next() < 0.55 ? 'elite' : 'commercial';
+            else if (distNorm < 0.38) theme = this.rng.next() < 0.5 ? 'commercial' : 'oldtown';
+            else if (distNorm < 0.60) theme = this.rng.next() < 0.5 ? 'residential' : 'suburbs';
+            else theme = this.rng.next() < 0.55 ? 'industrial' : 'suburbs';
+            if (theme !== d.theme) {
+                d.theme = theme;
+                // Re-derive pools and bias to match new theme
+                const pools = { residential: ['house','apartment','school','market'], commercial: ['market','shopping-mall','hotel','town-hall','office'], industrial: ['factory','warehouse','lumber-mill','garage','port'], waterfront: ['hotel','market','marina','restaurant'], elite: ['apartment','hotel','shopping-mall','town-hall','courthouse'], docks: ['warehouse','port','factory','market','container-yard'], suburbs: ['house','house','farm','school','park'], oldtown: ['house','market','library','museum','restaurant'] };
+                d.buildingPools = pools[theme] || d.buildingPools;
+                if (theme === 'elite' || theme === 'commercial') { d.bias.wealthBias = Math.abs(d.bias.wealthBias) + 0.15; d.securityLevel = Math.min(5, d.securityLevel + 1); }
+                if (theme === 'industrial' || theme === 'docks') { d.bias.wealthBias = -Math.abs(d.bias.wealthBias) - 0.1; d.bias.crimeBias += 0.12; }
+                if (theme === 'elite') d.densityTarget = Math.max(d.densityTarget, Math.floor(d.area / 12));
+                if (theme === 'docks' || theme === 'industrial') d.poiBudget += 1;
+            }
+        }
     }
 
     placeResourceClusters() {
@@ -169,6 +216,39 @@ export class Map {
                     this.grid[y][x] = TERRAIN_GRASS;
                 }
             }
+        }
+    }
+
+    _carveUrbanCanals() {
+        // One thin 2-tile canal hugging the eastern rim + a pocket harbor at SE — reads as Watch Dogs riverfront.
+        // Roads will bridge it via TERRAIN_BRIDGE handling in Map; we just ensure there's a visible water corridor.
+        const canalX = this.width - 5;
+        const harborY = Math.floor(this.height * 0.65);
+        for (let y = 4; y < this.height - 4; y++) {
+            for (let dx = 0; dx < 2; dx++) {
+                const x = canalX + dx;
+                if (x < 0 || x >= this.width) continue;
+                // Break the canal at the avenue crossing every ~18 tiles so blocks aren't severed
+                if (y % 18 < 2) continue;
+                if (this.grid[y][x] === TERRAIN_MOUNTAIN) continue;
+                this.grid[y][x] = TERRAIN_WATER;
+            }
+        }
+        // Pocket harbor 6x6 at SE rim
+        for (let dy = -3; dy <= 3; dy++) for (let dx = -4; dx <= 1; dx++) {
+            const x = this.width - 6 + dx, y = harborY + dy;
+            if (x < 0 || y < 0 || x >= this.width || y >= this.height) continue;
+            if (Math.abs(dx) === 4 && Math.abs(dy) === 3 && this.rng.next() < 0.5) continue;
+            this.grid[y][x] = TERRAIN_WATER;
+        }
+        // Interior park stripe — one linear park through midtown, breaks up slab
+        const parkY = Math.floor(this.height / 2) + this.rng.int(-6, 6);
+        for (let x = Math.floor(this.width * 0.22); x < Math.floor(this.width * 0.78); x++) {
+            if (x % 9 === 0) continue; // gap for avenue
+            if (this.grid[parkY][x] !== TERRAIN_GRASS) continue;
+            if (this.rng.next() < 0.55) this.grid[parkY][x] = TERRAIN_FOREST; // rendered as park
+            const y2 = parkY + 1;
+            if (y2 < this.height && this.grid[y2][x] === TERRAIN_GRASS && this.rng.next() < 0.35) this.grid[y2][x] = TERRAIN_FOREST;
         }
     }
 
