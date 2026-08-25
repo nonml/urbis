@@ -43,6 +43,7 @@ import { validateNPCArchetype } from '../src/content/npcs/schema.js';
 import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/content/npcs/generator.js';
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 import { buildGrid as buildPathGrid, solveWalkable } from '../src/workers/pathfinding_worker.js';
+import { getTargetLocation as schedGetTarget } from '../src/workers/schedule_worker.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -289,6 +290,47 @@ testCoverBlindfire();
 testCoverNpcUse();
 testBehaviorTreeLibrary();
 testPathfindingWorkerCore();
+testScheduleWorkerCore();
+
+function testScheduleWorkerCore() {
+    console.log('\n[49] Schedule Worker Core (Q12.A — q12-wk-schedule-worker)');
+    try {
+        const W = 20;
+        const H = 20;
+        const buildings = [
+            { type: 'house', x: 2, y: 2 },
+            { type: 'farm', x: 10, y: 10 },
+            { type: 'park', x: 3, y: 3 },
+        ];
+        const farmer = { x: 0, y: 0, job: 'farmer', id: 1 };
+
+        let t = schedGetTarget(buildings, W, H, farmer, 'Night');
+        assert(t && t.x === 2 && t.y === 2, 'Night targets home');
+
+        t = schedGetTarget(buildings, W, H, farmer, 'Morning');
+        assert(t && t.x === 10 && t.y === 10, 'Morning targets work (farm)');
+
+        t = schedGetTarget(buildings, W, H, farmer, 'Evening');
+        assert(t && t.x === 2 && t.y === 2, 'Evening returns home');
+
+        const idle = { x: 0, y: 0, job: 'unemployed', id: 2 };
+        t = schedGetTarget(buildings, W, H, idle, 'Day');
+        assert(t && t.x === 3 && t.y === 3, 'Unemployed goes to leisure (park)');
+
+        const noHome = [{ type: 'farm', x: 10, y: 10 }];
+        t = schedGetTarget(noHome, W, H, idle, 'Night');
+        assert(t === null, 'No home at Night returns null');
+
+        const atTile = [{ type: 'market', x: 8, y: 8 }];
+        const atMarket = { x: 8, y: 8, job: 'unemployed', id: 3 };
+        t = schedGetTarget(atTile, W, H, atMarket, 'Night');
+        assert(t && t.x === 8 && t.y === 8, 'Non-house building at tile is home fallback (main parity)');
+    } catch (e) {
+        console.log(`  ✗ Schedule worker core test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
 
 function testPathfindingWorkerCore() {
     console.log('\n[48] Pathfinding Worker Core (Q12.A — q12-wk-pathfind-worker)');

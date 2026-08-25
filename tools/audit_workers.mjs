@@ -85,6 +85,10 @@ check('schedule has _prefetchSchedTarget', sched.includes('_prefetchSchedTarget'
 check('schedule handles UPDATE_BUILDINGS in worker', sched.includes('UPDATE_BUILDINGS'), 'schedule missing UPDATE_BUILDINGS push');
 check('schedule_worker has FIND_TARGET handler', read('src/workers/schedule_worker.js').includes('FIND_TARGET'), 'schedule_worker missing FIND_TARGET');
 check('schedule_worker has UPDATE_BUILDINGS', read('src/workers/schedule_worker.js').includes('UPDATE_BUILDINGS'), 'schedule_worker missing UPDATE_BUILDINGS');
+const schedWorker = read('src/workers/schedule_worker.js');
+check('schedule_worker exports pure target core', schedWorker.includes('export function getTargetLocation'), 'schedule_worker target logic not exportable/testable');
+check('schedule_worker self-guarded handler', schedWorker.includes("typeof self !== 'undefined'"), 'schedule_worker handler not import-safe in Node');
+check('schedule_worker mirrors main at-tile fallback', schedWorker.includes('|| at[0]'), 'schedule_worker findNearestBuilding diverges from main thread');
 
 // 5. CitizenSim uses citizen_worker
 const citizenSim = read('src/sim/citizens/citizen_sim.js');
