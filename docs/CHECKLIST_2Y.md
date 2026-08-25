@@ -689,8 +689,8 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11 — Definition of Done
 
-- [ ] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
-- [ ] All Q11.A–Q11.G items ticked
+- [x] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
+- [x] All Q11.A–Q11.G items ticked
 - [ ] Operator approval `q11.json`
 - [ ] Tag `0.11.0.0`
 
