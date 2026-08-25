@@ -702,26 +702,26 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q12.A — Web Workers
 
-- [ ] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
-- [ ] `q12-wk-schedule-worker` NPC scheduling on worker
-- [ ] `q12-wk-faction-worker` faction sim tick on worker
-- [ ] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
-- [ ] `q12-wk-save-worker` save serialization on worker
-- [ ] `q12-wk-asset-decoder` asset decoder pool on worker
+- [x] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
+- [x] `q12-wk-schedule-worker` NPC scheduling on worker
+- [x] `q12-wk-faction-worker` faction sim tick on worker
+- [x] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
+- [x] `q12-wk-save-worker` save serialization on worker
+- [x] `q12-wk-asset-decoder` asset decoder pool on worker
 
 ### Q12.B — Asset Streaming
 
-- [ ] `q12-st-chunked-load` chunked load with LRU eviction
-- [ ] `q12-st-worker-only` chunk requests/releases never on main thread
-- [ ] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
+- [x] `q12-st-chunked-load` chunked load with LRU eviction
+- [x] `q12-st-worker-only` chunk requests/releases never on main thread
+- [x] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
 
 ### Q12.C — Asset Compression
 
-- [ ] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
-- [ ] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
-- [ ] `q12-cm-runtime-decode` runtime decode in asset worker
-- [ ] `q12-cm-opus-audio` audio shipped as Opus
-- [ ] `q12-cm-music-lazy` music lazy-loaded per district
+- [x] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
+- [x] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
+- [x] `q12-cm-runtime-decode` runtime decode in asset worker
+- [x] `q12-cm-opus-audio` audio shipped as Opus
+- [x] `q12-cm-music-lazy` music lazy-loaded per district
 
 ### Q12.D — GC Audit
 
