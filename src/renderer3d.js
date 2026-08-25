@@ -870,16 +870,18 @@ export class Renderer3D {
                     root.position.x -= center.x;
                     root.position.z -= center.z;
                     root.position.y -= box.min.y;
-                    // Tone down road markings: very bright/white surfaces → muted gray
+                    // GTA dark asphalt: asphalt → near-black, markings stay bright white
                     root.traverse((child) => {
                         if (child.isMesh && child.material) {
                             const m = child.material;
                             if (m.color) {
                                 const lum = m.color.r * 0.299 + m.color.g * 0.587 + m.color.b * 0.114;
-                                if (lum > 0.60) m.color.multiplyScalar(0.38); // aggressively dim road markings
-                                else if (lum > 0.35) m.color.multiplyScalar(0.72); // moderate dim for mid tones
+                                if (lum > 0.85) m.color.multiplyScalar(0.88); // lane markings stay white
+                                else if (lum > 0.60) m.color.multiplyScalar(0.32); // light asphalt → dark
+                                else if (lum > 0.30) m.color.multiplyScalar(0.28); // mid asphalt → very dark
+                                else if (lum > 0.12) m.color.multiplyScalar(0.45);
                             }
-                            if (m.roughness !== undefined) m.roughness = Math.min(0.99, m.roughness + 0.15);
+                            if (m.roughness !== undefined) m.roughness = Math.min(0.99, m.roughness + 0.18);
                             if (m.metalness !== undefined) m.metalness = 0;
                         }
                     });
@@ -2121,17 +2123,24 @@ export class Renderer3D {
                 }
             }
 
-            // Traffic lights at 4-way road intersections — check both terrain and roadMap
+            // Traffic lights at every road intersection (4-way and 3-way T) — check both terrain and roadMap
             {
                 const isRoadAt2 = (x, y) => {
                     const t = this.game.map.getTileAt(x, y);
                     return t === TERRAIN_ROAD || t === TERRAIN_HIGHWAY || this.game.map.roadMap?.[y * this.game.map.width + x] === 1;
                 };
-                const isIntersection = isRoadAt2(tile.x, tile.y - 1) && isRoadAt2(tile.x, tile.y + 1)
-                    && isRoadAt2(tile.x + 1, tile.y) && isRoadAt2(tile.x - 1, tile.y);
-                if (isIntersection && hash(tile.x, tile.y, 300) < 0.85) {
+                const n = isRoadAt2(tile.x, tile.y - 1) ? 1 : 0;
+                const s = isRoadAt2(tile.x, tile.y + 1) ? 1 : 0;
+                const e = isRoadAt2(tile.x + 1, tile.y) ? 1 : 0;
+                const w = isRoadAt2(tile.x - 1, tile.y) ? 1 : 0;
+                const deg = n + s + e + w;
+                const isIntersection = deg >= 3;
+                if (isIntersection && hash(tile.x, tile.y, 300) < 0.90) {
                     const terrainY = this._smoothTerrainY(tile.x, tile.y);
-                    const tl = this._buildTrafficLight(wx + 0.45, terrainY, wz + 0.45);
+                    // corner offset so light clears the road
+                    const ox = e ? 0.42 : w ? -0.42 : 0.35;
+                    const oz = s ? 0.42 : n ? -0.42 : 0.35;
+                    const tl = this._buildTrafficLight(wx + ox, terrainY, wz + oz);
                     objects.push(...tl);
                 }
             }
