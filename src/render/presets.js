@@ -25,6 +25,8 @@ export const PRESETS = {
         decalCap: 128,
         decalPerChunkCap: 16,
         vrs: true,
+        drsMinScale: 0.65,
+        vrsSkyRate: '2x2',
     },
     medium: {
         name: 'Medium',
@@ -46,6 +48,8 @@ export const PRESETS = {
         decalCap: 256,
         decalPerChunkCap: 32,
         vrs: false,
+        drsMinScale: 0.70,
+        vrsSkyRate: '1x1',
     },
     high: {
         name: 'High',
@@ -67,6 +71,8 @@ export const PRESETS = {
         decalCap: 512,
         decalPerChunkCap: 64,
         vrs: false,
+        drsMinScale: 0.75,
+        vrsSkyRate: '1x1',
     },
     ultra: {
         name: 'Ultra',
@@ -88,6 +94,8 @@ export const PRESETS = {
         decalCap: 1024,
         decalPerChunkCap: 128,
         vrs: false,
+        drsMinScale: 0.80,
+        vrsSkyRate: '1x1',
     },
 };
 
@@ -174,6 +182,8 @@ export function applyPreset(renderer, presetName) {
     }
     if (renderer._vrsSupported !== undefined) {
         renderer._vrsEnabled = !!preset.vrs && !!renderer._vrsSupported;
+        renderer._vrsSkyRate = preset.vrsSkyRate || '1x1';
     }
+    if (preset.drsMinScale !== undefined) renderer._drsMinScale = preset.drsMinScale;
     renderer._presetConfig = preset;
 }
