@@ -97,6 +97,10 @@ check('citizen_sim dispatches to worker', citizenSim.includes('_dispatchToWorker
 
 // 6. Faction/audio/save/asset workers have protocol
 check('faction_worker PROTOCOL TICK', read('src/workers/faction_worker.js').includes("type === 'TICK'") || read('src/workers/faction_worker.js').includes('TICK'), 'faction_worker missing TICK');
+const facWorker = read('src/workers/faction_worker.js');
+check('faction_worker exports pure drift core', facWorker.includes('export function tickFactions'), 'faction_worker drift not exportable/testable');
+check('faction_worker self-guarded handler', facWorker.includes("typeof self !== 'undefined'"), 'faction_worker handler not import-safe in Node');
+check('faction_worker has no divergence injection', !facWorker.includes('tickCount'), 'faction_worker drifts diverge from main-thread fallback');
 check('faction_system has isWorkerActive()', read('src/sim/factions/faction_system.js').includes('isWorkerActive'), 'faction_system missing isWorkerActive');
 check('faction_system dispatches TICK to worker', read('src/sim/factions/faction_system.js').includes("_dispatchWorker") && read('src/sim/factions/faction_system.js').includes("type: 'TICK'"), 'faction_system missing dispatch');
 check('faction_system applies pending worker result', read('src/sim/factions/faction_system.js').includes('_applyPendingWorkerResult'), 'faction_system missing apply pending');

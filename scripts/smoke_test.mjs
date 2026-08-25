@@ -44,6 +44,7 @@ import { generateNPCArchetype, generateBatch as generateNPCBatch } from '../src/
 import { sequence, selector, condition, action, inverter, tick as btTick, SUCCESS, FAILURE, RUNNING } from '../src/sim/agents/bt.js';
 import { buildGrid as buildPathGrid, solveWalkable } from '../src/workers/pathfinding_worker.js';
 import { getTargetLocation as schedGetTarget } from '../src/workers/schedule_worker.js';
+import { tickFactions } from '../src/workers/faction_worker.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -291,6 +292,53 @@ testCoverNpcUse();
 testBehaviorTreeLibrary();
 testPathfindingWorkerCore();
 testScheduleWorkerCore();
+testFactionWorkerCore();
+
+function testFactionWorkerCore() {
+    console.log('\n[50] Faction Worker Core (Q12.A — q12-wk-faction-worker)');
+    try {
+        const f = (id, rep, influence) => ({ id, rep, influence });
+
+        let out = [{ id: 'police', rep: 50, influence: 50 }];
+        for (let i = 0; i < 100; i++) out = tickFactions(out, 1);
+        let ref = { rep: 50, influence: 50 };
+        for (let i = 0; i < 100; i++) {
+            const cur = ref.rep;
+            const drift = cur > 0 ? -0.02 : cur < 0 ? 0.02 : 0;
+            ref.rep = Math.max(-100, Math.min(100, Math.round(cur + drift)));
+            ref.influence = Math.max(0, Math.min(100,
+                ref.influence + (ref.rep > 20 ? 0.05 : ref.rep < -20 ? -0.05 : 0)));
+        }
+        assert(out[0].rep === ref.rep && out[0].influence === ref.influence, '100-tick worker drift equals fallback reference');
+
+        out = tickFactions([f('gangs', -50, 50)], 1);
+        for (let i = 0; i < 100; i++) out = tickFactions(out, 1);
+        assert(out[0].rep >= -50 && out[0].rep <= 0, 'Negative rep never crosses zero');
+
+        out = tickFactions([f('corp', 0, 50)], 1);
+        assert(out[0].rep === 0, 'Zero rep stays at 0');
+
+        out = tickFactions([f('citizens', 50, 50)], 1);
+        assert(out[0].influence > 50, 'Influence rises when rep > 20');
+
+        out = tickFactions([f('citizens', -50, 50)], 1);
+        assert(out[0].influence < 50, 'Influence falls when rep < -20');
+
+        out = tickFactions([f('police', 100, 50)], 1);
+        assert(out[0].rep <= 100, 'Rep clamps at +100');
+
+        const p1 = tickFactions([f('police', 30, 40)], 1);
+        const p2 = tickFactions([f('police', 30, 40)], 1);
+        assert(JSON.stringify(p1) === JSON.stringify(p2), 'Faction drift is deterministic');
+
+        const fallbackDrift = Math.round(30 - 0.02);
+        assert(p1[0].rep === fallbackDrift, 'Worker drift matches main-thread fallback formula');
+    } catch (e) {
+        console.log(`  ✗ Faction worker core test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
 
 function testScheduleWorkerCore() {
     console.log('\n[49] Schedule Worker Core (Q12.A — q12-wk-schedule-worker)');
