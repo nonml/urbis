@@ -677,20 +677,20 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q11-drs-impl` dynamic resolution scaling with min-bound user setting
 - [x] `q11-drs-budget-driven` triggers when frame time exceeds budget for N frames
-- [x] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
-- [x] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
+- [ ] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
+- [ ] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
 
 ### Q11.G — Draw-Call & Per-Pass Budget
 
-- [x] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
-- [x] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
-- [x] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
-- [x] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
+- [ ] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
+- [ ] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
+- [ ] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
+- [ ] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
 
 ### Q11 — Definition of Done
 
-- [x] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
-- [x] All Q11.A–Q11.G items ticked
+- [ ] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
+- [ ] All Q11.A–Q11.G items ticked
 - [ ] Operator approval `q11.json`
 - [ ] Tag `0.11.0.0`
 
