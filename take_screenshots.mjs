@@ -221,7 +221,7 @@ await page.evaluate(() => {
   for (let y = 0; y < game.map.height; y++) {
     for (let x = 0; x < game.map.width; x++) {
       if (!isRoad(x, y)) continue;
-      if (rng(x, y, 0) > 0.30) continue; // ~30% of road tiles get a parked car
+      if (rng(x, y, 0) > 0.08) continue; // ~8% parked — readable, not a parking lot
       const carType = carTypes[Math.floor(rng(x, y, 1) * carTypes.length)];
       const model = r._vehicleModels.get(carType);
       if (!model) continue;

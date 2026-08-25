@@ -2062,12 +2062,13 @@ export class Renderer3D {
                 modelName = 'road-straight';
             }
 
+            const terrainY = this._smoothTerrainY(tile.x, tile.y);
             const model = this._roadModels.get(modelName);
             if (model) {
                 if (!roadInstances.has(modelName)) roadInstances.set(modelName, []);
-                roadInstances.get(modelName).push({ x: wx, y: 0.09, z: wz, rotY: rotation });
+                roadInstances.get(modelName).push({ x: wx, y: terrainY + 0.02, z: wz, rotY: rotation });
             } else {
-                fallbackRoads.push({ x: wx, z: wz });
+                fallbackRoads.push({ x: wx, y: terrainY + 0.015, z: wz });
             }
 
             // Street props: only in urban core (radius ≤ 14 from map center)
@@ -2177,16 +2178,17 @@ export class Renderer3D {
     }
 
     _buildInstancedRoadFallback(instances) {
-        const geo = new THREE.BoxGeometry(1, 0.18, 1);
-        const mat = new THREE.MeshPhysicalMaterial({ color: 0x888888, roughness: 0.8, metalness: 0.0, clearcoat: 0, clearcoatRoughness: 0.4 });
+        const geo = new THREE.PlaneGeometry(1, 1);
+        geo.rotateX(-Math.PI / 2);
+        const mat = new THREE.MeshStandardMaterial({ color: 0x2e2e2e, roughness: 0.92, metalness: 0.0 });
         const im = new THREE.InstancedMesh(geo, mat, instances.length);
-        im.castShadow = true;
+        im.castShadow = false;
         im.receiveShadow = true;
         im.userData.isRoad = true;
         const dummy = new THREE.Object3D();
         for (let i = 0; i < instances.length; i++) {
             const t = instances[i];
-            dummy.position.set(t.x, 0.09, t.z);
+            dummy.position.set(t.x, t.y, t.z);
             dummy.rotation.set(0, 0, 0);
             dummy.scale.setScalar(1);
             dummy.updateMatrix();
@@ -2948,8 +2950,11 @@ export class Renderer3D {
     /**
      * Additive rolling-hills height (≥ 0) at continuous tile coordinates.
      * Three octaves: broad swells, medium folds, fine surface detail.
+     * Urban maps (CITY/MEGA) are flat — Watch Dogs/GTA don't put skyscrapers on mountains.
      */
     _baseElevation(gx, gz) {
+        // Flat slab for any urban-sized map; hills only for tiny test maps.
+        if ((this.game?.map?.width ?? 0) >= 40) return 0;
         const o1 = this._valueNoise(gx / 24, gz / 24);
         const o2 = this._valueNoise(gx / 9, gz / 9);
         const o3 = this._valueNoise(gx / 3.5, gz / 3.5);
@@ -3877,9 +3882,10 @@ export class Renderer3D {
             });
         }
 
-        // Sparse trees dotting the open grassland — ~5% of grass tiles
+        // Sparse trees dotting the open grassland — ~5% normally, 0.6% in urban (don't hide GTA streets)
+        const grassChance = (this.game?.map?.width ?? 0) >= 40 ? 0.006 : 0.05;
         for (const tile of grassTiles) {
-            if (hash(tile.x, tile.y, 200) > 0.05) continue;
+            if (hash(tile.x, tile.y, 200) > grassChance) continue;
             const model = hash(tile.x, tile.y, 210) > 0.45 ? treeLarge : treeSmall;
             if (!model) continue;
             treeInstances.push({
