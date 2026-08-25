@@ -3907,23 +3907,25 @@ export class Renderer3D {
             objects.push(...this._buildInstancedTrees(model, instances));
         }
 
-        // Instanced grass billboards — 1 draw per chunk
-        const grassCandidates = [...grassTiles, ...parkTiles];
-        if (grassCandidates.length > 0) {
-            const blades = [];
-            for (const tile of grassCandidates) {
-                const count = 2 + Math.floor(hash(tile.x, tile.y, 300) * 4);
-                for (let i = 0; i < count; i++) {
-                    const ox = (hash(tile.x, tile.y, 310 + i) - 0.5) * 0.8;
-                    const oz = (hash(tile.x, tile.y, 320 + i) - 0.5) * 0.8;
-                    const rot = hash(tile.x, tile.y, 330 + i) * Math.PI;
-                    const h = 0.06 + hash(tile.x, tile.y, 340 + i) * 0.08;
-                    blades.push({ x: tile.x, y: tile.y, ox, oz, rot, h });
+        // Instanced grass billboards — skip in urban (clutters GTA streets)
+        if ((this.game?.map?.width ?? 0) < 40) {
+            const grassCandidates = [...grassTiles, ...parkTiles];
+            if (grassCandidates.length > 0) {
+                const blades = [];
+                for (const tile of grassCandidates) {
+                    const count = 2 + Math.floor(hash(tile.x, tile.y, 300) * 4);
+                    for (let i = 0; i < count; i++) {
+                        const ox = (hash(tile.x, tile.y, 310 + i) - 0.5) * 0.8;
+                        const oz = (hash(tile.x, tile.y, 320 + i) - 0.5) * 0.8;
+                        const rot = hash(tile.x, tile.y, 330 + i) * Math.PI;
+                        const h = 0.06 + hash(tile.x, tile.y, 340 + i) * 0.08;
+                        blades.push({ x: tile.x, y: tile.y, ox, oz, rot, h });
+                    }
                 }
-            }
-            if (blades.length > 0) {
-                const grassMesh = this._buildGrassBillboards(blades, hash);
-                if (grassMesh) objects.push(grassMesh);
+                if (blades.length > 0) {
+                    const grassMesh = this._buildGrassBillboards(blades, hash);
+                    if (grassMesh) objects.push(grassMesh);
+                }
             }
         }
 
