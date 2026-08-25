@@ -146,29 +146,26 @@ await page.evaluate(() => {
     return true;
   };
 
-  // Downtown: dense 7x7 grid (avoid road tiles at multiples of 4)
-  let di = 0;
-  for (let dy = -7; dy <= 7; dy++)
-    for (let dx = -7; dx <= 7; dx++)
-      addBuilding(cx+dx, cy+dy, DOWNTOWN[di++ % DOWNTOWN.length]);
-
-  // Mid ring: radius 8-14
-  let mi = 0;
-  for (let dy = -14; dy <= 14; dy++)
-    for (let dx = -14; dx <= 14; dx++) {
-      const d = Math.sqrt(dx*dx+dy*dy);
-      if (d < 8 || d > 14) continue;
-      addBuilding(cx+dx, cy+dy, MIDRING[mi++ % MIDRING.length]);
+  // District-aware fill — every buildable parcel tile gets a district-matching building.
+  // This fills blocks like GTA (not scattered), so the grid reads as city blocks.
+  for (let dy = -FLATTEN_R; dy <= FLATTEN_R; dy++) {
+    for (let dx = -FLATTEN_R; dx <= FLATTEN_R; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (dx*dx+dy*dy > FLATTEN_R*FLATTEN_R) continue;
+      if (!canBuild(x, y)) continue;
+      if (game.buildings.getBuildingsAt(x, y).length > 0) continue;
+      const districtId = game.map.getDistrictAt(x, y);
+      const district = game.map.districts.find(d => d.id === districtId);
+      const pool = district?.buildingPools || DOWNTOWN;
+      const h = ((x * 374761393 ^ y * 668265263) >>> 0) % pool.length;
+      let type = pool[h];
+      if (type === 'park') continue;
+      if (type === 'farm' && Math.hypot(dx, dy) < 9) type = 'apartment';
+      if (type === 'container-yard' || type === 'marina' || type === 'office') type = 'warehouse';
+      // Downtown towers get extra height via skyscraper variants (handled in renderer)
+      addBuilding(x, y, type);
     }
-
-  // Outer: radius 15-18
-  let oi = 0;
-  for (let dy = -18; dy <= 18; dy++)
-    for (let dx = -18; dx <= 18; dx++) {
-      const d = Math.sqrt(dx*dx+dy*dy);
-      if (d < 15 || d > 18) continue;
-      addBuilding(cx+dx, cy+dy, OUTER[oi++ % OUTER.length]);
-    }
+  }
 
   // Tree-lined road edges: set empty grass tiles adjacent to real roads → TERRAIN_PARK
   const TERRAIN_PARK_T = 6;

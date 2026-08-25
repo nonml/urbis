@@ -2129,7 +2129,7 @@ export class Renderer3D {
                 };
                 const isIntersection = isRoadAt2(tile.x, tile.y - 1) && isRoadAt2(tile.x, tile.y + 1)
                     && isRoadAt2(tile.x + 1, tile.y) && isRoadAt2(tile.x - 1, tile.y);
-                if (isIntersection && hash(tile.x, tile.y, 300) < 0.5) {
+                if (isIntersection && hash(tile.x, tile.y, 300) < 0.85) {
                     const terrainY = this._smoothTerrainY(tile.x, tile.y);
                     const tl = this._buildTrafficLight(wx + 0.45, terrainY, wz + 0.45);
                     objects.push(...tl);
@@ -2445,6 +2445,7 @@ export class Renderer3D {
         const meshes = [];
         const waterTiles = [];
         const roadTiles = [];
+        const sidewalkTiles = [];
         const highwayTiles = [];
         const bridgeTiles = [];
         const tunnelTiles = [];
@@ -2463,7 +2464,9 @@ export class Renderer3D {
                 if (terrain === TERRAIN_WATER) waterTiles.push({ x, y });
                 // Real city grid lives in roadMap — terrain is all grass in new urban maps.
                 const onRoadMap = this.game.map.roadMap?.[y * mapW + x] === 1;
+                const onWalk = this.game.map.sidewalkMap?.[y * mapW + x] === 1;
                 if (terrain === TERRAIN_ROAD || onRoadMap) roadTiles.push({ x, y });
+                else if (onWalk || terrain === TERRAIN_SIDEWALK) sidewalkTiles.push({ x, y });
                 if (terrain === TERRAIN_HIGHWAY) highwayTiles.push({ x: x, y: y });
                 if (terrain === TERRAIN_BRIDGE) bridgeTiles.push({ x: x, y: y });
                 if (terrain === TERRAIN_TUNNEL) tunnelTiles.push({ x: x, y: y });
@@ -2477,10 +2480,37 @@ export class Renderer3D {
             for (const t of roadTiles) { const k = `${t.x},${t.y}`; if (!seen.has(k)) { seen.add(k); uniq.push(t); } }
             roadTiles.length = 0; roadTiles.push(...uniq);
         }
+        if (sidewalkTiles.length > 1) {
+            const seen = new Set();
+            const uniq = [];
+            for (const t of sidewalkTiles) { const k = `${t.x},${t.y}`; if (!seen.has(k)) { seen.add(k); uniq.push(t); } }
+            sidewalkTiles.length = 0; sidewalkTiles.push(...uniq);
+        }
 
         // Water: animated plane
         if (waterTiles.length > 0) {
             meshes.push(...this._buildWaterMeshForTiles(waterTiles));
+        }
+
+        // Sidewalks: light concrete slabs framing the streets (GTA curb)
+        if (sidewalkTiles.length > 0) {
+            const swGeom = new THREE.PlaneGeometry(1, 1);
+            swGeom.rotateX(-Math.PI / 2);
+            const swMat = new THREE.MeshStandardMaterial({ color: 0x9a9a9a, roughness: 0.9, metalness: 0.0 });
+            const swMesh = new THREE.InstancedMesh(swGeom, swMat, sidewalkTiles.length);
+            swMesh.receiveShadow = true;
+            swMesh.userData.isRoad = true;
+            const dSw = new THREE.Object3D();
+            for (let i = 0; i < sidewalkTiles.length; i++) {
+                const t = sidewalkTiles[i];
+                const wx = t.x - this._mapHalfW + 0.5;
+                const wz = t.y - this._mapHalfH + 0.5;
+                dSw.position.set(wx, this._smoothTerrainY(t.x, t.y) + 0.012, wz);
+                dSw.updateMatrix();
+                swMesh.setMatrixAt(i, dSw.matrix);
+            }
+            swMesh.instanceMatrix.needsUpdate = true;
+            meshes.push(swMesh);
         }
 
         // Roads: 3D road models
