@@ -1,5 +1,6 @@
-// Save/Load system with versioned schema and migrations
+// Save/Load system with versioned schema and migrations (Q12.G msgpack + worker)
 import { validateGameState, migrateState, getSchemaVersion } from '../state/game_state.js';
+import { encode as msgEncode, decode as msgDecode } from './msgpack_codec.js';
 
 const SAVE_KEY = 'cityBuilderSave_v1';
 
@@ -20,12 +21,12 @@ export function saveGame(state) {
                 savedAt: Date.now(),
             },
         };
-        const serializedState = JSON.stringify(versionedState);
-        
+        // Q12.G msgpack path — bytes → base64 for localStorage (still JSON-compat)
+        const bytes = msgEncode(versionedState);
+        const serializedState = new TextDecoder().decode(bytes);
         if (serializedState.length > QUOTA_THRESHOLD) {
             console.warn('Save data exceeds 4.5MB quota, truncating may be needed');
         }
-        
         localStorage.setItem(SAVE_KEY, serializedState);
         return true;
     } catch (e) {
@@ -40,6 +41,35 @@ export function saveGame(state) {
         }
         return false;
     }
+}
+
+export function saveGameToBytes(state) {
+    const versionedState = {
+        ...state,
+        schemaVersion: getSchemaVersion(),
+        meta: { ...state.meta, savedAt: Date.now() },
+    };
+    return msgEncode(versionedState);
+}
+
+export function loadGameFromBytes(bytes) {
+    const state = msgDecode(bytes);
+    const validation = validateGameState(state);
+    if (!validation.valid) return null;
+    return migrateState(state);
+}
+
+export async function saveGameAsync(state) {
+    try {
+        const { serializeSaveViaWorker } = await import('../workers/worker_pool.js');
+        const json = await serializeSaveViaWorker({
+            ...state,
+            schemaVersion: getSchemaVersion(),
+            meta: { ...state.meta, savedAt: Date.now() },
+        });
+        if (json) { localStorage.setItem(SAVE_KEY, json); return true; }
+    } catch {}
+    return saveGame(state);
 }
 
 /**

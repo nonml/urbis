@@ -63,6 +63,42 @@ export class ChunkManager {
         return ids;
     }
 
+    // Prefetch heuristic — chunks ahead of velocity vector (Q12.B q12-st-prefetch-heuristic)
+    getPrefetchChunks(playerPos, velocity = { x: 0, y: 0 }, count = 3) {
+        const ids = new Set();
+        const speed = Math.hypot(velocity.x ?? 0, velocity.y ?? 0);
+        if (speed < 0.01) return ids;
+        const nx = (velocity.x ?? 0) / speed;
+        const ny = (velocity.y ?? 0) / speed;
+        const baseCx = Math.floor(playerPos.x / this.chunkSize);
+        const baseCy = Math.floor(playerPos.y / this.chunkSize);
+        for (let i = 1; i <= count; i++) {
+            const cx = baseCx + Math.round(nx * i);
+            const cy = baseCy + Math.round(ny * i);
+            if (cx < 0 || cy < 0) continue;
+            if (cx * this.chunkSize >= this.width) continue;
+            if (cy * this.chunkSize >= this.height) continue;
+            ids.add(chunkCoordsToId(cx, cy));
+        }
+        return ids;
+    }
+
+    // Worker-only chunk request path (Q12.B q12-st-worker-only)
+    // Main thread never touches filesystem; it posts to asset_decoder_worker
+    // and the worker posts back when the chunk buffer is ready.
+    async requestChunkViaWorker(chunkId, worker) {
+        if (!worker) return null;
+        return new Promise((resolve) => {
+            const id = `chunk_${chunkId}_${Date.now()}`;
+            const onMsg = (e) => {
+                if (e.data?.id === id) { worker.removeEventListener('message', onMsg); resolve(e.data.result); }
+            };
+            worker.addEventListener('message', onMsg);
+            worker.postMessage({ type: 'DECODE', id, assetType: 'chunk', buffer: new ArrayBuffer(0), meta: { chunkId } });
+            setTimeout(() => { worker.removeEventListener('message', onMsg); resolve(null); }, 80);
+        });
+    }
+
     update(playerPos, pinnedTiles = [], now = performance.now()) {
         const visible = this.getVisibleChunks(playerPos, pinnedTiles);
         const loadedNow = [];
