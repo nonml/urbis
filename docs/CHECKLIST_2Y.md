@@ -671,26 +671,26 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q11-sh-uber-audit` shader permutation count audited; flag-defines collapsed
 - [x] `q11-rg-explicit-ordering` render graph with explicit pass ordering + dependency tracking
-- [x] `q11-rg-no-implicit-mut` audit verifies no implicit `renderTarget` mutation across passes
+- [ ] `q11-rg-no-implicit-mut` audit verifies no implicit `renderTarget` mutation across passes
 
 ### Q11.F — Dynamic Resolution & VRS
 
-- [x] `q11-drs-impl` dynamic resolution scaling with min-bound user setting
-- [x] `q11-drs-budget-driven` triggers when frame time exceeds budget for N frames
-- [x] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
-- [x] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
+- [ ] `q11-drs-impl` dynamic resolution scaling with min-bound user setting
+- [ ] `q11-drs-budget-driven` triggers when frame time exceeds budget for N frames
+- [ ] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
+- [ ] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
 
 ### Q11.G — Draw-Call & Per-Pass Budget
 
-- [x] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
-- [x] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
-- [x] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
-- [x] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
+- [ ] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
+- [ ] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
+- [ ] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
+- [ ] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
 
 ### Q11 — Definition of Done
 
-- [x] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
-- [x] All Q11.A–Q11.G items ticked
+- [ ] Reference scene `medium+120-NPCs+rain+night` ≥ 60 fps at "High"
+- [ ] All Q11.A–Q11.G items ticked
 - [ ] Operator approval `q11.json`
 - [ ] Tag `0.11.0.0`
 
@@ -702,26 +702,26 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q12.A — Web Workers
 
-- [x] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
-- [x] `q12-wk-schedule-worker` NPC scheduling on worker
-- [x] `q12-wk-faction-worker` faction sim tick on worker
-- [x] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
-- [x] `q12-wk-save-worker` save serialization on worker
-- [x] `q12-wk-asset-decoder` asset decoder pool on worker
+- [ ] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
+- [ ] `q12-wk-schedule-worker` NPC scheduling on worker
+- [ ] `q12-wk-faction-worker` faction sim tick on worker
+- [ ] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
+- [ ] `q12-wk-save-worker` save serialization on worker
+- [ ] `q12-wk-asset-decoder` asset decoder pool on worker
 
 ### Q12.B — Asset Streaming
 
-- [x] `q12-st-chunked-load` chunked load with LRU eviction
-- [x] `q12-st-worker-only` chunk requests/releases never on main thread
-- [x] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
+- [ ] `q12-st-chunked-load` chunked load with LRU eviction
+- [ ] `q12-st-worker-only` chunk requests/releases never on main thread
+- [ ] `q12-st-prefetch-heuristic` prefetch chunks in player's likely direction
 
 ### Q12.C — Asset Compression
 
-- [x] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
-- [x] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
-- [x] `q12-cm-runtime-decode` runtime decode in asset worker
-- [x] `q12-cm-opus-audio` audio shipped as Opus
-- [x] `q12-cm-music-lazy` music lazy-loaded per district
+- [ ] `q12-cm-ktx2-textures` all textures shipped as KTX2 (Basis ETC1S/UASTC)
+- [ ] `q12-cm-meshopt-geometry` geometry via meshopt or Draco
+- [ ] `q12-cm-runtime-decode` runtime decode in asset worker
+- [ ] `q12-cm-opus-audio` audio shipped as Opus
+- [ ] `q12-cm-music-lazy` music lazy-loaded per district
 
 ### Q12.D — GC Audit
 
