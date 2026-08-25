@@ -27,3 +27,5 @@ tools/agent/tests/tmp/
 
 # Runtime screenshot captures (not baselines)
 scripts/*.png
+.playwright-mcp/
+screenshots/
