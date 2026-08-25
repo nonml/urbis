@@ -82,7 +82,7 @@ export async function createRenderer3D(game, canvas) {
     await loadThreeJS();
     return new Renderer3D(game, canvas);
 }
-import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK, TERRAIN_HIGHWAY, TERRAIN_BRIDGE, TERRAIN_TUNNEL, BUILDING_TYPES, BUILDING_3D } from './constants.js';
+import { TERRAIN_WATER, TERRAIN_GRASS, TERRAIN_FOREST, TERRAIN_MOUNTAIN, TERRAIN_ROAD, TERRAIN_SIDEWALK, TERRAIN_PARK, TERRAIN_HIGHWAY, TERRAIN_BRIDGE, TERRAIN_TUNNEL, TERRAIN_COLORS, BUILDING_TYPES, BUILDING_3D } from './constants.js';
 import { eventBus, EVENT_TYPES } from './sim/events.js';
 import { ZONE_TYPES } from './sim/zoning/zoning.js';
 import { createDayNightCycle, DAY_PHASES } from './sim/day_night.js';
@@ -2541,7 +2541,10 @@ export class Renderer3D {
             t.needsUpdate = true;
             return t;
         };
-        const baseTex = this._terrainTextures.get(dominantTerrain) ?? this._terrainTextures.get(TERRAIN_GRASS) ?? this._terrainTextures.get(0);
+        let baseTex = this._terrainTextures.get(dominantTerrain)
+            ?? this._terrainTextures.get(TERRAIN_GRASS)
+            ?? this._terrainTextures.get(0);
+        if (!baseTex) baseTex = this._getProceduralTerrainTexture(dominantTerrain);
         const baseNorm = this._terrainNormals?.get(dominantTerrain) ?? this._terrainNormals?.get(TERRAIN_GRASS);
         const tex = cloneTex(baseTex);
         const normTex = cloneTex(baseNorm);
@@ -2851,6 +2854,54 @@ export class Renderer3D {
         const n00 = this._elevHash(x0, z0), n10 = this._elevHash(x0 + 1, z0);
         const n01 = this._elevHash(x0, z0 + 1), n11 = this._elevHash(x0 + 1, z0 + 1);
         return (n00 + (n10 - n00) * sx) * (1 - sz) + (n01 + (n11 - n01) * sx) * sz;
+    }
+
+    _getProceduralTerrainTexture(type) {
+        if (!this._procTerrainCache) this._procTerrainCache = new Map();
+        if (this._procTerrainCache.has(type)) return this._procTerrainCache.get(type);
+        const hex = TERRAIN_COLORS[type] ?? '#5a7f3a';
+        const base = new THREE.Color(hex);
+        const cv = document.createElement('canvas');
+        cv.width = cv.height = 256;
+        const ctx = cv.getContext('2d');
+        ctx.fillStyle = `rgb(${base.r * 255 | 0},${base.g * 255 | 0},${base.b * 255 | 0})`;
+        ctx.fillRect(0, 0, 256, 256);
+        const isMountain = type === TERRAIN_MOUNTAIN;
+        const isForest = type === TERRAIN_FOREST;
+        for (let y = 0; y < 256; y += 2) {
+            for (let x = 0; x < 256; x += 2) {
+                const n = this._valueNoise(x * 0.08 + type * 19, y * 0.08 + type * 27);
+                const v = (n - 0.5) * (isMountain ? 38 : isForest ? 22 : 18);
+                const spots = isMountain ? (n > 0.72 ? 1 : 0) : 0;
+                if (spots || Math.abs(v) > 5) {
+                    const a = isMountain ? 0.22 : 0.12;
+                    ctx.fillStyle = v > 0
+                        ? `rgba(255,255,255,${a})`
+                        : `rgba(0,0,0,${a})`;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+                if (isForest && n > 0.68 && (x % 16 === 0) && (y % 16 === 0)) {
+                    ctx.fillStyle = 'rgba(18,38,22,0.16)';
+                    ctx.fillRect(x - 2, y - 2, 6, 6);
+                }
+            }
+        }
+        if (isMountain) {
+            ctx.strokeStyle = 'rgba(0,0,0,0.10)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 16; i++) {
+                const x = (this._valueNoise(i * 7.3, type * 3.1) * 256) | 0;
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x + 8 - this._valueNoise(i * 2.1, 19) * 16, 256);
+                ctx.stroke();
+            }
+        }
+        const tex = new THREE.CanvasTexture(cv);
+        tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
+        tex.anisotropy = 4;
+        this._procTerrainCache.set(type, tex);
+        return tex;
     }
 
     /**
