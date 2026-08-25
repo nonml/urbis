@@ -78,7 +78,13 @@ export class ScheduleManager {
                 return { moved: true, target, phase: currentPhase.name };
             }
 
-            // 2. Sync NavGrid fallback
+            // 2. Worker-only when active: prefetch and stall 1 tick (0-blocking)
+            if (this.pfProxy?.isWorkerActive?.()) {
+                this.pfProxy.prefetch(citizen.id, start, target);
+                return { moved: false, target, phase: currentPhase.name };
+            }
+
+            // 3. Sync NavGrid fallback — only when worker unavailable (headless / fallback)
             const path = this.findPath(start, target);
             if (path.length > 1) {
                 const nextPos = path[1];

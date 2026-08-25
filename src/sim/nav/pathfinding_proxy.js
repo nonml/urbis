@@ -94,6 +94,10 @@ export class PathfindingProxy {
         this._worker.postMessage({ type: 'UPDATE', data: null });
     }
 
+    isWorkerActive() {
+        return !!this._worker && this._ready && !this._fallback;
+    }
+
     _onMessage(e) {
         const { type, id, path, citizenId } = e.data;
         if (type !== 'RESULT') return;
