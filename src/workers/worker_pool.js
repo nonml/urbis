@@ -6,6 +6,7 @@ let factionWorker = null;
 let audioWorker = null;
 let saveWorker = null;
 let assetWorker = null;
+let scheduleWorker = null;
 
 function isHeadless() {
     return typeof window === 'undefined' || typeof Worker === 'undefined';
@@ -30,6 +31,11 @@ function getAssetWorker() {
     if (assetWorker || isHeadless()) return assetWorker;
     try { assetWorker = new Worker(new URL('./asset_decoder_worker.js', import.meta.url), { type: 'module' }); } catch { assetWorker = null; }
     return assetWorker;
+}
+function getScheduleWorker() {
+    if (scheduleWorker || isHeadless()) return scheduleWorker;
+    try { scheduleWorker = new Worker(new URL('./schedule_worker.js', import.meta.url), { type: 'module' }); } catch { scheduleWorker = null; }
+    return scheduleWorker;
 }
 
 let _nextId = 1;
@@ -85,8 +91,22 @@ export function decodeAssetViaWorker(assetType, buffer, meta = {}) {
     });
 }
 
+export function requestScheduleTargetViaWorker(citizen, phaseName) {
+    const w = getScheduleWorker();
+    if (!w) return Promise.resolve(null);
+    return new Promise((resolve) => {
+        const id = nextId();
+        const onMsg = (e) => {
+            if (e.data?.type === 'TARGET_RESULT' && e.data?.id === id) { w.removeEventListener('message', onMsg); resolve(e.data.target); }
+        };
+        w.addEventListener('message', onMsg);
+        w.postMessage({ type: 'FIND_TARGET', id, citizenId: citizen.id, x: citizen.x, y: citizen.y, job: citizen.job, phaseName });
+        setTimeout(() => { w.removeEventListener('message', onMsg); resolve(null); }, 40);
+    });
+}
+
 // Re-export existing workers for audit completeness
-export { getFactionWorker, getAudioWorker, getSaveWorker, getAssetWorker };
+export { getFactionWorker, getAudioWorker, getSaveWorker, getAssetWorker, getScheduleWorker };
 export function getPathfindingWorkerRef() {
     try { return new Worker(new URL('./pathfinding_worker.js', import.meta.url), { type: 'module' }); } catch { return null; }
 }

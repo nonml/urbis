@@ -24,9 +24,96 @@ export class ScheduleManager {
         this._lastBuildingCount = -1;
         // Async pathfinding proxy (WebWorker A* with SharedArrayBuffer fallback)
         this.pfProxy = (map && this.nav) ? new PathfindingProxy(this.nav, map) : null;
+        // Schedule worker (Q12.A q12-wk-schedule-worker) — target selection off main thread
+        this._schedWorker = null;
+        this._schedReady = false;
+        this._schedFallback = false;
+        this._schedCache = new Map(); // citizenId -> { target, phaseName }
+        this._schedInflight = new Map(); // citizenId -> phaseName
+        this._schedPending = new Map(); // id -> resolve
+        this._schedNextId = 1;
+        this._schedBuildings = [];
+        this._schedDirty = true;
+        this._schedLastCount = -1;
+        this._schedPendingList = null;
+        this._initSchedWorker(map);
         if (this.nav && buildings) {
             this.syncNavBuildings(buildings);
         }
+    }
+
+    _initSchedWorker(map) {
+        if (typeof Worker === 'undefined') { this._schedFallback = true; return; }
+        try {
+            this._schedWorker = new Worker(new URL('../workers/schedule_worker.js', import.meta.url), { type: 'module' });
+            this._schedWorker.onmessage = (e) => this._onSchedMessage(e);
+            const w = map?.width ?? this.width;
+            const h = map?.height ?? this.height;
+            this._schedWorker.postMessage({ type: 'INIT', width: w, height: h });
+        } catch { this._schedFallback = true; }
+    }
+
+    _onSchedMessage(e) {
+        const { type, id, citizenId, target } = e.data || {};
+        if (type === 'READY') {
+            this._schedReady = true;
+            if (this._schedDirty && this._schedPendingList) {
+                this._schedBuildings = this._schedPendingList.slice();
+                this._schedDirty = false;
+                this._schedPendingList = null;
+                this._schedWorker.postMessage({ type: 'UPDATE_BUILDINGS', buildings: this._schedBuildings });
+            }
+            return;
+        }
+        if (type !== 'TARGET_RESULT' && type !== 'SCHEDULE_BATCH_RESULT') return;
+        if (type === 'TARGET_RESULT') {
+            const prom = this._schedPending.get(id);
+            if (prom) { this._schedPending.delete(id); prom.resolve(target); }
+            const phase = this._schedInflight.get(citizenId);
+            if (citizenId !== undefined) {
+                this._schedCache.set(citizenId, { target: target ?? null, phaseName: phase || '' });
+            }
+            if (citizenId !== undefined) this._schedInflight.delete(citizenId);
+        } else if (type === 'SCHEDULE_BATCH_RESULT') {
+            const prom = this._schedPending.get(id);
+            if (prom) { this._schedPending.delete(id); prom.resolve(e.data.results); }
+            for (const r of e.data.results || []) {
+                this._schedCache.set(r.id, { target: r.target ?? null, phaseName: '' });
+                this._schedInflight.delete(r.id);
+            }
+        }
+    }
+
+    isSchedWorkerActive() { return !!this._schedWorker && this._schedReady && !this._schedFallback; }
+
+    _pushSchedBuildings(buildings) {
+        const list = (buildings.buildings || []).map(b => ({ type: b.type, x: b.x, y: b.y }));
+        this._schedPendingList = list.slice();
+        if (!this._schedWorker || !this._schedReady) { this._schedDirty = true; return; }
+        this._schedBuildings = list;
+        this._schedDirty = false;
+        this._schedPendingList = null;
+        this._schedWorker.postMessage({ type: 'UPDATE_BUILDINGS', buildings: list });
+    }
+
+    _consumeSchedTarget(citizenId, phaseName) {
+        const entry = this._schedCache.get(citizenId);
+        if (!entry) return undefined;
+        if (entry.phaseName && entry.phaseName !== phaseName) return undefined;
+        return entry.target ?? null;
+    }
+
+    _prefetchSchedTarget(citizen, phaseName) {
+        if (!this.isSchedWorkerActive() || this._schedInflight.has(citizen.id)) return;
+        if (this._schedDirty && this._schedPendingList) {
+            this._schedBuildings = this._schedPendingList.slice();
+            this._schedDirty = false;
+            this._schedPendingList = null;
+            this._schedWorker.postMessage({ type: 'UPDATE_BUILDINGS', buildings: this._schedBuildings });
+        }
+        this._schedInflight.set(citizen.id, phaseName);
+        const id = this._schedNextId++;
+        this._schedWorker.postMessage({ type: 'FIND_TARGET', id, citizenId: citizen.id, x: citizen.x, y: citizen.y, job: citizen.job, phaseName });
     }
 
     /**
@@ -63,7 +150,22 @@ export class ScheduleManager {
         const currentPhase = this.getPhaseAt(timeOfDay);
         this.ensureNav(map, buildings);
 
-        const target = this.getTargetLocation(citizen, currentPhase, map, buildings);
+        // Schedule worker (Q12.A): target selection off main thread when active
+        let target = null;
+        let fromWorker = false;
+        if (this.isSchedWorkerActive()) {
+            const cached = this._consumeSchedTarget(citizen.id, currentPhase.name);
+            if (cached !== undefined) {
+                target = cached;
+                fromWorker = true;
+            } else {
+                this._prefetchSchedTarget(citizen, currentPhase.name);
+                return { moved: false, target: null, phase: currentPhase.name };
+            }
+        }
+        if (!fromWorker) {
+            target = this.getTargetLocation(citizen, currentPhase, map, buildings);
+        }
 
         if (target && (citizen.x !== target.x || citizen.y !== target.y)) {
             const start = { x: citizen.x, y: citizen.y };
@@ -113,10 +215,19 @@ export class ScheduleManager {
     syncNavBuildings(buildings) {
         if (!this.nav || !buildings) return;
         const count = buildings.buildings?.length ?? 0;
-        if (count === this._lastBuildingCount) return;
-        this.nav.setBlockedTilesFromBuildings(buildings.buildings || []);
-        this.pfProxy?.invalidate();
-        this._lastBuildingCount = count;
+        if (count !== this._lastBuildingCount) {
+            this.nav.setBlockedTilesFromBuildings(buildings.buildings || []);
+            this.pfProxy?.invalidate();
+            this._lastBuildingCount = count;
+        }
+        // Schedule worker buildings sync (Q12.A)
+        if (count !== this._schedLastCount) {
+            this._schedCache.clear();
+            this._schedInflight.clear();
+            this._schedDirty = true;
+            this._pushSchedBuildings(buildings);
+            this._schedLastCount = count;
+        }
     }
 
     /** Async path query — uses WebWorker when available, sync NavGrid otherwise. */
@@ -282,6 +393,13 @@ export class ScheduleManager {
         if (this.nav) {
             this.nav.cache.clear();
         }
+        this._schedCache.clear();
+        this._schedInflight.clear();
+    }
+
+    destroy() {
+        try { this._schedWorker?.terminate(); } catch {}
+        try { this.pfProxy?.destroy?.(); } catch {}
     }
 }
 

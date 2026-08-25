@@ -20,6 +20,7 @@ const JSON_OUT = process.argv.includes('--json');
 
 const EXPECTED_WORKERS = [
     'src/workers/pathfinding_worker.js',
+    'src/workers/schedule_worker.js',
     'src/workers/citizen_worker.js',
     'src/workers/faction_worker.js',
     'src/workers/audio_worker.js',
@@ -49,10 +50,12 @@ check('worker_pool exports getFactionWorker', pool.includes('getFactionWorker'),
 check('worker_pool exports getAudioWorker', pool.includes('getAudioWorker'), 'missing audio');
 check('worker_pool exports getSaveWorker', pool.includes('getSaveWorker'), 'missing save');
 check('worker_pool exports getAssetWorker', pool.includes('getAssetWorker'), 'missing asset');
+check('worker_pool exports getScheduleWorker', pool.includes('getScheduleWorker'), 'missing schedule');
 check('worker_pool exports getPathfindingWorkerRef', pool.includes('getPathfindingWorkerRef'), 'missing pathfinding ref');
 check('worker_pool has tickFactionsViaWorker', pool.includes('tickFactionsViaWorker'), 'missing tickFactionsViaWorker');
 check('worker_pool has serializeSaveViaWorker', pool.includes('serializeSaveViaWorker'), 'missing serializeSaveViaWorker');
 check('worker_pool has decodeAssetViaWorker', pool.includes('decodeAssetViaWorker'), 'missing decodeAssetViaWorker');
+check('worker_pool has requestScheduleTargetViaWorker', pool.includes('requestScheduleTargetViaWorker'), 'missing schedule request');
 
 // 3. PathfindingProxy fully worker
 const proxy = read('src/sim/nav/pathfinding_proxy.js');
@@ -64,9 +67,16 @@ check('pathfinding_worker exists handler', read('src/workers/pathfinding_worker.
 
 // 4. ScheduleManager worker-only when active (no sync block)
 const sched = read('src/sim/schedule.js');
-check('schedule uses pfProxy.isWorkerActive()', sched.includes('isWorkerActive'), 'schedule not checking isWorkerActive');
+check('schedule uses pfProxy.isWorkerActive()', sched.includes('pfProxy.isWorkerActive') || sched.includes('pfProxy?.isWorkerActive'), 'schedule not checking pfProxy isWorkerActive');
 check('schedule stalls on worker cache miss (no sync)', sched.includes('prefetch(citizen.id, start, target)') && sched.includes('isWorkerActive'), 'schedule missing worker-only stall path');
 check('schedule retains sync fallback for headless', sched.includes('Sync NavGrid fallback') || sched.includes('fallback'), 'schedule missing fallback comment/path');
+check('schedule has isSchedWorkerActive()', sched.includes('isSchedWorkerActive'), 'schedule missing isSchedWorkerActive');
+check('schedule has schedule_worker wiring', sched.includes('schedule_worker.js') && sched.includes('_schedWorker'), 'schedule missing schedule_worker wiring');
+check('schedule has _consumeSchedTarget cache', sched.includes('_consumeSchedTarget'), 'schedule missing _consumeSchedTarget');
+check('schedule has _prefetchSchedTarget', sched.includes('_prefetchSchedTarget'), 'schedule missing _prefetchSchedTarget');
+check('schedule handles UPDATE_BUILDINGS in worker', sched.includes('UPDATE_BUILDINGS'), 'schedule missing UPDATE_BUILDINGS push');
+check('schedule_worker has FIND_TARGET handler', read('src/workers/schedule_worker.js').includes('FIND_TARGET'), 'schedule_worker missing FIND_TARGET');
+check('schedule_worker has UPDATE_BUILDINGS', read('src/workers/schedule_worker.js').includes('UPDATE_BUILDINGS'), 'schedule_worker missing UPDATE_BUILDINGS');
 
 // 5. CitizenSim uses citizen_worker
 const citizenSim = read('src/sim/citizens/citizen_sim.js');
@@ -84,13 +94,13 @@ if (JSON_OUT) {
     process.exit(findings.length ? 1 : 0);
 }
 
-console.log('=== Worker Audit (Q12.A — 6 workers) ===');
+console.log('=== Worker Audit (Q12.A — 6+1 workers) ===');
 console.log(`Passes: ${passes.length}  Failures: ${findings.length}`);
 for (const p of passes) console.log(`  [PASS] ${p}`);
 if (findings.length) {
     for (const f of findings) console.log(`  [FAIL] ${f.label} — ${f.detail}`);
 }
-if (findings.length === 0) console.log('[PASS] all 6 workers wired, pathfinding fully on worker when active');
+if (findings.length === 0) console.log('[PASS] all workers wired, pathfinding + schedule fully on worker when active');
 else console.log(`[FAIL] ${findings.length} worker audit failure(s)`);
 
 if (CI && findings.length) process.exit(1);

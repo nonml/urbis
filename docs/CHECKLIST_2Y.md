@@ -703,7 +703,7 @@ Verify the autonomous Roo loop works end-to-end.
 ### Q12.A — Web Workers
 
 - [x] `q12-wk-pathfind-worker` pathfinding fully on a worker (audit current partial impl)
-- [ ] `q12-wk-schedule-worker` NPC scheduling on worker
+- [x] `q12-wk-schedule-worker` NPC scheduling on worker
 - [ ] `q12-wk-faction-worker` faction sim tick on worker
 - [ ] `q12-wk-audio-worker` audio mixing on worker (if not already off-main)
 - [ ] `q12-wk-save-worker` save serialization on worker
