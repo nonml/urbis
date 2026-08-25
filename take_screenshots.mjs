@@ -101,8 +101,10 @@ await page.evaluate(() => {
     if (x < 1 || y < 1 || x >= game.map.width-1 || y >= game.map.height-1) return false;
     const idx = y * game.map.width + x;
     if (game.map.roadMap?.[idx] === 1 || game.map.sidewalkMap?.[idx] === 1) return false;
+    // Real GTA: buildings only on parcels (inside blocks), not scattered on grass
+    if (game.map.parcelMap?.[idx] === 65535) return false;
     const t = game.map.getTileAt(x, y);
-    return t === TERRAIN_GRASS || t === 6; // grass or park (forest) — not road/water/mountain
+    return t === TERRAIN_GRASS || t === 6;
   };
 
   // Downtown core: landmark tall buildings, deliberately varied colors

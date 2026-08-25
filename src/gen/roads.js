@@ -37,18 +37,22 @@ export function generateRoads(map, seed) {
 
     function clamp(v, lo, hi) { return Math.max(lo, Math.min(hi, v)); }
 
+    // GTA city core — roads only where the city is, not the farmland.
+    // Outer green stays as suburbs/farmland without streets or parked cars.
+    const coreInset = width < 50 ? 6 : width < 100 ? 12 : 22;
+    const coreMin = coreInset, coreMaxW = width - coreInset, coreMaxH = height - coreInset;
+
     // --- Horizontal streets (east-west) ---
     let hIndex = 0;
-    for (let baseY = 3; baseY < height - 3; baseY += spacing) {
+    for (let baseY = coreMin; baseY < coreMaxH; baseY += spacing) {
         const jitter = rng.int(-1, 1);
-        const y0 = clamp(baseY + jitter, 2, height - 3);
+        const y0 = clamp(baseY + jitter, coreMin, coreMaxH - 1);
         const isAvenue = (hIndex % avenueEvery) === 0;
         const lanes = isAvenue ? 2 : 1;
         for (let dy = 0; dy < lanes; dy++) {
-            const y = clamp(y0 + dy, 2, height - 3);
-            // Organic kink every ~12 tiles
+            const y = clamp(y0 + dy, coreMin, coreMaxH - 1);
             const road = drawAxisRoad(roadMap, sidewalkMap, width, height,
-                { x: 2, y }, { x: width - 3, y }, rng);
+                { x: coreMin, y }, { x: coreMaxW - 1, y }, rng);
             roads.push(road);
         }
         hIndex++;
@@ -56,32 +60,31 @@ export function generateRoads(map, seed) {
 
     // --- Vertical streets (north-south) ---
     let vIndex = 0;
-    for (let baseX = 3; baseX < width - 3; baseX += spacing) {
+    for (let baseX = coreMin; baseX < coreMaxW; baseX += spacing) {
         const jitter = rng.int(-1, 1);
-        const x0 = clamp(baseX + jitter, 2, width - 3);
+        const x0 = clamp(baseX + jitter, coreMin, coreMaxW - 1);
         const isAvenue = (vIndex % avenueEvery) === 0;
         const lanes = isAvenue ? 2 : 1;
         for (let dx = 0; dx < lanes; dx++) {
-            const x = clamp(x0 + dx, 2, width - 3);
+            const x = clamp(x0 + dx, coreMin, coreMaxW - 1);
             const road = drawAxisRoad(roadMap, sidewalkMap, width, height,
-                { x, y: 2 }, { x, y: height - 3 }, rng);
+                { x, y: coreMin }, { x, y: coreMaxH - 1 }, rng);
             roads.push(road);
         }
         vIndex++;
     }
 
-    // --- Ring highway (boxed, 2-tile thick) inset 2 from map border ---
-    const inset = 2;
-    const ringYs = [inset, inset + 1, height - 3, height - 2];
-    const ringXs = [inset, inset + 1, width - 3, width - 2];
+    // --- Ring highway framing the city core (2-tile thick) ---
+    const ringYs = [coreMin, coreMin + 1, coreMaxH - 1, coreMaxH - 2];
+    const ringXs = [coreMin, coreMin + 1, coreMaxW - 1, coreMaxW - 2];
     for (const y of ringYs) {
         if (y < 0 || y >= height) continue;
-        const r = drawRoad(roadMap, sidewalkMap, width, height, { x: inset, y }, { x: width - 1 - inset, y });
+        const r = drawRoad(roadMap, sidewalkMap, width, height, { x: coreMin, y }, { x: coreMaxW - 1, y });
         roads.push(r);
     }
     for (const x of ringXs) {
         if (x < 0 || x >= width) continue;
-        const r = drawRoad(roadMap, sidewalkMap, width, height, { x, y: inset }, { x, y: height - 1 - inset });
+        const r = drawRoad(roadMap, sidewalkMap, width, height, { x, y: coreMin }, { x, y: coreMaxH - 1 });
         roads.push(r);
     }
 
@@ -97,19 +100,19 @@ export function generateRoads(map, seed) {
     }
 
     // --- 18% of blocks get a mid-block alley (breaks up 8x8 blocks, Watch Dogs texture) ---
-    for (let by = 3 + spacing / 2 | 0; by < height - 3; by += spacing) {
-        for (let bx = 3 + spacing / 2 | 0; bx < width - 3; bx += spacing) {
+    for (let by = coreMin + spacing / 2 | 0; by < coreMaxH; by += spacing) {
+        for (let bx = coreMin + spacing / 2 | 0; bx < coreMaxW; bx += spacing) {
             if (rng.next() > 0.18) continue;
             if (rng.next() < 0.5) {
-                const y = clamp(by + rng.int(-1, 1), 3, height - 4);
-                const x0 = clamp(bx - Math.floor(spacing / 2) + 1, 2, width - 3);
-                const x1 = clamp(bx + Math.floor(spacing / 2) - 1, 2, width - 3);
+                const y = clamp(by + rng.int(-1, 1), coreMin, coreMaxH - 1);
+                const x0 = clamp(bx - Math.floor(spacing / 2) + 1, coreMin, coreMaxW - 1);
+                const x1 = clamp(bx + Math.floor(spacing / 2) - 1, coreMin, coreMaxW - 1);
                 const r = drawRoad(roadMap, sidewalkMap, width, height, { x: x0, y }, { x: x1, y });
                 roads.push(r);
             } else {
-                const x = clamp(bx + rng.int(-1, 1), 3, width - 4);
-                const y0 = clamp(by - Math.floor(spacing / 2) + 1, 2, height - 3);
-                const y1 = clamp(by + Math.floor(spacing / 2) - 1, 2, height - 3);
+                const x = clamp(bx + rng.int(-1, 1), coreMin, coreMaxW - 1);
+                const y0 = clamp(by - Math.floor(spacing / 2) + 1, coreMin, coreMaxH - 1);
+                const y1 = clamp(by + Math.floor(spacing / 2) - 1, coreMin, coreMaxH - 1);
                 const r = drawRoad(roadMap, sidewalkMap, width, height, { x, y: y0 }, { x, y: y1 });
                 roads.push(r);
             }

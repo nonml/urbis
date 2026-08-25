@@ -2011,6 +2011,33 @@ export class Renderer3D {
         const fallbackPoles = [];
         const fallbackGlows = [];
 
+        // Base asphalt under every road tile — dark continuous slab so streets read as asphalt, not tiles on grass.
+        const baseAsphalt = [];
+        for (const t of tiles) {
+            const wx2 = t.x - this._mapHalfW + 0.5;
+            const wz2 = t.y - this._mapHalfH + 0.5;
+            baseAsphalt.push({ x: wx2, y: this._smoothTerrainY(t.x, t.y) + 0.006, z: wz2 });
+        }
+        if (baseAsphalt.length > 0) {
+            const baseGeom = new THREE.PlaneGeometry(1, 1);
+            baseGeom.rotateX(-Math.PI / 2);
+            const baseMat = new THREE.MeshStandardMaterial({ color: 0x1e1e1e, roughness: 0.95, metalness: 0.0 });
+            const baseMesh = new THREE.InstancedMesh(baseGeom, baseMat, baseAsphalt.length);
+            baseMesh.receiveShadow = true;
+            baseMesh.userData.isRoad = true;
+            const d2 = new THREE.Object3D();
+            for (let i = 0; i < baseAsphalt.length; i++) {
+                const b = baseAsphalt[i];
+                d2.position.set(b.x, b.y, b.z);
+                d2.rotation.set(0, 0, 0);
+                d2.scale.set(1, 1, 1);
+                d2.updateMatrix();
+                baseMesh.setMatrixAt(i, d2.matrix);
+            }
+            baseMesh.instanceMatrix.needsUpdate = true;
+            objects.push(baseMesh);
+        }
+
         for (const tile of tiles) {
             const wx = tile.x - this._mapHalfW + 0.5;
             const wz = tile.y - this._mapHalfH + 0.5;
