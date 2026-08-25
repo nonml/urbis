@@ -671,7 +671,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q11-sh-uber-audit` shader permutation count audited; flag-defines collapsed
 - [x] `q11-rg-explicit-ordering` render graph with explicit pass ordering + dependency tracking
-- [ ] `q11-rg-no-implicit-mut` audit verifies no implicit `renderTarget` mutation across passes
+- [x] `q11-rg-no-implicit-mut` audit verifies no implicit `renderTarget` mutation across passes
 
 ### Q11.F — Dynamic Resolution & VRS
 
