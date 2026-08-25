@@ -1564,6 +1564,26 @@ export class Renderer3D {
             this._bloomPass.strength += (this._bloomDayStrength - this._bloomPass.strength) * 0.02;
             this._bloomPass.threshold += (this._bloomDayThreshold - this._bloomPass.threshold) * 0.02;
         }
+
+        const nightT = isNight ? 1 : isDay ? 0 : timeOfDay >= 18 ? (timeOfDay - 18) / 2 : (7 - timeOfDay) / 2;
+        if (this._highwayLightStrips) {
+            const want = nightT * 0.9;
+            for (const m of this._highwayLightStrips) {
+                m.material.emissiveIntensity += (want - m.material.emissiveIntensity) * 0.06;
+            }
+        }
+        if (this._windowGlowMeshes) {
+            const wantOpacity = 0.22 + nightT * 0.58;
+            for (const m of this._windowGlowMeshes) {
+                m.material.opacity += (wantOpacity - m.material.opacity) * 0.04;
+            }
+        }
+        if (this.scene?.fog) {
+            const fogNight = 0.012;
+            const fogDay = 0.006;
+            const wantFog = fogDay + nightT * (fogNight - fogDay);
+            this.scene.fog.density += (wantFog - this.scene.fog.density) * 0.02;
+        }
     }
 
     _disposeChunkEntry(entry) {
@@ -3028,7 +3048,11 @@ export class Renderer3D {
         }
         if (glowBuildings.length > 0) {
             const glow = this._buildInstancedWindowGlow(glowBuildings);
-            if (glow) objects.push(glow);
+            if (glow) {
+                objects.push(glow);
+                if (!this._windowGlowMeshes) this._windowGlowMeshes = [];
+                this._windowGlowMeshes.push(glow);
+            }
         }
 
         // Box instanced mesh fallback for types without a loaded model
