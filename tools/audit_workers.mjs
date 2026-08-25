@@ -85,6 +85,10 @@ check('citizen_sim dispatches to worker', citizenSim.includes('_dispatchToWorker
 
 // 6. Faction/audio/save/asset workers have protocol
 check('faction_worker PROTOCOL TICK', read('src/workers/faction_worker.js').includes("type === 'TICK'") || read('src/workers/faction_worker.js').includes('TICK'), 'faction_worker missing TICK');
+check('faction_system has isWorkerActive()', read('src/sim/factions/faction_system.js').includes('isWorkerActive'), 'faction_system missing isWorkerActive');
+check('faction_system dispatches TICK to worker', read('src/sim/factions/faction_system.js').includes("_dispatchWorker") && read('src/sim/factions/faction_system.js').includes("type: 'TICK'"), 'faction_system missing dispatch');
+check('faction_system applies pending worker result', read('src/sim/factions/faction_system.js').includes('_applyPendingWorkerResult'), 'faction_system missing apply pending');
+check('faction_system has sync fallback drift', read('src/sim/factions/faction_system.js').includes('Sync fallback') || read('src/sim/factions/faction_system.js').includes('drift'), 'faction_system missing fallback drift');
 check('audio_worker PROTOCOL PLAY/DUCK', read('src/workers/audio_worker.js').includes('PLAY') && read('src/workers/audio_worker.js').includes('DUCK'), 'audio_worker missing PLAY/DUCK');
 check('save_worker PROTOCOL SERIALIZE', read('src/workers/save_worker.js').includes('SERIALIZE'), 'save_worker missing SERIALIZE');
 check('asset_decoder PROTOCOL DECODE', read('src/workers/asset_decoder_worker.js').includes('DECODE'), 'asset_decoder missing DECODE');

@@ -19,7 +19,65 @@ export class FactionSystem {
     constructor(game) {
         this.game = game;
         this.lastHostilityTick = -9999;
+        this._repVersion = 0;
+        this._pendingResult = null;
+        this._pendingVersion = -1;
+        this._worker = null;
+        this._workerReady = false;
+        this._fallback = false;
+        this._inflight = false;
+        this._inflightVersion = -1;
+        this._nextId = 1;
+        this._initWorker();
         this.ensureState();
+    }
+
+    _initWorker() {
+        if (typeof Worker === 'undefined') { this._fallback = true; return; }
+        try {
+            this._worker = new Worker(new URL('../../workers/faction_worker.js', import.meta.url), { type: 'module' });
+            this._worker.onmessage = (e) => this._onMessage(e);
+            this._worker.onerror = () => { this._fallback = true; this._worker = null; };
+            this._workerReady = true;
+        } catch { this._fallback = true; }
+    }
+
+    _onMessage(e) {
+        const { type, id, factions } = e.data || {};
+        if (type === 'READY') { this._workerReady = true; return; }
+        if (type !== 'TICK_RESULT') return;
+        // Only accept if still inflight (ignore stale)
+        if (!this._inflight) return;
+        this._pendingResult = factions;
+        this._pendingVersion = this._inflightVersion;
+        this._inflight = false;
+    }
+
+    isWorkerActive() { return !!this._worker && this._workerReady && !this._fallback; }
+
+    _dispatchWorker() {
+        if (!this.isWorkerActive() || this._inflight) return;
+        const state = this.ensureState();
+        const factions = FACTION_IDS.map(id => ({ id, rep: state.reputation[id] ?? 0, influence: state.influence?.[id] ?? 50 }));
+        const id = `f${this._nextId++}`;
+        this._inflight = true;
+        this._inflightVersion = this._repVersion;
+        try { this._worker.postMessage({ type: 'TICK', id, factions, delta: 1 }); } catch { this._inflight = false; }
+    }
+
+    _applyPendingWorkerResult() {
+        if (!this._pendingResult || this._pendingVersion !== this._repVersion) {
+            // discard stale worker result if rep changed since dispatch
+            if (this._pendingResult && this._pendingVersion !== this._repVersion) this._pendingResult = null;
+            return;
+        }
+        const state = this.ensureState();
+        state.influence = state.influence || {};
+        for (const f of this._pendingResult) {
+            state.reputation[f.id] = clampRep(f.rep);
+            state.influence[f.id] = Math.max(0, Math.min(100, f.influence ?? 50));
+        }
+        this._pendingResult = null;
     }
 
     ensureState() {
@@ -31,6 +89,8 @@ export class FactionSystem {
             f.reputation[id] = clampRep(f.reputation[id]);
         }
         f.recentChanges = Array.isArray(f.recentChanges) ? f.recentChanges : [];
+        f.influence = f.influence || {};
+        for (const id of FACTION_IDS) if (!Number.isFinite(f.influence[id])) f.influence[id] = 50;
         return f;
     }
 
@@ -52,7 +112,10 @@ export class FactionSystem {
         const next = clampRep(value);
         f.reputation[factionId] = next;
         const delta = next - prev;
-        if (delta !== 0) this.logChange(factionId, delta, reason, prev, next);
+        if (delta !== 0) {
+            this._repVersion++;
+            this.logChange(factionId, delta, reason, prev, next);
+        }
         return next;
     }
 
@@ -130,6 +193,8 @@ export class FactionSystem {
     }
 
     update() {
+        // Double-buffered worker apply (Q12.A) — apply previous tick's worker result before computing perks
+        if (this.isWorkerActive()) this._applyPendingWorkerResult();
         this.ensureState();
         const perks = this.getPerkSnapshot();
         this.game.state.factions.perks = perks;
@@ -151,7 +216,24 @@ export class FactionSystem {
             }
         }
         while (world.factionEncounters.length > 50) world.factionEncounters.shift();
+
+        // Dispatch next worker tick, or sync fallback drift when worker unavailable (headless)
+        if (this.isWorkerActive()) {
+            this._dispatchWorker();
+        } else {
+            const state = this.ensureState();
+            state.influence = state.influence || {};
+            for (const id of FACTION_IDS) {
+                const cur = state.reputation[id];
+                const drift = cur > 0 ? -0.02 : cur < 0 ? 0.02 : 0;
+                if (drift !== 0) state.reputation[id] = clampRep(cur + drift);
+                const inf = state.influence[id] ?? 50;
+                state.influence[id] = Math.max(0, Math.min(100, inf + (state.reputation[id] > 20 ? 0.05 : state.reputation[id] < -20 ? -0.05 : 0)));
+            }
+        }
     }
+
+    destroy() { try { this._worker?.terminate(); } catch {} }
 }
 
 export { FACTION_IDS };
