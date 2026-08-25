@@ -682,10 +682,10 @@ Verify the autonomous Roo loop works end-to-end.
 
 ### Q11.G — Draw-Call & Per-Pass Budget
 
-- [ ] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
-- [ ] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
-- [ ] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
-- [ ] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
+- [x] `q11-dc-budget-medium` ≤ 2000 draws on `medium+120-NPCs`
+- [x] `q11-dc-budget-large` ≤ 3000 draws on `large+200-NPCs`
+- [x] `q11-dc-ci-gate` CI fails on draw-call budget exceedance
+- [x] `q11-pb-per-pass-timings` `tools/agent/baselines/perf.json` schema includes per-pass timings
 
 ### Q11 — Definition of Done
 
