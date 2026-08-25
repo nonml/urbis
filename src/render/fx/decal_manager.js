@@ -1,3 +1,5 @@
+import { createDecalArrayTexture, DECAL_TYPES } from './decal_atlas.js';
+
 let THREE = null;
 
 const FADE_FRACTION = 0.2;
@@ -31,6 +33,29 @@ export class DecalManager {
             roughness: 0.9,
             metalness: 0.0,
         });
+
+        try {
+            this._decalArrayTex = createDecalArrayTexture(THREE);
+            this._arrayTemplate = new THREE.ShaderMaterial({
+                uniforms: {
+                    decalArray: { value: this._decalArrayTex },
+                    decalLayer: { value: 0 },
+                    decalColor: { value: new THREE.Color(0xffffff) },
+                    decalOpacity: { value: 1.0 },
+                },
+                vertexShader: 'varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }',
+                fragmentShader: 'uniform sampler2DArray decalArray; uniform float decalLayer; uniform vec3 decalColor; uniform float decalOpacity; varying vec2 vUv; void main(){ vec4 tex=texture(decalArray, vec3(vUv, decalLayer)); vec3 col=tex.rgb * decalColor; float a=tex.a * decalOpacity; if(a<0.02) discard; gl_FragColor=vec4(col,a); }',
+                transparent: true,
+                depthWrite: false,
+                polygonOffset: true,
+                polygonOffsetFactor: -1,
+                polygonOffsetUnits: -1,
+                side: THREE.DoubleSide,
+            });
+        } catch {
+            this._decalArrayTex = null;
+            this._arrayTemplate = null;
+        }
     }
 
     spawnGround(wx, wz, opts = {}) {
@@ -43,14 +68,27 @@ export class DecalManager {
             weatherFade = false,
             roughness,
             metalness,
+            decalType = null,
         } = opts;
 
         const y = this._elevFn ? this._elevFn(wx, wz) + 0.01 : 0.02;
-        const mat = this._baseMat.clone();
-        mat.color.setHex(color);
-        mat.opacity = opacity;
-        if (roughness !== undefined) mat.roughness = roughness;
-        if (metalness !== undefined) mat.metalness = metalness;
+        let mat = null;
+        const layer = decalType != null ? DECAL_TYPES[decalType] : null;
+        if (layer != null && this._arrayTemplate) {
+            mat = this._arrayTemplate.clone();
+            mat.uniforms = {
+                decalArray: { value: this._decalArrayTex },
+                decalLayer: { value: layer },
+                decalColor: { value: new THREE.Color(0xffffff) },
+                decalOpacity: { value: opacity },
+            };
+        } else {
+            mat = this._baseMat.clone();
+            mat.color.setHex(color);
+            mat.opacity = opacity;
+            if (roughness !== undefined) mat.roughness = roughness;
+            if (metalness !== undefined) mat.metalness = metalness;
+        }
 
         const mesh = new THREE.Mesh(this._groundGeo, mat);
         mesh.scale.set(size, 1, size);
@@ -72,13 +110,26 @@ export class DecalManager {
             duration = Infinity,
             opacity = 1,
             weatherFade = false,
+            decalType = null,
         } = opts;
 
         if (!this._wallGeo) this._wallGeo = new THREE.PlaneGeometry(1, 1);
 
-        const mat = this._baseMat.clone();
-        mat.color.setHex(color);
-        mat.opacity = opacity;
+        let mat = null;
+        const layer = decalType != null ? DECAL_TYPES[decalType] : null;
+        if (layer != null && this._arrayTemplate) {
+            mat = this._arrayTemplate.clone();
+            mat.uniforms = {
+                decalArray: { value: this._decalArrayTex },
+                decalLayer: { value: layer },
+                decalColor: { value: new THREE.Color(0xffffff) },
+                decalOpacity: { value: opacity },
+            };
+        } else {
+            mat = this._baseMat.clone();
+            mat.color.setHex(color);
+            mat.opacity = opacity;
+        }
 
         const mesh = new THREE.Mesh(this._wallGeo, mat);
         mesh.scale.set(width, height, 1);
@@ -178,8 +229,10 @@ export class DecalManager {
             }
             const fadeStart = d.duration * (1 - FADE_FRACTION);
             if (d.life > fadeStart) {
-                d.mesh.material.opacity =
-                    d.baseOpacity * (1 - (d.life - fadeStart) / (d.duration * FADE_FRACTION));
+                const a = d.baseOpacity * (1 - (d.life - fadeStart) / (d.duration * FADE_FRACTION));
+                const m = d.mesh.material;
+                if (m.uniforms?.decalOpacity) m.uniforms.decalOpacity.value = a;
+                else m.opacity = a;
             }
         }
     }
@@ -212,5 +265,7 @@ export class DecalManager {
         this._groundGeo.dispose();
         this._wallGeo?.dispose();
         this._baseMat.dispose();
+        this._decalArrayTex?.dispose();
+        this._arrayTemplate?.dispose();
     }
 }

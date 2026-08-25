@@ -451,10 +451,17 @@ export class FXSystem {
         this._decalManager = dm;
     }
 
-    spawnDecal(x, y, z, color, duration) {
+    spawnDecal(x, y, z, color, duration, decalType = null) {
         if (!this.enabled || this.reducedMotion) return;
         if (this._decalManager) {
+            let type = decalType;
+            if (!type) {
+                if (color === 0x444444) type = 'bullet';
+                else if (color === 0x880000) type = 'blood';
+                else type = 'grime';
+            }
             this._decalManager.spawnGround(x, z, {
+                decalType: type,
                 color: color || 0x880000,
                 duration: duration || 15000,
                 weatherFade: true,
@@ -470,7 +477,7 @@ export class FXSystem {
         const radiusMap = { explosion_steam: 0.5, explosion_electrical: 0.4, explosion_gas: 0.7 };
         const size = (radiusMap[type] ?? 0.5) + 0.1;
         this._decalManager.spawnGround(wx, wz, {
-            color: 0x1a1a18,
+            decalType: 'scorch',
             size,
             duration: 60000,
             weatherFade: true,

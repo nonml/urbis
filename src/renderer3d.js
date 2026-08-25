@@ -213,6 +213,11 @@ export class Renderer3D {
         this.renderer.outputColorSpace = THREE.SRGBColorSpace;
         this.renderScale = 1.0;
         this._preset = DEFAULT_PRESET;
+        this._drsMinScale = 0.70;
+        this._drsBudget = 16.6;
+        this._drsOver = 0;
+        this._drsUnder = 0;
+        this._drsEnabled = true;
         // Auto-detect: measure first-frame timing to pick appropriate preset
         this._detectPreset().then((detected) => {
             if (detected && detected !== DEFAULT_PRESET) {
@@ -221,6 +226,7 @@ export class Renderer3D {
             }
         });
         this.setRenderScale(1.0);
+        this._initVRS();
 
         // Lighting — hemisphere light for natural sky/ground fill.
         // Base intensity is modulated by time of day so night actually goes dark.
@@ -1583,6 +1589,11 @@ export class Renderer3D {
             const fogDay = 0.006;
             const wantFog = fogDay + nightT * (fogNight - fogDay);
             this.scene.fog.density += (wantFog - this.scene.fog.density) * 0.02;
+        }
+        if (typeof document !== 'undefined' && document.body) {
+            document.body.classList.toggle('night', isNight);
+            document.body.classList.toggle('dusk', timeOfDay >= 18 && timeOfDay < 20);
+            document.body.classList.toggle('dawn', timeOfDay >= 5 && timeOfDay < 7);
         }
     }
 
@@ -4301,7 +4312,7 @@ export class Renderer3D {
                 const ox = (rng.next() - 0.5) * 0.8;
                 const oz = (rng.next() - 0.5) * 0.8;
                 this._decalManager.spawnGround(wx + ox, wz + oz, {
-                    color: rng.next() > 0.5 ? 0x2a2a22 : 0x33302a,
+                    decalType: 'grime',
                     size: 0.12 + rng.next() * 0.2,
                     duration: Infinity,
                     rotation: rng.next() * Math.PI * 2,
@@ -4343,7 +4354,7 @@ export class Renderer3D {
                 this._decalManager.spawnWall(
                     wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
                     face[0], face[1],
-                    { color, width: 0.12 + rng.next() * 0.08, height: 0.1 + rng.next() * 0.08, duration: Infinity, opacity: 0.75 }
+                    { decalType: 'poster', width: 0.12 + rng.next() * 0.08, height: 0.1 + rng.next() * 0.08, duration: Infinity, opacity: 0.75 }
                 );
             }
         }
@@ -4377,7 +4388,7 @@ export class Renderer3D {
             this._decalManager.spawnWall(
                 wx + face[0] * 0.45, wallY, wz + face[1] * 0.45,
                 face[0], face[1],
-                { color: cfg.color, width: 0.18 + rng.next() * 0.15, height: 0.12 + rng.next() * 0.1, duration: Infinity, opacity: 0.55 }
+                { decalType: 'graffiti', width: 0.18 + rng.next() * 0.15, height: 0.12 + rng.next() * 0.1, duration: Infinity, opacity: 0.55 }
             );
         }
     }
@@ -5148,7 +5159,7 @@ export class Renderer3D {
 
             if (this._decalManager && (v.driftFactor ?? 0) > 0.3 && Math.abs(v.speed ?? 0) > 2) {
                 this._decalManager.spawnGround(wx, wz, {
-                    color: 0x222222,
+                    decalType: 'skid',
                     size: 0.06,
                     duration: 20000,
                     rotation: v.angle ?? 0,
@@ -5312,13 +5323,11 @@ export class Renderer3D {
             const wz = ty - this._mapHalfH + 0.5 + (rng.next() - 0.5) * 0.6;
             const size = 0.25 + rng.next() * 0.35;
             this._decalManager.spawnGround(wx, wz, {
-                color: 0x2a3a4a,
+                decalType: 'puddle',
                 size,
                 duration: 30000 + rng.next() * 30000,
                 rotation: rng.next() * Math.PI * 2,
                 opacity: 0.35 + this._wetness * 0.35,
-                roughness: 0.15,
-                metalness: 0.5,
             });
         }
     }
@@ -6254,6 +6263,7 @@ export class Renderer3D {
         const now = performance.now();
         const dt = this._lastRenderTime ? Math.min(50, now - this._lastRenderTime) : 16.67;
         this._lastRenderTime = now;
+        this._updateDRS(dt);
         if (this.fpsElement && this.fpsTimes !== undefined) {
             this.fpsTimes.push(now);
             while (this.fpsTimes.length > 60) this.fpsTimes.shift();
@@ -6645,13 +6655,68 @@ export class Renderer3D {
      * Set render scale (for performance)
      */
     setRenderScale(scale) {
-        this.renderScale = scale;
+        const clamped = Math.max(this._drsMinScale ?? 0.7, Math.min(1.0, scale));
+        this.renderScale = clamped;
         const width = this.canvas.clientWidth;
         const height = this.canvas.clientHeight;
-        this.renderer.setSize(width * scale, height * scale, false);
+        this.renderer.setSize(width * clamped, height * clamped, false);
         if (this.composer) {
-            this.composer.setSize(width * scale, height * scale);
+            this.composer.setSize(width * clamped, height * clamped);
         }
+    }
+
+    _updateDRS(frameMs) {
+        if (!this._drsEnabled || this.testMode) return;
+        if (frameMs > this._drsBudget) {
+            this._drsUnder = 0;
+            this._drsOver += 1;
+            if (this._drsOver >= 30) {
+                const ns = Math.max(this._drsMinScale, this.renderScale - 0.05);
+                if (ns !== this.renderScale) this.setRenderScale(ns);
+                this._drsOver = 0;
+            }
+        } else if (frameMs < this._drsBudget * 0.70) {
+            this._drsOver = 0;
+            this._drsUnder += 1;
+            if (this._drsUnder >= 90) {
+                const ns = Math.min(1.0, this.renderScale + 0.05);
+                if (ns !== this.renderScale) this.setRenderScale(ns);
+                this._drsUnder = 0;
+            }
+        } else {
+            this._drsOver = Math.max(0, this._drsOver - 1);
+            this._drsUnder = Math.max(0, this._drsUnder - 1);
+        }
+    }
+
+    _initVRS() {
+        try {
+            const gl = this.renderer.getContext();
+            const ext = gl.getExtension('WEBGL_fragment_shading_rate')
+                || gl.getExtension('EXT_fragment_shading_rate')
+                || gl.getExtension('WEBGL_shading_rate');
+            this._vrsSupported = !!ext;
+            this._vrsExt = ext;
+            const isPerf = this._preset === 'low';
+            if (isPerf && this._vrsSupported) {
+                // Sky and out-of-focus regions could run at 2×2; stubbed as enabled flag.
+                this._vrsEnabled = true;
+            } else {
+                this._vrsEnabled = false;
+            }
+        } catch {
+            this._vrsSupported = false;
+            this._vrsEnabled = false;
+        }
+    }
+
+    getPerPassTimings() {
+        const base = this._renderGraph ? this._renderGraph.perPassTimings() : {};
+        base._drawCalls = this.renderer?.info?.render?.calls ?? 0;
+        base._triangles = this.renderer?.info?.render?.triangles ?? 0;
+        base._renderScale = this.renderScale;
+        base._vrs = !!this._vrsEnabled;
+        return base;
     }
 
     /**

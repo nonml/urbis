@@ -24,6 +24,7 @@ export const PRESETS = {
         antialias: false,
         decalCap: 128,
         decalPerChunkCap: 16,
+        vrs: true,
     },
     medium: {
         name: 'Medium',
@@ -44,6 +45,7 @@ export const PRESETS = {
         antialias: false,
         decalCap: 256,
         decalPerChunkCap: 32,
+        vrs: false,
     },
     high: {
         name: 'High',
@@ -64,6 +66,7 @@ export const PRESETS = {
         antialias: true,
         decalCap: 512,
         decalPerChunkCap: 64,
+        vrs: false,
     },
     ultra: {
         name: 'Ultra',
@@ -84,6 +87,7 @@ export const PRESETS = {
         antialias: true,
         decalCap: 1024,
         decalPerChunkCap: 128,
+        vrs: false,
     },
 };
 
@@ -167,6 +171,9 @@ export function applyPreset(renderer, presetName) {
     // Decal limits
     if (renderer._decalManager) {
         renderer._decalManager.setLimits(preset.decalCap, preset.decalPerChunkCap);
+    }
+    if (renderer._vrsSupported !== undefined) {
+        renderer._vrsEnabled = !!preset.vrs && !!renderer._vrsSupported;
     }
     renderer._presetConfig = preset;
 }

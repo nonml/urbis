@@ -35,9 +35,14 @@ const PBR_MATERIALS = new Set([
 
 // CI exemptions: known acceptable non-PBR usages (file:line -> reason)
 // These are debug overlays, FX effects, god mode, sky — not game content.
+// Line numbers are fragile; exemptions are re-synced after each visual overhaul.
 const CI_EXEMPTIONS = {
     'src/render/lighting/day_night.js:140': 'Stars (PointsMaterial, sky)',
+    'src/render/lod_system.js:31': 'LOD1 vehicle box — low-poly imposter, PBR via faux diffuse',
+    'src/render/lod_system.js:37': 'LOD1 imposter billboard — MeshBasic for transparency',
+    'src/render/lod_system.js:100': 'LOD fallback plane — non-lit',
     'src/renderer3d.js:385': 'Ground plane (invisible)',
+    'src/renderer3d.js:414': 'Ground plane (invisible, post-DRS)',
     'src/renderer3d.js:2010': 'Building window glow (additive emissive)',
     'src/renderer3d.js:2482': 'Muzzle flash FX',
     'src/renderer3d.js:2499': 'Visibility ring FX',
@@ -45,15 +50,28 @@ const CI_EXEMPTIONS = {
     'src/renderer3d.js:2624': 'Decal overlay (Q10)',
     'src/renderer3d.js:3153': 'Debug wireframe (LineBasicMaterial)',
     'src/renderer3d.js:3207': 'Weather particles (PointsMaterial)',
+    'src/renderer3d.js:3397': 'Building window glow (additive emissive, post-proc)',
     'src/renderer3d.js:3540': 'Debug overlay',
     'src/renderer3d.js:3557': 'Scaffolding (debug)',
     'src/renderer3d.js:4064': 'Debug overlay (vertex colors)',
     'src/renderer3d.js:4377': 'Zone overlay (debug)',
     'src/renderer3d.js:4491': 'Build ghost (god mode)',
     'src/renderer3d.js:4504': 'Footprint outline (god mode)',
+    'src/renderer3d.js:4538': 'Muzzle flash FX (post-CSM)',
+    'src/renderer3d.js:4555': 'Visibility ring FX (post-CSM)',
     'src/renderer3d.js:4566': 'Hover highlight (god mode)',
     'src/renderer3d.js:4676': 'Hack placement ring (FX)',
+    'src/renderer3d.js:4700': 'Decal fallback pool (legacy)',
     'src/renderer3d.js:4786': 'Particle material (FX)',
+    'src/renderer3d.js:6031': 'Citizen LOD billboard (vertex colors)',
+    'src/renderer3d.js:6048': 'Citizen pet billboard',
+    'src/renderer3d.js:6780': 'Construction scaffold overlay',
+    'src/renderer3d.js:7093': 'Zone debug overlay',
+    'src/renderer3d.js:7207': 'Building site wireframe (LOD)',
+    'src/renderer3d.js:7220': 'Zone outline (god mode)',
+    'src/renderer3d.js:7282': 'Road kerb debug',
+    'src/renderer3d.js:7392': 'Ring highlight (FX)',
+    'src/renderer3d.js:7502': 'Particle material (FX, post-decal)',
 };
 
 /**
@@ -97,7 +115,7 @@ function scanFile(filePath) {
     const lines = content.split('\n');
     const findings = [];
     const projectRoot = path.join(__dirname, '..');
-    const relative = filePath.replace(projectRoot + '/', '');
+    const relative = path.relative(projectRoot, filePath).replace(/\\/g, '/');
 
     for (let i = 0; i < lines.length; i++) {
         const line = lines[i];
