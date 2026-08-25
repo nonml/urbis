@@ -48,6 +48,8 @@ import { SimChunkManager } from './sim/streaming/sim_cells.js';
 import { HeatSystem } from './sim/heat/heat_system.js';
 import { CaseManager } from './sim/cases/case_manager.js';
 import { EvidenceSystem } from './sim/evidence/evidence_system.js';
+import { MemoryBudget } from './sim/memory_budget.js';
+import * as workerPool from './workers/worker_pool.js';
 import { CampaignModel } from './sim/campaign/model.js';
 import { CaseGeneratorV2 } from './sim/campaign/case_generator.js';
 import { DialogueManager } from './sim/campaign/dialogue.js';
@@ -222,12 +224,13 @@ export class Game {
         this.scheduleManager = new ScheduleManager(this.map.width, this.map.height, this.map, this.buildings);
         this.nav = this.scheduleManager.nav;
 
-        // Chunk streaming
+        // Chunk streaming (Q12.B LRU, worker-only, prefetch)
         this.chunks = new ChunkManager(this.map.width, this.map.height, {
             chunkSize: 32,
             activeRadius: 3,
             unloadDelayMs: 2000,
         });
+        this.memoryBudget = new MemoryBudget(this, 'medium');
         this.economyLedger = new EconomyLedger(30);
         this.servicesManager = new ServiceManager(this);
         this.powerShortageTicks = 0;
@@ -622,6 +625,15 @@ export class Game {
         // Physics step (fixed-rate, deterministic)
         this.physics.step();
 
+        // Q12.F memory budget (soft 2GB/4GB, evict 80%, hard cap recoverable)
+        if (this.memoryBudget) {
+            const mb = this.memoryBudget.check();
+            if (!mb.ok && mb.recoverable) {
+                // Recoverable hard-cap path — don't crash, just warn and keep streaming
+                this.ui?.showMessage?.('Memory pressure — evicted a distant chunk', 'warning');
+            }
+        }
+
         // Compute transit metrics from placed buildings
         const placedBuildings = this.buildings.buildings.reduce((map, b) => {
             if (!map.has(b.type)) map.set(b.type, []);
@@ -739,8 +751,23 @@ export class Game {
         this.state.resources.population = this.citizens.getPopulation();
         this.state.resources.housing = this.buildings.totalHousing;
 
-        // Milestone Q-01: Simulation chunking update
+        // Milestone Q-01: Simulation chunking update + Q12.B prefetch heuristic
         this.chunkManager.update(this.state.time.tick);
+        // Q12.B prefetch: warm chunks ahead of velocity via worker (main never blocks)
+        if (this.player && this._lastPlayerX !== undefined) {
+            const vx = this.player.x - this._lastPlayerX;
+            const vy = this.player.y - this._lastPlayerY;
+            if (Math.hypot(vx, vy) > 0.01) {
+                const prefetch = this.chunks.getPrefetchChunks(this.player, { x: vx, y: vy }, 2);
+                if (prefetch.size > 0) {
+                    const w = workerPool.getAssetWorker?.();
+                    for (const id of prefetch) workerPool.decodeAssetViaWorker?.('chunk', new ArrayBuffer(0), { chunkId: id });
+                    void w;
+                }
+            }
+        }
+        this._lastPlayerX = this.player?.x;
+        this._lastPlayerY = this.player?.y;
 
         // 5. Job production (from employed citizens)
         if (citizenResult?.jobProduction) {
