@@ -4,6 +4,8 @@
  * Each preset controls shadow quality, post-processing, SSR, volumetrics.
  */
 
+import { shouldEnableVRS, VRS_RATE } from './vrs_support.js';
+
 export const PRESETS = {
     low: {
         name: 'Low',
@@ -181,8 +183,9 @@ export function applyPreset(renderer, presetName) {
         renderer._decalManager.setLimits(preset.decalCap, preset.decalPerChunkCap);
     }
     if (renderer._vrsSupported !== undefined) {
-        renderer._vrsEnabled = !!preset.vrs && !!renderer._vrsSupported;
-        renderer._vrsSkyRate = preset.vrsSkyRate || '1x1';
+        renderer._vrsEnabled = shouldEnableVRS(preset, renderer._vrsSupported);
+        renderer._vrsRate = preset.vrsSkyRate || VRS_RATE.X1X1;
+        if (renderer._applyVRSState) renderer._applyVRSState();
     }
     if (preset.drsMinScale !== undefined) renderer._drsMinScale = preset.drsMinScale;
     renderer._presetConfig = preset;

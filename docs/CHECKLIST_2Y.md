@@ -677,7 +677,7 @@ Verify the autonomous Roo loop works end-to-end.
 
 - [x] `q11-drs-impl` dynamic resolution scaling with min-bound user setting
 - [x] `q11-drs-budget-driven` triggers when frame time exceeds budget for N frames
-- [ ] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
+- [x] `q11-vrs-perf-preset` VRS opt-in for "Performance" preset on supported hardware
 - [ ] `q11-vrs-sky-2x2` sky and out-of-focus regions render at 2×2 VRS rate
 
 ### Q11.G — Draw-Call & Per-Pass Budget

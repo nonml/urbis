@@ -45,6 +45,8 @@ import { sequence, selector, condition, action, inverter, tick as btTick, SUCCES
 import { buildGrid as buildPathGrid, solveWalkable } from '../src/workers/pathfinding_worker.js';
 import { getTargetLocation as schedGetTarget } from '../src/workers/schedule_worker.js';
 import { tickFactions } from '../src/workers/faction_worker.js';
+import { detectVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE } from '../src/render/vrs_support.js';
+import { PRESETS } from '../src/render/presets.js';
 
 let passCount = 0;
 let failCount = 0;
@@ -3917,6 +3919,26 @@ function testZeroHostilitiesQuest() {
     }
 }
 
+function testVRSSupport() {
+    console.log('\n[Q11.F] VRS Support');
+    try {
+        const soft = detectVRS();
+        assert(soft.available === true, 'Software VRS always available');
+        assert(soft.mode === 'software', `Software VRS mode reported (got ${soft.mode})`);
+        assert(soft.rate === VRS_RATE.X2X2, 'Software VRS defaults to 2x2 rate');
+        assert(VRS_SKY_SCALE === 0.5, '2x2 rate halves sky resolution (scale 0.5)');
+        assert(shouldEnableVRS(PRESETS.low, true) === true, 'Performance preset opts into VRS on supported hardware');
+        assert(shouldEnableVRS(PRESETS.medium, true) === false, 'Medium preset does not opt into VRS');
+        assert(shouldEnableVRS(PRESETS.high, true) === false, 'High preset does not opt into VRS');
+        assert(shouldEnableVRS(PRESETS.low, false) === false, 'VRS stays off on unsupported hardware');
+        assert(shouldEnableVRS(undefined, true) === false, 'Unknown preset never enables VRS');
+    } catch (e) {
+        console.log(`  �o- VRS support test failed: ${e.message}`);
+        console.log(`  Stack: ${e.stack}`);
+        failCount++;
+    }
+}
+
 testZeroHostilitiesQuest();
 
 testDistrictVariants();
@@ -3928,6 +3950,7 @@ testNPCTemplateSchema();
 testContentQueue();
 testContentGoals();
 testWaveEncounter();
+testVRSSupport();
 
 runRapierDeterminismTest().then(() => runRapierPoolTest()).then(() => runRapierSaveLoadTest()).then(() => runPhysicsPropTest()).then(() => runTrashcanKickTest()).then(() => runSignToppleTest()).then(() => runChairPropTest()).then(() => runCrateBreakTest()).then(() => runPropSpawnerTest()).then(() => runRagdoll3BoneTest()).then(() => runRagdollBlendInTest()).then(() => runRagdollBlendOutTest()).then(() => runRagdollKnockbackTest()).then(() => runRagdollDespawnTest()).then(() => {
     console.log('='.repeat(60));

@@ -100,6 +100,7 @@ import { CharacterPool } from './render/character_pool.js';
 import { RenderGraph } from './render/graph/render_graph.js';
 import { createCSM, updateCSM } from './render/graph/csm.js';
 import { createSkyDome, updateSkyDomeForPhase } from './render/graph/sky.js';
+import { detectVRS, detectHardwareVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE } from './render/vrs_support.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -1022,6 +1023,7 @@ export class Renderer3D {
             this.composer.renderTarget2.type = THREE.HalfFloatType;
             const renderPass = new RenderPass(this.scene, this.camera);
             this.composer.addPass(renderPass);
+            this._renderPass = renderPass;
 
             // SSAO — ambient occlusion for depth (tuned for perf: half-res, small kernel)
             if (SSAOMod) {
@@ -1420,9 +1422,13 @@ export class Renderer3D {
                 this._starPass = starPass;
             }
 
+            // --- Software VRS sky pass (Q11.F): 2×2 sky rate on supported hardware ---
+            await this._setupVRSSkyPass();
+
             // --- Render Graph: explicit ordering + dependency tracking (Q11.E) ---
             try {
                 this._renderGraph = new RenderGraph(this.composer);
+                if (this._vrsPass) this._renderGraph.add('vrsSky', this._vrsPass);
                 this._renderGraph.add('render', renderPass);
                 if (this._ssaoPass) this._renderGraph.add('ssao', this._ssaoPass);
                 if (this._gtaoPass) this._renderGraph.add('gtao', this._gtaoPass);
@@ -6774,24 +6780,56 @@ export class Renderer3D {
     }
 
     _initVRS() {
-        try {
-            const gl = this.renderer.getContext();
-            const ext = gl.getExtension('WEBGL_fragment_shading_rate')
-                || gl.getExtension('EXT_fragment_shading_rate')
-                || gl.getExtension('WEBGL_shading_rate');
-            this._vrsSupported = !!ext;
-            this._vrsExt = ext;
-            const isPerf = this._preset === 'low';
-            if (isPerf && this._vrsSupported) {
-                // Sky and out-of-focus regions could run at 2×2; stubbed as enabled flag.
-                this._vrsEnabled = true;
-            } else {
-                this._vrsEnabled = false;
+        // WebGL has no native VRS — software region-based scaling is the real
+        // mechanism (sky shaded at 2×2 then upscaled). Native hardware VRS via
+        // WebGPU `fragment-shading-rate` upgrades the mode when present.
+        const soft = detectVRS();
+        this._vrsSupported = soft.available;
+        this._vrsMode = soft.mode;
+        this._vrsRate = soft.rate;
+        this._vrsSkyScale = VRS_SKY_SCALE;
+        this._vrsEnabled = false;
+        this._vrsActive = false;
+        this._vrsPass = null;
+        this._renderPass = null;
+        detectHardwareVRS().then((hw) => {
+            if (hw && this._vrsMode === 'software') {
+                this._vrsMode = hw.mode;
+                this._vrsRate = hw.rate;
             }
+        });
+    }
+
+    /**
+     * Build the software-VRS sky pass and slot it ahead of the scene render.
+     * Called from _initPostProcessing once the composer + render graph exist.
+     */
+    async _setupVRSSkyPass() {
+        if (!this.composer || this._vrsPass) return;
+        try {
+            const { VRSSkyPass } = await import('./render/graph/passes/vrs_sky_pass.js');
+            const pass = new VRSSkyPass();
+            pass.setSkyMesh(this._skyDome, this.camera);
+            this.composer.insertPass(pass, 0);
+            this._vrsPass = pass;
+            this._applyVRSState();
         } catch {
             this._vrsSupported = false;
             this._vrsEnabled = false;
         }
+    }
+
+    /**
+     * Toggle the VRS sky pass + scene-render clear to match the active state.
+     * With VRS on, the sky pass owns color fill + depth clear, so the scene
+     * RenderPass must not re-clear (it would wipe the low-res sky).
+     */
+    _applyVRSState() {
+        const on = this._vrsEnabled && this._vrsRate === VRS_RATE.X2X2 && !!this._vrsPass;
+        if (this._vrsPass) this._vrsPass.enabled = on;
+        if (this._renderPass) this._renderPass.clear = !on;
+        if (this._skyDome) this._skyDome.visible = !on;
+        this._vrsActive = on;
     }
 
     getPerPassTimings() {
@@ -6800,6 +6838,9 @@ export class Renderer3D {
         base._triangles = this.renderer?.info?.render?.triangles ?? 0;
         base._renderScale = this.renderScale;
         base._vrs = !!this._vrsEnabled;
+        base._vrsMode = this._vrsMode;
+        base._vrsRate = this._vrsRate;
+        base._vrsSkyScale = this._vrsSkyScale;
         return base;
     }
 
