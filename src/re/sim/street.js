@@ -50,6 +50,7 @@ export function createStreet(seed) {
       speed: 0.9 + rng.sim() * 0.8,
       phase: rng.sim() * Math.PI * 2,
       coat: COAT_COLORS[Math.floor(rng.sim() * COAT_COLORS.length)],
+      h: 0.92 + rng.sim() * 0.22,
       hurryUntil: 0,
       profile: makeProfile(rng.sim, i),
     });

@@ -58,6 +58,26 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [ ] `re-006` Craft pass: close-up fidelity — real character silhouettes, detailed hero car, shopfront set dressing, puddle reflections.
 - [ ] `re-007` Pressure: first mission + wanted response. Toys become a game.
 - [ ] `re-008` Cutover review: operator plays re-005→re-007, then we delete the old game.
+- [ ] `re-009` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
+- [ ] `re-010` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
+- [ ] `re-011` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
+- [ ] `re-012` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
+- [ ] `re-013` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
+
+## Salvage map (old 2Y plan → rewrite)
+
+The old code on `archive/pre-rewrite` is frozen, but its plan was mostly specs.
+Rules: copy the design, never the code. Read the old sim as reference, never import it.
+No save migration — clean break between world models.
+
+- Q5 template freeze → `re-009` (schemas + validators are renderer-agnostic)
+- Q6 hack chains / combat hacks / camera net → `re-010`
+- Q4 police tiers / cover / behavior tree → `re-011` (tiers first, cover+BT with combat)
+- Q7 mission arc / radio / TTS approach → `re-012`
+- Q3 interiors / Q13 rooftops+underground → `re-013`
+- Q2 tutorial beats → onboarding spec for the `re-008` review checklist
+- Gate philosophy / perf harness / honest budgets → already charter law (#2, #3)
+- Superseded, do not salvage: Q9–Q11 renderer-bound passes, date-driven quarters, old saves.
 
 ## Harvest log (fable-cities, 2026-09-16 — decision: harvest, don't fork)
 

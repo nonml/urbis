@@ -32,7 +32,7 @@ export function buildAtmosphere(scene, renderer) {
   moon.position.set(30, 50, -20);
   scene.add(moon);
   for (const z of [-9, 9]) {
-    const spot = new THREE.SpotLight(0xffc98a, 90, 45, 0.65, 0.55, 2);
+    const spot = new THREE.SpotLight(0xffc98a, 45, 45, 0.5, 0.55, 2);
     spot.position.set(0, 7, z);
     spot.target.position.set(0, 0, z);
     scene.add(spot, spot.target);

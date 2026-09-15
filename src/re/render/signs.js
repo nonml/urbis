@@ -10,7 +10,7 @@ const SIGNS = [
   { text: '酒場', sub: 'CAFE', color: '#52ff9e', side: -1, z: 36, y: 9 },
   { text: 'HOTEL', sub: 'EAST', color: '#35e0ff', side: 1, z: -14, y: 10, ax: 44 },
   { text: '麺', sub: 'NOODLE', color: '#ff4df0', side: -1, z: 20, y: 7.5, ax: 44 },
-  { text: 'PARK', sub: '24H', color: '#ffb14e', side: 0, z: -60.5, y: 8, ax: 22, face: 'south' },
+  { text: 'PARK', sub: '24H', color: '#ffb14e', side: 0, z: -59.9, y: 8, ax: 22, face: 'south' },
 ];
 
 function signTexture(main, sub, color) {
@@ -81,7 +81,7 @@ export function buildSigns() {
   for (const s of SIGNS) {
     const ax = s.ax ?? 0;
     const faceSouth = s.face === 'south';
-    const x = faceSouth ? ax : ax + s.side * 7.7;
+    const x = faceSouth ? ax : ax + s.side * 6.4;
     const z = faceSouth ? s.z : s.z;
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(1.5, 4.5),
@@ -91,8 +91,8 @@ export function buildSigns() {
     plane.rotation.y = faceSouth ? Math.PI : s.side > 0 ? -Math.PI / 2 : Math.PI / 2;
     group.add(plane);
     addGlowSprite(group, s.color, x, s.y, z, 7, 9, 0.32);
-    const arm = new THREE.BoxGeometry(faceSouth ? 0.12 : 1.0, 0.12, faceSouth ? 1.0 : 0.12);
-    arm.translate(faceSouth ? x : s.side * 8.1 + ax, s.y + 2.1, faceSouth ? s.z - 0.5 : s.z);
+    const arm = new THREE.BoxGeometry(faceSouth ? 0.12 : 2.8, 0.12, faceSouth ? 1.4 : 0.12);
+    arm.translate(faceSouth ? x : s.side * 7.5 + ax, s.y + 2.1, faceSouth ? s.z - 0.7 : s.z);
     arms.push(arm);
     pools.push({ x: faceSouth ? x : x - s.side * 2.5, z: faceSouth ? z + 2.5 : s.z, size: 9, color: s.color });
   }

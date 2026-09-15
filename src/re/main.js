@@ -10,6 +10,7 @@ import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
+import { buildShops, buildPuddles, buildSteam, tickSteam } from './render/setdress.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { createRenderer, buildAtmosphere, createComposer, fitRenderer } from './render/atmosphere.js';
@@ -51,6 +52,10 @@ const heroRig = buildPlayerCar(scene, heroCar);
 scene.add(heroRig.group);
 const avatar = buildPlayer();
 scene.add(avatar.group);
+scene.add(buildShops());
+scene.add(buildPuddles());
+const steam = buildSteam();
+scene.add(steam.group);
 buildProfiler();
 
 const prompt = document.createElement('div');
@@ -96,6 +101,9 @@ const spawnPreset = new URLSearchParams(location.search).get('spawn');
 if (spawnPreset === 'east') {
   player.x = 49.5;
   player.z = 16;
+} else if (spawnPreset === 'shop') {
+  player.x = 3.5;
+  player.z = 7;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -247,6 +255,7 @@ function render() {
     if (DARK[z] && !isDark(street, z)) applyZone(z, false);
   }
   tickRain(rain, clock.elapsed);
+  tickSteam(steam, clock.elapsed);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street);
 
@@ -294,7 +303,7 @@ function render() {
     const over = draws > DRAW_BUDGET;
     const speedLine = driving ? ` · ${Math.abs(heroCar.speed * 3.6).toFixed(0)} km/h` : '';
     hud.innerHTML =
-      `<b>NEON BLOCK 004</b> · night · rain<br>` +
+      `<b>NEON BLOCK 006</b> · night · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]${speedLine}`;

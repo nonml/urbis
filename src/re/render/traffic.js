@@ -29,6 +29,24 @@ const tailGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(-0.55, 0.75, -2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(0.55, 0.75, -2.11); return g; })(),
 ]);
+const canopyGeo = (() => {
+  const g = new THREE.BoxGeometry(1.5, 0.42, 1.9);
+  g.translate(0, 1.12, -0.2);
+  return g;
+})();
+const hubGeo = (() => {
+  const parts = [];
+  for (const [x, z] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
+    const g = new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10);
+    g.rotateZ(Math.PI / 2);
+    g.translate(x, 0.35, z);
+    parts.push(g);
+  }
+  return mergeGeometries(parts);
+})();
+const glassMat = new THREE.MeshStandardMaterial({
+  color: 0x0a121c, metalness: 0.9, roughness: 0.06, envMapIntensity: 2.2,
+});
 const poolGeo = (() => {
   const g = new THREE.PlaneGeometry(5, 8);
   g.rotateX(-Math.PI / 2);
@@ -54,6 +72,7 @@ export function buildTraffic(street) {
   const wheels = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }), CAR_COUNT);
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), CAR_COUNT);
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), CAR_COUNT);
+  const glass = new THREE.InstancedMesh(canopyGeo, glassMat, CAR_COUNT);
   const poolMat = new THREE.MeshBasicMaterial({
     map: getGlowTex(), color: 0x4d6a8a, transparent: true, opacity: 0.4,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -71,20 +90,21 @@ export function buildTraffic(street) {
     glows.push(s);
   });
   bodies.instanceColor.needsUpdate = true;
-  group.add(bodies, wheels, beams, tails, pools);
-  const rig = { bodies, wheels, beams, tails, pools, glows, dummy };
+  group.add(bodies, wheels, beams, tails, glass, pools);
+  const rig = { bodies, wheels, beams, tails, glass, pools, glows, dummy };
   updateTraffic(rig, street);
   return { group, rig };
 }
 
 export function updateTraffic(rig, street) {
-  const { bodies, wheels, beams, tails, pools, glows, dummy } = rig;
+  const { bodies, wheels, beams, tails, glass, pools, glows, dummy } = rig;
   street.cars.forEach((c, i) => {
     const m = placeOnCar(dummy, c, 0);
     bodies.setMatrixAt(i, m);
     wheels.setMatrixAt(i, m);
     beams.setMatrixAt(i, m);
     tails.setMatrixAt(i, m);
+    glass.setMatrixAt(i, m);
     dummy.position.set(c.lane, 0.05, c.z + c.dir * 3.5);
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
@@ -96,6 +116,7 @@ export function updateTraffic(rig, street) {
   wheels.instanceMatrix.needsUpdate = true;
   beams.instanceMatrix.needsUpdate = true;
   tails.instanceMatrix.needsUpdate = true;
+  glass.instanceMatrix.needsUpdate = true;
   pools.instanceMatrix.needsUpdate = true;
 }
 
@@ -109,6 +130,8 @@ export function buildPlayerCar(scene, car) {
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4ff }));
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_DIM.clone() });
   const tails = new THREE.Mesh(tailGeo, tailMat);
+  const canopy = new THREE.Mesh(canopyGeo, glassMat);
+  const hubs = new THREE.Mesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }));
   const pool = new THREE.Mesh(poolGeo, new THREE.MeshBasicMaterial({
     map: getGlowTex(), color: 0x6a8ab0, transparent: true, opacity: 0.5,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -127,7 +150,7 @@ export function buildPlayerCar(scene, car) {
   }
   const spot = new THREE.SpotLight(0xcfe2ff, 140, 42, 0.52, 0.45, 2);
   scene.add(spot, spot.target);
-  group.add(paint, wheels, beams, tails, pool);
+  group.add(paint, wheels, beams, tails, canopy, hubs, pool);
   const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot };
   updatePlayerCar(rig, car, false);
   return rig;

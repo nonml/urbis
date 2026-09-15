@@ -87,11 +87,11 @@ function buildMarkings() {
     const q = stripe.clone();
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
-    q.translate(0, 0.02, 8 + i * 1.1);
+    q.translate(0, 0.02, 20 + i * 1.1);
     quads.push(q);
   }
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.15, roughness: 0.6,
+    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.08, roughness: 0.6,
   });
   return new THREE.Mesh(mergeGeometries(quads), mat);
 }
@@ -123,26 +123,57 @@ export function buildTowers(texLoader, maxAniso) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = maxAniso;
   }
-  const facadeMat = new THREE.MeshStandardMaterial({
+  const facadeMatA = new THREE.MeshStandardMaterial({
     map: color, emissiveMap: emission, emissive: 0xffffff, emissiveIntensity: 0.75,
     normalMap: normal, roughnessMap: rough, roughness: 1.0,
     metalnessMap: metal, metalness: 1.0,
     color: 0x565c68, envMapIntensity: 1.1,
   });
-  const facades = [];
+  const facadeMatB = facadeMatA.clone();
+  facadeMatB.color = new THREE.Color(0x4a5a6e);
+  const podiumMapsA = loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2);
+  const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.95, envMapIntensity: 0.25, color: 0x54575f });
+  const podiumMapsB = loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2);
+  const podiumMatB = standardFromMaps(podiumMapsB, { roughness: 0.9, envMapIntensity: 0.25, color: 0x4e5158 });
+  const facadesA = [];
+  const facadesB = [];
+  const podiumsA = [];
+  const podiumsB = [];
   const caps = [];
+  // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
+  function emitTower(cx, cz, w, h, d, idx) {
+    (idx % 2 === 0 ? podiumsA : podiumsB).push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
+    // Stone trim course capping the podium — one thin ring, catches lamp light.
+    caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
+    (idx % 2 === 0 ? facadesA : facadesB).push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
+    let topY = h;
+    if (h >= 30 && idx % 2 === 0) {
+      const uw = w * 0.72;
+      const uh = h * 0.3;
+      const ud = d * 0.72;
+      facadesA.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
+      topY = h + uh;
+    }
+    caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
+    caps.push(box(w + 0.9, 0.35, d + 0.9, cx, topY + 0.1, cz));
+    const ux = cx + (idx % 3 - 1) * w * 0.22;
+    const uz = cz + ((idx + 1) % 3 - 1) * d * 0.22;
+    caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
+    caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
+  }
+  let idx = 0;
   for (const ax of avenues) {
     for (const [side, z, w, h, d] of TOWERS) {
-      const cx = ax + side * (8.5 + d / 2);
-      facades.push(worldUVs(box(w, h, d, cx, h / 2, z), w, h, d, 11));
-      caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, z));
+      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++);
     }
   }
   for (const [x, w, h] of SOUTH_TOWERS) {
-    facades.push(worldUVs(box(w, h, 10, x, h / 2, -66), w, h, 10, 11));
-    caps.push(box(w + 0.4, 0.5, 10.4, x, h + 0.25, -66));
+    emitTower(x, -66, w, h, 10, idx++);
   }
-  group.add(new THREE.Mesh(mergeGeometries(facades), facadeMat));
+  group.add(new THREE.Mesh(mergeGeometries(facadesA), facadeMatA));
+  group.add(new THREE.Mesh(mergeGeometries(facadesB), facadeMatB));
+  group.add(new THREE.Mesh(mergeGeometries(podiumsA), podiumMatA));
+  group.add(new THREE.Mesh(mergeGeometries(podiumsB), podiumMatB));
   const capMat = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.9 });
   group.add(new THREE.Mesh(mergeGeometries(caps), capMat));
 
