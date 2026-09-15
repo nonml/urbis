@@ -57,12 +57,13 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-005` District (done in `69cffa3`, evidence `re-005-district.png` + `re-005-east.png`, 81 draws / 150)
 - [x] `re-006` Craft pass (done in `ce5ef87`, evidence `re-006-craft.png`, 82 draws / 150)
 - [x] `re-007` Pressure (done in `c53be0c`, evidence `re-007-pursuit/busted/chained.png`, ~104 draws / 150)
-- [ ] `re-008` Cutover review: operator plays re-005→re-007, then we delete the old game.
-- [ ] `re-009` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
-- [ ] `re-010` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
-- [ ] `re-011` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
-- [ ] `re-012` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
-- [ ] `re-013` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
+- [ ] `re-008` World beauty: GLB street props, trees, beacons, stars, road detail. Look like a place fable-cities would respect.
+- [ ] `re-009` Cutover review: operator plays re-005→re-007, then we delete the old game.
+- [ ] `re-010` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
+- [ ] `re-011` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
+- [ ] `re-012` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
+- [ ] `re-013` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
+- [ ] `re-014` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
 
 ## Salvage map (old 2Y plan → rewrite)
 

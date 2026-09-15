@@ -3,14 +3,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
+import { mulberry32 } from '../sim/rng.js';
 
 const SHOPS = [
-  { x: -8.3, z: -12, ry: Math.PI / 2, kind: 0 },
-  { x: 8.3, z: 2, ry: -Math.PI / 2, kind: 1 },
-  { x: -8.3, z: 22, ry: Math.PI / 2, kind: 2 },
-  { x: 44 - 8.3, z: -20, ry: Math.PI / 2, kind: 1 },
-  { x: 44 + 8.3, z: 14, ry: -Math.PI / 2, kind: 0 },
-  { x: 10, z: -60.7, ry: Math.PI, kind: 2 },
+  { x: -6.0, z: -12, ry: Math.PI / 2, kind: 0 },
+  { x: 6.0, z: 2, ry: -Math.PI / 2, kind: 1 },
+  { x: -6.0, z: 22, ry: Math.PI / 2, kind: 2 },
+  { x: 35.5, z: -20, ry: Math.PI / 2, kind: 1 },
+  { x: 50.0, z: 14, ry: -Math.PI / 2, kind: 0 },
+  { x: 10, z: -60.9, ry: Math.PI, kind: 2 },
 ];
 
 const SHOP_STYLES = [
@@ -124,6 +125,42 @@ const VENTS = [
   { x: 46.5, z: 8, phase: 0.8 },
   { x: -5.5, z: -14, phase: 1.6 },
 ];
+
+// Aviation beacons on tall crowns: one merged mesh, one synced pulse.
+// Stars: one static dome of points above the fog.
+
+export function buildBeacons(points) {
+  const geos = [];
+  for (const [x, y, z] of points) {
+    const g = new THREE.SphereGeometry(0.28, 8, 6);
+    g.translate(x, y, z);
+    geos.push(g);
+  }
+  const mat = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
+  return { mesh: new THREE.Mesh(mergeGeometries(geos), mat), mat };
+}
+
+export function buildStars() {
+  const rand = mulberry32(4242);
+  const N = 450;
+  const pos = new Float32Array(N * 3);
+  for (let i = 0; i < N; i++) {
+    const a = rand() * Math.PI * 2;
+    const e = 0.12 + rand() * 1.4;
+    const r = 320;
+    pos[i * 3] = Math.cos(a) * Math.cos(e) * r;
+    pos[i * 3 + 1] = Math.sin(e) * r;
+    pos[i * 3 + 2] = Math.sin(a) * Math.cos(e) * r;
+  }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  const points = new THREE.Points(geo, new THREE.PointsMaterial({
+    color: 0xaac4e8, size: 1.6, sizeAttenuation: false,
+    transparent: true, opacity: 0.75, fog: false, depthWrite: false,
+  }));
+  points.frustumCulled = false;
+  return points;
+}
 
 export function buildSteam() {
   const group = new THREE.Group();

@@ -90,10 +90,45 @@ function buildMarkings() {
     q.translate(0, 0.02, 20 + i * 1.1);
     quads.push(q);
   }
+  const stripeE = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  for (let i = -3; i <= 3; i++) {
+    const q = stripeE.clone();
+    q.rotateX(-Math.PI / 2);
+    q.rotateY(Math.PI / 2);
+    q.translate(44, 0.02, -20 + i * 1.1);
+    quads.push(q);
+  }
+  // Edge lines, same merge, same draw.
+  const edge = new THREE.PlaneGeometry(0.12, STREET_LEN);
+  for (const ax of [0, 44]) {
+    for (const ex of [ax - 3.7, ax + 3.7]) {
+      const q = edge.clone();
+      q.rotateX(-Math.PI / 2);
+      q.translate(ex, 0.02, 0);
+      quads.push(q);
+    }
+  }
   const mat = new THREE.MeshStandardMaterial({
-    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.08, roughness: 0.6,
+    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.05, roughness: 0.6,
   });
-  return new THREE.Mesh(mergeGeometries(quads), mat);
+  const mesh = new THREE.Mesh(mergeGeometries(quads), mat);
+  const manholes = [];
+  const mh = new THREE.CircleGeometry(0.55, 14);
+  for (const ax of [0, 44]) {
+    for (let z = -48; z <= 48; z += 24) {
+      const q = mh.clone();
+      q.rotateX(-Math.PI / 2);
+      q.translate(ax + (z % 48 === 0 ? -1.8 : 1.8), 0.022, z);
+      manholes.push(q);
+    }
+  }
+  const mhMesh = new THREE.Mesh(
+    mergeGeometries(manholes),
+    new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.7, metalness: 0.4 })
+  );
+  const g = new THREE.Group();
+  g.add(mesh, mhMesh);
+  return g;
 }
 
 const TOWERS = [
@@ -140,6 +175,7 @@ export function buildTowers(texLoader, maxAniso) {
   const podiumsA = [];
   const podiumsB = [];
   const caps = [];
+  const beaconPts = [];
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   function emitTower(cx, cz, w, h, d, idx) {
     (idx % 2 === 0 ? podiumsA : podiumsB).push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
@@ -160,6 +196,7 @@ export function buildTowers(texLoader, maxAniso) {
     const uz = cz + ((idx + 1) % 3 - 1) * d * 0.22;
     caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
     caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
+    if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
   }
   let idx = 0;
   for (const ax of avenues) {
@@ -185,5 +222,5 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return group;
+  return { group, beacons: beaconPts };
 }

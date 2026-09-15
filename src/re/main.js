@@ -13,7 +13,8 @@ import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
 import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
-import { buildShops, buildPuddles, buildSteam, tickSteam } from './render/setdress.js';
+import { buildShops, buildPuddles, buildSteam, tickSteam, buildBeacons, buildStars } from './render/setdress.js';
+import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { createRenderer, buildAtmosphere, createComposer, fitRenderer } from './render/atmosphere.js';
@@ -31,7 +32,20 @@ const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerH
 
 const { spots } = buildAtmosphere(scene, renderer);
 scene.add(buildGround(texLoader, maxAniso));
-scene.add(buildTowers(texLoader, maxAniso));
+const towers = buildTowers(texLoader, maxAniso);
+scene.add(towers.group);
+scene.add(buildStars());
+const beacons = buildBeacons(towers.beacons);
+scene.add(beacons.mesh);
+scene.add(buildTrees());
+scene.add(await loadPropInstances('re-assets/models/fire_hydrant/fire_hydrant_1k.gltf', [
+  [-6.9, -50], [6.9, -15], [-6.9, 20], [6.9, 45], [37.1, -40],
+  [50.9, -5], [37.1, 25], [50.9, 48], [-2, -69.5], [30, -69.5],
+]));
+scene.add(await loadPropInstances('re-assets/models/metal_trash_can/metal_trash_can_1k.gltf', [
+  [-5.9, -44], [-5.9, -26], [5.9, -8], [5.9, 10], [-5.9, 28], [-5.9, 46],
+  [38.1, -44], [49.9, -8], [38.1, 28], [49.9, 46], [8, -69], [36, -69],
+]));
 const signs = buildSigns();
 scene.add(signs.group);
 scene.add(buildPools(signs.pools));
@@ -295,6 +309,8 @@ function render() {
   missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
   tickSteam(steam, clock.elapsed);
+  const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
+  beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street);
   const tx = driving ? heroCar.x : player.x;
@@ -352,7 +368,7 @@ function render() {
     const stars = '★'.repeat(wanted.heat) + '☆'.repeat(3 - wanted.heat);
     const busted = isBusted(wanted, street.time);
     hud.innerHTML =
-      `<b>NEON BLOCK 007</b> · night · rain<br>` +
+      `<b>NEON BLOCK 008</b> · night · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]${speedLine}<br>` +
