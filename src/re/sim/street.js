@@ -6,7 +6,7 @@ export const NPC_COUNT = 36;
 export const CAR_COUNT = 9;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
-export const HACK_COOLDOWN_SECS = 5;
+export const ZONE_COOLDOWN_SECS = 3;
 export const STREET_HALF = 60;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c];
@@ -71,9 +71,8 @@ export function createStreet(seed) {
     time: 0,
     npcs,
     cars,
-    zones: [{ darkUntil: 0 }, { darkUntil: 0 }],
+    zones: [{ darkUntil: 0, coolUntil: 0 }, { darkUntil: 0, coolUntil: 0 }],
     hurryUntil: 0,
-    cooldownUntil: 0,
     lastHack: null,
   };
 }
@@ -86,18 +85,20 @@ export function isDark(state, zone) {
   return state.time < state.zones[zone].darkUntil;
 }
 
-// The hack: kill a lamp zone. Returns affected lamp count (0 = on cooldown).
+// The hack: kill a lamp zone. Each zone recharges on its own clock, so chaining
+// two zones inside one 8s window is possible — by car, not on foot.
+// Returns affected lamp count (0 = that zone recharging).
 export function hackBlackout(state, zone) {
-  if (state.time < state.cooldownUntil) return 0;
+  if (state.time < state.zones[zone].coolUntil) return 0;
   state.zones[zone].darkUntil = state.time + BLACKOUT_SECS;
+  state.zones[zone].coolUntil = state.time + BLACKOUT_SECS + ZONE_COOLDOWN_SECS;
   state.hurryUntil = state.time + BLACKOUT_SECS + 5;
-  state.cooldownUntil = state.time + BLACKOUT_SECS + HACK_COOLDOWN_SECS;
   state.lastHack = { zone, at: state.time };
-  return 3; // 3 lamps per zone
+  return 3; // 3 lamps per zone on the main avenue
 }
 
-export function hackCooldownLeft(state) {
-  return Math.max(0, state.cooldownUntil - state.time);
+export function hackCooldownLeft(state, zone) {
+  return Math.max(0, state.zones[zone].coolUntil - state.time);
 }
 
 // Nearest NPC inside a ~30° facing cone within 12m. Null when nobody qualifies.

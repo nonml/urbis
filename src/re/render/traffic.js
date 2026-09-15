@@ -7,11 +7,11 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { CAR_COUNT } from '../sim/street.js';
 import { getGlowTex } from './signs.js';
 
-const bodyGeo = mergeGeometries([
+export const bodyGeo = mergeGeometries([
   (() => { const g = new THREE.BoxGeometry(1.8, 0.55, 4.2); g.translate(0, 0.65, 0); return g; })(),
   (() => { const g = new THREE.BoxGeometry(1.6, 0.5, 2.1); g.translate(0, 1.15, -0.2); return g; })(),
 ]);
-const wheelGeo = (() => {
+export const wheelGeo = (() => {
   const parts = [];
   for (const [x, z] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
     const g = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
@@ -21,11 +21,11 @@ const wheelGeo = (() => {
   }
   return mergeGeometries(parts);
 })();
-const beamGeo = mergeGeometries([
+export const beamGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(-0.55, 0.7, 2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(0.55, 0.7, 2.11); return g; })(),
 ]);
-const tailGeo = mergeGeometries([
+export const tailGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(-0.55, 0.75, -2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(0.55, 0.75, -2.11); return g; })(),
 ]);
@@ -47,7 +47,7 @@ const hubGeo = (() => {
 const glassMat = new THREE.MeshStandardMaterial({
   color: 0x0a121c, metalness: 0.9, roughness: 0.06, envMapIntensity: 2.2,
 });
-const poolGeo = (() => {
+export const poolGeo = (() => {
   const g = new THREE.PlaneGeometry(5, 8);
   g.rotateX(-Math.PI / 2);
   return g;

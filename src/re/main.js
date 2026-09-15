@@ -4,11 +4,14 @@ import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
+import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionReset, missionNote } from './sim/mission.js';
+import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { buildGround, buildTowers } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
+import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
 import { buildShops, buildPuddles, buildSteam, tickSteam } from './render/setdress.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
@@ -44,12 +47,17 @@ const street = createStreet(20260916);
 const player = createPlayer();
 player.mode = 'foot';
 const heroCar = createPlayerCar();
+const mission = createMission();
+const wanted = createWanted();
+let lastWantedStatus = 'clean';
 const npcRig = buildNPCs(street);
 scene.add(npcRig.group);
 const traffic = buildTraffic(street);
 scene.add(traffic.group);
 const heroRig = buildPlayerCar(scene, heroCar);
 scene.add(heroRig.group);
+const pursuitRigs = [buildPursuitCar(), buildPursuitCar()];
+for (const r of pursuitRigs) scene.add(r.group);
 const avatar = buildPlayer();
 scene.add(avatar.group);
 scene.add(buildShops());
@@ -68,6 +76,28 @@ prompt.style.cssText = [
 ].join(';');
 prompt.textContent = 'F · DRIVE';
 document.body.appendChild(prompt);
+
+const missionPanel = document.createElement('div');
+missionPanel.id = 'mission';
+missionPanel.style.cssText = [
+  'position:fixed', 'top:12px', 'right:12px', 'pointer-events:none', 'z-index:5',
+  'font:11px/1.7 ui-monospace,Menlo,monospace', 'letter-spacing:0.05em',
+  'color:#ffd9a0', 'background:rgba(12,8,3,0.72)',
+  'border:1px solid rgba(255,177,78,0.4)', 'border-left:3px solid #ffb14e',
+  'padding:7px 12px', 'border-radius:4px',
+  'text-shadow:0 0 6px rgba(255,177,78,0.5)',
+].join(';');
+document.body.appendChild(missionPanel);
+
+const banner = document.createElement('div');
+banner.id = 'banner';
+banner.style.cssText = [
+  'position:fixed', 'top:34%', 'left:50%', 'transform:translateX(-50%)',
+  'display:none', 'pointer-events:none', 'z-index:6',
+  'font:600 26px ui-monospace,Menlo,monospace', 'letter-spacing:0.2em',
+  'color:#fff', 'text-shadow:0 0 18px rgba(84,240,255,0.9),0 0 46px rgba(84,240,255,0.5)',
+].join(';');
+document.body.appendChild(banner);
 
 const rain = buildRain();
 scene.add(rain);
@@ -113,7 +143,9 @@ const DARK = [false, false];
 function fireHack() {
   const zone = zoneAt(player.mode === 'drive' ? heroCar.z : player.z);
   if (hackBlackout(street, zone) === 0) return;
+  wantedOnBlackout(wanted);
   applyZone(zone, true);
+  missionOnBlackout(mission, DARK, street.time);
 }
 
 function applyZone(zone, dark) {
@@ -121,6 +153,7 @@ function applyZone(zone, dark) {
   lamps.setZoneDark(zone, dark);
   spots[zone].visible = !dark;
   lampPoolMeshes[zone].visible = !dark;
+  missionOnBlackout(mission, DARK, street.time);
 }
 
 function nearHero() {
@@ -131,6 +164,7 @@ function toggleVehicle() {
   if (player.mode === 'foot' && nearHero()) {
     player.mode = 'drive';
     avatar.group.visible = false;
+    missionOnEnterCar(mission);
     cam.dist = 9;
     cam.pitch = 0.3;
   } else if (player.mode === 'drive') {
@@ -166,6 +200,9 @@ window.__re = {
   car: () => ({ x: +heroCar.x.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
   enter: () => toggleVehicle(),
   profile: () => lastProfile,
+  heat: () => wanted.heat,
+  pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
+  mission: () => ({ done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
 };
 
 let last = performance.now();
@@ -215,7 +252,8 @@ function acquireTarget() {
 }
 
 function hackStatus() {
-  const left = hackCooldownLeft(street);
+  const zone = zoneAt(player.mode === 'drive' ? heroCar.z : player.z);
+  const left = hackCooldownLeft(street, zone);
   if (DARK[0] || DARK[1]) {
     const z = DARK[0] ? 0 : 1;
     const s = Math.max(0, street.zones[z].darkUntil - street.time);
@@ -254,10 +292,19 @@ function render() {
   for (let z = 0; z < 2; z++) {
     if (DARK[z] && !isDark(street, z)) applyZone(z, false);
   }
+  missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
   tickSteam(steam, clock.elapsed);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street);
+  const tx = driving ? heroCar.x : player.x;
+  const tz = driving ? heroCar.z : player.z;
+  lastWantedStatus = tickWanted(wanted, dt, tx, tz, driving, heroCar.speed, isDark(street, zoneAt(tz)), street.time);
+  if (lastWantedStatus === 'busted' && !mission.complete) {
+    missionReset(mission);
+    missionNote(mission, 'BUSTED — contract reset', street.time, 3);
+  }
+  wanted.pursuit.forEach((p, i) => updatePursuit(pursuitRigs[i], p, clock.elapsed));
 
   const ax = driving ? heroCar.x : player.x;
   const az = driving ? heroCar.z : player.z;
@@ -302,11 +349,26 @@ function render() {
     const tris = (renderer.info.render.triangles / 1e6).toFixed(2);
     const over = draws > DRAW_BUDGET;
     const speedLine = driving ? ` · ${Math.abs(heroCar.speed * 3.6).toFixed(0)} km/h` : '';
+    const stars = '★'.repeat(wanted.heat) + '☆'.repeat(3 - wanted.heat);
+    const busted = isBusted(wanted, street.time);
     hud.innerHTML =
-      `<b>NEON BLOCK 006</b> · night · rain<br>` +
+      `<b>NEON BLOCK 007</b> · night · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
-      `H · blackout [${hackStatus()}]${speedLine}`;
+      `H · blackout [${hackStatus()}]${speedLine}<br>` +
+      `<span class="${wanted.heat > 0 ? 'warn' : ''}">${stars}</span> · ₡${mission.balance}`;
+    const obj = mission.phases.map((p, i) => `${mission.done[i] ? '✓' : '·'} ${p}`).join('<br>');
+    missionPanel.innerHTML = `<b>◈ ${mission.id}</b><br>${obj}`;
+    missionPanel.style.display = mission.complete && street.time > mission.bannerUntil ? 'none' : 'block';
+    if (busted) {
+      banner.textContent = 'BUSTED';
+      banner.style.display = 'block';
+    } else if (street.time < mission.bannerUntil) {
+      banner.textContent = mission.bannerText;
+      banner.style.display = 'block';
+    } else {
+      banner.style.display = 'none';
+    }
   }
 }
 render();
