@@ -53,7 +53,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-002` Living street (done in `7d22df1`, evidence `re-002-lit.png` + `re-002-blackout.png`, 55 draws / 150)
       (streetlight blackout with visible cause→effect). Acceptance: hack feels like conducting.
 - [x] `re-003` Player on foot (done in `9dea1cb`, evidence `re-003-profiler.png` + `re-003-secret.png`, 60 draws / 150)
-- [ ] `re-004` Drive: enter car, drive the block, rain + headlights + wet reflections hold up.
+- [x] `re-004` Drive (done in `2b5e267`, evidence `re-004-drive.png`, 64 draws / 150)
 - [ ] `re-005` Cutover review: operator plays re-001→re-004, then we delete the old game.
 
 ## Harvest log (fable-cities, 2026-09-16 — decision: harvest, don't fork)
