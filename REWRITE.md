@@ -50,7 +50,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 
 - [x] `re-001` Neon block (done in `088722e`, evidence `docs/re-shots/re-001.png`, 42 draws / 150): one rain-slicked street block at night. Acceptance: screenshot
       looks AAA-indie, ≤ 150 draws, boots < 3s, orbit + WASD-streetcam, live draw/fps HUD.
-- [ ] `re-002` Living street: 20+ NPCs (instanced), 6+ traffic cars (instanced), one hackable
+- [x] `re-002` Living street (done in `7d22df1`, evidence `re-002-lit.png` + `re-002-blackout.png`, 55 draws / 150)
       (streetlight blackout with visible cause→effect). Acceptance: hack feels like conducting.
 - [ ] `re-003` Player on foot: enter the block, walk, profiler overlay on NPCs.
 - [ ] `re-004` Drive: enter car, drive the block, rain + headlights + wet reflections hold up.
