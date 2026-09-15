@@ -11,7 +11,7 @@ export default defineConfig({
         emptyOutDir: true,
         manifest: true,
         rollupOptions: {
-            input: 'index.html',
+            input: { main: 'index.html', re: 're.html' },
             output: {
                 manualChunks: {
                     three: ['three'],

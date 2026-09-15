@@ -1,0 +1,123 @@
+// Neon street block geometry. Everything repeated is instanced or merged —
+// per-object draws for repeated things are banned (charter law #4).
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { loadPBRMaps, standardFromMaps } from './materials.js';
+
+const STREET_LEN = 120;
+const ROAD_HALF = 4;
+
+function box(w, h, d, x, y, z) {
+  const g = new THREE.BoxGeometry(w, h, d);
+  g.translate(x, y, z);
+  return g;
+}
+
+// Scale box UVs to world meters so the facade texture tiles every TILE m.
+function worldUVs(geo, w, h, d, tile) {
+  const uv = geo.attributes.uv;
+  const sx = Math.max(w, d) / tile;
+  const sy = h / tile;
+  for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * sx, uv.getY(i) * sy);
+  return geo;
+}
+
+export function buildGround(texLoader, maxAniso) {
+  const group = new THREE.Group();
+  const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
+  const road = new THREE.Mesh(
+    new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN),
+    standardFromMaps(asphalt, { roughness: 0.45, envMapIntensity: 1.4, color: 0x8a8f99 })
+  );
+  road.rotation.x = -Math.PI / 2;
+  group.add(road);
+
+  const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
+  const walkMat = standardFromMaps(paving, { roughness: 0.7, envMapIntensity: 0.7, color: 0x9aa0ab });
+  const walks = mergeGeometries([
+    box(3, 0.24, STREET_LEN, -(ROAD_HALF + 1.5), 0.0, 0),
+    box(3, 0.24, STREET_LEN, ROAD_HALF + 1.5, 0.0, 0),
+  ]);
+  group.add(new THREE.Mesh(walks, walkMat));
+
+  const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
+  const curbMat = standardFromMaps(concrete, { roughness: 0.85, envMapIntensity: 0.4, color: 0x7d828c });
+  const curbs = mergeGeometries([
+    box(0.3, 0.3, STREET_LEN, -(ROAD_HALF + 0.15), 0.03, 0),
+    box(0.3, 0.3, STREET_LEN, ROAD_HALF + 0.15, 0.03, 0),
+  ]);
+  group.add(new THREE.Mesh(curbs, curbMat));
+
+  group.add(buildMarkings());
+  return group;
+}
+
+function buildMarkings() {
+  const quads = [];
+  const dash = new THREE.PlaneGeometry(0.15, 2);
+  for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 5) {
+    const q = dash.clone();
+    q.rotateX(-Math.PI / 2);
+    q.translate(0, 0.02, z);
+    quads.push(q);
+  }
+  const stripe = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  for (let i = -3; i <= 3; i++) {
+    const q = stripe.clone();
+    q.rotateX(-Math.PI / 2);
+    q.rotateY(Math.PI / 2);
+    q.translate(0, 0.02, 8 + i * 1.1);
+    quads.push(q);
+  }
+  const mat = new THREE.MeshStandardMaterial({
+    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.15, roughness: 0.6,
+  });
+  return new THREE.Mesh(mergeGeometries(quads), mat);
+}
+
+const TOWERS = [
+  // side, z-center, width, height, depth
+  [-1, -48, 12, 34, 10], [-1, -32, 10, 22, 10], [-1, -14, 14, 44, 11],
+  [-1, 6, 11, 28, 10], [-1, 24, 13, 38, 10], [-1, 44, 10, 24, 10],
+  [1, -44, 11, 26, 10], [1, -26, 13, 40, 11], [1, -6, 10, 30, 10],
+  [1, 12, 12, 24, 10], [1, 30, 14, 46, 11], [1, 50, 10, 22, 10],
+];
+
+export function buildTowers(texLoader, maxAniso) {
+  const group = new THREE.Group();
+  const color = texLoader.load('re-assets/facade_glass_night/color.jpg');
+  color.colorSpace = THREE.SRGBColorSpace;
+  const emission = texLoader.load('re-assets/facade_glass_night/emission.jpg');
+  emission.colorSpace = THREE.SRGBColorSpace;
+  const normal = texLoader.load('re-assets/facade_glass_night/normal.jpg');
+  const rough = texLoader.load('re-assets/facade_glass_night/roughness.jpg');
+  const metal = texLoader.load('re-assets/facade_glass_night/metalness.jpg');
+  for (const t of [color, emission, normal, rough, metal]) {
+    t.wrapS = t.wrapT = THREE.RepeatWrapping;
+    t.anisotropy = maxAniso;
+  }
+  const facadeMat = new THREE.MeshStandardMaterial({
+    map: color, emissiveMap: emission, emissive: 0xffffff, emissiveIntensity: 0.75,
+    normalMap: normal, roughnessMap: rough, roughness: 1.0,
+    metalnessMap: metal, metalness: 1.0,
+    color: 0x565c68, envMapIntensity: 1.1,
+  });
+  const facades = [];
+  const caps = [];
+  for (const [side, z, w, h, d] of TOWERS) {
+    const cx = side * (8.5 + d / 2);
+    facades.push(worldUVs(box(w, h, d, cx, h / 2, z), w, h, d, 11));
+    caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, z));
+  }
+  group.add(new THREE.Mesh(mergeGeometries(facades), facadeMat));
+  const capMat = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.9 });
+  group.add(new THREE.Mesh(mergeGeometries(caps), capMat));
+
+  const silhouettes = [
+    box(20, 60, 16, -32, 30, -30), box(24, 74, 18, 34, 37, -8),
+    box(18, 52, 14, -30, 26, 26), box(22, 66, 16, 32, 33, 38),
+  ];
+  const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
+  group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
+  return group;
+}
