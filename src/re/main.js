@@ -38,14 +38,17 @@ scene.add(buildStars());
 const beacons = buildBeacons(towers.beacons);
 scene.add(beacons.mesh);
 scene.add(buildTrees());
-scene.add(await loadPropInstances('re-assets/models/fire_hydrant/fire_hydrant_1k.gltf', [
-  [-6.9, -50], [6.9, -15], [-6.9, 20], [6.9, 45], [37.1, -40],
-  [50.9, -5], [37.1, 25], [50.9, 48], [-2, -69.5], [30, -69.5],
-]));
-scene.add(await loadPropInstances('re-assets/models/metal_trash_can/metal_trash_can_1k.gltf', [
-  [-5.9, -44], [-5.9, -26], [5.9, -8], [5.9, 10], [-5.9, 28], [-5.9, 46],
-  [38.1, -44], [49.9, -8], [38.1, 28], [49.9, 46], [8, -69], [36, -69],
-]));
+// Props resolve a frame or two after boot — the loop never touches them.
+Promise.all([
+  loadPropInstances('re-assets/models/fire_hydrant/fire_hydrant_1k.gltf', [
+    [-6.9, -50], [6.9, -15], [-6.9, 20], [6.9, 45], [37.1, -40],
+    [50.9, -5], [37.1, 25], [50.9, 48], [-2, -69.5], [30, -69.5],
+  ]),
+  loadPropInstances('re-assets/models/metal_trash_can/metal_trash_can_1k.gltf', [
+    [-5.9, -44], [-5.9, -26], [5.9, -8], [5.9, 10], [-5.9, 28], [-5.9, 46],
+    [38.1, -44], [49.9, -8], [38.1, 28], [49.9, 46], [8, -69], [36, -69],
+  ]),
+]).then(([hydrants, trash]) => scene.add(hydrants, trash));
 const signs = buildSigns();
 scene.add(signs.group);
 scene.add(buildPools(signs.pools));
