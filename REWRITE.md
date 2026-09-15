@@ -57,7 +57,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-005` District (done in `69cffa3`, evidence `re-005-district.png` + `re-005-east.png`, 81 draws / 150)
 - [x] `re-006` Craft pass (done in `ce5ef87`, evidence `re-006-craft.png`, 82 draws / 150)
 - [x] `re-007` Pressure (done in `c53be0c`, evidence `re-007-pursuit/busted/chained.png`, ~104 draws / 150)
-- [ ] `re-008` World beauty: GLB street props, trees, beacons, stars, road detail. Look like a place fable-cities would respect.
+- [x] `re-008` World beauty (done in `b91a8a8`+`a808c97`, evidence `re-008-beauty.png`, 92 draws / 150, 180fps RTX)
 - [ ] `re-009` Cutover review: operator plays re-005→re-007, then we delete the old game.
 - [ ] `re-010` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
 - [ ] `re-011` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
