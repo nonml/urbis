@@ -45,7 +45,7 @@ import { sequence, selector, condition, action, inverter, tick as btTick, SUCCES
 import { buildGrid as buildPathGrid, solveWalkable } from '../src/workers/pathfinding_worker.js';
 import { getTargetLocation as schedGetTarget } from '../src/workers/schedule_worker.js';
 import { tickFactions } from '../src/workers/faction_worker.js';
-import { detectVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE } from '../src/render/vrs_support.js';
+import { detectVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE, VRS_FAR_SCALE, VRS_FAR_DIST } from '../src/render/vrs_support.js';
 import { PRESETS } from '../src/render/presets.js';
 
 let passCount = 0;
@@ -3927,6 +3927,10 @@ function testVRSSupport() {
         assert(soft.mode === 'software', `Software VRS mode reported (got ${soft.mode})`);
         assert(soft.rate === VRS_RATE.X2X2, 'Software VRS defaults to 2x2 rate');
         assert(VRS_SKY_SCALE === 0.5, '2x2 rate halves sky resolution (scale 0.5)');
+        assert(VRS_FAR_SCALE === 0.5, '2x2 rate halves out-of-focus far-band resolution (scale 0.5)');
+        assert(VRS_FAR_DIST === 150, 'Far band shaded at 2x2 starts at 150m (detail culled beyond)');
+        assert(PRESETS.low.vrsSkyRate === VRS_RATE.X2X2, 'Performance sky renders at 2x2');
+        assert(PRESETS.low.vrsFarRate === VRS_RATE.X2X2, 'Performance out-of-focus far band renders at 2x2');
         assert(shouldEnableVRS(PRESETS.low, true) === true, 'Performance preset opts into VRS on supported hardware');
         assert(shouldEnableVRS(PRESETS.medium, true) === false, 'Medium preset does not opt into VRS');
         assert(shouldEnableVRS(PRESETS.high, true) === false, 'High preset does not opt into VRS');

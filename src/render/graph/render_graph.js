@@ -17,6 +17,7 @@
 const PASS_DEFS = [
     { id: 'vrsSky', after: null, reads: [], writes: ['color', 'depth'] },
     { id: 'render', after: 'vrsSky', reads: [], writes: ['color', 'depth'] },
+    { id: 'vrsComposite', after: 'render', reads: ['color', 'depth'], writes: ['color'] },
     { id: 'ssao', after: 'render', reads: ['depth', 'normal'], writes: ['color'] },
     { id: 'gtao', after: 'ssao', reads: ['depth', 'normal'], writes: ['color'] },
     { id: 'volumetric', after: 'gtao', reads: ['color', 'depth'], writes: ['color'] },

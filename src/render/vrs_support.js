@@ -16,6 +16,16 @@ export const VRS_RATE = Object.freeze({
 /** 2×2 rate renders each 2×2 block once → half resolution per axis. */
 export const VRS_SKY_SCALE = 0.5;
 
+/** Out-of-focus (far-band) regions shade at the same 2×2 rate as the sky. */
+export const VRS_FAR_SCALE = 0.5;
+
+/**
+ * View distance of the far band shaded at 2×2. Beyond this the renderer
+ * culls everything but terrain (LOD_TERRAIN_ONLY_DIST) and fog shrouds the
+ * distance — the pipeline's perceptually out-of-focus region.
+ */
+export const VRS_FAR_DIST = 150;
+
 /**
  * Detect the software VRS path. Always available — any GPU can run the
  * half-res sky pass, so this is the honest baseline capability.
@@ -60,7 +70,8 @@ export async function detectHardwareVRS() {
 
 /**
  * Decide whether a preset opts into VRS. Pure — used by applyPreset and by
- * tests. A preset opts in only when it declares VRS AND a sub-1x1 sky rate.
+ * tests. A preset opts in only when it declares VRS AND a sub-1x1 rate for
+ * the sky or the out-of-focus far band (both render at 2×2 on Performance).
  *
  * @param {object|undefined} preset - a PRESETS entry
  * @param {boolean} supported - whether a VRS mechanism is available
@@ -68,5 +79,9 @@ export async function detectHardwareVRS() {
  */
 export function shouldEnableVRS(preset, supported) {
     if (!preset || !supported) return false;
-    return !!preset.vrs && preset.vrsSkyRate !== undefined && preset.vrsSkyRate !== VRS_RATE.X1X1;
+    const sky2x2 = preset.vrsSkyRate !== undefined && preset.vrsSkyRate !== VRS_RATE.X1X1;
+    const far2x2 = preset.vrsFarRate !== undefined && preset.vrsFarRate !== VRS_RATE.X1X1;
+    // Legacy presets only declare vrsSkyRate; honour either region opting in.
+    if (preset.vrsFarRate === undefined) return !!preset.vrs && sky2x2;
+    return !!preset.vrs && (sky2x2 || far2x2);
 }

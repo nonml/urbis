@@ -4,7 +4,7 @@
  * Each preset controls shadow quality, post-processing, SSR, volumetrics.
  */
 
-import { shouldEnableVRS, VRS_RATE } from './vrs_support.js';
+import { shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE, VRS_FAR_SCALE } from './vrs_support.js';
 
 export const PRESETS = {
     low: {
@@ -29,6 +29,7 @@ export const PRESETS = {
         vrs: true,
         drsMinScale: 0.65,
         vrsSkyRate: '2x2',
+        vrsFarRate: '2x2',
     },
     medium: {
         name: 'Medium',
@@ -52,6 +53,7 @@ export const PRESETS = {
         vrs: false,
         drsMinScale: 0.70,
         vrsSkyRate: '1x1',
+        vrsFarRate: '1x1',
     },
     high: {
         name: 'High',
@@ -75,6 +77,7 @@ export const PRESETS = {
         vrs: false,
         drsMinScale: 0.75,
         vrsSkyRate: '1x1',
+        vrsFarRate: '1x1',
     },
     ultra: {
         name: 'Ultra',
@@ -98,6 +101,7 @@ export const PRESETS = {
         vrs: false,
         drsMinScale: 0.80,
         vrsSkyRate: '1x1',
+        vrsFarRate: '1x1',
     },
 };
 
@@ -185,6 +189,9 @@ export function applyPreset(renderer, presetName) {
     if (renderer._vrsSupported !== undefined) {
         renderer._vrsEnabled = shouldEnableVRS(preset, renderer._vrsSupported);
         renderer._vrsRate = preset.vrsSkyRate || VRS_RATE.X1X1;
+        renderer._vrsFarRate = preset.vrsFarRate || VRS_RATE.X1X1;
+        renderer._vrsSkyScale = preset.vrsSkyRate === VRS_RATE.X2X2 ? VRS_SKY_SCALE : 1;
+        renderer._vrsFarScale = preset.vrsFarRate === VRS_RATE.X2X2 ? VRS_FAR_SCALE : 1;
         if (renderer._applyVRSState) renderer._applyVRSState();
     }
     if (preset.drsMinScale !== undefined) renderer._drsMinScale = preset.drsMinScale;

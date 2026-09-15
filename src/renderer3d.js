@@ -100,7 +100,7 @@ import { CharacterPool } from './render/character_pool.js';
 import { RenderGraph } from './render/graph/render_graph.js';
 import { createCSM, updateCSM } from './render/graph/csm.js';
 import { createSkyDome, updateSkyDomeForPhase } from './render/graph/sky.js';
-import { detectVRS, detectHardwareVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE } from './render/vrs_support.js';
+import { detectVRS, detectHardwareVRS, shouldEnableVRS, VRS_RATE, VRS_SKY_SCALE, VRS_FAR_SCALE, VRS_FAR_DIST } from './render/vrs_support.js';
 
 // Non-deterministic float (no Math.random). Used ONLY for VFX jitter.
 function rand01() {
@@ -1430,6 +1430,7 @@ export class Renderer3D {
                 this._renderGraph = new RenderGraph(this.composer);
                 if (this._vrsPass) this._renderGraph.add('vrsSky', this._vrsPass);
                 this._renderGraph.add('render', renderPass);
+                if (this._vrsCompositePass) this._renderGraph.add('vrsComposite', this._vrsCompositePass);
                 if (this._ssaoPass) this._renderGraph.add('ssao', this._ssaoPass);
                 if (this._gtaoPass) this._renderGraph.add('gtao', this._gtaoPass);
                 if (this._volFogPass) this._renderGraph.add('volumetric', this._volFogPass);
@@ -6497,7 +6498,15 @@ export class Renderer3D {
         if (this.composer) {
             const restoreJitter = (this._taaPass && this._taaPass.enabled)
                 ? this._taaPass.applyJitter(this.camera) : null;
-            this.composer.render();
+            if (this._vrsActive) {
+                this._updateVRSPlanes();
+                this.renderer.clippingPlanes = [this._vrsNearPlane];
+            }
+            try {
+                this.composer.render();
+            } finally {
+                if (this._vrsActive) this.renderer.clippingPlanes = [];
+            }
             if (restoreJitter) restoreJitter();
         } else {
             this.renderer.render(this.scene, this.camera);
@@ -6781,17 +6790,25 @@ export class Renderer3D {
 
     _initVRS() {
         // WebGL has no native VRS — software region-based scaling is the real
-        // mechanism (sky shaded at 2×2 then upscaled). Native hardware VRS via
-        // WebGPU `fragment-shading-rate` upgrades the mode when present.
+        // mechanism (sky + far band shaded at 2×2 then upscaled). Native
+        // hardware VRS via WebGPU `fragment-shading-rate` upgrades the mode.
         const soft = detectVRS();
         this._vrsSupported = soft.available;
         this._vrsMode = soft.mode;
         this._vrsRate = soft.rate;
         this._vrsSkyScale = VRS_SKY_SCALE;
+        this._vrsFarRate = soft.rate;
+        this._vrsFarScale = VRS_FAR_SCALE;
         this._vrsEnabled = false;
         this._vrsActive = false;
         this._vrsPass = null;
+        this._vrsCompositePass = null;
         this._renderPass = null;
+        this._vrsNearPlane = new THREE.Plane();
+        this._vrsFarPlane = new THREE.Plane();
+        this._vrsForward = new THREE.Vector3();
+        this._vrsBackward = new THREE.Vector3();
+        this._vrsFarPoint = new THREE.Vector3();
         detectHardwareVRS().then((hw) => {
             if (hw && this._vrsMode === 'software') {
                 this._vrsMode = hw.mode;
@@ -6801,17 +6818,23 @@ export class Renderer3D {
     }
 
     /**
-     * Build the software-VRS sky pass and slot it ahead of the scene render.
+     * Build the software-VRS passes and slot them around the scene render.
      * Called from _initPostProcessing once the composer + render graph exist.
      */
     async _setupVRSSkyPass() {
         if (!this.composer || this._vrsPass) return;
         try {
-            const { VRSSkyPass } = await import('./render/graph/passes/vrs_sky_pass.js');
-            const pass = new VRSSkyPass();
-            pass.setSkyMesh(this._skyDome, this.camera);
-            this.composer.insertPass(pass, 0);
-            this._vrsPass = pass;
+            const { VRSPrePass, VRSCompositePass } = await import('./render/graph/passes/vrs_passes.js');
+            const prePass = new VRSPrePass(this.scene, this.camera, this._vrsFarPlane);
+            prePass.setSkyMesh(this._skyDome);
+            const compositePass = new VRSCompositePass(prePass);
+            this.composer.insertPass(prePass, 0);
+            this.composer.addPass(compositePass);
+            this.composer.renderTarget1.depthTexture = new THREE.DepthTexture(1, 1);
+            this.composer.renderTarget2.depthTexture = new THREE.DepthTexture(1, 1);
+            this.renderer.localClippingEnabled = true;
+            this._vrsPass = prePass;
+            this._vrsCompositePass = compositePass;
             this._applyVRSState();
         } catch {
             this._vrsSupported = false;
@@ -6820,16 +6843,30 @@ export class Renderer3D {
     }
 
     /**
-     * Toggle the VRS sky pass + scene-render clear to match the active state.
-     * With VRS on, the sky pass owns color fill + depth clear, so the scene
-     * RenderPass must not re-clear (it would wipe the low-res sky).
+     * Toggle the VRS passes + scene-render clear to match the active state.
+     * With VRS on, the pre pass owns sky/far-band color fill, the composite
+     * merges it back, and the scene RenderPass must not re-clear.
      */
     _applyVRSState() {
         const on = this._vrsEnabled && this._vrsRate === VRS_RATE.X2X2 && !!this._vrsPass;
         if (this._vrsPass) this._vrsPass.enabled = on;
+        if (this._vrsCompositePass) this._vrsCompositePass.enabled = on;
         if (this._renderPass) this._renderPass.clear = !on;
         if (this._skyDome) this._skyDome.visible = !on;
         this._vrsActive = on;
+    }
+
+    /**
+     * Frame-sync the VRS clip planes to the camera: a view-aligned split at
+     * VRS_FAR_DIST. The near plane bounds the full-res scene render (kept),
+     * the far plane bounds the half-res pre-pass render.
+     */
+    _updateVRSPlanes() {
+        this.camera.getWorldDirection(this._vrsForward);
+        this._vrsBackward.copy(this._vrsForward).negate();
+        this._vrsFarPoint.copy(this.camera.position).addScaledVector(this._vrsForward, VRS_FAR_DIST);
+        this._vrsNearPlane.setFromNormalAndCoplanarPoint(this._vrsBackward, this._vrsFarPoint);
+        this._vrsFarPlane.setFromNormalAndCoplanarPoint(this._vrsForward, this._vrsFarPoint);
     }
 
     getPerPassTimings() {
@@ -6841,6 +6878,8 @@ export class Renderer3D {
         base._vrsMode = this._vrsMode;
         base._vrsRate = this._vrsRate;
         base._vrsSkyScale = this._vrsSkyScale;
+        base._vrsFarRate = this._vrsFarRate;
+        base._vrsFarScale = this._vrsFarScale;
         return base;
     }
 
