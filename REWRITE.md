@@ -1,0 +1,76 @@
+# Rewrite Charter — Project Neon Rebirth (working title)
+
+The old game is archived on branch `archive/pre-rewrite` (commit `955d662`).
+This document governs the rewrite. It outranks all prior roadmaps for new code.
+
+## Why we burned it down
+
+Evidence, not taste (captured 2026-09-16):
+- Noon god-view screenshot: dark, muddy, toy-like. Flat unlit boxes, cone trees,
+  washed-out fog. Q9/Q10 claimed PBR/HDR/bloom/SSAO/volumetrics — none of it readable.
+- Real measurement: `medium+120-NPCs` on High = **18,648 draws vs 2,000 budget (9.3x)**;
+  `large+200-NPCs` = **29,325 vs 3,000**. The celebrated "1,029 draws" baseline was fiction.
+- Root causes: no art direction (tech stacked without a look), estimated-not-measured
+  budgets, thousands of individual meshes instead of instancing/merging from day one.
+
+## Visual target (locked until vetoed)
+
+**Neon-noir rain.** Night, wet streets, neon signage, dark towers with lit windows.
+It serves the cyberpunk fantasy (Watch Dogs × GTA at street level), flatters low-poly
+geometry with light instead of punishing it, and every element is cheap: emissive +
+bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it waits.
+
+## Non-negotiable laws
+
+1. **Beauty is the gate.** Every slice must prove itself in a screenshot before merge.
+   No screenshot, no tick. No exceptions.
+2. **Honest numbers.** Draw calls, fps, ms — measured from the running game only.
+   Estimates, hand-patched baselines, and formula audits are banned. The live draw
+   counter stays on screen from slice 001.
+3. **Budget from birth.** Whole frame ≤ 150 draws (scene + post). Each feature declares
+   its draw cost in its commit message. Over budget = slice fails, no debate.
+4. **Instance or merge.** No feature lands that adds per-object draws for repeated
+   things (poles, windows, trees, cars, decals). InstancedMesh / merged geometry only.
+5. **Sim/render boundary from birth.** `src/re/sim/` = pure logic, zero three.js.
+   `src/re/render/` = three.js only. The old codebase proved this boundary is what
+   lets a renderer be replaced without losing the game.
+6. **No dead tech.** No post pass, light, or system that isn't visible in a screenshot.
+   If you can't see it, delete it.
+
+## Repo strategy
+
+- Old game (`index.html`, `src/`) is **frozen** — no edits except deletion at cutover.
+- New game lives at `re.html` + `src/re/`, sharing the Three.js/Vite install.
+- `vite.config.js` builds both entries until cutover; `re.html` must never break
+  `index.html`'s build.
+- Cutover (delete old, `re.html` → `index.html`) happens only when the rewrite
+  completes a playable vertical slice (street → hack → drive). Not before.
+
+## Slice roadmap
+
+- [ ] `re-001` Neon block: one rain-slicked street block at night. Acceptance: screenshot
+      looks AAA-indie, ≤ 150 draws, boots < 3s, orbit + WASD-streetcam, live draw/fps HUD.
+- [ ] `re-002` Living street: 20+ NPCs (instanced), 6+ traffic cars (instanced), one hackable
+      (streetlight blackout with visible cause→effect). Acceptance: hack feels like conducting.
+- [ ] `re-003` Player on foot: enter the block, walk, profiler overlay on NPCs.
+- [ ] `re-004` Drive: enter car, drive the block, rain + headlights + wet reflections hold up.
+- [ ] `re-005` Cutover review: operator plays re-001→re-004, then we delete the old game.
+
+## Harvest log (fable-cities, 2026-09-16 — decision: harvest, don't fork)
+
+- `public/re-assets/`: 6 CC0 texture sets (asphalt, paving slabs, 2 glass facades incl.
+  night emission map, concrete, metal plates) + `CREDITS.md`. ~18 MB, not 208 MB.
+- Adopted method: measured look-targets (their LOOK_TARGET.md diagnoses our old disease —
+  everything at 3x lightness, no black floor); builder/critic screenshot loop with scores;
+  texture discipline (sRGB albedo/emissive, linear data maps, max anisotropy);
+  night via `emissiveIntensity` driven by time of day.
+- Deliberately NOT taken: whole-repo fork (wrong genre — god-view painter, no
+  player/combat/hacking; 873 draws for terrain+veg alone; their own critics score 6–7.5/10).
+
+## Working agreements
+
+- Commits: `<type>(re): <title>` + `Why:` + `Slice: re-00N`. No checklist trailers;
+  this file's boxes tick via commit hash noted beside the box.
+- Old `npm run gate` does not govern new code (it audits the frozen game).
+  New-code gate: `npm run build` green + screenshot attached + draws ≤ budget.
+  (A dedicated `re` gate script lands when slice 002 does.)
