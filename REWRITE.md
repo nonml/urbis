@@ -52,7 +52,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
       looks AAA-indie, ≤ 150 draws, boots < 3s, orbit + WASD-streetcam, live draw/fps HUD.
 - [x] `re-002` Living street (done in `7d22df1`, evidence `re-002-lit.png` + `re-002-blackout.png`, 55 draws / 150)
       (streetlight blackout with visible cause→effect). Acceptance: hack feels like conducting.
-- [ ] `re-003` Player on foot: enter the block, walk, profiler overlay on NPCs.
+- [x] `re-003` Player on foot (done in `9dea1cb`, evidence `re-003-profiler.png` + `re-003-secret.png`, 60 draws / 150)
 - [ ] `re-004` Drive: enter car, drive the block, rain + headlights + wet reflections hold up.
 - [ ] `re-005` Cutover review: operator plays re-001→re-004, then we delete the old game.
 
