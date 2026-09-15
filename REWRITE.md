@@ -58,7 +58,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-006` Craft pass (done in `ce5ef87`, evidence `re-006-craft.png`, 82 draws / 150)
 - [x] `re-007` Pressure (done in `c53be0c`, evidence `re-007-pursuit/busted/chained.png`, ~104 draws / 150)
 - [x] `re-008` World beauty (done in `b91a8a8`+`a808c97`, evidence `re-008-beauty.png`, 92 draws / 150, 180fps RTX)
-- [ ] `re-009` Day shift: afternoon sun with shadows, sky dome, day/night material drivers, T toggle. Daylight is where ugly hides nothing.
+- [x] `re-009` Day shift (done in `3ce3331`, evidence `re-009-day.png` + `re-009-valley.png`, 127 draws / 150, 180fps RTX)
 - [ ] `re-010` Cutover review: operator plays re-005→re-008, then we delete the old game.
 - [ ] `re-011` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
 - [ ] `re-012` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
