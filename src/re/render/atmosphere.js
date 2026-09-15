@@ -20,6 +20,7 @@ export function createRenderer(canvas) {
 }
 
 export function buildAtmosphere(scene, renderer) {
+  const spots = [];
   scene.background = new THREE.Color(0x04060c);
   scene.fog = new THREE.FogExp2(0x070b16, 0.016);
   const pmrem = new THREE.PMREMGenerator(renderer);
@@ -35,6 +36,7 @@ export function buildAtmosphere(scene, renderer) {
     spot.position.set(0, 7, z);
     spot.target.position.set(0, 0, z);
     scene.add(spot, spot.target);
+    spots.push(spot);
   }
   const moonGlow = new THREE.Sprite(new THREE.SpriteMaterial({
     map: getGlowTex(), color: 0x5f7fb8, transparent: true, opacity: 0.5,
@@ -43,6 +45,7 @@ export function buildAtmosphere(scene, renderer) {
   moonGlow.position.set(45, 60, -90);
   moonGlow.scale.set(40, 40, 1);
   scene.add(moonGlow);
+  return { spots };
 }
 
 export function createComposer(renderer, scene, camera) {
