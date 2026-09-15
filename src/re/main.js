@@ -1,13 +1,15 @@
-// re-002 bootstrap: sim ticks, render reads. HUD shows measured numbers only.
+// re-003 bootstrap: sim ticks, render reads. HUD shows measured numbers only.
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { createClock, tickClock } from './sim/clock.js';
-import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt } from './sim/street.js';
+import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget } from './sim/street.js';
+import { createPlayer, tickPlayer } from './sim/player.js';
 import { buildGround, buildTowers } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic } from './render/traffic.js';
+import { buildPlayer, updatePlayer } from './render/player.js';
+import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { createRenderer, buildAtmosphere, createComposer, fitRenderer } from './render/atmosphere.js';
 
@@ -21,7 +23,6 @@ const texLoader = new THREE.TextureLoader();
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 400);
-camera.position.set(2.5, 4.2, 26);
 
 const { spots } = buildAtmosphere(scene, renderer);
 scene.add(buildGround(texLoader, maxAniso));
@@ -38,10 +39,14 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
 });
 
 const street = createStreet(20260916);
+const player = createPlayer();
 const npcRig = buildNPCs(street);
 scene.add(npcRig.group);
 const traffic = buildTraffic(street);
 scene.add(traffic.group);
+const avatar = buildPlayer();
+scene.add(avatar.group);
+buildProfiler();
 
 const rain = buildRain();
 scene.add(rain);
@@ -49,13 +54,23 @@ scene.add(rain);
 const composer = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.target.set(-0.5, 5, -10);
-controls.enableDamping = true;
-controls.dampingFactor = 0.06;
-controls.maxPolarAngle = 1.53;
-controls.minDistance = 3;
-controls.maxDistance = 70;
+// Third-person follow cam: drag looks, wheel dollies, WASD moves the player.
+const cam = { yaw: Math.PI, pitch: 0.34, dist: 7 };
+let dragging = false;
+let lastPX = 0;
+let lastPY = 0;
+canvas.addEventListener('pointerdown', (e) => { dragging = true; lastPX = e.clientX; lastPY = e.clientY; });
+window.addEventListener('pointermove', (e) => {
+  if (!dragging) return;
+  cam.yaw -= (e.clientX - lastPX) * 0.005;
+  cam.pitch = Math.max(0.08, Math.min(1.2, cam.pitch + (e.clientY - lastPY) * 0.004));
+  lastPX = e.clientX;
+  lastPY = e.clientY;
+});
+window.addEventListener('pointerup', () => { dragging = false; });
+canvas.addEventListener('wheel', (e) => {
+  cam.dist = Math.max(3, Math.min(12, cam.dist * (1 + e.deltaY * 0.001)));
+}, { passive: true });
 
 const keys = new Set();
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
@@ -64,7 +79,7 @@ window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 const DARK = [false, false];
 
 function fireHack() {
-  const zone = zoneAt(controls.target.z);
+  const zone = zoneAt(player.z);
   if (hackBlackout(street, zone) === 0) return;
   applyZone(zone, true);
 }
@@ -82,6 +97,23 @@ window.addEventListener('keydown', (e) => {
 
 const clock = createClock();
 const hud = document.getElementById('hud');
+let lastProfile = null;
+let lockedNpc = null;
+
+// Sticky profiler lock: acquire by facing cone, hold while within 14m.
+// (Sidewalk offset means a pure cone can never get close — the lock must persist.)
+function acquireTarget() {
+  const fx = Math.sin(player.yaw);
+  const fz = Math.cos(player.yaw);
+  if (lockedNpc) {
+    const d = Math.hypot(lockedNpc.x - player.x, lockedNpc.z - player.z);
+    if (d <= 14 && d >= 0.4) return { npc: lockedNpc, dist: d };
+    lockedNpc = null;
+  }
+  const t = profilerTarget(street, player.x, player.z, fx, fz);
+  if (t) lockedNpc = t.npc;
+  return t;
+}
 // Minimal probe for scripted verification (screenshots, control checks).
 window.__re = {
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
@@ -89,6 +121,8 @@ window.__re = {
   hack: () => fireHack(),
   dark: () => [...DARK],
   cooldown: () => +hackCooldownLeft(street).toFixed(1),
+  player: () => ({ x: +player.x.toFixed(2), z: +player.z.toFixed(2) }),
+  profile: () => lastProfile,
 };
 
 let last = performance.now();
@@ -98,25 +132,21 @@ let fpsShown = 0;
 let hudTimer = 0;
 let firstFrame = true;
 let bootMs = 0;
-const fwd = new THREE.Vector3();
-const right = new THREE.Vector3();
+const lookAt = new THREE.Vector3();
 
-function glide(dt) {
-  camera.getWorldDirection(fwd);
-  fwd.y = 0;
-  fwd.normalize();
-  right.crossVectors(fwd, new THREE.Vector3(0, 1, 0)).negate();
-  const speed = (keys.has('shift') ? 18 : 8) * dt;
-  const move = new THREE.Vector3();
-  if (keys.has('w')) move.add(fwd);
-  if (keys.has('s')) move.sub(fwd);
-  if (keys.has('a')) move.add(right);
-  if (keys.has('d')) move.sub(right);
-  if (move.lengthSq() > 0) {
-    move.normalize().multiplyScalar(speed);
-    camera.position.add(move);
-    controls.target.add(move);
-  }
+function playerInput() {
+  const lx = Math.sin(cam.yaw);
+  const lz = Math.cos(cam.yaw);
+  const rx = -lz;
+  const rz = lx;
+  let mx = 0;
+  let mz = 0;
+  if (keys.has('w')) { mx += lx; mz += lz; }
+  if (keys.has('s')) { mx -= lx; mz -= lz; }
+  if (keys.has('a')) { mx -= rx; mz -= rz; }
+  if (keys.has('d')) { mx += rx; mz += rz; }
+  const len = Math.hypot(mx, mz) || 1;
+  return { mx: mx / len, mz: mz / len, hurry: keys.has('shift') };
 }
 
 function hackStatus() {
@@ -137,20 +167,33 @@ function render() {
   last = now;
   tickClock(clock, dt);
   tickStreet(street, dt);
+  tickPlayer(player, playerInput(), dt);
+  updatePlayer(avatar, player);
   for (let z = 0; z < 2; z++) {
     if (DARK[z] && !isDark(street, z)) applyZone(z, false);
   }
   tickRain(rain, clock.elapsed);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street);
-  glide(dt);
-  controls.update();
+
+  const cp = Math.cos(cam.pitch);
+  const sp = Math.sin(cam.pitch);
+  camera.position.set(
+    player.x - Math.sin(cam.yaw) * cam.dist * cp,
+    sp * cam.dist + 0.6,
+    player.z - Math.cos(cam.yaw) * cam.dist * cp
+  );
+  lookAt.set(player.x, 1.7, player.z);
+  camera.lookAt(lookAt);
+
+  lastProfile = updateProfiler(camera, acquireTarget());
+
   renderer.info.reset();
   composer.render();
   if (firstFrame) {
     firstFrame = false;
     bootMs = Math.round(now - bootStart);
-    console.log(`[re-002] boot ${bootMs}ms, draws ${renderer.info.render.calls}`);
+    console.log(`[re-003] boot ${bootMs}ms, draws ${renderer.info.render.calls}`);
   }
   fpsAcc += dt;
   fpsN++;
@@ -164,7 +207,7 @@ function render() {
     const tris = (renderer.info.render.triangles / 1e6).toFixed(2);
     const over = draws > DRAW_BUDGET;
     hud.innerHTML =
-      `<b>NEON BLOCK 002</b> · night · rain<br>` +
+      `<b>NEON BLOCK 003</b> · night · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]`;

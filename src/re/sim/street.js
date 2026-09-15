@@ -11,6 +11,28 @@ export const STREET_HALF = 60;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c];
 const CAR_PAINTS = [0x7a1020, 0x10233d, 0x3d3d42, 0x0f3d2e, 0x4d4d10, 0x222222];
+const FIRST = ['Mara', 'Kaito', 'Iris', 'Dario', 'Yuki', 'Petra', 'Sol', 'Nadia', 'Rook', 'Esen', 'Milo', 'Aya', 'Corv', 'Lena', 'Juno', 'Theo'];
+const LAST = ['Vane', 'Kuro', 'Dax', 'Mori', 'Lark', 'Voss', 'Quill', 'Reyes', 'Hale', 'Ito', 'Fenn', 'Okafor', 'Rill', 'Sable', 'Thorn', 'Vale'];
+const JOBS = [
+  ['courier', 2100], ['noodle vendor', 1800], ['corp clerk', 3400], ['drone tech', 4100],
+  ['street doc', 5200], ['fixer', 6100], ['busker', 900], ['night guard', 2400],
+];
+const SECRETS = [
+  'owes the Red Lanterns', 'runs night drops', 'snitches for precinct 9',
+  'skimming corp creds', 'hides a fugitive sibling', 'sells patched optics',
+  'blackmailed by a fixer', 'maps patrol routes',
+];
+
+function makeProfile(rng, i) {
+  const job = JOBS[Math.floor(rng() * JOBS.length)];
+  return {
+    name: `${FIRST[Math.floor(rng() * FIRST.length)]} ${LAST[Math.floor(rng() * LAST.length)]}`.toUpperCase(),
+    age: 19 + Math.floor(rng() * 38),
+    job: job[0],
+    income: `₡${(job[1] + Math.floor(rng() * 900)).toLocaleString('en-US')}/mo`,
+    secret: SECRETS[(i * 3 + 1) % SECRETS.length],
+  };
+}
 
 export function createStreet(seed) {
   const rng = createStreams(seed);
@@ -26,6 +48,7 @@ export function createStreet(seed) {
       phase: rng.sim() * Math.PI * 2,
       coat: COAT_COLORS[Math.floor(rng.sim() * COAT_COLORS.length)],
       hurryUntil: 0,
+      profile: makeProfile(rng.sim, i),
     });
   }
   const cars = [];
@@ -70,6 +93,22 @@ export function hackBlackout(state, zone) {
 
 export function hackCooldownLeft(state) {
   return Math.max(0, state.cooldownUntil - state.time);
+}
+
+// Nearest NPC inside a ~30° facing cone within 12m. Null when nobody qualifies.
+export function profilerTarget(street, px, pz, fx, fz) {
+  let best = null;
+  let bestD = 12;
+  for (const n of street.npcs) {
+    const dx = n.x - px;
+    const dz = n.z - pz;
+    const d = Math.hypot(dx, dz);
+    if (d > bestD || d < 0.5) continue;
+    if ((dx * fx + dz * fz) / (d || 1) < 0.86) continue;
+    best = n;
+    bestD = d;
+  }
+  return best ? { npc: best, dist: bestD } : null;
 }
 
 export function tickStreet(state, dt) {
