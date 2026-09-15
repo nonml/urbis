@@ -48,7 +48,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 
 ## Slice roadmap
 
-- [ ] `re-001` Neon block: one rain-slicked street block at night. Acceptance: screenshot
+- [x] `re-001` Neon block (done in `088722e`, evidence `docs/re-shots/re-001.png`, 42 draws / 150): one rain-slicked street block at night. Acceptance: screenshot
       looks AAA-indie, ≤ 150 draws, boots < 3s, orbit + WASD-streetcam, live draw/fps HUD.
 - [ ] `re-002` Living street: 20+ NPCs (instanced), 6+ traffic cars (instanced), one hackable
       (streetlight blackout with visible cause→effect). Acceptance: hack feels like conducting.
