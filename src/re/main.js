@@ -91,6 +91,12 @@ canvas.addEventListener('wheel', (e) => {
 }, { passive: true });
 
 const keys = new Set();
+// Dev spawn presets for scripted verification (?spawn=east).
+const spawnPreset = new URLSearchParams(location.search).get('spawn');
+if (spawnPreset === 'east') {
+  player.x = 49.5;
+  player.z = 16;
+}
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
@@ -121,8 +127,8 @@ function toggleVehicle() {
     cam.pitch = 0.3;
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
-    player.x = Math.max(-7, Math.min(7, heroCar.x + 1.8));
-    player.z = heroCar.z;
+    player.x = Math.max(-7, Math.min(51, heroCar.x + 1.8));
+    player.z = Math.max(-68, Math.min(58, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
     cam.dist = 7;

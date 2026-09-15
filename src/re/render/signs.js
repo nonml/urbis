@@ -8,6 +8,9 @@ const SIGNS = [
   { text: 'BAR', sub: 'NEON', color: '#ff4df0', side: -1, z: 6, y: 7 },
   { text: '24H', sub: 'OPEN', color: '#ffb14e', side: 1, z: 24, y: 6.5 },
   { text: '酒場', sub: 'CAFE', color: '#52ff9e', side: -1, z: 36, y: 9 },
+  { text: 'HOTEL', sub: 'EAST', color: '#35e0ff', side: 1, z: -14, y: 10, ax: 44 },
+  { text: '麺', sub: 'NOODLE', color: '#ff4df0', side: -1, z: 20, y: 7.5, ax: 44 },
+  { text: 'PARK', sub: '24H', color: '#ffb14e', side: 0, z: -60.5, y: 8, ax: 22, face: 'south' },
 ];
 
 function signTexture(main, sub, color) {
@@ -76,19 +79,22 @@ export function buildSigns() {
   const pools = [];
   const arms = [];
   for (const s of SIGNS) {
-    const x = s.side * 7.7;
+    const ax = s.ax ?? 0;
+    const faceSouth = s.face === 'south';
+    const x = faceSouth ? ax : ax + s.side * 7.7;
+    const z = faceSouth ? s.z : s.z;
     const plane = new THREE.Mesh(
       new THREE.PlaneGeometry(1.5, 4.5),
       new THREE.MeshBasicMaterial({ map: signTexture(s.text, s.sub, s.color) })
     );
-    plane.position.set(x, s.y, s.z);
-    plane.rotation.y = s.side > 0 ? -Math.PI / 2 : Math.PI / 2;
+    plane.position.set(x, s.y, z);
+    plane.rotation.y = faceSouth ? Math.PI : s.side > 0 ? -Math.PI / 2 : Math.PI / 2;
     group.add(plane);
-    addGlowSprite(group, s.color, x, s.y, s.z, 7, 9, 0.32);
-    const arm = new THREE.BoxGeometry(1.0, 0.12, 0.12);
-    arm.translate(s.side * 8.1, s.y + 2.1, s.z);
+    addGlowSprite(group, s.color, x, s.y, z, 7, 9, 0.32);
+    const arm = new THREE.BoxGeometry(faceSouth ? 0.12 : 1.0, 0.12, faceSouth ? 1.0 : 0.12);
+    arm.translate(faceSouth ? x : s.side * 8.1 + ax, s.y + 2.1, faceSouth ? s.z - 0.5 : s.z);
     arms.push(arm);
-    pools.push({ x: x - s.side * 2.5, z: s.z, size: 9, color: s.color });
+    pools.push({ x: faceSouth ? x : x - s.side * 2.5, z: faceSouth ? z + 2.5 : s.z, size: 9, color: s.color });
   }
   const armMat = new THREE.MeshBasicMaterial({ color: 0x0a0c10 });
   group.add(new THREE.Mesh(mergeGeometries(arms), armMat));

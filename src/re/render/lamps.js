@@ -4,10 +4,25 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 
-const LAMPS = [-45, -27, -9, 9, 27, 45].map((z, i) => ({
-  z, side: i % 2 === 0 ? -1 : 1, zone: z < 0 ? 0 : 1,
-}));
+// Explicit per-lamp placement: pole base (x,z), head offset toward the road,
+// instance yaw, blackout zone. Main + east avenues share the z rhythm.
 const POLE_X = 5.4;
+const LAMPS = [
+  ...[-45, -27, -9, 9, 27, 45].flatMap((z, i) => {
+    const side = i % 2 === 0 ? -1 : 1;
+    return [0, 44].map((ax) => ({
+      x: ax + side * POLE_X,
+      z,
+      hx: ax + side * (POLE_X - 1.8),
+      hz: z,
+      rotY: side > 0 ? 0 : Math.PI,
+      zone: z < 0 ? 0 : 1,
+    }));
+  }),
+  ...[-2, 12, 26, 40].map((x) => ({
+    x, z: -68.2, hx: x, hz: -66.4, rotY: Math.PI / 2, zone: 0,
+  })),
+];
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);
 const HEAD_DARK = new THREE.Color(0x11100c);
@@ -36,19 +51,17 @@ export function buildLamps() {
   const coneBase = [];
 
   LAMPS.forEach((l, i) => {
-    const dir = l.side > 0 ? -1 : 1;
-    dummy.position.set(l.side * POLE_X, 0, l.z);
-    dummy.rotation.set(0, dir > 0 ? 0 : Math.PI, 0);
+    dummy.position.set(l.x, 0, l.z);
+    dummy.rotation.set(0, l.rotY, 0);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     poles.setMatrixAt(i, dummy.matrix);
-    const hx = l.side * (POLE_X - 1.8);
-    dummy.position.set(hx, HEAD_Y, l.z);
+    dummy.position.set(l.hx, HEAD_Y, l.hz);
     dummy.rotation.set(0, 0, 0);
     dummy.updateMatrix();
     heads.setMatrixAt(i, dummy.matrix);
     heads.setColorAt(i, HEAD_LIT);
-    dummy.position.set(hx, HEAD_Y / 2, l.z);
+    dummy.position.set(l.hx, HEAD_Y / 2, l.hz);
     dummy.updateMatrix();
     cones.setMatrixAt(i, dummy.matrix);
     coneBase.push(dummy.matrix.clone());
@@ -57,11 +70,11 @@ export function buildLamps() {
       map: getGlowTex(), color: 0xffc98a, transparent: true, opacity: 0.38,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }));
-    glow.position.set(hx, HEAD_Y, l.z);
+    glow.position.set(l.hx, HEAD_Y, l.hz);
     glow.scale.set(3.2, 3.2, 1);
     group.add(glow);
     spritesByZone[l.zone].push(glow);
-    poolsByZone[l.zone].push({ x: hx, z: l.z, size: 11, color: '#b97c3a' });
+    poolsByZone[l.zone].push({ x: l.hx, z: l.hz, size: 11, color: '#b97c3a' });
   });
   poles.instanceMatrix.needsUpdate = true;
   heads.instanceMatrix.needsUpdate = true;
@@ -81,6 +94,6 @@ export function buildLamps() {
     for (const s of spritesByZone[zone]) s.visible = !dark;
   }
 
-  const headPositions = LAMPS.map((l) => new THREE.Vector3(l.side * (POLE_X - 1.8), HEAD_Y, l.z));
+  const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
   return { group, poolsByZone, setZoneDark, heads: headPositions };
 }

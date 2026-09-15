@@ -2,8 +2,8 @@
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
 
-export const NPC_COUNT = 24;
-export const CAR_COUNT = 6;
+export const NPC_COUNT = 36;
+export const CAR_COUNT = 9;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const HACK_COOLDOWN_SECS = 5;
@@ -36,12 +36,15 @@ function makeProfile(rng, i) {
 
 export function createStreet(seed) {
   const rng = createStreams(seed);
+  const npcSpots = [];
+  for (const baseX of [0, 44]) {
+    npcSpots.push(baseX - 6.2, baseX - 5.7, baseX + 5.7, baseX + 6.2);
+  }
   const npcs = [];
   for (let i = 0; i < NPC_COUNT; i++) {
-    const side = rng.sim() < 0.5 ? -1 : 1;
+    const x = npcSpots[Math.floor(rng.sim() * npcSpots.length)];
     npcs.push({
-      side,
-      x: side * (5.6 + rng.sim() * 1.2),
+      x,
       z: (rng.sim() - 0.5) * STREET_HALF * 2,
       dir: rng.sim() < 0.5 ? -1 : 1,
       speed: 0.9 + rng.sim() * 0.8,
@@ -54,12 +57,13 @@ export function createStreet(seed) {
   const cars = [];
   for (let i = 0; i < CAR_COUNT; i++) {
     const dir = i % 2 === 0 ? 1 : -1;
+    const avenue = i >= 6 ? 44 : 0;
     cars.push({
-      lane: dir > 0 ? 2 : -2,
+      lane: avenue + (dir > 0 ? 2 : -2),
       dir,
-      z: -STREET_HALF + (i / CAR_COUNT) * STREET_HALF * 2,
+      z: -STREET_HALF + ((i * 37) % CAR_COUNT) / CAR_COUNT * STREET_HALF * 2,
       speed: 7 + rng.sim() * 3,
-      paint: CAR_PAINTS[i % CAR_PAINTS.length],
+      paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
     });
   }
   return {

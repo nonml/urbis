@@ -1,7 +1,7 @@
 // On-foot player state. Pure data — render reads, main ticks.
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
-export const BOUNDS = { x: 7, z: 58 };
+export const BOUNDS = { minX: -7, maxX: 51, minZ: -68, maxZ: 58 };
 
 export function createPlayer() {
   return {
@@ -21,8 +21,8 @@ export function tickPlayer(player, input, dt) {
   if (player.speed > 0.05) {
     player.x += input.mx * player.speed * dt;
     player.z += input.mz * player.speed * dt;
-    player.x = Math.max(-BOUNDS.x, Math.min(BOUNDS.x, player.x));
-    player.z = Math.max(-BOUNDS.z, Math.min(BOUNDS.z, player.z));
+    player.x = Math.max(BOUNDS.minX, Math.min(BOUNDS.maxX, player.x));
+    player.z = Math.max(BOUNDS.minZ, Math.min(BOUNDS.maxZ, player.z));
     const targetYaw = Math.atan2(input.mx, input.mz);
     let d = targetYaw - player.yaw;
     while (d > Math.PI) d -= Math.PI * 2;
