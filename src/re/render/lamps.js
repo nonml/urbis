@@ -22,6 +22,8 @@ const LAMPS = [
   ...[-2, 12, 26, 40].map((x) => ({
     x, z: -68.2, hx: x, hz: -66.4, rotY: Math.PI / 2, zone: 0,
   })),
+  { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
+  { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
 ];
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);
@@ -83,6 +85,7 @@ export function buildLamps() {
   group.add(poles, heads, cones);
 
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  const spriteBase = 0.38;
   function setZoneDark(zone, dark) {
     LAMPS.forEach((l, i) => {
       if (l.zone !== zone) return;
@@ -94,6 +97,15 @@ export function buildLamps() {
     for (const s of spritesByZone[zone]) s.visible = !dark;
   }
 
+  // Daylight: heads go dull, cones and glows fade with the night.
+  function setDaylight(n) {
+    headMat.color.setScalar(0.35 + 0.65 * n);
+    coneMat.opacity = 0.03 * n;
+    for (const zone of spritesByZone) {
+      for (const s of zone) s.material.opacity = spriteBase * n;
+    }
+  }
+
   const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
-  return { group, poolsByZone, setZoneDark, heads: headPositions };
+  return { group, poolsByZone, setZoneDark, setDaylight, heads: headPositions };
 }

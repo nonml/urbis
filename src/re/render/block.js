@@ -2,7 +2,7 @@
 // per-object draws for repeated things are banned (charter law #4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadPBRMaps, standardFromMaps } from './materials.js';
+import { loadPBRMaps, standardFromMaps, facadeMaterial } from './materials.js';
 
 const STREET_LEN = 120;
 const ROAD_HALF = 4;
@@ -24,6 +24,7 @@ function worldUVs(geo, w, h, d, tile) {
 
 export function buildGround(texLoader, maxAniso) {
   const group = new THREE.Group();
+  const mats = {};
   const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
   const roadMat = standardFromMaps(asphalt, { roughness: 0.45, envMapIntensity: 1.4, color: 0x8a8f99 });
   const roadMain = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
@@ -34,7 +35,10 @@ export function buildGround(texLoader, maxAniso) {
   const roadSouth = new THREE.PlaneGeometry(58, ROAD_HALF * 2);
   roadSouth.rotateX(-Math.PI / 2);
   roadSouth.translate(22, 0, -64);
-  group.add(new THREE.Mesh(mergeGeometries([roadMain, roadEast, roadSouth]), roadMat));
+  const roadMesh = new THREE.Mesh(mergeGeometries([roadMain, roadEast, roadSouth]), roadMat);
+  roadMesh.receiveShadow = true;
+  group.add(roadMesh);
+  mats.road = roadMat;
 
   const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
   const walkMat = standardFromMaps(paving, { roughness: 0.7, envMapIntensity: 0.7, color: 0x9aa0ab });
@@ -45,8 +49,12 @@ export function buildGround(texLoader, maxAniso) {
     box(3, 0.24, STREET_LEN, 44 + (ROAD_HALF + 1.5), 0.0, 0),
     box(58, 0.24, 3, 22, 0.0, -64 - (ROAD_HALF + 1.5)),
     box(58, 0.24, 3, 22, 0.0, -64 + (ROAD_HALF + 1.5)),
+    box(22, 0.24, 9, -17, 0.0, -32),
   ]);
-  group.add(new THREE.Mesh(walks, walkMat));
+  const walkMesh = new THREE.Mesh(walks, walkMat);
+  walkMesh.receiveShadow = true;
+  group.add(walkMesh);
+  mats.walk = walkMat;
 
   const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
   const curbMat = standardFromMaps(concrete, { roughness: 0.85, envMapIntensity: 0.4, color: 0x7d828c });
@@ -57,11 +65,14 @@ export function buildGround(texLoader, maxAniso) {
     box(0.3, 0.3, STREET_LEN, 44 + (ROAD_HALF + 0.15), 0.03, 0),
     box(58, 0.3, 0.3, 22, 0.03, -64 - (ROAD_HALF + 0.15)),
     box(58, 0.3, 0.3, 22, 0.03, -64 + (ROAD_HALF + 0.15)),
+    box(0.35, 1.0, 9, -27.8, 0.5, -32),
   ]);
-  group.add(new THREE.Mesh(curbs, curbMat));
+  const curbMesh = new THREE.Mesh(curbs, curbMat);
+  curbMesh.receiveShadow = true;
+  group.add(curbMesh);
 
   group.add(buildMarkings());
-  return group;
+  return { group, mats };
 }
 
 function buildMarkings() {
@@ -133,7 +144,8 @@ function buildMarkings() {
 
 const TOWERS = [
   // side, z-center, width, height, depth
-  [-1, -48, 12, 34, 10], [-1, -32, 10, 22, 10], [-1, -14, 14, 44, 11],
+  // (west row omits z=-32: the promenade gap to the river)
+  [-1, -48, 12, 34, 10], [-1, -14, 14, 44, 11],
   [-1, 6, 11, 28, 10], [-1, 24, 13, 38, 10], [-1, 44, 10, 24, 10],
   [1, -44, 11, 26, 10], [1, -26, 13, 40, 11], [1, -6, 10, 30, 10],
   [1, 12, 12, 24, 10], [1, 30, 14, 46, 11], [1, 50, 10, 22, 10],
@@ -158,14 +170,13 @@ export function buildTowers(texLoader, maxAniso) {
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = maxAniso;
   }
-  const facadeMatA = new THREE.MeshStandardMaterial({
-    map: color, emissiveMap: emission, emissive: 0xffffff, emissiveIntensity: 0.75,
-    normalMap: normal, roughnessMap: rough, roughness: 1.0,
-    metalnessMap: metal, metalness: 1.0,
-    color: 0x565c68, envMapIntensity: 1.1,
-  });
-  const facadeMatB = facadeMatA.clone();
-  facadeMatB.color = new THREE.Color(0x4a5a6e);
+  const dayColor = texLoader.load('re-assets/facade_glass/color.jpg');
+  dayColor.colorSpace = THREE.SRGBColorSpace;
+  dayColor.wrapS = dayColor.wrapT = THREE.RepeatWrapping;
+  dayColor.anisotropy = maxAniso;
+  const nightMaps = { color, emission, normal, rough, metal };
+  const facadeMatA = facadeMaterial(nightMaps, dayColor, 0x9aa2ae);
+  const facadeMatB = facadeMaterial(nightMaps, dayColor, 0x8a94a8);
   const podiumMapsA = loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2);
   const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.95, envMapIntensity: 0.25, color: 0x54575f });
   const podiumMapsB = loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2);
@@ -207,20 +218,24 @@ export function buildTowers(texLoader, maxAniso) {
   for (const [x, w, h] of SOUTH_TOWERS) {
     emitTower(x, -66, w, h, 10, idx++);
   }
-  group.add(new THREE.Mesh(mergeGeometries(facadesA), facadeMatA));
-  group.add(new THREE.Mesh(mergeGeometries(facadesB), facadeMatB));
-  group.add(new THREE.Mesh(mergeGeometries(podiumsA), podiumMatA));
-  group.add(new THREE.Mesh(mergeGeometries(podiumsB), podiumMatB));
+  for (const [geos, mat] of [[facadesA, facadeMatA], [facadesB, facadeMatB], [podiumsA, podiumMatA], [podiumsB, podiumMatB]]) {
+    const m = new THREE.Mesh(mergeGeometries(geos), mat);
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+  }
   const capMat = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.9 });
-  group.add(new THREE.Mesh(mergeGeometries(caps), capMat));
+  const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
+  capMesh.castShadow = true;
+  group.add(capMesh);
 
   const silhouettes = [
-    box(20, 60, 16, -32, 30, -30), box(24, 74, 18, 34, 37, -8),
-    box(18, 52, 14, -30, 26, 26), box(22, 66, 16, 32, 33, 38),
+    box(20, 60, 16, -58, 30, -30), box(24, 74, 18, 34, 37, -8),
+    box(18, 52, 14, -56, 26, 26), box(22, 66, 16, 32, 33, 38),
     box(22, 62, 16, 74, 31, -20), box(20, 56, 16, 72, 28, 30),
     box(26, 48, 16, 22, 24, -100),
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return { group, beacons: beaconPts };
+  return { group, beacons: beaconPts, facadeMats: [facadeMatA, facadeMatB] };
 }

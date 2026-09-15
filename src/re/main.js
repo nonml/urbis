@@ -1,6 +1,6 @@
 // re-004 bootstrap: sim ticks, render reads. HUD shows measured numbers only.
 import * as THREE from 'three';
-import { createClock, tickClock } from './sim/clock.js';
+import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
@@ -17,7 +17,8 @@ import { buildShops, buildPuddles, buildSteam, tickSteam, buildBeacons, buildSta
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
-import { createRenderer, buildAtmosphere, createComposer, fitRenderer } from './render/atmosphere.js';
+import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
+import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 
 const DRAW_BUDGET = 150;
 const bootStart = performance.now();
@@ -30,11 +31,20 @@ const texLoader = new THREE.TextureLoader();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 400);
 
-const { spots } = buildAtmosphere(scene, renderer);
-scene.add(buildGround(texLoader, maxAniso));
+const env = buildAtmosphere(scene, renderer);
+const spots = env.spots;
+const ground = buildGround(texLoader, maxAniso);
+scene.add(ground.group);
+const groundMats = ground.mats;
 const towers = buildTowers(texLoader, maxAniso);
 scene.add(towers.group);
-scene.add(buildStars());
+const stars = buildStars();
+scene.add(stars);
+const river = buildRiver(texLoader, maxAniso);
+scene.add(river.mesh);
+scene.add(buildGrassGround());
+scene.add(buildGrassTufts());
+scene.add(buildMountains());
 const beacons = buildBeacons(towers.beacons);
 scene.add(beacons.mesh);
 scene.add(buildTrees());
@@ -51,7 +61,8 @@ Promise.all([
 ]).then(([hydrants, trash]) => scene.add(hydrants, trash));
 const signs = buildSigns();
 scene.add(signs.group);
-scene.add(buildPools(signs.pools));
+const signPools = buildPools(signs.pools);
+scene.add(signPools);
 const lamps = buildLamps();
 scene.add(lamps.group);
 const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
@@ -119,7 +130,7 @@ document.body.appendChild(banner);
 const rain = buildRain();
 scene.add(rain);
 
-const composer = createComposer(renderer, scene, camera);
+const { composer, bloom } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
 
 // Follow cam: drag looks, wheel dollies. WASD moves player / drives car.
@@ -151,6 +162,10 @@ if (spawnPreset === 'east') {
 } else if (spawnPreset === 'shop') {
   player.x = 3.5;
   player.z = 7;
+} else if (spawnPreset === 'river') {
+  player.x = -6;
+  player.z = -32;
+  cam.yaw = -Math.PI / 2;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -200,6 +215,7 @@ window.addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (k === 'h') fireHack();
   if (k === 'f') toggleVehicle();
+  if (k === 't') toggleDay(clock);
 });
 
 const clock = createClock();
@@ -312,6 +328,23 @@ function render() {
   missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
   tickSteam(steam, clock.elapsed);
+  tickRiver(river, dt);
+  const night = clock.nightFactor;
+  updateDaylight(env, scene, bloom, night);
+  for (const m of towers.facadeMats) {
+    m.emissiveIntensity = 0.75 * night;
+    m.userData.uNight.value = night;
+    m.envMapIntensity = 1.1 + 1.4 * (1 - night);
+  }
+  groundMats.road.envMapIntensity = 1.4 - 0.9 * (1 - night);
+  groundMats.walk.envMapIntensity = 0.7 - 0.35 * (1 - night);
+  lamps.setDaylight(night);
+  for (const m of signs.mats) m.color.setScalar(0.3 + 0.7 * night);
+  for (const m of signs.spriteMats) m.opacity = m.userData.baseOp * night;
+  for (const p of lampPoolMeshes) p.material.opacity = 0.5 * night;
+  signPools.material.opacity = 0.5 * night;
+  stars.material.opacity = 0.75 * night;
+  for (const s of env.spots) s.intensity = 45 * night;
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   updateNPCs(npcRig, street);
@@ -371,7 +404,7 @@ function render() {
     const stars = '★'.repeat(wanted.heat) + '☆'.repeat(3 - wanted.heat);
     const busted = isBusted(wanted, street.time);
     hud.innerHTML =
-      `<b>NEON BLOCK 008</b> · night · rain<br>` +
+      `<b>NEON BLOCK 009</b> · ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]${speedLine}<br>` +

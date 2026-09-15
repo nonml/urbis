@@ -14,6 +14,7 @@ export function buildPursuitCar() {
   const paint = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
     color: 0x0e1826, roughness: 0.3, metalness: 0.6, envMapIntensity: 1.5,
   }));
+  paint.castShadow = true;
   const wheels = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }));
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }));
   const tails = new THREE.Mesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }));

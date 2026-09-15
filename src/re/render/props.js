@@ -51,6 +51,7 @@ export async function loadPropInstances(relPath, placements) {
       inst.setMatrixAt(i, dummy.matrix);
     });
     inst.instanceMatrix.needsUpdate = true;
+    inst.castShadow = true;
     group.add(inst);
   }
   return group;
@@ -60,6 +61,12 @@ function treeSpots() {
   const spots = [];
   for (const baseX of [-7.3, 7.3, 44 - 7.3, 44 + 7.3]) {
     for (let z = -52; z <= 52; z += 17) spots.push([baseX, z]);
+  }
+  for (const bx of [-29, -39.5]) {
+    for (let z = -50; z <= 50; z += 20) spots.push([bx, z]);
+  }
+  for (let x = 56; x <= 66; x += 5) {
+    for (let z = -6; z <= 16; z += 7) spots.push([x, z]);
   }
   spots.push([-4, -69.5], [14, -69.5], [32, -69.5], [48, -69.5]);
   return spots;
@@ -79,6 +86,8 @@ export function buildTrees() {
   const spots = treeSpots();
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
   const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, spots.length);
+  trunks.castShadow = true;
+  canopies.castShadow = true;
   const dummy = new THREE.Object3D();
   spots.forEach(([x, z], i) => {
     const s = 0.8 + rand() * 0.5;

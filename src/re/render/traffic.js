@@ -69,6 +69,7 @@ export function buildTraffic(street) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
   const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.3, metalness: 0.6, envMapIntensity: 1.6 }), CAR_COUNT);
+  bodies.castShadow = true;
   const wheels = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }), CAR_COUNT);
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), CAR_COUNT);
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), CAR_COUNT);
@@ -126,6 +127,7 @@ export function buildPlayerCar(scene, car) {
   const paint = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
     color: 0xb96a12, roughness: 0.28, metalness: 0.65, envMapIntensity: 1.7,
   }));
+  paint.castShadow = true;
   const wheels = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }));
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4ff }));
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_DIM.clone() });

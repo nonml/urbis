@@ -6,6 +6,7 @@ export function buildPlayer() {
   const coatMat = new THREE.MeshStandardMaterial({ color: 0x0e2a30, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9 });
   const coat = new THREE.Mesh(new THREE.CylinderGeometry(0.26, 0.42, 1.25, 10), coatMat);
   coat.position.y = 0.95;
+  coat.castShadow = true;
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.17, 12, 10),
     new THREE.MeshStandardMaterial({ color: 0x0c0e12, roughness: 0.4 })

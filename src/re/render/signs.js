@@ -77,6 +77,7 @@ function addGlowSprite(group, color, x, y, z, sx, sy, opacity) {
 export function buildSigns() {
   const group = new THREE.Group();
   const pools = [];
+  const mats = [];
   const arms = [];
   for (const s of SIGNS) {
     const ax = s.ax ?? 0;
@@ -87,6 +88,7 @@ export function buildSigns() {
       new THREE.PlaneGeometry(1.5, 4.5),
       new THREE.MeshBasicMaterial({ map: signTexture(s.text, s.sub, s.color) })
     );
+    mats.push(plane.material);
     plane.position.set(x, s.y, z);
     plane.rotation.y = faceSouth ? Math.PI : s.side > 0 ? -Math.PI / 2 : Math.PI / 2;
     group.add(plane);
@@ -98,8 +100,17 @@ export function buildSigns() {
   }
   const armMat = new THREE.MeshBasicMaterial({ color: 0x0a0c10 });
   group.add(new THREE.Mesh(mergeGeometries(arms), armMat));
-  group.add(buildAlleyGlows());
-  return { group, pools };
+  const alleys = buildAlleyGlows();
+  alleys.traverse((o) => { if (o.isMesh) mats.push(o.material); });
+  group.add(alleys);
+  const spriteMats = [];
+  group.traverse((o) => {
+    if (o.isSprite) {
+      o.material.userData.baseOp = o.material.opacity;
+      spriteMats.push(o.material);
+    }
+  });
+  return { group, pools, mats, spriteMats };
 }
 
 function buildAlleyGlows() {

@@ -58,12 +58,13 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-006` Craft pass (done in `ce5ef87`, evidence `re-006-craft.png`, 82 draws / 150)
 - [x] `re-007` Pressure (done in `c53be0c`, evidence `re-007-pursuit/busted/chained.png`, ~104 draws / 150)
 - [x] `re-008` World beauty (done in `b91a8a8`+`a808c97`, evidence `re-008-beauty.png`, 92 draws / 150, 180fps RTX)
-- [ ] `re-009` Cutover review: operator plays re-005→re-007, then we delete the old game.
-- [ ] `re-010` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
-- [ ] `re-011` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
-- [ ] `re-012` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
-- [ ] `re-013` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
-- [ ] `re-014` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
+- [ ] `re-009` Day shift: afternoon sun with shadows, sky dome, day/night material drivers, T toggle. Daylight is where ugly hides nothing.
+- [ ] `re-010` Cutover review: operator plays re-005→re-008, then we delete the old game.
+- [ ] `re-011` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
+- [ ] `re-012` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
+- [ ] `re-013` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
+- [ ] `re-014` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
+- [ ] `re-015` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
 
 ## Salvage map (old 2Y plan → rewrite)
 
@@ -71,12 +72,12 @@ The old code on `archive/pre-rewrite` is frozen, but its plan was mostly specs.
 Rules: copy the design, never the code. Read the old sim as reference, never import it.
 No save migration — clean break between world models.
 
-- Q5 template freeze → `re-009` (schemas + validators are renderer-agnostic)
-- Q6 hack chains / combat hacks / camera net → `re-010`
-- Q4 police tiers / cover / behavior tree → `re-011` (tiers first, cover+BT with combat)
-- Q7 mission arc / radio / TTS approach → `re-012`
-- Q3 interiors / Q13 rooftops+underground → `re-013`
-- Q2 tutorial beats → onboarding spec for the `re-008` review checklist
+- Q5 template freeze → `re-011` (schemas + validators are renderer-agnostic)
+- Q6 hack chains / combat hacks / camera net → `re-012`
+- Q4 police tiers / cover / behavior tree → `re-013` (tiers first, cover+BT with combat)
+- Q7 mission arc / radio / TTS approach → `re-014`
+- Q3 interiors / Q13 rooftops+underground → `re-015`
+- Q2 tutorial beats → onboarding spec for the `re-010` review checklist
 - Gate philosophy / perf harness / honest budgets → already charter law (#2, #3)
 - Superseded, do not salvage: Q9–Q11 renderer-bound passes, date-driven quarters, old saves.
 
