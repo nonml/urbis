@@ -55,7 +55,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-003` Player on foot (done in `9dea1cb`, evidence `re-003-profiler.png` + `re-003-secret.png`, 60 draws / 150)
 - [x] `re-004` Drive (done in `2b5e267`, evidence `re-004-drive.png`, 64 draws / 150)
 - [x] `re-005` District (done in `69cffa3`, evidence `re-005-district.png` + `re-005-east.png`, 81 draws / 150)
-- [ ] `re-006` Craft pass: close-up fidelity — real character silhouettes, detailed hero car, shopfront set dressing, puddle reflections.
+- [x] `re-006` Craft pass (done in `ce5ef87`, evidence `re-006-craft.png`, 82 draws / 150)
 - [ ] `re-007` Pressure: first mission + wanted response. Toys become a game.
 - [ ] `re-008` Cutover review: operator plays re-005→re-007, then we delete the old game.
 - [ ] `re-009` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
