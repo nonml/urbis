@@ -57,14 +57,14 @@ export function buildShops() {
   const group = new THREE.Group();
   const texes = [shopTexture(0), shopTexture(1), shopTexture(2)];
   const canopies = [];
-  for (const s of SHOPS) {
-    const m = new THREE.Mesh(
-      new THREE.PlaneGeometry(6.4, 3.4),
-      new THREE.MeshBasicMaterial({ map: texes[s.kind] })
-    );
+  const mats = [];
+  for (const [si, s] of SHOPS.entries()) {
+    const mat = new THREE.MeshBasicMaterial({ map: texes[s.kind] });
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.4), mat);
     m.position.set(s.x, 2.0, s.z);
     m.rotation.y = s.ry;
     group.add(m);
+    mats.push({ mat, zone: s.z < 0 ? 0 : 1, seed: si * 1.9 + 3 });
     const dirX = Math.sin(s.ry);
     const dirZ = Math.cos(s.ry);
     const cap = new THREE.BoxGeometry(7.0, 0.14, 1.1);
@@ -73,7 +73,7 @@ export function buildShops() {
   }
   const capMat = new THREE.MeshStandardMaterial({ color: 0x0d1016, roughness: 0.7, metalness: 0.3 });
   group.add(new THREE.Mesh(mergeGeometries(canopies), capMat));
-  return group;
+  return { group, mats };
 }
 
 function blobTexture() {
@@ -174,15 +174,18 @@ export function buildSteam() {
     group.add(s);
     sprites.push(s);
   }
-  return { group, sprites };
+  return { group, sprites, erupt: [0, 0] };
 }
 
-export function tickSteam(rig, elapsed) {
+export function tickSteam(rig, elapsed, dt) {
+  for (let zi = 0; zi < 2; zi++) rig.erupt[zi] = Math.max(0, rig.erupt[zi] - dt * 0.8);
   for (const s of rig.sprites) {
-    const prog = ((elapsed * 0.45 + s.userData.phase) % 2.2) / 2.2;
-    s.position.set(s.userData.x, 0.4 + prog * 3.2, s.userData.z);
-    const sc = 1.4 + prog * 3.0;
+    const zone = s.userData.z < 0 ? 0 : 1;
+    const e = rig.erupt[zone];
+    const prog = ((elapsed * (0.45 + e * 1.6) + s.userData.phase) % 2.2) / 2.2;
+    s.position.set(s.userData.x, 0.4 + prog * (3.2 + e * 3.5), s.userData.z);
+    const sc = (1.4 + prog * 3.0) * (1 + e * 0.7);
     s.scale.set(sc, sc, 1);
-    s.material.opacity = 0.36 * (1 - prog);
+    s.material.opacity = Math.min(0.7, 0.36 * (1 - prog) * (1 + e * 2.4));
   }
 }

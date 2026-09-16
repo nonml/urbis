@@ -3,6 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
+import { blink } from '../sim/street.js';
 
 // Explicit per-lamp placement: pole base (x,z), head offset toward the road,
 // instance yaw, blackout zone. Main + east avenues share the z rhythm.
@@ -33,6 +34,7 @@ export function buildLamps() {
   const group = new THREE.Group();
   const poolsByZone = [[], []];
   const spritesByZone = [[], []];
+  const spriteOf = [];
   const dummy = new THREE.Object3D();
 
   const poleGeo = mergeGeometries([
@@ -50,7 +52,6 @@ export function buildLamps() {
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
   });
   const cones = new THREE.InstancedMesh(coneGeo, coneMat, LAMPS.length);
-  const coneBase = [];
 
   LAMPS.forEach((l, i) => {
     dummy.position.set(l.x, 0, l.z);
@@ -66,7 +67,6 @@ export function buildLamps() {
     dummy.position.set(l.hx, HEAD_Y / 2, l.hz);
     dummy.updateMatrix();
     cones.setMatrixAt(i, dummy.matrix);
-    coneBase.push(dummy.matrix.clone());
 
     const glow = new THREE.Sprite(new THREE.SpriteMaterial({
       map: getGlowTex(), color: 0xffc98a, transparent: true, opacity: 0.38,
@@ -76,6 +76,7 @@ export function buildLamps() {
     glow.scale.set(3.2, 3.2, 1);
     group.add(glow);
     spritesByZone[l.zone].push(glow);
+    spriteOf.push(glow);
     poolsByZone[l.zone].push({ x: l.hx, z: l.hz, size: 11, color: '#b97c3a' });
   });
   poles.instanceMatrix.needsUpdate = true;
@@ -86,26 +87,47 @@ export function buildLamps() {
 
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const spriteBase = 0.38;
-  function setZoneDark(zone, dark) {
+  const zoneLight = [1, 1];
+  let nightF = 1;
+  const litColor = new THREE.Color();
+  const m4 = new THREE.Matrix4();
+  const q0 = new THREE.Quaternion();
+  const v3 = new THREE.Vector3();
+  const s3 = new THREE.Vector3();
+  // Per-fixture brightness: mid-phase zones sputter per lamp (seeded blink).
+  function setZoneLight(zone, v) {
+    zoneLight[zone] = v;
+  }
+  function tick(time) {
     LAMPS.forEach((l, i) => {
-      if (l.zone !== zone) return;
-      heads.setColorAt(i, dark ? HEAD_DARK : HEAD_LIT);
-      cones.setMatrixAt(i, dark ? zero : coneBase[i]);
+      const v = zoneLight[l.zone];
+      const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(time, i * 1.7 + l.zone);
+      litColor.copy(HEAD_DARK).lerp(HEAD_LIT, b);
+      heads.setColorAt(i, litColor);
+      if (b <= 0.02) {
+        cones.setMatrixAt(i, zero);
+      } else {
+        const s = 0.25 + 0.75 * b;
+        v3.set(l.hx, (HEAD_Y / 2) * b, l.hz);
+        s3.set(s, Math.max(b, 0.02), s);
+        m4.compose(v3, q0, s3);
+        cones.setMatrixAt(i, m4);
+      }
+      const s = spriteOf[i];
+      s.visible = b > 0.02;
+      s.material.opacity = spriteBase * nightF * b;
     });
     heads.instanceColor.needsUpdate = true;
     cones.instanceMatrix.needsUpdate = true;
-    for (const s of spritesByZone[zone]) s.visible = !dark;
   }
 
   // Daylight: heads go dull, cones and glows fade with the night.
   function setDaylight(n) {
+    nightF = n;
     headMat.color.setScalar(0.35 + 0.65 * n);
     coneMat.opacity = 0.03 * n;
-    for (const zone of spritesByZone) {
-      for (const s of zone) s.material.opacity = spriteBase * n;
-    }
   }
 
   const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
-  return { group, poolsByZone, setZoneDark, setDaylight, heads: headPositions };
+  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions };
 }

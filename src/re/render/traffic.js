@@ -79,16 +79,18 @@ export function buildTraffic(street) {
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const pools = new THREE.InstancedMesh(poolGeo, poolMat, CAR_COUNT);
-  const glows = [];
-  street.cars.forEach((c, i) => {
-    bodies.setColorAt(i, new THREE.Color(c.paint));
-    const s = new THREE.Sprite(new THREE.SpriteMaterial({
+  const glows = new THREE.InstancedMesh(
+    new THREE.PlaneGeometry(2.4, 1.4),
+    new THREE.MeshBasicMaterial({
       map: getGlowTex(), color: 0xcfe6ff, transparent: true, opacity: 0.5,
       blending: THREE.AdditiveBlending, depthWrite: false,
-    }));
-    s.scale.set(2.4, 1.4, 1);
-    group.add(s);
-    glows.push(s);
+    }),
+    CAR_COUNT
+  );
+  glows.frustumCulled = false;
+  group.add(glows);
+  street.cars.forEach((c, i) => {
+    bodies.setColorAt(i, new THREE.Color(c.paint));
   });
   bodies.instanceColor.needsUpdate = true;
   group.add(bodies, wheels, beams, tails, glass, pools);
@@ -97,7 +99,7 @@ export function buildTraffic(street) {
   return { group, rig };
 }
 
-export function updateTraffic(rig, street) {
+export function updateTraffic(rig, street, camera = null) {
   const { bodies, wheels, beams, tails, glass, pools, glows, dummy } = rig;
   street.cars.forEach((c, i) => {
     const m = placeOnCar(dummy, c, 0);
@@ -111,7 +113,12 @@ export function updateTraffic(rig, street) {
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     pools.setMatrixAt(i, dummy.matrix);
-    glows[i].position.set(c.lane, 0.7, c.z + c.dir * 2.3);
+    dummy.position.set(c.lane, 0.7, c.z + c.dir * 2.3);
+    if (camera) dummy.quaternion.copy(camera.quaternion);
+    else dummy.rotation.set(0, 0, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    glows.setMatrixAt(i, dummy.matrix);
   });
   bodies.instanceMatrix.needsUpdate = true;
   wheels.instanceMatrix.needsUpdate = true;
@@ -119,6 +126,7 @@ export function updateTraffic(rig, street) {
   tails.instanceMatrix.needsUpdate = true;
   glass.instanceMatrix.needsUpdate = true;
   pools.instanceMatrix.needsUpdate = true;
+  glows.instanceMatrix.needsUpdate = true;
 }
 
 // --- Hero car (player-driven): own materials, brake lights, real headlight spot.

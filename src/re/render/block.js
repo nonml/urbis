@@ -177,28 +177,39 @@ export function buildTowers(texLoader, maxAniso) {
   const nightMaps = { color, emission, normal, rough, metal };
   const facadeMatA = facadeMaterial(nightMaps, dayColor, 0x9aa2ae);
   const facadeMatB = facadeMaterial(nightMaps, dayColor, 0x8a94a8);
+  // Per-zone material twins: blackouts kill windows one zone at a time (+2 draws).
+  const facadeMatA1 = facadeMaterial(nightMaps, dayColor, 0x9aa2ae);
+  const facadeMatB1 = facadeMaterial(nightMaps, dayColor, 0x8a94a8);
+  for (const m of [facadeMatA, facadeMatB, facadeMatA1, facadeMatB1]) {
+    m.userData.baseTint = m.color.clone();
+  }
   const podiumMapsA = loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2);
   const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.95, envMapIntensity: 0.25, color: 0x54575f });
   const podiumMapsB = loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2);
   const podiumMatB = standardFromMaps(podiumMapsB, { roughness: 0.9, envMapIntensity: 0.25, color: 0x4e5158 });
   const facadesA = [];
   const facadesB = [];
+  const facadesA1 = [];
+  const facadesB1 = [];
   const podiumsA = [];
   const podiumsB = [];
   const caps = [];
   const beaconPts = [];
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   function emitTower(cx, cz, w, h, d, idx) {
+    const zn = cz < 0 ? 0 : 1;
+    const FA = zn === 0 ? facadesA : facadesA1;
+    const FB = zn === 0 ? facadesB : facadesB1;
     (idx % 2 === 0 ? podiumsA : podiumsB).push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
-    (idx % 2 === 0 ? facadesA : facadesB).push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
+    (idx % 2 === 0 ? FA : FB).push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * 0.72;
       const uh = h * 0.3;
       const ud = d * 0.72;
-      facadesA.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
+      FA.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
       topY = h + uh;
     }
     caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
@@ -218,7 +229,8 @@ export function buildTowers(texLoader, maxAniso) {
   for (const [x, w, h] of SOUTH_TOWERS) {
     emitTower(x, -66, w, h, 10, idx++);
   }
-  for (const [geos, mat] of [[facadesA, facadeMatA], [facadesB, facadeMatB], [podiumsA, podiumMatA], [podiumsB, podiumMatB]]) {
+  const zoneMats = [[facadeMatA, facadeMatB], [facadeMatA1, facadeMatB1]];
+  for (const [geos, mat] of [[facadesA, facadeMatA], [facadesB, facadeMatB], [facadesA1, facadeMatA1], [facadesB1, facadeMatB1], [podiumsA, podiumMatA], [podiumsB, podiumMatB]]) {
     const m = new THREE.Mesh(mergeGeometries(geos), mat);
     m.castShadow = true;
     m.receiveShadow = true;
@@ -237,5 +249,5 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return { group, beacons: beaconPts, facadeMats: [facadeMatA, facadeMatB] };
+  return { group, beacons: beaconPts, facadeMats: [facadeMatA, facadeMatB, facadeMatA1, facadeMatB1], zoneMats };
 }

@@ -6,6 +6,8 @@ export const NPC_COUNT = 36;
 export const CAR_COUNT = 9;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
+export const COLLAPSE_SECS = 0.9;
+export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
 export const STREET_HALF = 60;
 
@@ -71,7 +73,10 @@ export function createStreet(seed) {
     time: 0,
     npcs,
     cars,
-    zones: [{ darkUntil: 0, coolUntil: 0 }, { darkUntil: 0, coolUntil: 0 }],
+    zones: [
+      { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
+      { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
+    ],
     hurryUntil: 0,
     lastHack: null,
   };
@@ -79,6 +84,28 @@ export function createStreet(seed) {
 
 export function zoneAt(z) {
   return z < 0 ? 0 : 1;
+}
+
+// Zone power phase: lit → dying (collapse flicker) → dark → restoring → lit.
+export function zonePhase(state, zone) {
+  const t = state.time;
+  const z = state.zones[zone];
+  if (z.darkUntil > 0 && t < z.collapseUntil) return 'dying';
+  if (t < z.darkUntil) return 'dark';
+  if (t < z.restoreUntil) return 'restoring';
+  return 'lit';
+}
+
+// Target brightness: mid-phase flicker is resolved per-fixture by blink().
+export function zoneGlow(state, zone) {
+  const p = zonePhase(state, zone);
+  return p === 'lit' ? 1 : p === 'dark' ? 0 : 0.5;
+}
+
+// Deterministic sputter: full or near-off. Pure in time+seed, sim-safe.
+export function blink(time, seed) {
+  const h = (time * 11 + seed * 13.7) % 1;
+  return h < 0.5 ? 1 : 0.06;
 }
 
 export function isDark(state, zone) {
@@ -90,8 +117,10 @@ export function isDark(state, zone) {
 // Returns affected lamp count (0 = that zone recharging).
 export function hackBlackout(state, zone) {
   if (state.time < state.zones[zone].coolUntil) return 0;
-  state.zones[zone].darkUntil = state.time + BLACKOUT_SECS;
-  state.zones[zone].coolUntil = state.time + BLACKOUT_SECS + ZONE_COOLDOWN_SECS;
+  state.zones[zone].collapseUntil = state.time + COLLAPSE_SECS;
+  state.zones[zone].darkUntil = state.time + COLLAPSE_SECS + BLACKOUT_SECS;
+  state.zones[zone].coolUntil = state.time + COLLAPSE_SECS + BLACKOUT_SECS + ZONE_COOLDOWN_SECS;
+  state.zones[zone].restoreUntil = 0;
   state.hurryUntil = state.time + BLACKOUT_SECS + 5;
   state.lastHack = { zone, at: state.time };
   return 3; // 3 lamps per zone on the main avenue
@@ -119,6 +148,11 @@ export function profilerTarget(street, px, pz, fx, fz) {
 
 export function tickStreet(state, dt) {
   state.time += dt;
+  for (const z of state.zones) {
+    if (z.darkUntil > 0 && state.time >= z.darkUntil && z.restoreUntil === 0) {
+      z.restoreUntil = state.time + RESTORE_SECS;
+    }
+  }
   const hurrying = state.time < state.hurryUntil;
   for (const n of state.npcs) {
     const dark = isDark(state, zoneAt(n.z));

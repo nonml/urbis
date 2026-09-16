@@ -1,7 +1,7 @@
 // re-004 bootstrap: sim ticks, render reads. HUD shows measured numbers only.
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
-import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget } from './sim/street.js';
+import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
@@ -14,6 +14,7 @@ import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './
 import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
 import { buildShops, buildPuddles, buildSteam, tickSteam, buildBeacons, buildStars } from './render/setdress.js';
+import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } from './render/hackfx.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
@@ -61,8 +62,11 @@ Promise.all([
 ]).then(([hydrants, trash]) => scene.add(hydrants, trash));
 const signs = buildSigns();
 scene.add(signs.group);
-const signPools = buildPools(signs.pools);
-scene.add(signPools);
+const signPoolMeshes = [0, 1].map((zone) => {
+  const m = buildPools(signs.pools.filter((q) => q.zone === zone));
+  scene.add(m);
+  return m;
+});
 const lamps = buildLamps();
 scene.add(lamps.group);
 const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
@@ -88,10 +92,13 @@ const pursuitRigs = [buildPursuitCar(), buildPursuitCar()];
 for (const r of pursuitRigs) scene.add(r.group);
 const avatar = buildPlayer();
 scene.add(avatar.group);
-scene.add(buildShops());
+const shops = buildShops();
+scene.add(shops.group);
 scene.add(buildPuddles());
 const steam = buildSteam();
 scene.add(steam.group);
+const fx = buildHackFx();
+scene.add(fx.group);
 buildProfiler();
 
 const prompt = document.createElement('div');
@@ -173,20 +180,28 @@ window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 const DARK = [false, false];
 
 function fireHack() {
-  const zone = zoneAt(player.mode === 'drive' ? heroCar.z : player.z);
+  const driving = player.mode === 'drive';
+  const px = driving ? heroCar.x : player.x;
+  const pz = driving ? heroCar.z : player.z;
+  const zone = zoneAt(pz);
   if (hackBlackout(street, zone) === 0) return;
   wantedOnBlackout(wanted);
-  applyZone(zone, true);
+  firePulse(fx, px, pz);
+  const sub = SUBSTATIONS.find((s) => s.zone === zone);
+  fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
+  // Companion burst at the lamp head nearest the player — the visible one.
+  let best = null;
+  let bestD = 1e9;
+  for (const h of lamps.heads) {
+    const d = Math.hypot(h.x - px, h.z - pz);
+    if (d < bestD) { bestD = d; best = h; }
+  }
+  if (best) fireSparks(fx, best.x, 0.5, best.z, street.time, 12, 12);
+  steam.erupt[zone] = 1;
   missionOnBlackout(mission, DARK, street.time);
 }
 
-function applyZone(zone, dark) {
-  DARK[zone] = dark;
-  lamps.setZoneDark(zone, dark);
-  spots[zone].visible = !dark;
-  lampPoolMeshes[zone].visible = !dark;
-  missionOnBlackout(mission, DARK, street.time);
-}
+// Per-frame zone power driver: DARK follows sim truth; every light answers.
 
 function nearHero() {
   return Math.hypot(heroCar.x - player.x, heroCar.z - player.z) < 3.4;
@@ -322,35 +337,60 @@ function render() {
     tickPlayer(player, footInput(), dt);
     updatePlayer(avatar, player);
   }
+  const glows = [zoneGlow(street, 0), zoneGlow(street, 1)];
+  const nf = clock.nightFactor;
   for (let z = 0; z < 2; z++) {
-    if (DARK[z] && !isDark(street, z)) applyZone(z, false);
+    const dark = isDark(street, z);
+    if (DARK[z] !== dark) {
+      DARK[z] = dark;
+      missionOnBlackout(mission, DARK, street.time);
+    }
+    const b = glows[z] >= 1 ? 1 : glows[z] <= 0 ? 0 : blink(street.time, z * 3.7);
+    lamps.setZoneLight(z, glows[z]);
+    spots[z].visible = b > 0.02;
+    lampPoolMeshes[z].material.opacity = 0.5 * nf * b;
+    signPoolMeshes[z].material.opacity = 0.5 * nf * b;
+    spots[z].intensity = 45 * nf * b;
+    for (const m of towers.zoneMats[z]) {
+      m.emissiveIntensity = 0.75 * nf * b;
+      m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
+    }
+    setSlit(fx, z, b);
   }
+  signs.tick(signs.zoneMats, signs.zoneSprites, glows, street.time, nf);
+  for (const e of shops.mats) {
+    const v = glows[e.zone];
+    const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(street.time, e.seed);
+    e.mat.color.setScalar((0.3 + 0.7 * nf) * (0.06 + 0.94 * b));
+  }
+  lamps.tick(street.time);
   missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
-  tickSteam(steam, clock.elapsed);
+  tickSteam(steam, clock.elapsed, dt);
+  tickHackFx(fx, dt);
   tickRiver(river, dt);
   const night = clock.nightFactor;
   updateDaylight(env, scene, bloom, night);
   for (const m of towers.facadeMats) {
-    m.emissiveIntensity = 0.75 * night;
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);
   }
   groundMats.road.envMapIntensity = 1.4 - 0.9 * (1 - night);
   groundMats.walk.envMapIntensity = 0.7 - 0.35 * (1 - night);
   lamps.setDaylight(night);
-  for (const m of signs.mats) m.color.setScalar(0.3 + 0.7 * night);
-  for (const m of signs.spriteMats) m.opacity = m.userData.baseOp * night;
-  for (const p of lampPoolMeshes) p.material.opacity = 0.5 * night;
-  signPools.material.opacity = 0.5 * night;
   stars.material.opacity = 0.75 * night;
   for (const s of env.spots) s.intensity = 45 * night;
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   updateNPCs(npcRig, street);
-  updateTraffic(traffic.rig, street);
-  const tx = driving ? heroCar.x : player.x;
-  const tz = driving ? heroCar.z : player.z;
+  updateTraffic(traffic.rig, street, camera);
+  let tx = driving ? heroCar.x : player.x;
+  let tz = driving ? heroCar.z : player.z;
+  // Threat pull: a fresh hack drags pursuit toward the dead zone (re-012).
+  if (street.lastHack && street.time - street.lastHack.at < 6 && wanted.heat > 0) {
+    tx = 2;
+    tz = street.lastHack.zone === 0 ? -30 : 30;
+  }
   lastWantedStatus = tickWanted(wanted, dt, tx, tz, driving, heroCar.speed, isDark(street, zoneAt(tz)), street.time);
   if (lastWantedStatus === 'busted' && !mission.complete) {
     missionReset(mission);
