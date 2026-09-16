@@ -60,6 +60,9 @@ Watch Dogs sells *the city as a visible machine you conduct*. Our hacks work in 
 - **Lamps are dumb sticks.** No camera heads, no tally LEDs, no sensor pods — Watch Dogs London weaponized every lamppost; ours hold a bulb.
 - **No tally LEDs anywhere.** No red dots on cameras, routers, or junction boxes — the surveilled city has no eyes to see.
 - **Signal strength is text.** `signal weak — move closer` with no waveform, no bars, no audio-visual static — the profiler's core verb has no instrument.
+- **Peds own no rain gear.** WD1's rainy frame has umbrellas up; ours walk bare-headed through every storm — rain changes no silhouette.
+- **No cloth anywhere.** Aiden's coat flares mid-stride with legs and arms working; our coats are traffic cones that glide.
+- **Hacks have no HUD identity.** WD1 parks a tool icon with charge state bottom-left; ours are invisible keypresses — charge state is a text tag (`H · blackout [READY]`).
 
 ---
 
@@ -121,3 +124,5 @@ Measured against our own charter: neon-noir rain *and* honest daylight, a city t
 - **Mountains sit on the grass.** Hard cone-to-plane seam, no foothill blend, no scree or tree-line — the rim reads as dropped-in geometry.
 - **Grass meets concrete with a hard alias.** No dirt blend strip, no edging, no overgrowth — every material boundary is a razor line.
 - **Twin towers wear twin windows.** Stand any two towers side by side: identical lit patterns, the texture repeat undisguised — siblings at 20 m, clones at 200 m.
+- **Headlights don't pool.** White quads with no throw — WD1's 2014 SUVs lay real light on wet asphalt; ours float bright rectangles.
+- **One green, forever.** Same lollipop, same leaf color, no species, no autumn red — the WD1 frame has a red tree; our park has a stamp.
