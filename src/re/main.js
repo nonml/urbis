@@ -20,7 +20,7 @@ import { buildRain, tickRain } from './render/rain.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
 import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 
-const DRAW_BUDGET = 150;
+const DRAW_BUDGET = 175;
 const bootStart = performance.now();
 
 const canvas = document.getElementById('scene');

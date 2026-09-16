@@ -51,7 +51,7 @@ export async function loadPropInstances(relPath, placements) {
       inst.setMatrixAt(i, dummy.matrix);
     });
     inst.instanceMatrix.needsUpdate = true;
-    inst.castShadow = true;
+    // Small props skip the shadow pass: their shadows are subpixel at play distance.
     group.add(inst);
   }
   return group;

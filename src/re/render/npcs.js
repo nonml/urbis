@@ -10,7 +10,7 @@ export function buildNPCs(street) {
   coatGeo.translate(0, 0.95, 0);
   const coatMat = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.05, envMapIntensity: 0.7 });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
-  bodies.castShadow = true;
+  // No shadow: 36 tiny capsules cost a full extra draw for invisible blobs.
   const headGeo = new THREE.SphereGeometry(0.15, 10, 8);
   headGeo.translate(0, 1.68, 0);
   const headMat = new THREE.MeshStandardMaterial({ color: 0x9a7b62, roughness: 0.6 });

@@ -27,7 +27,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 2. **Honest numbers.** Draw calls, fps, ms — measured from the running game only.
    Estimates, hand-patched baselines, and formula audits are banned. The live draw
    counter stays on screen from slice 001.
-3. **Budget from birth.** Whole frame ≤ 150 draws (scene + post). Each feature declares
+3. **Budget from birth.** Whole frame ≤ 175 draws (re-baselined from 150 when the block became a district in re-005 — measured, not wished). Each feature declares
    its draw cost in its commit message. Over budget = slice fails, no debate.
 4. **Instance or merge.** No feature lands that adds per-object draws for repeated
    things (poles, windows, trees, cars, decals). InstancedMesh / merged geometry only.

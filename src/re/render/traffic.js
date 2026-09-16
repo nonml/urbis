@@ -152,8 +152,15 @@ export function buildPlayerCar(scene, car) {
   }
   const spot = new THREE.SpotLight(0xcfe2ff, 140, 42, 0.52, 0.45, 2);
   scene.add(spot, spot.target);
+  // Finder beacon: faint cyan pillar so the car is findable on foot.
+  const beacon = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: getGlowTex(), color: 0x54f0ff, transparent: true, opacity: 0.3,
+    blending: THREE.AdditiveBlending, depthWrite: false,
+  }));
+  beacon.scale.set(1.6, 3.2, 1);
+  group.add(beacon);
   group.add(paint, wheels, beams, tails, canopy, hubs, pool);
-  const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot };
+  const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot, beacon };
   updatePlayerCar(rig, car, false);
   return rig;
 }
@@ -162,6 +169,7 @@ export function updatePlayerCar(rig, car, braking) {
   rig.group.position.set(car.x, 0, car.z);
   rig.group.rotation.y = car.yaw;
   rig.tailMat.color.copy(braking ? TAIL_BRAKE : TAIL_DIM);
+  rig.beacon.position.set(0, 3.4, 0);
   const fx = Math.sin(car.yaw);
   const fz = Math.cos(car.yaw);
   const rx = Math.cos(car.yaw);
