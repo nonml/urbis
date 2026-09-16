@@ -60,7 +60,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [x] `re-008` World beauty (done in `b91a8a8`+`a808c97`, evidence `re-008-beauty.png`, 92 draws / 150, 180fps RTX)
 - [x] `re-009` Day shift (done in `3ce3331`, evidence `re-009-day.png` + `re-009-valley.png`, 127 draws / 150, 180fps RTX)
 - [ ] `re-010` Cutover review (REHEARSED in `eb74e80`: scripted 10/10 pass, evidence `re-010-rehearsal.png`; awaiting operator play — old-game deletion needs their word)
-- [ ] `re-011` Content engine (salvage Q5): building/vehicle/hack/quest content schemas + validators + generator queue.
+- [x] `re-011` Content engine (done in `193d393`: signs.json + missions.json + validator green + 12/12 runner asserts, evidence `re-011-market.png`)
 - [ ] `re-012` Hacking depth (salvage Q6): declarative hack chains, camera-network traversal, combat hacks.
 - [ ] `re-013` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
 - [ ] `re-014` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
