@@ -34,6 +34,18 @@ GTA sells *density, variety, and a camera that never lies*. Our streets are clea
 - **No construction anywhere.** No scaffolding, cranes, barriers, or work sites — GTA skylines always have something half-built.
 - **No transit identity.** No subway entrances, bus lanes, taxi ranks, or tram wires — the city has no public transport footprint at all.
 - **No aircraft-warning beacons.** Real towers blink red at the crown; ours go dark at the roofline — the night skyline has no heartbeat.
+- **Nobody drives.** No driver silhouette, no cabin, no glass to see through — every car is a sealed box, hero included (`re-004-drive`, chase cam).
+- **No cops on foot.** The entire police force is two sedans — no uniformed officers, no patrol pairs, no one ever standing on a corner.
+- **Two poses: stand and walk.** Nobody sits, leans, smokes, gestures, argues, or loafs — every figure is either parked or gliding.
+- **No frozen moments.** No argument, no deal, no arrest, no street performance, no queue — GTA corners stage little plays; ours stage nothing.
+- **Walls carry no paper.** No flyers, posters, protest signs, menus taped to ramen glass, or newspaper boxes — every surface is wipe-clean.
+- **Streets have no names.** No corner blades, no addresses, no wayfinding — the city is unnavigable and unmemorable at once.
+- **Crashes leave nothing.** Hit whatever you like: no debris, no glass, no sparks, no bumper parts, no impact marks — the world is dent-proof.
+- **No carts, crates, or pallets.** No delivery clutter behind shops, no market spillover — commerce leaves no footprint.
+- **Bare rooftops.** No water towers, billboards, AC farms, or antenna clusters — GTA skylines are furnished at the top; ours stop.
+- **Wrong paving for the genre.** The sidewalk reads as old-town cobble, not downtown concrete (`re-005-east`) — quaint where it should be brutal.
+- **Streets run into black voids.** No terminating vista, landmark, or glow at the ends — avenues just darken out (`re-005-east`).
+- **Traffic clips the camera.** Cars pass through the chase cam with no awareness (`re-004-drive`, black fender intruding frame) — the world doesn't know you're filming.
 
 ---
 
@@ -63,6 +75,7 @@ Watch Dogs sells *the city as a visible machine you conduct*. Our hacks work in 
 - **Peds own no rain gear.** WD1's rainy frame has umbrellas up; ours walk bare-headed through every storm — rain changes no silhouette.
 - **No cloth anywhere.** Aiden's coat flares mid-stride with legs and arms working; our coats are traffic cones that glide.
 - **Hacks have no HUD identity.** WD1 parks a tool icon with charge state bottom-left; ours are invisible keypresses — charge state is a text tag (`H · blackout [READY]`).
+- **No phone boxes.** London's red K2/K6 kiosks are hack-node icons; our sidewalks offer nothing to open, tap, or hide behind.
 
 ---
 
@@ -88,6 +101,7 @@ Cyberpunk sells *overwhelming vertical density, fashion bodies, and holographic 
 - **No barrel fires.** Trash cans stand cold; Night City breathes through firelight in drums, and our alleys have no warm points at all.
 - **No depth of field.** Foreground cans, midground hero, background towers — everything tack-sharp always. Cyberpunk photography lives on bokeh; we have none.
 - **The grade has no identity.** Neutral exposure, no film grain, no halation on neon, no teal-orange pressure — it reads as viewport, not cinema.
+- **No vending machines.** Night City's glowing boxes are light, color, and reflection sources all at once; our streets have none — nowhere to buy anything, visually.
 
 ---
 
@@ -124,6 +138,20 @@ Measured against our own charter: neon-noir rain *and* honest daylight, a city t
 - **Mountains sit on the grass.** Hard cone-to-plane seam, no foothill blend, no scree or tree-line — the rim reads as dropped-in geometry.
 - **Grass meets concrete with a hard alias.** No dirt blend strip, no edging, no overgrowth — every material boundary is a razor line.
 - **Twin towers wear twin windows.** Stand any two towers side by side: identical lit patterns, the texture repeat undisguised — siblings at 20 m, clones at 200 m.
+- **The close-up texture makes it worse.** Plants, chairs, standing figures — the window bake is genuinely good (`re-005-east`), which means players will memorize one plant and meet it on every tower in the city.
+- **One shopfront bakes a frozen figure.** A silhouette stands mid-step in the window glow forever (`re-006-craft`) — interior life as a fossil.
+- **Contracts live in a text panel.** No waypoint, no route ribbon, no destination glow in 3D — GRID RUN navigates by paragraph.
+- **Heat has no screen language.** Stars are text; no edge pulse, no desaturation creep, no vignette tightening as the net closes.
+- **Busted is a sentence.** `BUSTED — contract reset` with no cuffs, no fade, no slow-mo — the loop's harshest moment is typography.
+- **Money is a number.** No payout animation, no chip or stash visual — ₡500 arrives as arithmetic.
+- **Factions have no colors.** No tags, turf markings, uniforms, or livery — consequence cascades leave no paint behind.
+- **Profiler jobs have no props.** A noodle vendor with no stall, a busker with no instrument (`MILO OKAFOR`), couriers with no parcels — the dossiers promise a street the geometry never built.
+- **Secrets have no objects.** Night drops with no drop, patrol maps with no map, skimmed creds with no terminal — the 6 m secret points at nothing.
+- **T is binary: noon or midnight.** No dawn, no dusk, no golden hour, no blue hour — the two most beautiful hours in games don't exist here.
+- **No cloud shadows.** Sunlight never breaks and drifts — daylight is one flat exposure across the whole district.
+- **The camera has no impact language.** No shake, no FOV kick, no speed lines — 22 km/h and parked read identically (`re-004-drive`).
+- **Light cones are solid pyramids.** Hard polygonal edges, opaque amber volumes marching down the street (`re-003-secret`) — the most geometric objects in a game about light.
+- **Poles have no hardware.** No base cabinet, access panel, banner arm, or footing — black sticks with a glowing bar on top.
 - **Headlights don't pool.** White quads with no throw — WD1's 2014 SUVs lay real light on wet asphalt; ours float bright rectangles.
 - **One green, forever.** Same lollipop, same leaf color, no species, no autumn red — the WD1 frame has a red tree; our park has a stamp.
 
