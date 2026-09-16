@@ -19,10 +19,10 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 
 ## B. Blackout theater (the signature hack)
 
-- **VGA-007 Blackout honesty.** Zone dark kills tower windows, signs, and pools per-zone (facade emissive + sign mats + pools driven by zone flag). Fixes: windows blazing, BAR glowing, zebra shining, stray cones. Touches: `street.js` zones, facade/sign/pool materials. Done when: `re-002-blackout` re-shot is actually dark. Draws: +0.
-- **VGA-008 Death & rebirth cascade.** Flicker-and-die rolling down the block, staggered per-fixture; relight staggers back. Lamp pop/buzz visual (flash scale + sprite kick). Touches: lamp/sign update fns. Done when: 3-frame sequence (lit → dying → dark). Draws: +0.
-- **VGA-009 Hack origin.** Pulse leaves the player (or substation flashes first), wavefront rolls down the street; transformer/substation prop with spark burst at the source. Touches: new VFX + one prop mesh. Done when: H-press sequence shows cause → effect. Draws: +2.
-- **VGA-010 Reflections die with the lights.** Mirror street to matte black the instant a zone drops (depends on VGA-001). Lightning becomes the only source during blackout rain. Done when: blackout-in-rain frame with lightning reveal. Draws: +0.
+- **VGA-007 Blackout honesty.** ✅ DONE (`b406d64`, re-012). Zone dark kills tower windows, signs, and pools per-zone (facade emissive + sign mats + pools driven by zone flag). Fixes: windows blazing, BAR glowing, zebra shining, stray cones. Touches: `street.js` zones, facade/sign/pool materials. Done when: `re-002-blackout` re-shot is actually dark. Draws: +0.
+- **VGA-008 Death & rebirth cascade.** ✅ DONE (`b406d64`, re-012). Flicker-and-die rolling down the block, staggered per-fixture; relight staggers back. Lamp pop/buzz visual (flash scale + sprite kick). Touches: lamp/sign update fns. Done when: 3-frame sequence (lit → dying → dark). Draws: +0.
+- **VGA-009 Hack origin.** ✅ DONE (`b406d64`, re-012). Pulse leaves the player (or substation flashes first), wavefront rolls down the street; transformer/substation prop with spark burst at the source. Touches: new VFX + one prop mesh. Done when: H-press sequence shows cause → effect. Draws: +2.
+- **VGA-010 Reflections die with the lights.** ⏳ PARTIAL (`b406d64`: pools/signs/facades die per zone; lightning-as-only-source waits on VGA-051). Mirror street to matte black the instant a zone drops (depends on VGA-001). Lightning becomes the only source during blackout rain. Done when: blackout-in-rain frame with lightning reveal. Draws: +0.
 
 ## C. People (the city lives — screen-true)
 
@@ -97,7 +97,7 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 
 - **VGA-056 Splash system.** Drop crowns + rings on puddles scaled by intensity, micro-mist kick-up, neon sparkle in spray, footstep/tire splashes, hydroplaning walls, car mist trails. Done when: downpour close-ups at boot, tire, and awning height. Draws: +2 (pooled particles).
 - **VGA-057 Drainage theater.** Drip lines off every edge, gutter rivers, corner waterfalls, water visibly entering grates, splashback speckle bands, puddle-to-drain threads. Done when: curb-line frame in rain. Draws: +1..2.
-- **VGA-058 Steam overhaul.** Day-readable plumes (no more smoke blobs), pressure bursts as hack gags, rain flattening + cloudburst bursts off hot grates. Done when: noon + gag frames. Draws: +1.
+- **VGA-058 Steam overhaul.** ⏳ PARTIAL (`b406d64`: eruption-on-zone-death + scale discipline; day-plume readability + rain response still open). Day-readable plumes (no more smoke blobs), pressure bursts as hack gags, rain flattening + cloudburst bursts off hot grates. Done when: noon + gag frames. Draws: +1.
 - **VGA-059 Barrel fires.** Fire drums with flicker light + ember particles — warm points for alleys and the market. Done when: night alley frame breathes. Draws: +1..2.
 
 ## L. Camera (never lies, always feels)
@@ -126,7 +126,7 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 
 - **VGA-070 Hackable affordances.** Junction boxes, camera housings with tally LEDs, router nodes, glowing weak points, camera-head lamp posts, traffic-light targets, phone boxes as nodes. Done when: pre-hack frame offers instruments. Draws: +2..3.
 - **VGA-071 AR layer.** Scan sweep, X-ray outlines, data trails between devices, network graph over the block. Done when: hack frame leaves residue. Draws: +1..2 (post/sprites).
-- **VGA-072 Gags with theater.** Steam bursts, bollard pops, roadblock flips, camera-feed view on breach. Done when: one gag, three frames. Draws: +1..2.
+- **VGA-072 Gags with theater.** ⏳ PARTIAL (`b406d64`: steam-burst gag on zone death; bollard pops, roadblock flips, camera-feed view still open). Steam bursts, bollard pops, roadblock flips, camera-feed view on breach. Done when: one gag, three frames. Draws: +1..2.
 
 ## Q. Life dressing (places, not geometry)
 
