@@ -4,7 +4,7 @@ import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
-import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionReset, missionNote } from './sim/mission.js';
+import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { buildGround, buildTowers } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
@@ -235,7 +235,7 @@ window.__re = {
   profile: () => lastProfile,
   heat: () => wanted.heat,
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
-  mission: () => ({ done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
+  mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
 };
 
 let last = performance.now();
@@ -371,6 +371,7 @@ function render() {
   camera.lookAt(lookAt);
 
   lastProfile = driving ? null : updateProfiler(camera, acquireTarget());
+  if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   if (driving && lockedNpc) lockedNpc = null;
   if (driving) {
     prompt.textContent = 'F · EXIT CAR';

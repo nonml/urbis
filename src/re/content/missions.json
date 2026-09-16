@@ -1,0 +1,21 @@
+[
+  {
+    "id": "GRID RUN",
+    "payout": 500,
+    "steps": [
+      { "verb": "enter_car", "label": "Get in the car (F)" },
+      { "verb": "blackout_zone", "zone": 1, "label": "Blackout Zone 1" },
+      { "verb": "blackout_chain", "zones": [1, 0], "label": "Blackout Zone 0 — while Zone 1 burns" },
+      { "verb": "lose_heat", "label": "Lose the heat (★★★ → ☆☆☆)" }
+    ]
+  },
+  {
+    "id": "DARK MARKET",
+    "payout": 750,
+    "steps": [
+      { "verb": "profile_count", "n": 3, "label": "Profile 3 strangers" },
+      { "verb": "blackout_zone", "zone": -1, "label": "Blackout any zone" },
+      { "verb": "lose_heat", "label": "Go clean (★★★ → ☆☆☆)" }
+    ]
+  }
+]

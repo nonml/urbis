@@ -14,6 +14,7 @@
     "test:e2e:ui": "playwright test --ui",
     "test:e2e:debug": "playwright test --debug",
     "validate": "node scripts/validate_content.mjs",
+    "validate:re": "node tools/validate_re_content.mjs",
     "lint:basic": "node scripts/lint_basic.mjs",
     "check:no-math-random": "node scripts/check_no_math_random.mjs",
     "check:pbr": "node scripts/audit_materials.mjs --ci",

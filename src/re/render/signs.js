@@ -2,16 +2,15 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-const SIGNS = [
-  { text: 'ラーメン', sub: 'RAMEN', color: '#ff3b5c', side: -1, z: -22, y: 8.5 },
-  { text: 'HOTEL', sub: '★★★', color: '#35e0ff', side: 1, z: -6, y: 11 },
-  { text: 'BAR', sub: 'NEON', color: '#ff4df0', side: -1, z: 6, y: 7 },
-  { text: '24H', sub: 'OPEN', color: '#ffb14e', side: 1, z: 24, y: 6.5 },
-  { text: '酒場', sub: 'CAFE', color: '#52ff9e', side: -1, z: 36, y: 9 },
-  { text: 'HOTEL', sub: 'EAST', color: '#35e0ff', side: 1, z: -14, y: 10, ax: 44 },
-  { text: '麺', sub: 'NOODLE', color: '#ff4df0', side: -1, z: 20, y: 7.5, ax: 44 },
-  { text: 'PARK', sub: '24H', color: '#ffb14e', side: 0, z: -59.9, y: 8, ax: 22, face: 'south' },
-];
+import SIGN_DEFS from '../content/signs.json';
+
+// Runtime guard: content errors must degrade to a missing sign, never a dead boot.
+function validSign(s) {
+  return s && typeof s.text === 'string' && typeof s.sub === 'string'
+    && /^#[0-9a-fA-F]{6}$/.test(s.color || '') && [-1, 0, 1].includes(s.side)
+    && typeof s.z === 'number' && typeof s.y === 'number';
+}
+const SIGNS = SIGN_DEFS.filter((s, i) => validSign(s) || (console.error(`[signs] bad def ${i}, skipped`), false));
 
 function signTexture(main, sub, color) {
   const c = document.createElement('canvas');
