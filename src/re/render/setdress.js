@@ -113,11 +113,13 @@ export function buildPuddles() {
     q.translate(x, y, z);
     geos.push(q);
   }
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x11161f, metalness: 0.95, roughness: 0.05, envMapIntensity: 2.4,
+  const mat = new THREE.MeshPhysicalMaterial({
+    color: 0x0a0e14, metalness: 0.9, roughness: 0.04, envMapIntensity: 2.4,
+    iridescence: 0.55, iridescenceIOR: 1.32,
     transparent: true, alphaMap: blobTexture(), depthWrite: false,
   });
-  return new THREE.Mesh(mergeGeometries(geos), mat);
+  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  return { mesh, mat };
 }
 
 const VENTS = [

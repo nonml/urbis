@@ -54,7 +54,7 @@ export function buildHackFx() {
   }
   slitMesh.instanceColor.needsUpdate = true;
   group.add(slitMesh);
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: 0.55, metalness: 0.7 });
+  const bodyMat = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: 0.4, metalness: 0.7 });
   const bodyMesh = new THREE.Mesh(mergeGeometries(bodies), bodyMat);
   bodyMesh.castShadow = true;
   group.add(bodyMesh);

@@ -103,7 +103,8 @@ const avatar = buildPlayer();
 scene.add(avatar.group);
 const shops = buildShops();
 scene.add(shops.group);
-scene.add(buildPuddles());
+const puddles = buildPuddles();
+scene.add(puddles.mesh);
 const steam = buildSteam();
 scene.add(steam.group);
 const fx = buildHackFx();
@@ -390,8 +391,9 @@ function render() {
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);
   }
-  groundMats.road.envMapIntensity = 1.4 - 0.9 * (1 - night);
+  groundMats.road.envMapIntensity = 1.6 - 0.9 * (1 - night);
   groundMats.walk.envMapIntensity = 0.7 - 0.35 * (1 - night);
+  puddles.mat.envMapIntensity = 1.2 + 1.4 * night;
   lamps.setDaylight(night);
   stars.material.opacity = 0.75 * night;
   for (const s of env.spots) s.intensity = 45 * night;

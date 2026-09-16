@@ -41,7 +41,7 @@ export function buildLamps() {
     (() => { const g = new THREE.CylinderGeometry(0.09, 0.12, HEAD_Y, 8); g.translate(0, HEAD_Y / 2, 0); return g; })(),
     (() => { const g = new THREE.BoxGeometry(1.9, 0.1, 0.1); g.translate(-0.85, HEAD_Y, 0); return g; })(),
   ]);
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.5, metalness: 0.8 });
+  const poleMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.35, metalness: 0.8 });
   const poles = new THREE.InstancedMesh(poleGeo, poleMat, LAMPS.length);
   const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.3);
   const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });

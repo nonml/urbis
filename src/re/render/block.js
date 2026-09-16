@@ -26,7 +26,7 @@ export function buildGround(texLoader, maxAniso) {
   const group = new THREE.Group();
   const mats = {};
   const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
-  const roadMat = standardFromMaps(asphalt, { roughness: 0.45, envMapIntensity: 1.4, color: 0x8a8f99 });
+  const roadMat = standardFromMaps(asphalt, { roughness: 0.38, envMapIntensity: 1.4, color: 0x7e838d });
   const roadMain = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
   roadMain.rotateX(-Math.PI / 2);
   const roadEast = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
@@ -41,7 +41,7 @@ export function buildGround(texLoader, maxAniso) {
   mats.road = roadMat;
 
   const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
-  const walkMat = standardFromMaps(paving, { roughness: 0.7, envMapIntensity: 0.7, color: 0x9aa0ab });
+  const walkMat = standardFromMaps(paving, { roughness: 0.6, envMapIntensity: 0.7, color: 0x9aa0ab });
   const walks = mergeGeometries([
     box(3, 0.24, STREET_LEN, -(ROAD_HALF + 1.5), 0.0, 0),
     box(3, 0.24, STREET_LEN, ROAD_HALF + 1.5, 0.0, 0),
@@ -57,7 +57,7 @@ export function buildGround(texLoader, maxAniso) {
   mats.walk = walkMat;
 
   const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
-  const curbMat = standardFromMaps(concrete, { roughness: 0.85, envMapIntensity: 0.4, color: 0x7d828c });
+  const curbMat = standardFromMaps(concrete, { roughness: 0.75, envMapIntensity: 0.4, color: 0x7d828c });
   const curbs = mergeGeometries([
     box(0.3, 0.3, STREET_LEN, -(ROAD_HALF + 0.15), 0.03, 0),
     box(0.3, 0.3, STREET_LEN, ROAD_HALF + 0.15, 0.03, 0),
@@ -193,9 +193,9 @@ export function buildTowers(texLoader, maxAniso) {
     m.userData.baseTint = m.color.clone();
   }
   const podiumMapsA = loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2);
-  const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.95, envMapIntensity: 0.25, color: 0x54575f });
+  const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.85, envMapIntensity: 0.35, color: 0x54575f });
   const podiumMapsB = loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2);
-  const podiumMatB = standardFromMaps(podiumMapsB, { roughness: 0.9, envMapIntensity: 0.25, color: 0x4e5158 });
+  const podiumMatB = standardFromMaps(podiumMapsB, { roughness: 0.8, envMapIntensity: 0.35, color: 0x4e5158 });
   const facadesA = [];
   const facadesB = [];
   const facadesA1 = [];
