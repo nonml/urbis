@@ -26,6 +26,14 @@ GTA sells *density, variety, and a camera that never lies*. Our streets are clea
 - **No skyline beyond the play area.** Past the mountains: fog and void. GTA horizons always promise more city.
 - **No clouds, birds, or planes.** Both skies are flat gradients; nothing ever moves up there.
 - **Water with nothing on it.** No boats, docks, buoys, foam edges, or ripples around the banks — the river is a bright strip (`re-009-valley`).
+- **Police cars are civilian boxes with a lightbar.** No push bar, no livery or POLICE lettering, no spotlight, no alternating red/blue wash thrown onto the street and facades (`re-007-pursuit`).
+- **Car paint doesn't pick up neon.** The maroon sedan parked under a magenta sign wash stays flat maroon (`re-007-pursuit`) — no env response, no clearcoat, showroom lighting only.
+- **The hero has no back.** Hours of third-person staring at a flat cone: no jacket, collar, backpack, katana, hair, or phone-in-hand (`re-007-pursuit`, player from behind).
+- **No traffic furniture at intersections.** No signal poles, no pedestrian walk/don't-walk boxes, no stop lines — the zebra leads nowhere (`re-002-blackout`).
+- **No civic furniture anywhere.** No parking meters, post boxes, ATMs, bus shelters, clocks, flags, or banners — the sidewalk is paving plus cans.
+- **No construction anywhere.** No scaffolding, cranes, barriers, or work sites — GTA skylines always have something half-built.
+- **No transit identity.** No subway entrances, bus lanes, taxi ranks, or tram wires — the city has no public transport footprint at all.
+- **No aircraft-warning beacons.** Real towers blink red at the crown; ours go dark at the roofline — the night skyline has no heartbeat.
 
 ---
 
@@ -45,6 +53,13 @@ Watch Dogs sells *the city as a visible machine you conduct*. Our hacks work in 
 - **Lamps die silently.** Sixteen lamp sprites wink out with no buzz, pop, or glass-dark stagger — compare Legion's block-by-block brownouts.
 - **Rain + neon is close to Legion London — but our neon doesn't reflect in the street.** The wet-asphalt promise dies here: signs glow, the road sheens, and the two never meet (no planar/SSR reflections).
 - **No drone, no RC, no remote-view visual.** Every hack fires from the player's body — the remote-conducting half of Watch Dogs has no screen presence.
+- **The blackout doesn't black out.** Tower windows stay fully lit (`re-002-blackout`, every floor blazing), the BAR sign keeps glowing, and the zebra crossings shine on — only lamps and pools die. Gamers will post this screenshot with one caption.
+- **The hack has no origin.** No pulse leaves the player, no substation flashes first, no wavefront rolls down the street — the zone just goes. Cause-and-effect theater is zero.
+- **Stray light survives inside blackouts.** Lit lamp cones burn on while their zone reads BLACKOUT (`re-002-blackout`, right side) — the dark flag leaks.
+- **The hacker holds no phone.** No device in hand, no raised-phone pose, no screen glow on the face — the franchise's central prop is invisible.
+- **Lamps are dumb sticks.** No camera heads, no tally LEDs, no sensor pods — Watch Dogs London weaponized every lamppost; ours hold a bulb.
+- **No tally LEDs anywhere.** No red dots on cameras, routers, or junction boxes — the surveilled city has no eyes to see.
+- **Signal strength is text.** `signal weak — move closer` with no waveform, no bars, no audio-visual static — the profiler's core verb has no instrument.
 
 ---
 
@@ -66,6 +81,10 @@ Cyberpunk sells *overwhelming vertical density, fashion bodies, and holographic 
 - **Mountains are repeating cones.** Same silhouette stamped around the rim, no snow, rock strata, or transmission towers — a backdrop, not a place.
 - **Rain has no texture.** No splashes, no ripples in puddles, no drips from awnings, no camera droplets, no rolling fog banks — one streak system, day and night.
 - **Car paint is flat.** No clearcoat, flake, chrome trim, or liveries — hero orange is a matte slab next to Rayfield gloss.
+- **No holograms at all.** No ads that flicker, no koi drifting over the street, no volumetric menu boards — every sign is paint with light behind it.
+- **No barrel fires.** Trash cans stand cold; Night City breathes through firelight in drums, and our alleys have no warm points at all.
+- **No depth of field.** Foreground cans, midground hero, background towers — everything tack-sharp always. Cyberpunk photography lives on bokeh; we have none.
+- **The grade has no identity.** Neutral exposure, no film grain, no halation on neon, no teal-orange pressure — it reads as viewport, not cinema.
 
 ---
 
@@ -91,3 +110,14 @@ Measured against our own charter: neon-noir rain *and* honest daylight, a city t
 - **Windows never change.** Lit grids stay lit through day, blackout, and dawn — nobody home, nobody sleeping, no tower ever going dark floor by floor.
 - **Trash exists; litter doesn't.** Two hero-quality cans (`re-008-beauty`) with sterile pavement around them — grime, flyers, stains, and clutter are all missing.
 - **Steam reads as smoke blobs by day.** Soft white puffs against noon sun look like errors, not pressure valves — the day shift exposed the sprite.
+- **Night people are floating heads.** Coats absorb every photon while heads glow pale — sidewalks read as hovering lampshades with faces (`re-002-blackout`, `re-007-pursuit`).
+- **Oncoming traffic is floating headlights.** Civilian bodies go unlit black at night; only the white quads announce them — ghost cars with no mass.
+- **The hero vanishes at night.** No rim light, no key, no jacket sheen — the player is the darkest object in its own game (`re-011-market`).
+- **No contact shadows after dark.** The sun is the only shadow-caster, so at night cars, cans, and cones sit on unanchored sheen — nothing touches the ground.
+- **Lamp cones wash whatever they touch.** The amber volumes ignore occlusion and paint whole facades (`re-010-rehearsal`) — bloom without discipline.
+- **Day rain reads as scratches.** Frozen in stills the streaks are white dashes on blue sky (`re-009-day`) — our evidence screenshots argue against us.
+- **Foliage goes silhouette-black by day.** The valley tree is a black cutout against noon sky (`re-009-valley`) — backlit leaves don't exist.
+- **Hero props are subpixel.** Manholes, hydrant detailing, curb craft — all modeled, none readable at play distance. Craft that can't be seen is craft wasted.
+- **Mountains sit on the grass.** Hard cone-to-plane seam, no foothill blend, no scree or tree-line — the rim reads as dropped-in geometry.
+- **Grass meets concrete with a hard alias.** No dirt blend strip, no edging, no overgrowth — every material boundary is a razor line.
+- **Twin towers wear twin windows.** Stand any two towers side by side: identical lit patterns, the texture repeat undisguised — siblings at 20 m, clones at 200 m.
