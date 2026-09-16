@@ -126,3 +126,92 @@ Measured against our own charter: neon-noir rain *and* honest daylight, a city t
 - **Twin towers wear twin windows.** Stand any two towers side by side: identical lit patterns, the texture repeat undisguised — siblings at 20 m, clones at 200 m.
 - **Headlights don't pool.** White quads with no throw — WD1's 2014 SUVs lay real light on wet asphalt; ours float bright rectangles.
 - **One green, forever.** Same lollipop, same leaf color, no species, no autumn red — the WD1 frame has a red tree; our park has a stamp.
+
+---
+
+## 5. Rain reaction matrix — the complete list
+
+Correction to the earlier claim: rain is not missing, it is *static*. Wet asphalt, puddles, and streaks are always on — there is no dry state, no drizzle-to-downpour ladder, no storm lifecycle, so nothing in the frame can change *because of* rain. Below is everything rain should react with, exhaustively. Visual items only.
+
+**The meta-gaps (why nothing below can work yet):**
+- **No dry state.** It has never not rained — wetness can't arrive, deepen, or leave.
+- **No intensity ladder.** No drizzle / shower / downpour / clearing — one streak system at one density, day and night.
+- **No storm lifecycle.** No buildup, no peak, no clearing light, no drying — weather is a constant, not an event.
+- **No wind.** Rain falls perfectly vertical forever — no angle shifts, gusts, sway, spray drift, or umbrella inverts.
+- **No drying.** No evaporation order (tops first, gutters last), no steam wisps off hot asphalt after, no watermark rings where puddles were.
+- **Wetness is baked, not a value.** No per-material 0–1 wetness — surfaces can't darken, gloss up, or recover.
+
+**Surfaces — every material should answer rain:**
+- Asphalt darkening + gloss ramp with wetness, not a fixed look.
+- Puddle formation and growth: dry → damp patches → spreading sheets → full mirrors → drying rings.
+- Oil-rainbow sheen inside old puddles under neon.
+- Lane paint retroreflectivity: worn paint vs fresh paint behave differently wet; crosswalks glow under headlights, vanish between them.
+- Paving slabs darken per-slab with pooled water in the joints.
+- Concrete podiums grow rain-streak dirt trails under every sill and a dark splash band at the base.
+- Glass facades run rivulets; droplets distort the windows behind them.
+- Metal (poles, rails, hydrant, cans) gains specular bite and drip points; rust streaks bleed when wet.
+- Car bodies bead and sheet; windshields need wiper arcs or they white out.
+- Roofs sheet water to drip edges; gutters overflow; downspouts stream.
+- Awnings sag, drum, and pour drip lines off their edges.
+- Trash-can lids pool and ring-drip.
+- Tree canopies drip along their edges, gain leaf sheen, droop in downpour.
+- Grass darkens, flattens under cloudburst, muddies at the soil line.
+- Soil puddles and splashes mud speckle onto adjacent concrete.
+- River stipples with drop pits; flow texture speeds up; edges foam and brown.
+- Lit windows trail rain that warps the light coming through.
+- Neon faces sheet water; mount arms drip; halos fatten in mist.
+- Stone parapets darken with a drip edge underneath.
+
+**Water movement — rain must go somewhere:**
+- Drip lines off every edge: rooflines, sign boxes, lamp arms, awnings, parapets, canopies.
+- Gutter rivers running the curb line, corner waterfalls into drains.
+- Water visibly streaming *into* grates and manholes.
+- Splashback dirt speckle banding on every wall base.
+- Puddle-to-drain overflow threads chaining across pavement.
+- Tire-borne water: rooster tails, side spray, bow waves through deep sheets.
+- Footstep splashes out of every puddle anyone crosses.
+
+**Splashes and particles:**
+- Drop crowns and expanding rings on every puddle, scaled by intensity.
+- Micro-splash mist kick-up on hard surfaces during downpour.
+- Splashes catching neon and headlights — sparkle, not gray dots.
+- Rain flattening vent steam; cloudburst bursts off hot grates as extra steam.
+- Mist trailing fast cars; spray walls off hydroplaning tires.
+
+**People — rain must change silhouettes:**
+- Umbrellas up, in colors and patterns that double in the wet ground.
+- Hoods up, collars up, hunched runs; newspaper-over-head classics.
+- Shelter clustering: crowds bunching under awnings and overhangs as intensity peaks.
+- Thinning streets: density visibly dropping as the storm peaks, returning after.
+- Wet shoulders: clothing darkening and sheening on coats and heads.
+- Splashes at every footstep; reflections of every umbrella.
+
+**Traffic — rain must change the road:**
+- Wipers on, on everything: traffic, hero, police — speed matched to intensity.
+- Headlights on in day-rain by rule, with pools stretching long on wet asphalt.
+- Spray roosters behind every fast car; bow waves through standing water.
+- Mist hanging behind traffic; brake-light glow diffusing in spray.
+- Light throw elongation: every lamp and lens smears down-road when wet.
+
+**Light and atmosphere:**
+- Lamp and sign halos swelling with humidity and mist.
+- Headlight and searchlight shafts made visible *by* the precipitation.
+- Fog density coupled to rain intensity; valley fog banking in downpour.
+- Lightning: distant flashes washing facades, doubled in every reflection.
+- Cloud darkening, movement, and post-storm clearing light shift.
+- Ambient bounce desaturating as the sky closes.
+
+**Lens and frame:**
+- Droplets on the lens, runs and drips crawling across it, spray blur at speed.
+- Highlight fringing and halation swelling in wet-night air.
+
+**Blackout × rain — our signature combo, half-built:**
+- Reflections must die with the lights: mirror street to matte black the instant a zone drops.
+- Lightning as the only source: flashes revealing the dead city, doubled in standing water.
+- Pursuit headlights as the sole pools: red/blue stretching for blocks on wet asphalt — the money shot we can't currently stage.
+
+**Valley and river:**
+- Rain pitting across the whole river surface, brown foam lines at the banks.
+- Bank runoff threads cutting the grass, muddy waterline edge.
+- Grass flattening in streaks along the wind, trees dripping in rings.
+- Low cloud snagging the peaks, mist filling the valley in downpour.
