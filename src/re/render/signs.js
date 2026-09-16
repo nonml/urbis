@@ -82,6 +82,7 @@ export function buildSigns() {
   const arms = [];
   const zoneMats = [];
   const zoneSprites = [];
+  const streakSources = [];
   for (const [idx, s] of SIGNS.entries()) {
     const zone = s.z < 0 ? 0 : 1;
     const ax = s.ax ?? 0;
@@ -102,12 +103,13 @@ export function buildSigns() {
     arm.translate(faceSouth ? x : s.side * 7.5 + ax, s.y + 2.1, faceSouth ? s.z - 0.7 : s.z);
     arms.push(arm);
     pools.push({ x: faceSouth ? x : x - s.side * 2.5, z: faceSouth ? z + 2.5 : s.z, size: 9, color: s.color, zone });
+    streakSources.push({ x, z, color: s.color, len: 8, width: 1.4 });
   }
   const armMat = new THREE.MeshBasicMaterial({ color: 0x0a0c10 });
   group.add(new THREE.Mesh(mergeGeometries(arms), armMat));
   const alleys = buildAlleyGlows(zoneMats);
   group.add(alleys);
-  return { group, pools, mats, zoneMats, zoneSprites, tick: tickSigns };
+  return { group, pools, mats, zoneMats, zoneSprites, streakSources, tick: tickSigns };
 }
 
 // Per-fixture zone brightness with seeded sputter mid-phase.

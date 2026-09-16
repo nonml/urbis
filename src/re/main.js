@@ -15,6 +15,7 @@ import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
 import { buildShops, buildPuddles, buildSteam, tickSteam, buildBeacons, buildStars } from './render/setdress.js';
 import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } from './render/hackfx.js';
+import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildRain, tickRain } from './render/rain.js';
@@ -37,6 +38,7 @@ const spots = env.spots;
 const ground = buildGround(texLoader, maxAniso);
 scene.add(ground.group);
 const groundMats = ground.mats;
+const markingMats = ground.markings;
 const towers = buildTowers(texLoader, maxAniso);
 scene.add(towers.group);
 const stars = buildStars();
@@ -69,6 +71,13 @@ const signPoolMeshes = [0, 1].map((zone) => {
 });
 const lamps = buildLamps();
 scene.add(lamps.group);
+const streakMeshes = buildStreaks([
+  ...signs.streakSources,
+  ...lamps.heads.map((h) => ({ x: h.x, z: h.z, color: '#c98a4a', len: 9, width: 1.3 })),
+]);
+for (const m of streakMeshes) scene.add(m);
+const carStreaks = buildCarStreaks();
+scene.add(carStreaks.mesh);
 const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
   const m = buildPools(quads);
   scene.add(m);
@@ -356,7 +365,13 @@ function render() {
       m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
     }
     setSlit(fx, z, b);
+    streakMeshes[z].material.opacity = 0.55 * nf * b;
+    const mk = markingMats[z];
+    mk.color.setScalar((0.25 + 0.75 * nf) * (0.05 + 0.95 * b));
+    mk.envMapIntensity = 0.1 + 0.6 * nf * b;
+    mk.emissiveIntensity = 0.05 * nf * b;
   }
+  updateCarStreaks(carStreaks, heroCar, driving, wanted.pursuit, nf, street.time);
   signs.tick(signs.zoneMats, signs.zoneSprites, glows, street.time, nf);
   for (const e of shops.mats) {
     const v = glows[e.zone];

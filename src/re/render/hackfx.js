@@ -2,16 +2,16 @@
 // die per zone, and a pooled spark burst. Draws: body 1 + slits 2 + pulse 1
 // (transient) + sparks 1. Render-only; main triggers, sim owns the clock.
 import * as THREE from 'three';
-import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+
+const SPARKS = 24;
+const HALF = 12;
 
 export const SUBSTATIONS = [
   { x: 8.3, z: -30, zone: 0 },
   { x: -8.3, z: 30, zone: 1 },
 ];
-
-const SPARKS = 24;
-const HALF = 12;
 
 export function buildHackFx() {
   const group = new THREE.Group();
@@ -65,7 +65,7 @@ export function buildHackFx() {
   const sparkGeo = new THREE.BufferGeometry();
   sparkGeo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   const sparks = new THREE.Points(sparkGeo, new THREE.PointsMaterial({
-    color: 0xffd9a0, size: 0.45, transparent: true, opacity: 0.95,
+    color: 0xffd9a0, size: 0.35, map: getGlowTex(), transparent: true, opacity: 0.95,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   sparks.visible = false;

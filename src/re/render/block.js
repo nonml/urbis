@@ -71,19 +71,21 @@ export function buildGround(texLoader, maxAniso) {
   curbMesh.receiveShadow = true;
   group.add(curbMesh);
 
-  group.add(buildMarkings());
-  return { group, mats };
+  const markings = buildMarkings();
+  group.add(markings.group);
+  return { group, mats, markings: markings.mats };
 }
 
 function buildMarkings() {
-  const quads = [];
+  const quads = [[], []];
+  const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
   const dash = new THREE.PlaneGeometry(0.15, 2);
   for (const ax of [0, 44]) {
     for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 5) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
       q.translate(ax, 0.02, z);
-      quads.push(q);
+      push(q, z);
     }
   }
   const dashX = new THREE.PlaneGeometry(2, 0.15);
@@ -91,7 +93,7 @@ function buildMarkings() {
     const q = dashX.clone();
     q.rotateX(-Math.PI / 2);
     q.translate(x, 0.02, -64);
-    quads.push(q);
+    push(q, -64);
   }
   const stripe = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
@@ -99,7 +101,7 @@ function buildMarkings() {
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
     q.translate(0, 0.02, 20 + i * 1.1);
-    quads.push(q);
+    push(q, 20);
   }
   const stripeE = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
@@ -107,22 +109,28 @@ function buildMarkings() {
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
     q.translate(44, 0.02, -20 + i * 1.1);
-    quads.push(q);
+    push(q, -20);
   }
-  // Edge lines, same merge, same draw.
-  const edge = new THREE.PlaneGeometry(0.12, STREET_LEN);
+  // Edge lines split at the zone boundary — same look, two draws.
+  const edge = new THREE.PlaneGeometry(0.12, STREET_LEN / 2);
   for (const ax of [0, 44]) {
     for (const ex of [ax - 3.7, ax + 3.7]) {
-      const q = edge.clone();
-      q.rotateX(-Math.PI / 2);
-      q.translate(ex, 0.02, 0);
-      quads.push(q);
+      for (const [zc, zs] of [[-STREET_LEN / 4, 0], [STREET_LEN / 4, 1]]) {
+        const q = edge.clone();
+        q.rotateX(-Math.PI / 2);
+        q.translate(ex, 0.02, zc);
+        quads[zs].push(q);
+      }
     }
   }
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.05, roughness: 0.6,
+  const mats = [];
+  const meshes = quads.map((list) => {
+    const mat = new THREE.MeshStandardMaterial({
+      color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.05, roughness: 0.6,
+    });
+    mats.push(mat);
+    return new THREE.Mesh(mergeGeometries(list), mat);
   });
-  const mesh = new THREE.Mesh(mergeGeometries(quads), mat);
   const manholes = [];
   const mh = new THREE.CircleGeometry(0.55, 14);
   for (const ax of [0, 44]) {
@@ -138,8 +146,9 @@ function buildMarkings() {
     new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.7, metalness: 0.4 })
   );
   const g = new THREE.Group();
-  g.add(mesh, mhMesh);
-  return g;
+  for (const m of meshes) g.add(m);
+  g.add(mhMesh);
+  return { group: g, mats };
 }
 
 const TOWERS = [

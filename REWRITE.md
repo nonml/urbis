@@ -62,7 +62,7 @@ bloom + env reflections + fog. If a feature doesn't serve neon-noir rain, it wai
 - [ ] `re-010` Cutover review (REHEARSED in `eb74e80`: scripted 10/10 pass, evidence `re-010-rehearsal.png`; awaiting operator play — old-game deletion needs their word)
 - [x] `re-011` Content engine (done in `193d393`: signs.json + missions.json + validator green + 12/12 runner asserts, evidence `re-011-market.png`)
 - [x] `re-012` Hacking depth (done in `b406d64`: honest per-zone dark + collapse/relight cascade + pulse/sparks/substations + steam gag + threat pull 20m→2m, evidence `re-012-dying/dark/sparks.png`, gate 973/973)
-- [ ] `re-013` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter.
+- [ ] `re-013` Wanted (salvage Q4): police tiers — roadblocks, helicopter, spikes, dispatch chatter. (Operator redirect: VGA items in `docs/VISUAL-GAP-ACTIONS.md` close first.)
 - [ ] `re-014` Arc + radio (salvage Q7): 6-mission narrative skeleton, 3-channel radio structure.
 - [ ] `re-015` Verticality (salvage Q3/Q13): interiors (shop/safehouse), accessible rooftops.
 
