@@ -1,7 +1,7 @@
 // On-foot player state. Pure data — render reads, main ticks.
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
-export const BOUNDS = { minX: -7, maxX: 51, minZ: -68, maxZ: 58 };
+export const BOUNDS = { minX: -52, maxX: 70, minZ: -68, maxZ: 100 };
 
 export function createPlayer() {
   return {

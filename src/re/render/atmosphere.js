@@ -79,7 +79,7 @@ export function createRenderer(canvas) {
 
 export function buildAtmosphere(scene, renderer) {
   scene.background = new THREE.Color(0x04060c);
-  scene.fog = new THREE.FogExp2(0x070b16, 0.016);
+  scene.fog = new THREE.FogExp2(0x070b16, 0.012);
   const pmrem = new THREE.PMREMGenerator(renderer);
   scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
   pmrem.dispose();
@@ -141,7 +141,7 @@ export function updateDaylight(env, scene, bloom, n) {
   env.hemi.groundColor.copy(NIGHT_GND).lerp(DAY_GND, day);
   _fog.copy(NIGHT_FOG).lerp(DAY_FOG, day);
   scene.fog.color.copy(_fog);
-  scene.fog.density = 0.016 - 0.0085 * day;
+  scene.fog.density = 0.012 - 0.0055 * day;
   scene.background = null; // sky dome owns the background
   env.moonGlowMat.opacity = 0.5 * n;
   bloom.threshold = 0.85 + 0.07 * day;

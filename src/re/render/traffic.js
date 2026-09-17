@@ -58,8 +58,9 @@ const TAIL_BRAKE = new THREE.Color(0xff2a20);
 
 function placeOnCar(dummy, car, yOff) {
   dummy.position.set(car.x ?? car.lane, yOff, car.z);
-  dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
   if (car.yaw !== undefined) dummy.rotation.set(0, car.yaw, 0);
+  else if (car.axis === 'x') dummy.rotation.set(0, car.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+  else dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
   dummy.scale.set(1, 1, 1);
   dummy.updateMatrix();
   return dummy.matrix;
@@ -108,12 +109,20 @@ export function updateTraffic(rig, street, camera = null) {
     beams.setMatrixAt(i, m);
     tails.setMatrixAt(i, m);
     glass.setMatrixAt(i, m);
-    dummy.position.set(c.lane, 0.05, c.z + c.dir * 3.5);
+    if (c.axis === 'x') {
+      dummy.position.set(c.x + c.dir * 3.5, 0.05, c.z);
+    } else {
+      dummy.position.set(c.x ?? c.lane, 0.05, c.z + c.dir * 3.5);
+    }
     dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     pools.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(c.lane, 0.7, c.z + c.dir * 2.3);
+    if (c.axis === 'x') {
+      dummy.position.set(c.x + c.dir * 2.3, 0.7, c.z);
+    } else {
+      dummy.position.set(c.x ?? c.lane, 0.7, c.z + c.dir * 2.3);
+    }
     if (camera) dummy.quaternion.copy(camera.quaternion);
     else dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);

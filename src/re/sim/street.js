@@ -2,14 +2,14 @@
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
 
-export const NPC_COUNT = 36;
-export const CAR_COUNT = 9;
+export const NPC_COUNT = 60;
+export const CAR_COUNT = 16;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
 export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
-export const STREET_HALF = 60;
+export const STREET_HALF = 100;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c];
 const CAR_PAINTS = [0x7a1020, 0x10233d, 0x3d3d42, 0x0f3d2e, 0x4d4d10, 0x222222];
@@ -36,38 +36,88 @@ function makeProfile(rng, i) {
   };
 }
 
+function makeBody(rng, i) {
+  return {
+    dir: rng.sim() < 0.5 ? -1 : 1,
+    speed: 0.9 + rng.sim() * 0.8,
+    phase: rng.sim() * Math.PI * 2,
+    coat: COAT_COLORS[Math.floor(rng.sim() * COAT_COLORS.length)],
+    h: 0.92 + rng.sim() * 0.22,
+    hurryUntil: 0,
+    profile: makeProfile(rng.sim, i),
+  };
+}
+
+function makeNSWalker(rng, i, npcSpots) {
+  return {
+    axis: 'z',
+    x: npcSpots[Math.floor(rng.sim() * npcSpots.length)],
+    z: (rng.sim() - 0.5) * STREET_HALF * 2,
+    ...makeBody(rng, i),
+  };
+}
+
+function makeEWWalker(rng, i) {
+  // Cross-street walkers: stroll the connector sidewalks (E-W), not the avenues.
+  const onSouth = i >= 56;
+  const z = onSouth ? -58.5 : (rng.sim() < 0.5 ? 34.8 : 45.2);
+  const xMin = onSouth ? -5 : -50;
+  const xMax = onSouth ? 49 : 50;
+  return {
+    axis: 'x',
+    x: xMin + rng.sim() * (xMax - xMin),
+    z: z + (rng.sim() - 0.5) * 1.2,
+    xMin,
+    xMax,
+    ...makeBody(rng, i),
+  };
+}
+
+function makeNSCar(rng, i) {
+  const dir = i % 2 === 0 ? 1 : -1;
+  const avenue = [0, 44, -44][i % 3];
+  return {
+    axis: 'z',
+    lane: avenue + (dir > 0 ? 2 : -2),
+    dir,
+    z: -STREET_HALF + ((i * 37) % 12) / 12 * STREET_HALF * 2,
+    speed: 7 + rng.sim() * 3,
+    paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
+  };
+}
+
+function makeEWCar(rng, i) {
+  // Cross-street traffic: run the z=40 connector + south road E-W.
+  const onSouth = i >= 15;
+  const base = onSouth ? -64 : 40;
+  const dir = i % 2 === 0 ? 1 : -1;
+  const xMin = onSouth ? -7 : -52;
+  const xMax = onSouth ? 51 : 52;
+  return {
+    axis: 'x',
+    x: xMin + ((i * 53) % 10) / 10 * (xMax - xMin),
+    z: base + (dir > 0 ? 2 : -2),
+    dir,
+    speed: 7 + rng.sim() * 3,
+    paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
+    xMin,
+    xMax,
+  };
+}
+
 export function createStreet(seed) {
   const rng = createStreams(seed);
   const npcSpots = [];
-  for (const baseX of [0, 44]) {
+  for (const baseX of [0, 44, -44]) {
     npcSpots.push(baseX - 6.2, baseX - 5.7, baseX + 5.7, baseX + 6.2);
   }
   const npcs = [];
   for (let i = 0; i < NPC_COUNT; i++) {
-    const x = npcSpots[Math.floor(rng.sim() * npcSpots.length)];
-    npcs.push({
-      x,
-      z: (rng.sim() - 0.5) * STREET_HALF * 2,
-      dir: rng.sim() < 0.5 ? -1 : 1,
-      speed: 0.9 + rng.sim() * 0.8,
-      phase: rng.sim() * Math.PI * 2,
-      coat: COAT_COLORS[Math.floor(rng.sim() * COAT_COLORS.length)],
-      h: 0.92 + rng.sim() * 0.22,
-      hurryUntil: 0,
-      profile: makeProfile(rng.sim, i),
-    });
+    npcs.push(i < 48 ? makeNSWalker(rng, i, npcSpots) : makeEWWalker(rng, i));
   }
   const cars = [];
   for (let i = 0; i < CAR_COUNT; i++) {
-    const dir = i % 2 === 0 ? 1 : -1;
-    const avenue = i >= 6 ? 44 : 0;
-    cars.push({
-      lane: avenue + (dir > 0 ? 2 : -2),
-      dir,
-      z: -STREET_HALF + ((i * 37) % CAR_COUNT) / CAR_COUNT * STREET_HALF * 2,
-      speed: 7 + rng.sim() * 3,
-      paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
-    });
+    cars.push(i < 12 ? makeNSCar(rng, i) : makeEWCar(rng, i));
   }
   return {
     time: 0,
@@ -158,14 +208,30 @@ export function tickStreet(state, dt) {
     const dark = isDark(state, zoneAt(n.z));
     let v = dark ? 0 : n.speed;
     if (hurrying && !dark) v *= 1.6;
-    n.z += n.dir * v * dt;
-    if (n.z > STREET_HALF) n.z = -STREET_HALF;
-    if (n.z < -STREET_HALF) n.z = STREET_HALF;
+    if (n.axis === 'x') {
+      n.x += n.dir * v * dt;
+      const lo = n.xMin ?? -50;
+      const hi = n.xMax ?? 50;
+      if (n.x > hi) n.x = lo;
+      if (n.x < lo) n.x = hi;
+    } else {
+      n.z += n.dir * v * dt;
+      if (n.z > STREET_HALF) n.z = -STREET_HALF;
+      if (n.z < -STREET_HALF) n.z = STREET_HALF;
+    }
     n.phase += dt * (dark ? 0 : v * 4);
   }
   for (const c of state.cars) {
-    c.z += c.dir * c.speed * dt;
-    if (c.z > STREET_HALF + 5) c.z = -STREET_HALF - 5;
-    if (c.z < -STREET_HALF - 5) c.z = STREET_HALF + 5;
+    if (c.axis === 'x') {
+      c.x += c.dir * c.speed * dt;
+      const lo = (c.xMin ?? -52) - 3;
+      const hi = (c.xMax ?? 52) + 3;
+      if (c.x > hi) c.x = lo;
+      if (c.x < lo) c.x = hi;
+    } else {
+      c.z += c.dir * c.speed * dt;
+      if (c.z > STREET_HALF + 5) c.z = -STREET_HALF - 5;
+      if (c.z < -STREET_HALF - 5) c.z = STREET_HALF + 5;
+    }
   }
 }

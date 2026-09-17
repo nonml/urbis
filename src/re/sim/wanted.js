@@ -78,8 +78,8 @@ export function tickWanted(w, dt, tx, tz, inCar, carSpeed, cover, time) {
     p.speed += ((d > 6 ? PURSUIT_SPEED : PURSUIT_SPEED * 0.4) - p.speed) * Math.min(1, dt * 2);
     p.x += Math.sin(p.yaw) * p.speed * dt;
     p.z += Math.cos(p.yaw) * p.speed * dt;
-    p.x = Math.max(-3.2, Math.min(3.2, p.x));
-    p.z = Math.max(-58, Math.min(58, p.z));
+    p.x = Math.max(-52, Math.min(52, p.x));
+    p.z = Math.max(-68, Math.min(100, p.z));
   }
   if (w.heat === 0) {
     w.catchT = 0;

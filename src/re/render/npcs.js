@@ -33,7 +33,7 @@ export function buildNPCs(street) {
 export function updateNPCs(rig, street) {
   const { bodies, heads, legL, legR, dummy } = rig;
   street.npcs.forEach((n, i) => {
-    const yaw = n.dir > 0 ? 0 : Math.PI;
+    const yaw = n.axis === 'x' ? (n.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (n.dir > 0 ? 0 : Math.PI);
     const moving = !isDark(street, zoneAt(n.z));
     const bob = moving ? Math.abs(Math.sin(n.phase)) * 0.05 : 0;
     const swing = moving ? Math.sin(n.phase) * 0.5 : 0;
@@ -44,12 +44,16 @@ export function updateNPCs(rig, street) {
     dummy.updateMatrix();
     bodies.setMatrixAt(i, dummy.matrix);
     heads.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(n.x + 0.13 * flip, 0.62 * n.h + bob, n.z);
+    const lx = n.axis === 'x' ? n.x : n.x + 0.13 * flip;
+    const lz = n.axis === 'x' ? n.z + 0.13 * flip : n.z;
+    const rx = n.axis === 'x' ? n.x : n.x - 0.13 * flip;
+    const rz = n.axis === 'x' ? n.z - 0.13 * flip : n.z;
+    dummy.position.set(lx, 0.62 * n.h + bob, lz);
     dummy.rotation.set(swing, yaw, 0, 'YXZ');
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     legL.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(n.x - 0.13 * flip, 0.62 * n.h + bob, n.z);
+    dummy.position.set(rx, 0.62 * n.h + bob, rz);
     dummy.rotation.set(-swing, yaw, 0, 'YXZ');
     dummy.updateMatrix();
     legR.setMatrixAt(i, dummy.matrix);

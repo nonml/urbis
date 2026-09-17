@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadPBRMaps, standardFromMaps, facadeMaterial } from './materials.js';
 
-const STREET_LEN = 120;
+const STREET_LEN = 200;
 const ROAD_HALF = 4;
 
 function box(w, h, d, x, y, z) {
@@ -32,10 +32,16 @@ export function buildGround(texLoader, maxAniso) {
   const roadEast = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
   roadEast.rotateX(-Math.PI / 2);
   roadEast.translate(44, 0, 0);
+  const roadWest = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
+  roadWest.rotateX(-Math.PI / 2);
+  roadWest.translate(-44, 0, 0);
+  const roadCross = new THREE.PlaneGeometry(104, ROAD_HALF * 2);
+  roadCross.rotateX(-Math.PI / 2);
+  roadCross.translate(0, 0, 40);
   const roadSouth = new THREE.PlaneGeometry(58, ROAD_HALF * 2);
   roadSouth.rotateX(-Math.PI / 2);
   roadSouth.translate(22, 0, -64);
-  const roadMesh = new THREE.Mesh(mergeGeometries([roadMain, roadEast, roadSouth]), roadMat);
+  const roadMesh = new THREE.Mesh(mergeGeometries([roadMain, roadEast, roadWest, roadCross, roadSouth]), roadMat);
   roadMesh.receiveShadow = true;
   group.add(roadMesh);
   mats.road = roadMat;
@@ -47,6 +53,10 @@ export function buildGround(texLoader, maxAniso) {
     box(3, 0.24, STREET_LEN, ROAD_HALF + 1.5, 0.0, 0),
     box(3, 0.24, STREET_LEN, 44 - (ROAD_HALF + 1.5), 0.0, 0),
     box(3, 0.24, STREET_LEN, 44 + (ROAD_HALF + 1.5), 0.0, 0),
+    box(3, 0.24, STREET_LEN, -44 - (ROAD_HALF + 1.5), 0.0, 0),
+    box(3, 0.24, STREET_LEN, -44 + (ROAD_HALF + 1.5), 0.0, 0),
+    box(104, 0.24, 2.4, 0, 0.0, 40 - (ROAD_HALF + 1.2)),
+    box(104, 0.24, 2.4, 0, 0.0, 40 + (ROAD_HALF + 1.2)),
     box(58, 0.24, 3, 22, 0.0, -64 - (ROAD_HALF + 1.5)),
     box(58, 0.24, 3, 22, 0.0, -64 + (ROAD_HALF + 1.5)),
     box(22, 0.24, 9, -17, 0.0, -32),
@@ -63,14 +73,26 @@ export function buildGround(texLoader, maxAniso) {
     box(0.3, 0.3, STREET_LEN, ROAD_HALF + 0.15, 0.03, 0),
     box(0.3, 0.3, STREET_LEN, 44 - (ROAD_HALF + 0.15), 0.03, 0),
     box(0.3, 0.3, STREET_LEN, 44 + (ROAD_HALF + 0.15), 0.03, 0),
+    box(0.3, 0.3, STREET_LEN, -44 - (ROAD_HALF + 0.15), 0.03, 0),
+    box(0.3, 0.3, STREET_LEN, -44 + (ROAD_HALF + 0.15), 0.03, 0),
     box(58, 0.3, 0.3, 22, 0.03, -64 - (ROAD_HALF + 0.15)),
     box(58, 0.3, 0.3, 22, 0.03, -64 + (ROAD_HALF + 0.15)),
+    box(104, 0.3, 0.3, 0, 0.03, 40 - (ROAD_HALF + 0.15)),
+    box(104, 0.3, 0.3, 0, 0.03, 40 + (ROAD_HALF + 0.15)),
     box(0.35, 1.0, 9, -27.8, 0.5, -32),
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
   curbMesh.receiveShadow = true;
   group.add(curbMesh);
 
+  const groundBase = new THREE.Mesh(
+    new THREE.PlaneGeometry(700, 700),
+    new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 1, metalness: 0 })
+  );
+  groundBase.rotation.x = -Math.PI / 2;
+  groundBase.position.y = -0.08;
+  groundBase.receiveShadow = true;
+  group.add(groundBase);
   const markings = buildMarkings();
   group.add(markings.group);
   return { group, mats, markings: markings.mats };
@@ -80,7 +102,7 @@ function buildMarkings() {
   const quads = [[], []];
   const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
   const dash = new THREE.PlaneGeometry(0.15, 2);
-  for (const ax of [0, 44]) {
+  for (const ax of [0, 44, -44]) {
     for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 5) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
@@ -94,6 +116,12 @@ function buildMarkings() {
     q.rotateX(-Math.PI / 2);
     q.translate(x, 0.02, -64);
     push(q, -64);
+  }
+  for (let x = -50; x <= 50; x += 5) {
+    const q = dashX.clone();
+    q.rotateX(-Math.PI / 2);
+    q.translate(x, 0.02, 40);
+    push(q, 40);
   }
   const stripe = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
@@ -111,9 +139,27 @@ function buildMarkings() {
     q.translate(44, 0.02, -20 + i * 1.1);
     push(q, -20);
   }
+  const stripeW = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  for (let i = -3; i <= 3; i++) {
+    const q = stripeW.clone();
+    q.rotateX(-Math.PI / 2);
+    q.rotateY(Math.PI / 2);
+    q.translate(-44, 0.02, 10 + i * 1.1);
+    push(q, 10);
+  }
+  // Zebra crossings over the E-W connector (z=40) at each avenue.
+  const stripeC = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  for (const ax of [-44, 0, 44]) {
+    for (let i = -3; i <= 3; i++) {
+      const q = stripeC.clone();
+      q.rotateX(-Math.PI / 2);
+      q.translate(ax + i * 1.1, 0.02, 40);
+      push(q, 40);
+    }
+  }
   // Edge lines split at the zone boundary — same look, two draws.
   const edge = new THREE.PlaneGeometry(0.12, STREET_LEN / 2);
-  for (const ax of [0, 44]) {
+  for (const ax of [0, 44, -44]) {
     for (const ex of [ax - 3.7, ax + 3.7]) {
       for (const [zc, zs] of [[-STREET_LEN / 4, 0], [STREET_LEN / 4, 1]]) {
         const q = edge.clone();
@@ -133,7 +179,7 @@ function buildMarkings() {
   });
   const manholes = [];
   const mh = new THREE.CircleGeometry(0.55, 14);
-  for (const ax of [0, 44]) {
+  for (const ax of [0, 44, -44]) {
     for (let z = -48; z <= 48; z += 24) {
       const q = mh.clone();
       q.rotateX(-Math.PI / 2);
@@ -158,6 +204,8 @@ const TOWERS = [
   [-1, 6, 11, 28, 10], [-1, 24, 13, 38, 10], [-1, 44, 10, 24, 10],
   [1, -44, 11, 26, 10], [1, -26, 13, 40, 11], [1, -6, 10, 30, 10],
   [1, 12, 12, 24, 10], [1, 30, 14, 46, 11], [1, 50, 10, 22, 10],
+  // North district (z 64–92, mirrored on every avenue)
+  [-1, 68, 12, 36, 10], [1, 78, 14, 48, 11], [-1, 90, 10, 28, 10],
 ];
 
 const SOUTH_TOWERS = [
@@ -165,8 +213,29 @@ const SOUTH_TOWERS = [
   [-2, 12, 30], [10, 10, 42], [22, 14, 26], [34, 11, 36], [46, 12, 28],
 ];
 
+// Mid-block infill (x,z,w,h,d): fills the dark voids between avenues so the
+// district reads as city blocks, not three streets. Merged into the same
+// facade draws (+0 draws). Keeps clear of roads (x=0/±44 ±4, z=40 ±4, z=-64 ±4).
+const INFILL_TOWERS = [
+  [22, -48, 14, 30, 12], [-22, -48, 12, 26, 10],
+  [22, -24, 12, 38, 11], [-22, -24, 14, 32, 12],
+  [22, -4, 10, 24, 10], [-22, -4, 12, 28, 11],
+  [22, 14, 13, 36, 11], [-22, 14, 11, 26, 10],
+  [22, 28, 10, 22, 10], [-22, 28, 12, 30, 11],
+  [22, 70, 12, 34, 11], [-22, 70, 14, 40, 12],
+  [22, 88, 10, 26, 10], [-22, 88, 12, 32, 11],
+  [66, -20, 12, 30, 11], [66, 30, 14, 38, 12],
+];
+
+// North terminus caps (z=104): close the avenue vistas so driving north
+// ends in lit towers, not black void. Beyond playable bounds, visual only.
+const TERMINUS_TOWERS = [
+  [0, 104, 16, 44, 12], [44, 104, 14, 36, 11], [-44, 104, 14, 40, 12],
+  [22, 106, 12, 52, 11], [-22, 106, 12, 48, 11],
+];
+
 export function buildTowers(texLoader, maxAniso) {
-  const avenues = [0, 44];
+  const avenues = [0, 44, -44];
   const group = new THREE.Group();
   const color = texLoader.load('re-assets/facade_glass_night/color.jpg');
   color.colorSpace = THREE.SRGBColorSpace;
@@ -238,6 +307,12 @@ export function buildTowers(texLoader, maxAniso) {
   for (const [x, w, h] of SOUTH_TOWERS) {
     emitTower(x, -66, w, h, 10, idx++);
   }
+  for (const [x, z, w, h, d] of INFILL_TOWERS) {
+    emitTower(x, z, w, h, d, idx++);
+  }
+  for (const [x, z, w, h, d] of TERMINUS_TOWERS) {
+    emitTower(x, z, w, h, d, idx++);
+  }
   const zoneMats = [[facadeMatA, facadeMatB], [facadeMatA1, facadeMatB1]];
   for (const [geos, mat] of [[facadesA, facadeMatA], [facadesB, facadeMatB], [facadesA1, facadeMatA1], [facadesB1, facadeMatB1], [podiumsA, podiumMatA], [podiumsB, podiumMatB]]) {
     const m = new THREE.Mesh(mergeGeometries(geos), mat);
@@ -259,4 +334,26 @@ export function buildTowers(texLoader, maxAniso) {
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
   return { group, beacons: beaconPts, facadeMats: [facadeMatA, facadeMatB, facadeMatA1, facadeMatB1], zoneMats };
+}
+
+// Horizon promise (VGA-054): lit-window ring beyond the playable blocks.
+// One merged mesh, dimmed to silhouette by day from main.
+export function buildSkyline(texLoader, maxAniso) {
+  const emission = texLoader.load('re-assets/facade_glass_night/emission.jpg');
+  emission.colorSpace = THREE.SRGBColorSpace;
+  emission.wrapS = emission.wrapT = THREE.RepeatWrapping;
+  emission.anisotropy = maxAniso;
+  const RING = [
+    // x, z, w, h, d — east wall, north rim, south rim (west stays open river valley)
+    [110, -70, 22, 64, 18], [128, -30, 26, 88, 20], [112, 10, 20, 52, 16],
+    [130, 50, 24, 72, 18], [108, 82, 20, 58, 16],
+    [-20, 112, 24, 66, 18], [20, 118, 20, 84, 16], [60, 110, 26, 56, 20],
+    [-30, -102, 22, 60, 18], [15, -108, 24, 78, 20], [58, -100, 18, 50, 16],
+    [-62, 60, 18, 54, 16], [-64, -60, 20, 68, 18],
+  ];
+  const geos = RING.map(([x, z, w, h, d]) => worldUVs(box(w, h, d, x, h / 2, z), w, h, d, 9));
+  const mat = new THREE.MeshBasicMaterial({ map: emission });
+  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  mesh.frustumCulled = false;
+  return { mesh, mat };
 }

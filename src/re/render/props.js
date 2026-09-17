@@ -59,8 +59,8 @@ export async function loadPropInstances(relPath, placements) {
 
 function treeSpots() {
   const spots = [];
-  for (const baseX of [-7.3, 7.3, 44 - 7.3, 44 + 7.3]) {
-    for (let z = -52; z <= 52; z += 17) spots.push([baseX, z]);
+  for (const baseX of [-7.3, 7.3, 44 - 7.3, 44 + 7.3, -44 - 7.3, -44 + 7.3]) {
+    for (let z = -86; z <= 86; z += 17) spots.push([baseX, z]);
   }
   for (const bx of [-29, -39.5]) {
     for (let z = -50; z <= 50; z += 20) spots.push([bx, z]);

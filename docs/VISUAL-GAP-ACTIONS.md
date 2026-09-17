@@ -51,7 +51,7 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 
 ## F. Streets (furniture, signs of life)
 
-- **VGA-027 Intersections, complete.** Traffic lights (hackable — feeds VGA-047), stop lines, ped walk/don't-walk boxes, turn arrows, signal poles. Done when: connector crossing re-shot dressed. Draws: +3..4.
+- **VGA-027 Intersections, complete.** ⏳ PARTIAL (city-grid slice: zebra crossings over the z=40 connector at all 3 avenues + west-avenue dashes/edges/manholes + cross-street curbs + live E-W traffic/peds; hackable traffic lights, stop lines, walk boxes, signal poles still open). Traffic lights (hackable — feeds VGA-047), stop lines, ped walk/don't-walk boxes, turn arrows, signal poles. Done when: connector crossing re-shot dressed. Draws: +3..4.
 - **VGA-028 Road wear pass.** Patches, cracks, oil stains, drain grates, manholes readable at play distance, lane arrows, bus lanes. Done when: road close-up shows age. Draws: +1 (decal merge).
 - **VGA-029 Paving identity.** Downtown concrete/granite replacing old-town cobble; slab joints, grime gradients, tree grates. Done when: `re-005-east` re-shot reads downtown. Draws: +0.
 - **VGA-030 Civic furniture set.** Meters, post boxes, ATMs, shelters, clocks, flags, banners, phone boxes (WD), street-name blades, addresses. Touches: one merged prop system. Done when: sidewalk frame carries 5+ nouns. Draws: +2..3.
@@ -90,7 +90,7 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 - **VGA-051 Storm lifecycle.** Dry state → buildup → drizzle/shower/downpour → clearing → drying, with wind (angle, gusts, sway, spray drift), lightning + facade wash, cloud darkening/movement, post-storm light shift. The foundation VGA-005/015/045/049 stand on. Done when: 4-frame weather sequence, same angle. Draws: +1..2.
 - **VGA-052 Living sky.** Clouds (with drifting cloud shadows!), birds, planes, night stars/moon polish. Done when: noon frame has weather overhead; sky timelapse reads alive. Draws: +2..3.
 - **VGA-053 Golden & blue hour.** Dawn/dusk grades with long shadows — T stops being binary noon/midnight. Done when: magic-hour frame. Draws: +0.
-- **VGA-054 Horizon promise.** Skyline backdrop ring beyond the rim + second-street sky traffic (AV paths, blimps, ad drones). Done when: vista frames show more city. Draws: +2..3.
+- **VGA-054 Horizon promise.** ⏳ PARTIAL (city-grid slice: skyline ring + north terminus caps close the avenue vistas + 16 mid-block infill towers fill the inter-avenue voids, all merged +0 draws; second-street AV paths/blimps/ad drones still open). Skyline backdrop ring beyond the rim + second-street sky traffic (AV paths, blimps, ad drones). Done when: vista frames show more city. Draws: +2..3.
 - **VGA-055 Valley weather.** Fog banking in downpour, runoff threads, mist in the vale, brown banks. Done when: storm valley frame. Draws: +0..1.
 
 ## K. Splashes, drainage & fire (water goes somewhere)
@@ -132,7 +132,7 @@ screenshot-or-it-didn't-happen. Coverage footer at the bottom proves no gap was 
 
 - **VGA-073 Market density.** Stalls, awnings, tables, hanging signs, bodies, steam — one choked Night-City block. Done when: market frame overflows. Draws: +2..3.
 - **VGA-074 Alleys as places.** Walkable gaps, dumpsters with stories, fire escapes, overhead cables, art, barrel fire, paper. Done when: alley frame invites entry. Draws: +2..3.
-- **VGA-075 District identity.** Connector vs east vs promenade vs park: palettes, gateways, lamp/tree/curb variants, termini landmarks killing the black voids. Done when: 4 frames, 4 moods. Draws: +1..2.
+- **VGA-075 District identity.** ⏳ PARTIAL (city-grid slice: north terminus caps kill the end-of-street black void, mid-block infill gives avenues real blocks; palette/gateway/lamp variants + termini landmarks still open). Connector vs east vs promenade vs park: palettes, gateways, lamp/tree/curb variants, termini landmarks killing the black voids. Done when: 4 frames, 4 moods. Draws: +1..2.
 - **VGA-076 Job & secret objects.** Stalls, instruments, parcels, terminals, dead drops, maps — every dossier line gets geometry. Done when: MILO OKAFOR holds his livelihood. Draws: +1..2.
 - **VGA-077 Faction paint.** Tags, turf marks, colors, uniforms, livery — cascades leave evidence. Done when: post-action frame shows who answered. Draws: +1.
 - **VGA-078 Interiors v1 + verticality.** One enterable shop (shelves, keeper, steam, stools) + first accessible rooftop (stairwell fade, vista, beacon). (Charter re-015.) Done when: inside + above frames. Draws: +3..4.

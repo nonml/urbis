@@ -32,7 +32,8 @@ export function buildGrassGround() {
     g.translate(x, -0.1, z);
     geos.push(g);
   };
-  slab(16, 280, -35, -5); // west banks (river runs through the middle)
+  slab(2.5, 280, -50.75, -5); // far-west verge (west of the avenue)
+  slab(11, 280, -32.5, -5); // river bank (avenue runs clear between them)
   slab(15, 32, 61, 5); // pocket park east
   slab(60, 4, 22, -71.5); // connector verge south
   slab(60, 4, 22, -56.5); // connector verge north
@@ -67,7 +68,8 @@ function bladeTexture() {
 }
 
 const TUFT_RECTS = [
-  { x0: -42, x1: -29, z0: -60, z1: 55 }, // west banks (not the water)
+  { x0: -52, x1: -50, z0: -60, z1: 55 }, // far-west verge (west of the avenue)
+  { x0: -38, x1: -29, z0: -60, z1: 55 }, // river bank (east of the avenue)
   { x0: 54, x1: 68, z0: -10, z1: 20 }, // park
   { x0: -7, x1: 51, z0: -73, z1: -70 }, // connector verges
 ];

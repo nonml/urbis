@@ -30,7 +30,7 @@ export function tickPlayerCar(car, input, dt) {
   car.yaw += input.steer * TURN * grip * dt;
   car.x += Math.sin(car.yaw) * car.speed * dt;
   car.z += Math.cos(car.yaw) * car.speed * dt;
-  if (car.x < -3.2 || car.x > 3.2) { car.x = Math.max(-3.2, Math.min(3.2, car.x)); car.speed = 0; }
-  if (car.z < -56 || car.z > 56) { car.z = Math.max(-56, Math.min(56, car.z)); car.speed = 0; }
+  if (car.x < -52 || car.x > 52) { car.x = Math.max(-52, Math.min(52, car.x)); car.speed = 0; }
+  if (car.z < -68 || car.z > 100) { car.z = Math.max(-68, Math.min(100, car.z)); car.speed = 0; }
   return { braking };
 }

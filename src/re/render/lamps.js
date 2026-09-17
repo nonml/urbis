@@ -25,6 +25,20 @@ const LAMPS = [
   })),
   { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
   { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
+  // West avenue (sparser rhythm — different mood, fewer sprites)
+  ...[-27, -9, 9, 27].flatMap((z, i) => {
+    const side = i % 2 === 0 ? -1 : 1;
+    return [{
+      x: -44 + side * POLE_X, z,
+      hx: -44 + side * (POLE_X - 1.8), hz: z,
+      rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
+    }];
+  }),
+  // North extension + cross street
+  { x: 5.4, z: 63, hx: 3.6, hz: 63, rotY: 0, zone: 1 },
+  { x: -5.4, z: 81, hx: -3.6, hz: 81, rotY: Math.PI, zone: 1 },
+  { x: -20, z: 35.8, hx: -20, hz: 37.6, rotY: Math.PI / 2, zone: 1 },
+  { x: 20, z: 44.2, hx: 20, hz: 42.4, rotY: -Math.PI / 2, zone: 1 },
 ];
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);

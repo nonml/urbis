@@ -6,5 +6,7 @@
   { "text": "酒場", "sub": "CAFE", "color": "#52ff9e", "side": -1, "z": 36, "y": 9 },
   { "text": "HOTEL", "sub": "EAST", "color": "#35e0ff", "side": 1, "z": -14, "y": 10, "ax": 44 },
   { "text": "麺", "sub": "NOODLE", "color": "#ff4df0", "side": -1, "z": 20, "y": 7.5, "ax": 44 },
-  { "text": "PARK", "sub": "24H", "color": "#ffb14e", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" }
+  { "text": "PARK", "sub": "24H", "color": "#ffb14e", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" },
+  { "text": "HOTEL", "sub": "WEST", "color": "#35e0ff", "side": -1, "z": -10, "y": 10, "ax": -44 },
+  { "text": "BAR", "sub": "NEON", "color": "#ff4df0", "side": 1, "z": 30, "y": 7, "ax": -44 }
 ]

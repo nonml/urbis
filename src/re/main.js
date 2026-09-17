@@ -6,7 +6,7 @@ import { createPlayer, tickPlayer } from './sim/player.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
-import { buildGround, buildTowers } from './render/block.js';
+import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
@@ -41,6 +41,8 @@ const groundMats = ground.mats;
 const markingMats = ground.markings;
 const towers = buildTowers(texLoader, maxAniso);
 scene.add(towers.group);
+const skyline = buildSkyline(texLoader, maxAniso);
+scene.add(skyline.mesh);
 const stars = buildStars();
 scene.add(stars);
 const river = buildRiver(texLoader, maxAniso);
@@ -183,6 +185,20 @@ if (spawnPreset === 'east') {
   player.x = -6;
   player.z = -32;
   cam.yaw = -Math.PI / 2;
+} else if (spawnPreset === 'west') {
+  player.x = -42;
+  player.z = 0;
+  cam.yaw = Math.PI;
+} else if (spawnPreset === 'north') {
+  player.x = 2;
+  player.z = 70;
+  cam.yaw = Math.PI;
+} else if (spawnPreset === 'cross') {
+  // Middle of the z=40 intersection, looking east down the E-W canyon
+  // (cross traffic + lamps + both road axes in one frame).
+  player.x = 0;
+  player.z = 40;
+  cam.yaw = Math.PI / 2;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -226,8 +242,8 @@ function toggleVehicle() {
     cam.pitch = 0.3;
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
-    player.x = Math.max(-7, Math.min(51, heroCar.x + 1.8));
-    player.z = Math.max(-68, Math.min(58, heroCar.z));
+    player.x = Math.max(-52, Math.min(70, heroCar.x + 1.8));
+    player.z = Math.max(-68, Math.min(100, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
     cam.dist = 7;
@@ -259,6 +275,7 @@ window.__re = {
   enter: () => toggleVehicle(),
   profile: () => lastProfile,
   heat: () => wanted.heat,
+  tod: () => +clock.nightFactor.toFixed(3),
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
 };
@@ -391,11 +408,12 @@ function render() {
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);
   }
-  groundMats.road.envMapIntensity = 1.6 - 0.9 * (1 - night);
-  groundMats.walk.envMapIntensity = 0.7 - 0.35 * (1 - night);
+  groundMats.road.envMapIntensity = 0.85 - 0.15 * (1 - night);
+  groundMats.walk.envMapIntensity = 0.5 - 0.15 * (1 - night);
   puddles.mat.envMapIntensity = 1.2 + 1.4 * night;
   lamps.setDaylight(night);
   stars.material.opacity = 0.75 * night;
+  skyline.mat.color.setScalar(0.12 + 0.88 * night);
   for (const s of env.spots) s.intensity = 45 * night;
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
