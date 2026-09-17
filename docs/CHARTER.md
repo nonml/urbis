@@ -64,6 +64,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 019 | Parked cars + sidewalk crowd, +0 draws | — | `slice-019-street/-north.png` |
 | 020 | Paint discipline, skyglow lift, closer camera | — | `slice-020-street/-north.png` |
 | 021 | Repo unified, measured gate, black-frame fix | **151** | `slice-021-fixed-frame.png` |
+| 022 | Shop canopies wear metalplates006 | **151** (+0) | `slice-022-canopy-day.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
@@ -78,7 +79,7 @@ Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queu
 (82 items, most still open) and closes first per operator redirect. The feature slices
 below are the **structural** work.
 
-Next free slice number: **022**.
+Next free slice number: **023**.
 
 ### Feature slices, in order
 

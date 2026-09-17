@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { mulberry32 } from '../sim/rng.js';
+import { loadPBRMaps, standardFromMaps } from './materials.js';
 
 const SHOPS = [
   { x: -6.0, z: -12, ry: Math.PI / 2, kind: 0 },
@@ -53,7 +54,7 @@ function shopTexture(kind) {
   return tex;
 }
 
-export function buildShops() {
+export function buildShops(texLoader, maxAniso) {
   const group = new THREE.Group();
   const texes = [shopTexture(0), shopTexture(1), shopTexture(2)];
   const canopies = [];
@@ -71,7 +72,8 @@ export function buildShops() {
     cap.translate(s.x + dirX * 0.5, 3.85, s.z + dirZ * 0.5);
     canopies.push(cap);
   }
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x0d1016, roughness: 0.7, metalness: 0.3 });
+  const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
+  const capMat = standardFromMaps(plate, { roughness: 0.62, metalness: 0.25, envMapIntensity: 0.9, color: 0x8b949f });
   group.add(new THREE.Mesh(mergeGeometries(canopies), capMat));
   return { group, mats };
 }

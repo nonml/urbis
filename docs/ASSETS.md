@@ -28,24 +28,24 @@ player, combat or hacking — the wrong genre, and 873 draws for terrain and veg
 
 Record every addition in `public/assets/CREDITS.md` with its licence and URL. No exceptions.
 
-### Already harvested and still unused — do this before generating anything
+### Already harvested and still unused
 
-Audited 2026-09-17. Of nine vendored material sets, **three are wired**. The rest are
-complete PBR sets sitting on disk while the visual-gap list asks for exactly what they
-provide. This is the cheapest work available in the whole project.
+Audited 2026-09-17. Most of the harvest **is** wired. Note that `loadPBRMaps(texLoader,
+maxAniso, '<dir>', ...)` builds paths from a directory argument, so grepping for literal
+`assets/...` strings undercounts badly — do not audit that way. Wired today: asphalt,
+paving_slabs and concrete in `buildGround()`; plaster_rough and plaster_painted as tower
+podiums A and B; both facade glass sets.
 
-| Unused asset | Size | The open item it already answers |
+Two items are genuinely unused (`metalplates006` was wired onto shop canopies in slice 022):
+
+| Unused asset | Size | What it could answer |
 |---|---|---|
-| `plaster_painted/` + `plaster_rough/` | 6.2 MB | **VGA-041** "two more facade materials so the district isn't one glass" — both sets are already here |
-| `paving_slabs/` | 5.2 MB | **VGA-029** paving identity, slab joints, grime gradients (includes an AO map) |
-| `concrete/` | 1.5 MB | **VGA-028/029** curbs, walls, road wear |
-| `metalplates006/` | 2.3 MB | **VGA-031** shopfront shutters, commerce clutter |
-| `concrete_wall_008/` | 2.0 MB | Blocked on a loader detail: Poly Haven's `Diffuse`/`nor_gl`/`arm` naming needs the linear-workflow path, not the ambientCG one |
-| `models/street_lamp_01/` | 2.1 MB | **VGA-036** "lamp heads as fixtures, not floating bars" — the lamps are still procedural (`buildLamps()`, 115 lines) |
+| `models/street_lamp_01/` | 2.1 MB | **VGA-036** "lamp heads as fixtures, not floating bars". Not a texture swap: `buildLamps()` returns `heads` and `poolsByZone`, both load-bearing for the blackout cascade |
+| `concrete_wall_008/` | 2.0 MB | A second wall material. Blocked on a loader gap: Poly Haven ships `Diffuse`/`nor_gl`/`arm` (packed occlusion-roughness-metalness) and `loadPBRMaps` expects ambientCG's separate maps |
 
-Wiring these is mostly `materials.js` work, costs **zero extra draws** (they replace
-materials on geometry that already renders), and closes or advances six tracked items.
-Generating new props before this is done is wasted GPU time.
+**VGA-041** ("two more facade materials so the district isn't one glass") is still open,
+but it needs *new* textures — the plaster sets are already spoken for by the podiums.
+Harvest for it rather than assuming something spare is lying around.
 
 ---
 
@@ -130,10 +130,10 @@ not by prop detail, which helps; but every batch needs a play-camera frame befor
 
 ## Order of attack
 
-1. **Wire the six unused sets already on disk** (table above). Zero draws, zero downloads,
-   zero toolchain, six tracked items advanced. Nothing else competes with this.
-2. Re-harvest `fable-cities` and ambientCG/Poly Haven for anything else on the open VGA
-   list. Still no toolchain required.
+1. Re-harvest for **VGA-041** (two more facade materials) — the highest-value gap that
+   needs only a download.
+2. Teach `loadPBRMaps` the Poly Haven ARM layout, which unlocks `concrete_wall_008`
+   and the rest of that library.
 3. Stand up `trellis.cpp` + Blender for the props that genuinely don't exist —
    VGA-030 civic furniture, VGA-031 commerce clutter, VGA-042 rooftop furniture,
    VGA-073 market density, VGA-076 job objects.

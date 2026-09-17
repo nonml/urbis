@@ -106,7 +106,7 @@ const pursuitRigs = [buildPursuitCar(), buildPursuitCar()];
 for (const r of pursuitRigs) scene.add(r.group);
 const avatar = buildPlayer();
 scene.add(avatar.group);
-const shops = buildShops();
+const shops = buildShops(texLoader, maxAniso);
 scene.add(shops.group);
 const puddles = buildPuddles();
 scene.add(puddles.mesh);

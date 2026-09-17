@@ -14,12 +14,16 @@ function load(texLoader, maxAniso, path, srgb, rx, ry) {
   return tex;
 }
 
-// kind: 'pbr' (albedo/normal/roughness) or 'facade' (+metal/emission)
-export function loadPBRMaps(texLoader, maxAniso, dir, fileStem, rx, ry) {
-  const albedo = load(texLoader, maxAniso, `${dir}/${fileStem}.jpg`, true, rx, ry);
-  const normal = load(texLoader, maxAniso, `${dir}/normal.jpg`, false, rx, ry);
-  const rough = load(texLoader, maxAniso, `${dir}/roughness.jpg`, false, rx, ry);
-  return { albedo, normal, rough };
+// Map filenames vary by vendor: ambientCG ships normal.jpg, Poly Haven normalgl.jpg.
+// `names` overrides the stems; pass metal to pick up a metalness map.
+export function loadPBRMaps(texLoader, maxAniso, dir, fileStem, rx, ry, names = {}) {
+  const maps = {
+    albedo: load(texLoader, maxAniso, `${dir}/${fileStem}.jpg`, true, rx, ry),
+    normal: load(texLoader, maxAniso, `${dir}/${names.normal ?? 'normal'}.jpg`, false, rx, ry),
+    rough: load(texLoader, maxAniso, `${dir}/${names.rough ?? 'roughness'}.jpg`, false, rx, ry),
+  };
+  if (names.metal) maps.metal = load(texLoader, maxAniso, `${dir}/${names.metal}.jpg`, false, rx, ry);
+  return maps;
 }
 
 // Day/night facade: one material, two albedos mixed in-shader by uNight.
@@ -64,6 +68,7 @@ export function standardFromMaps(maps, opts) {
     map: maps.albedo,
     normalMap: maps.normal,
     roughnessMap: maps.rough,
+    metalnessMap: maps.metal ?? null,
     roughness: opts.roughness ?? 1.0,
     metalness: opts.metalness ?? 0.0,
     envMapIntensity: opts.envMapIntensity ?? 1.0,
