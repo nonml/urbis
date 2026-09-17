@@ -272,7 +272,7 @@ const hud = document.getElementById('hud');
 let lastProfile = null;
 let lockedNpc = null;
 // Minimal probe for scripted verification (screenshots, control checks).
-window.__re = {
+window.__game = {
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
   draws: () => renderer.info.render.calls,
   hack: () => fireHack(),
@@ -286,6 +286,14 @@ window.__re = {
   tod: () => +clock.nightFactor.toFixed(3),
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
+  shot: () => {
+    composer.render();
+    const blit = document.createElement('canvas');
+    blit.width = renderer.domElement.width;
+    blit.height = renderer.domElement.height;
+    blit.getContext('2d').drawImage(renderer.domElement, 0, 0);
+    return blit.toDataURL('image/png');
+  },
 };
 
 let last = performance.now();

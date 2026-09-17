@@ -29,3 +29,5 @@ tools/agent/tests/tmp/
 scripts/*.png
 .playwright-mcp/
 screenshots/
+# Gate evidence (regenerated each run)
+docs/shots/gate/

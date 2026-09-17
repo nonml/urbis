@@ -1,40 +1,27 @@
 {
-  "name": "city-builder",
-  "version": "1.0.0",
-  "description": "Dynamic City Builder",
+  "name": "neon-city",
+  "version": "0.1.0",
+  "description": "A living neon-noir city you can walk, drive, and hack.",
   "type": "module",
+  "main": "electron.cjs",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:beta": "node tools/release_build.js",
-    "preview": "vite preview",
-    "test": "node scripts/smoke_test.mjs",
-    "scenario": "node scripts/scenario.mjs",
-    "test:e2e": "playwright test",
-    "test:e2e:ui": "playwright test --ui",
-    "test:e2e:debug": "playwright test --debug",
+    "preview": "vite preview --port 4173",
+    "lint": "node scripts/lint_basic.mjs",
+    "check:rng": "node scripts/check_no_math_random.mjs",
+    "check:boundary": "node scripts/check_boundary.mjs",
     "validate": "node scripts/validate_content.mjs",
-    "validate:re": "node tools/validate_re_content.mjs",
-    "lint:basic": "node scripts/lint_basic.mjs",
-    "check:no-math-random": "node scripts/check_no_math_random.mjs",
-    "check:pbr": "node scripts/audit_materials.mjs --ci",
-    "check:instancing": "node tools/audit_instancing.mjs --ci",
-    "check:workers": "node tools/audit_workers.mjs --ci",
-    "gate": "npm run lint:basic && npm run check:no-math-random && npm run check:instancing && npm run check:workers && npm run validate && npm run build && npm test",
-    "tauri": "tauri",
-    "tauri:dev": "tauri dev",
-    "tauri:build": "tauri build",
+    "test": "playwright test",
+    "test:ui": "playwright test --ui",
+    "gate": "npm run lint && npm run check:rng && npm run check:boundary && npm run validate && npm run build && npm test",
     "electron:dev": "electron electron.cjs",
     "electron:build": "npm run build && electron-builder",
-    "electron:pack": "electron-builder --dir",
-    "mp:server": "node server/multiplayer_server.js",
-    "mp:server:dev": "node --watch server/multiplayer_server.js",
-    "greenworks:rebuild": "node_modules/.bin/electron-rebuild -f -w greenworks"
+    "electron:pack": "electron-builder --dir"
   },
-  "main": "electron.cjs",
   "build": {
-    "appId": "com.nonta.city-builder",
-    "productName": "City Builder",
+    "appId": "com.nonta.neon-city",
+    "productName": "Neon City",
     "directories": {
       "buildResources": "public",
       "output": "dist-electron"
@@ -44,8 +31,7 @@
       "electron.cjs",
       "electron-preload.cjs",
       "steam_appid.txt",
-      "greenworks.json",
-      "node_modules/greenworks/**/*"
+      "greenworks.json"
     ],
     "win": {
       "target": [
@@ -63,27 +49,19 @@
     }
   },
   "keywords": [
-    "city-builder"
+    "game",
+    "three.js",
+    "cyberpunk"
   ],
   "license": "MIT",
   "dependencies": {
-    "@dimforge/rapier3d-compat": "^0.19.3",
-    "@mintplex-labs/piper-tts-web": "^1.0.4",
-    "@rollup/rollup-win32-x64-msvc": "^4.59.0",
-    "three": "^0.160.0",
-    "tone": "^15.1.22"
+    "three": "^0.160.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.58.2",
-    "@sveltejs/vite-plugin-svelte": "^3.1.2",
-    "@tauri-apps/api": "^2.10.1",
-    "@tauri-apps/cli": "^2.10.1",
+    "@rollup/rollup-win32-x64-msvc": "^4.59.0",
     "electron": "^41.0.2",
     "electron-builder": "^26.8.1",
-    "glob": "^10.0.0",
-    "svelte": "^4.2.20",
-    "typescript": "^5.9.3",
-    "vite": "^5.0.0",
-    "ws": "^8.19.0"
+    "vite": "^5.0.0"
   }
 }
