@@ -1,7 +1,7 @@
-# Harvested asset credits (`public/re-assets/`)
+# Harvested asset credits (`public/assets/`)
 
 Subset vendored 2026-09-16 from [fable-cities](https://github.com/rawprogress/fable-cities)
-(MIT code; assets below are public-domain CC0 as listed). Only the maps re-001 needs
+(MIT code; assets below are public-domain CC0 as listed). Only the maps slice 001 needed
 were copied (no preview renders). Each folder keeps its upstream `info.json`.
 
 - ambientCG Asphalt010 — CC0 — https://ambientcg.com/view?id=Asphalt010 — wet road surface

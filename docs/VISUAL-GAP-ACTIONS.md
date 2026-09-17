@@ -13,36 +13,36 @@ Coverage footer at the bottom proves no gap was dropped.
 
 ## A. Street reflection & wetness (the founding image)
 
-- **VGA-001 Neon-to-asphalt reflections.** ✅ DONE (VGA batch 1: static merged smears per zone for all signs + lamp heads, dynamic instanced streaks for hero + strobing pursuit, die per zone, day-subtle. Evidence `re-013-streaks.png` + `re-013-paintdark.png`.) Signs, lamps, and headlights smear on wet road (planar probe / SSR-lite / stretched sprite decals — implementer's choice, fixed cost). Touches: `src/re/render/*` + road material. Done when: night frame shows magenta/cyan smears under signs; re-shot angle matches `re-011-market`. Draws: +2..4.
-- **VGA-002 Puddle mirrors.** ⏳ PARTIAL (physical material + top-down lab mirror proof hold; play-angle audit 2026-09-17 `re-016-audit-night.png`: no readable tower/sign reflections at play distance — wet sheen only. Reopen until mirrors read in the play frame. Full formation/drying lifecycle still waits on VGA-051.) Puddles graduate from damp patches to true mirror sheets with drying rings (ties to storm system VGA-040). Touches: ground material + puddle pass. Done when: day + night puddle close-ups reflect towers/signs. Draws: +1..2.
-- **VGA-003 Lane paint, done right.** ✅ DONE (VGA batch 1 + play-angle audit 2026-09-17: zebra dies per zone 99→11 so it no longer shines through blackouts; day frame reads as paint at 44. Evidence `re-013-daypaint.png` + `re-013-paintdark.png` + `re-016-audit-day/dark.png`.) Retroreflective paint: bright under direct light, quiet between; zebra stops glowing white-hot by day and stops shining through blackouts. Touches: markings material/merge. Done when: `re-009-day` + `re-002-blackout` angles re-shot, paint reads as paint. Draws: +0.
+- **VGA-001 Neon-to-asphalt reflections.** ✅ DONE (VGA batch 1: static merged smears per zone for all signs + lamp heads, dynamic instanced streaks for hero + strobing pursuit, die per zone, day-subtle. Evidence `slice-013-streaks.png` + `slice-013-paintdark.png`.) Signs, lamps, and headlights smear on wet road (planar probe / SSR-lite / stretched sprite decals — implementer's choice, fixed cost). Touches: `src/render/*` + road material. Done when: night frame shows magenta/cyan smears under signs; re-shot angle matches `slice-011-market`. Draws: +2..4.
+- **VGA-002 Puddle mirrors.** ⏳ PARTIAL (physical material + top-down lab mirror proof hold; play-angle audit 2026-09-17 `slice-016-audit-night.png`: no readable tower/sign reflections at play distance — wet sheen only. Reopen until mirrors read in the play frame. Full formation/drying lifecycle still waits on VGA-051.) Puddles graduate from damp patches to true mirror sheets with drying rings (ties to storm system VGA-040). Touches: ground material + puddle pass. Done when: day + night puddle close-ups reflect towers/signs. Draws: +1..2.
+- **VGA-003 Lane paint, done right.** ✅ DONE (VGA batch 1 + play-angle audit 2026-09-17: zebra dies per zone 99→11 so it no longer shines through blackouts; day frame reads as paint at 44. Evidence `slice-013-daypaint.png` + `slice-013-paintdark.png` + `slice-016-audit-day/dark.png`.) Retroreflective paint: bright under direct light, quiet between; zebra stops glowing white-hot by day and stops shining through blackouts. Touches: markings material/merge. Done when: `slice-009-day` + `slice-002-blackout` angles re-shot, paint reads as paint. Draws: +0.
 - **VGA-004 Headlight pools with throw.** ⏳ PARTIAL (pools + beams exist and die per zone; dedicated throw elongation tuning still open). Every lens lays an elongated pool; pools stretch on wet asphalt, die in blackout zones. Touches: traffic/hero/police rigs + ground. Done when: oncoming traffic reads as cars, not floating quads. Draws: +0 (reuse pool merge).
-- **VGA-005 Wetness response materials.** ✅ DONE (VGA batch 2: wet-grade scalar pass — road/paving/curb/podium/metal/paint roughness down + env up, road darkened. Zero draws. Evidence `re-014-puddle.png`. Per-material animated wetness values wait on VGA-051.) Per-material 0–1 wetness driving darkening/gloss on asphalt, paving, concrete, metal, car bodies, awnings, cans. Touches: materials lib + all maps. Done when: dry/wet split frame shows the ramp. Draws: +0.
-- **VGA-006 Oil-rainbow & joint water.** ⏳ PARTIAL (thin-film iridescence proven in lab `re-014-rainbow.png`; play-angle audit 2026-09-17: fringe invisible at play distance. Reopen until it reads in the play frame. Full per-slab water simulation waits on VGA-051.) Rainbow sheen in old puddles under neon; pooled water darkening paving joints. Touches: puddle shader, paving. Done when: close-up night frame. Draws: +0..1.
+- **VGA-005 Wetness response materials.** ✅ DONE (VGA batch 2: wet-grade scalar pass — road/paving/curb/podium/metal/paint roughness down + env up, road darkened. Zero draws. Evidence `slice-014-puddle.png`. Per-material animated wetness values wait on VGA-051.) Per-material 0–1 wetness driving darkening/gloss on asphalt, paving, concrete, metal, car bodies, awnings, cans. Touches: materials lib + all maps. Done when: dry/wet split frame shows the ramp. Draws: +0.
+- **VGA-006 Oil-rainbow & joint water.** ⏳ PARTIAL (thin-film iridescence proven in lab `slice-014-rainbow.png`; play-angle audit 2026-09-17: fringe invisible at play distance. Reopen until it reads in the play frame. Full per-slab water simulation waits on VGA-051.) Rainbow sheen in old puddles under neon; pooled water darkening paving joints. Touches: puddle shader, paving. Done when: close-up night frame. Draws: +0..1.
 
 ## B. Blackout theater (the signature hack)
 
-- **VGA-007 Blackout honesty.** ✅ DONE (`b406d64`, re-012; play-angle audit 2026-09-17 `re-016-audit-dark.png` holds: shop awning 94→15, road 77→37, facade band 57→20, zebra 99→11 — the zone actually dies in the play frame). Fixes: windows blazing, BAR glowing, zebra shining, stray cones. Touches: `street.js` zones, facade/sign/pool materials. Draws: +0.
-- **VGA-008 Death & rebirth cascade.** ✅ DONE (`b406d64`, re-012). Flicker-and-die rolling down the block, staggered per-fixture; relight staggers back. Lamp pop/buzz visual (flash scale + sprite kick). Touches: lamp/sign update fns. Done when: 3-frame sequence (lit → dying → dark). Draws: +0.
-- **VGA-009 Hack origin.** ✅ DONE (`b406d64`, re-012). Pulse leaves the player (or substation flashes first), wavefront rolls down the street; transformer/substation prop with spark burst at the source. Touches: new VFX + one prop mesh. Done when: H-press sequence shows cause → effect. Draws: +2.
+- **VGA-007 Blackout honesty.** ✅ DONE (`b406d64`, slice 012; play-angle audit 2026-09-17 `slice-016-audit-dark.png` holds: shop awning 94→15, road 77→37, facade band 57→20, zebra 99→11 — the zone actually dies in the play frame). Fixes: windows blazing, BAR glowing, zebra shining, stray cones. Touches: `street.js` zones, facade/sign/pool materials. Draws: +0.
+- **VGA-008 Death & rebirth cascade.** ✅ DONE (`b406d64`, slice 012). Flicker-and-die rolling down the block, staggered per-fixture; relight staggers back. Lamp pop/buzz visual (flash scale + sprite kick). Touches: lamp/sign update fns. Done when: 3-frame sequence (lit → dying → dark). Draws: +0.
+- **VGA-009 Hack origin.** ✅ DONE (`b406d64`, slice 012). Pulse leaves the player (or substation flashes first), wavefront rolls down the street; transformer/substation prop with spark burst at the source. Touches: new VFX + one prop mesh. Done when: H-press sequence shows cause → effect. Draws: +2.
 - **VGA-010 Reflections die with the lights.** ⏳ PARTIAL (`b406d64`: pools/signs/facades die per zone; lightning-as-only-source waits on VGA-051). Mirror street to matte black the instant a zone drops (depends on VGA-001). Lightning becomes the only source during blackout rain. Done when: blackout-in-rain frame with lightning reveal. Draws: +0.
 
 ## C. People (the city lives — screen-true)
 
-- **VGA-011 Body system v2.** ⏳ PARTIAL (re-017: flared short jackets replace cones, long legs, 1/8-scale heads, counter-swinging arms, painted faces, walker shadows; hero rebuilt to the same ratio. Same-angle frames read humanoid, but heads still ball-like past 10 m and the 5-silhouette sidewalk close-up is still open.) Touches: `npcs.js` (+ walkers), sim spawn data. Draws: +1..3 (instanced parts).
-- **VGA-012 Fashion & cyberware.** ⏳ PARTIAL (re-017: instanced hats on ~42%, glowing visors on ~25%, 5 skin tones, widened coat palette — all in sim data and rendering; not yet readable at play distance, close-up proof still open). Draws: +1 (atlas).
-- **VGA-013 Night readability.** ⏳ PARTIAL (re-017: hero key light +0 draws, coats brightened with env response up, walkers cast shadows by day; head-vs-coat contrast still strong at distance — heads need the VGA-011 close-up pass to fully land). Draws: +1 (hero light).
+- **VGA-011 Body system v2.** ⏳ PARTIAL (slice 017: flared short jackets replace cones, long legs, 1/8-scale heads, counter-swinging arms, painted faces, walker shadows; hero rebuilt to the same ratio. Same-angle frames read humanoid, but heads still ball-like past 10 m and the 5-silhouette sidewalk close-up is still open.) Touches: `npcs.js` (+ walkers), sim spawn data. Draws: +1..3 (instanced parts).
+- **VGA-012 Fashion & cyberware.** ⏳ PARTIAL (slice 017: instanced hats on ~42%, glowing visors on ~25%, 5 skin tones, widened coat palette — all in sim data and rendering; not yet readable at play distance, close-up proof still open). Draws: +1 (atlas).
+- **VGA-013 Night readability.** ⏳ PARTIAL (slice 017: hero key light +0 draws, coats brightened with env response up, walkers cast shadows by day; head-vs-coat contrast still strong at distance — heads need the VGA-011 close-up pass to fully land). Draws: +1 (hero light).
 - **VGA-014 Poses & tableaus.** Sit, lean, smoke (glow tip), gesture, argue, queue, perform — plus staged frozen moments (deal, arrest, busk) at fixed corners. Done when: 3 tableau frames. Draws: +1..2.
 - **VGA-015 Rain silhouettes.** Umbrellas (colors/patterns), hoods, hunched runs, shelter clustering, density thinning at peak, wet shoulders, footstep splashes. Depends on VGA-040. Done when: storm-peak vs drizzle frames differ. Draws: +2 (umbrella instancing).
 - **VGA-016 Hands carry things.** Phones (hero raised-phone pose + screen glow on face; NPC handsets), courier parcels, vendor goods, instruments for buskers, laptops. Done when: profiler job + carried prop match in one frame. Draws: +1..2.
 - **VGA-017 Drivers & foot cops.** Driver silhouette + cabin in every car; uniformed officer NPCs, patrol pairs, corner standing. Done when: chase-cam shows a driver; corner shows patrol. Draws: +1.
-- **VGA-018 Crowd density.** ⏳ PARTIAL (re-019: 60→72 walkers, 14 curb-parked cars riding the same instanced meshes for +0 draws — streets read occupied in `re-019-street/north.png`; true market/crossing crush + LOD discipline still open). Touches: spawn counts + VGA-011 variety. Draws: 0 (instances), +perf watch.
+- **VGA-018 Crowd density.** ⏳ PARTIAL (slice 019: 60→72 walkers, 14 curb-parked cars riding the same instanced meshes for +0 draws — streets read occupied in `slice-019-street/north.png`; true market/crossing crush + LOD discipline still open). Touches: spawn counts + VGA-011 variety. Draws: 0 (instances), +perf watch.
 
 ## D. Cars (photographable traffic)
 
-- **VGA-019 Body variants.** Taxi, van, truck, bus, bike silhouettes + neon underglow option (instanced, shared materials). Done when: `re-009-day` angle re-shot shows 4+ shapes. Draws: +3..5.
+- **VGA-019 Body variants.** Taxi, van, truck, bus, bike silhouettes + neon underglow option (instanced, shared materials). Done when: `slice-009-day` angle re-shot shows 4+ shapes. Draws: +3..5.
 - **VGA-020 Close-up detail.** Glass (with wiper arcs), rims/tires, plates, mirrors, panel gaps, dirt gradient, liveries/taxi markings. Done when: hero-car orbit close-up survives. Draws: +1..2.
-- **VGA-021 Paint that answers neon.** Clearcoat/env response so sign wash lands on bodies (fixes maroon-under-magenta). Done when: `re-007-pursuit` angle re-shot, paint picks up wash. Draws: +0.
+- **VGA-021 Paint that answers neon.** Clearcoat/env response so sign wash lands on bodies (fixes maroon-under-magenta). Done when: `slice-007-pursuit` angle re-shot, paint picks up wash. Draws: +0.
 - **VGA-022 Police build.** Push bar, livery + POLICE lettering, spotlight, alternating red/blue wash thrown on street and facades; wipers on all fleets. Done when: pursuit frame paints the towers red/blue. Draws: +1..2.
 - **VGA-023 Light language.** Headlight/taillight/brake behavior on traffic (brakes flare), night bodies catch light (no more ghost cars). Done when: night traffic reads mass + intent. Draws: +0.
 - **VGA-024 Cabs & glass.** Cabins, driver figures (VGA-017), windshield wiper motion in rain. Done when: windshield close-up in rain. Draws: +1.
@@ -56,11 +56,11 @@ Coverage footer at the bottom proves no gap was dropped.
 
 - **VGA-027 Intersections, complete.** ⏳ PARTIAL (city-grid slice: zebra crossings over the z=40 connector at all 3 avenues + west-avenue dashes/edges/manholes + cross-street curbs + live E-W traffic/peds; hackable traffic lights, stop lines, walk boxes, signal poles still open). Traffic lights (hackable — feeds VGA-047), stop lines, ped walk/don't-walk boxes, turn arrows, signal poles. Done when: connector crossing re-shot dressed. Draws: +3..4.
 - **VGA-028 Road wear pass.** Patches, cracks, oil stains, drain grates, manholes readable at play distance, lane arrows, bus lanes. Done when: road close-up shows age. Draws: +1 (decal merge).
-- **VGA-029 Paving identity.** Downtown concrete/granite replacing old-town cobble; slab joints, grime gradients, tree grates. Done when: `re-005-east` re-shot reads downtown. Draws: +0.
+- **VGA-029 Paving identity.** Downtown concrete/granite replacing old-town cobble; slab joints, grime gradients, tree grates. Done when: `slice-005-east` re-shot reads downtown. Draws: +0.
 - **VGA-030 Civic furniture set.** Meters, post boxes, ATMs, shelters, clocks, flags, banners, phone boxes (WD), street-name blades, addresses. Touches: one merged prop system. Done when: sidewalk frame carries 5+ nouns. Draws: +2..3.
 - **VGA-031 Commerce clutter.** Carts, crates, pallets, A-frames, overflowing bins, parked bikes, newsstands, food carts, vending machines (glowing). Done when: shopfront frame spills onto pavement. Draws: +2..3.
 - **VGA-032 Paper on walls.** Flyers, posters, protest signs, ramen menus taped to glass, stickers, tags. Touches: decal merge + content file. Done when: wall close-up carries paper. Draws: +1.
-- **VGA-033 Grime & litter.** Stains, gum, runoff trails, litter scatter, hydrant-cluster mess. Done when: hero-can frame (`re-008-beauty` angle) has a dirty neighborhood. Draws: +1.
+- **VGA-033 Grime & litter.** Stains, gum, runoff trails, litter scatter, hydrant-cluster mess. Done when: hero-can frame (`slice-008-beauty` angle) has a dirty neighborhood. Draws: +1.
 - **VGA-034 Transit identity.** Subway entrance(s), bus-lane paint, taxi rank, tram/bus wires. Done when: one unmistakable transit moment. Draws: +2..3.
 - **VGA-035 Construction site.** Scaffolding, barriers, crane silhouette, half-built floor, work lights. Done when: skyline frame shows something becoming. Draws: +2..3.
 - **VGA-036 Pole hardware.** Base cabinets, access panels, banner arms, footings; lamp heads as fixtures, not floating bars. Done when: lamp close-up. Draws: +0..1.
@@ -105,7 +105,7 @@ Coverage footer at the bottom proves no gap was dropped.
 
 ## L. Camera (never lies, always feels)
 
-- **VGA-060 Collision & awareness.** No wall interiors, no traffic pass-throughs, occlusion-aware framing. Done when: re-shot of `re-011-market` angle contains no black wall. Draws: +0.
+- **VGA-060 Collision & awareness.** No wall interiors, no traffic pass-throughs, occlusion-aware framing. Done when: re-shot of `slice-011-market` angle contains no black wall. Draws: +0.
 - **VGA-061 Speed & impact language.** (With VGA-026.) FOV, shake, lines, road blur states. Done when: drive frames read velocity. Draws: +0.
 
 ## M. HUD & information (fiction, not terminal)
@@ -123,7 +123,7 @@ Coverage footer at the bottom proves no gap was dropped.
 ## O. Police & pursuit (the net that closes)
 
 - **VGA-068 Search language.** Vision cones, search rings, patrol scan sweeps, heli + night spotlight cone, police drone quad. Done when: evasion frame shows the machine hunting. Draws: +3..4.
-- **VGA-069 Roadblock theater.** (Per re-013 scope.) Lit barricades, spike strips, alternating wash on facades. Done when: heat-3 frame. Draws: +1..2.
+- **VGA-069 Roadblock theater.** (Per slice 013 scope.) Lit barricades, spike strips, alternating wash on facades. Done when: heat-3 frame. Draws: +1..2.
 
 ## P. Hacking visuals (conduct the orchestra)
 
@@ -138,14 +138,14 @@ Coverage footer at the bottom proves no gap was dropped.
 - **VGA-075 District identity.** ⏳ PARTIAL (city-grid slice: north terminus caps kill the end-of-street black void, mid-block infill gives avenues real blocks; palette/gateway/lamp variants + termini landmarks still open). Connector vs east vs promenade vs park: palettes, gateways, lamp/tree/curb variants, termini landmarks killing the black voids. Done when: 4 frames, 4 moods. Draws: +1..2.
 - **VGA-076 Job & secret objects.** Stalls, instruments, parcels, terminals, dead drops, maps — every dossier line gets geometry. Done when: MILO OKAFOR holds his livelihood. Draws: +1..2.
 - **VGA-077 Faction paint.** Tags, turf marks, colors, uniforms, livery — cascades leave evidence. Done when: post-action frame shows who answered. Draws: +1.
-- **VGA-078 Interiors v1 + verticality.** One enterable shop (shelves, keeper, steam, stools) + first accessible rooftop (stairwell fade, vista, beacon). (Charter re-015.) Done when: inside + above frames. Draws: +3..4.
+- **VGA-078 Interiors v1 + verticality.** One enterable shop (shelves, keeper, steam, stools) + first accessible rooftop (stairwell fade, vista, beacon). (Charter: Verticality.) Done when: inside + above frames. Draws: +3..4.
 - **VGA-079 Park & promenade, furnished.** Paths, beds, fountain, playground, lighting design; promenade benches, bins, railing craft, lamp pools that land. Done when: day leisure frames. Draws: +2..3.
 
 ## R. Grade & post (cinema, not viewport)
 
 - **VGA-080 Filmic identity.** Grade with intent (teal-orange pressure), grain, halation, vignette discipline, night/day variants. Done when: grade on/off split frame. Draws: +1 (post).
 - **VGA-081 Depth & lens.** DoF/bokeh option, lens droplets + runs in rain, highlight fringing, spray blur at speed. Done when: photo framescene. Draws: +1..2.
-- **VGA-082 Light discipline.** ⏳ PARTIAL (re-018: cones slimmed 3.4→1.5 with head-to-ground gradient falloff + contact-shadow blobs under all walkers/cars/hero, same draw count; true occluding soft volumes + bloom-threshold tuning still open). Done when: `re-003-secret` angle re-shot — no pyramids. Draws: +1.
+- **VGA-082 Light discipline.** ⏳ PARTIAL (slice 018: cones slimmed 3.4→1.5 with head-to-ground gradient falloff + contact-shadow blobs under all walkers/cars/hero, same draw count; true occluding soft volumes + bloom-threshold tuning still open). Done when: `slice-003-secret` angle re-shot — no pyramids. Draws: +1.
 
 ---
 

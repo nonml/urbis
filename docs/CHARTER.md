@@ -1,0 +1,141 @@
+# Charter — the roadmap and the record
+
+`AGENTS.md` holds the laws and the patterns. This file holds **what we're building,
+in what order, and what's already proven.**
+
+---
+
+## Visual target (locked until vetoed)
+
+**Neon-noir rain.** Night, wet streets, neon signage, dark towers with lit windows.
+
+It serves the cyberpunk fantasy at street level, it flatters low-poly geometry with
+light instead of punishing it, and every element of it is cheap: emissive + bloom +
+env reflections + fog. **If a feature doesn't serve neon-noir rain, it waits.**
+
+Day exists and must hold up (slice 009), but night is the founding image.
+
+---
+
+## Why the budget laws exist
+
+Captured 2026-09-16, before the renderer was rebuilt:
+
+- The noon god-view frame was dark, muddy and toy-like — flat unlit boxes, cone trees,
+  washed-out fog. PBR, HDR, bloom, SSAO and volumetrics were all claimed. None were readable.
+- Measured: `medium+120-NPCs` on High = **18,648 draws against a 2,000 budget (9.3×)**.
+  `large+200-NPCs` = **29,325 against 3,000**. The celebrated "1,029 draws" baseline was fiction.
+- Root causes: no art direction (tech stacked without a look), budgets estimated instead
+  of measured, and thousands of individual meshes instead of instancing from day one.
+
+Laws 2 and 3 in `AGENTS.md` exist so this cannot recur. `npm test` now measures the
+draw count from the running game on every gate run — it is no longer a promise.
+
+The pre-rebuild codebase is preserved on branch `archive/pre-rewrite` (`955d662`).
+**Read it for design reference; never import from it.** There is no save migration —
+the world models are unrelated.
+
+---
+
+## Shipped
+
+Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`.
+
+| Slice | What landed | Draws | Evidence |
+|---|---|---|---|
+| 001 | Neon block — one rain-slicked street at night | 42 | `slice-001.png` |
+| 002 | Living street — streetlight blackout, visible cause→effect | 55 | `slice-002-lit/-blackout.png` |
+| 003 | Player on foot + profiler | 60 | `slice-003-profiler/-secret.png` |
+| 004 | Drive | 64 | `slice-004-drive.png` |
+| 005 | District — the block became a neighbourhood | 81 | `slice-005-district/-east.png` |
+| 006 | Craft pass | 82 | `slice-006-craft.png` |
+| 007 | Pressure — pursuit, busted, chained heat | ~104 | `slice-007-pursuit/-busted/-chained.png` |
+| 008 | World beauty | 92 | `slice-008-beauty.png` |
+| 009 | Day shift | 127 | `slice-009-day/-valley.png` |
+| 010 | Cutover rehearsal — scripted 10/10 pass | — | `slice-010-rehearsal.png` |
+| 011 | Content engine — signs.json + missions.json + validator | — | `slice-011-market.png` |
+| 012 | Hacking depth — honest dark, collapse/relight cascade, sparks | — | `slice-012-dying/-dark/-sparks.png` |
+| 013 | Reflection streaks + lane-paint discipline (VGA-001/003) | — | `slice-013-streaks/-daypaint/-paintdark.png` |
+| 014 | Puddle mirrors, wet grade, oil-rainbow (VGA-002/005/006) | — | `slice-014-puddle/-rainbow.png` |
+| 015 | Open-world city grid — blocks, cross traffic, termini | — | `slice-015-north/-west/-valleyday.png` |
+| 016 | Play-angle audit — added the evidence rule, downgraded lab-only proofs | — | `slice-016-audit-*.png` |
+| 017 | Anti-toy pass — human proportions, car detail, grounding | — | `slice-017-street/-north.png` |
+| 018 | Gradient lamp shafts + hero head | — | `slice-018-street/-north.png` |
+| 019 | Parked cars + sidewalk crowd, +0 draws | — | `slice-019-street/-north.png` |
+| 020 | Paint discipline, skyglow lift, closer camera | — | `slice-020-street/-north.png` |
+
+**Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
+Verticality. An operator redirect sent visual-gap work first, and those numbers were
+consumed by it. The three features were never built — they are listed below by name.
+**Slices are numbered by what ships, in the order it ships. Never reserve a number.**
+
+---
+
+## Next
+
+Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queue**
+(82 items, most still open) and closes first per operator redirect. The feature slices
+below are the **structural** work.
+
+Next free slice number: **021**.
+
+### Feature slices, in order
+
+1. **Wanted** — police tiers: roadblocks, helicopter, spike strips, dispatch chatter.
+   Pairs with VGA-068/069. Salvages the old Q4 design.
+2. **Arc + radio** — 6-mission narrative skeleton, 3-channel radio structure.
+   Salvages old Q7. Radio audio comes from the local pipeline in `docs/ASSETS.md`.
+3. **Verticality** — interiors (shop, safehouse) and accessible rooftops.
+   Pairs with VGA-078. Salvages old Q3/Q13.
+4. **Zoning + growth** — the Cities:Skylines leg, currently missing. Zones grow through
+   a staged pipeline; the skyline changes because the city decided it, not because
+   an artist placed a tower.
+5. **District economy** — jobs, wealth and demand per district, feeding growth and
+   giving consequence cascades something real to move (VGA-077 faction paint reads it).
+
+**Why 4 and 5 matter:** pillar 1, "the city lives", currently rests on traffic, NPCs
+and a day/night clock. That is motion, not life. Until zones grow and an economy shifts,
+the third leg of the three-game pitch is a claim rather than a feature. Building them
+is a deliberate commitment made 2026-09-17, not a someday-maybe.
+
+Longer-horizon engineering and content work — streaming, KTX2/meshopt, zero-alloc loops,
+sewers, skybridges, accessibility, launch readiness — is in `docs/BACKLOG.md`.
+
+---
+
+## Salvage rules
+
+The pre-rebuild plan was mostly specs, and specs survive a renderer change.
+
+- **Copy the design, never the code.** Read the old sim as reference; never import it.
+- Renderer-bound work from the old plan is superseded — do not salvage it.
+- No save migration. Clean break between world models.
+
+---
+
+## Asset harvest log
+
+**2026-09-16 — fable-cities. Decision: harvest, don't fork.**
+
+- Taken: 6 CC0 texture sets in `public/assets/` (asphalt, paving slabs, two glass facades
+  including a night emission map, concrete, metal plates) + `CREDITS.md`. ~18 MB, not 208 MB.
+- Adopted method: measured look-targets (their diagnosis — everything at 3× lightness with
+  no black floor — was exactly our disease); builder/critic screenshot loop with scores;
+  texture discipline (sRGB albedo/emissive, linear data maps, max anisotropy); night driven
+  by `emissiveIntensity` against time of day.
+- Refused: the whole-repo fork. Wrong genre (god-view painter, no player, combat or hacking),
+  873 draws for terrain and vegetation alone, and their own critics scored it 6–7.5/10.
+
+Generation of new assets is covered in `docs/ASSETS.md`.
+
+---
+
+## Working agreements
+
+- **Commits:** `<type>(<area>): <title>`, plus a `Why:` line and the measured draw cost.
+  Slices tick in this file with their commit hash and evidence filename.
+- **Verification:** GPU-backed headless (ANGLE/D3D11) at 960×540 for iteration, full
+  resolution for final evidence. **SwiftShader is banned** — it melts CPUs and its fps
+  numbers are meaningless.
+- **Evidence:** the play camera, always. A close-up or top-down lab angle caps an item at
+  PARTIAL — that rule was added 2026-09-17 after an audit caught lab-only proofs passing as done.

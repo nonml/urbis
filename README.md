@@ -1,71 +1,68 @@
-# City Builder (3rd‑Person Prototype)
+# Neon City
 
-This is a lightweight **third-person city-builder** prototype with:
+A living neon-noir city you can walk, drive, and hack. Night, wet streets, neon signage,
+dark towers with lit windows — built in Three.js, running in a browser.
 
-- **Seeded procedural maps** (repeatable runs)
-- **Small → Mega** map sizes (40×40, 96×96, 256×256)
-- **Citizen simulation** (jobs, happiness, births/deaths)
-- **Dynamic crisis events** with player choices
-- **3D instanced rendering** for performance on large maps
+Blackout a city zone and watch the street die in a cascade: lamps flicker out down the
+block, sign reflections drain off the wet asphalt, windows go dark, and the police start
+looking for whoever did it.
 
-## Run
+## Run it
 
-Because this uses ES modules + dynamic imports, run it via a local web server (not `file://`).
-
-### Recommended (most reliable): Vite dev server
-
-This path installs **Three.js locally** (no CDN required) and avoids firewall/adblock issues.
+Requires Node 20+ and a WebGL2 browser.
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open the URL printed in your terminal (usually `http://localhost:5173`).
-
-### Alternative: simple static server (may require CDN access)
-
-If you don't want Vite, you can serve the directory directly. In this mode the game will try:
-1) local `three` (will fail without a bundler), then
-2) CDN fallbacks (unpkg/jsdelivr/cdnjs).
-
-**Prerequisites**: Node.js or Python 3.x, and a modern WebGL-capable browser.
-
-Example (Node.js):
-
-```bash
-npx serve .
-# or
-npm install -g serve && serve .
-```
-
-Example (Python):
-
-```bash
-python -m http.server 8000
-# or for a custom port:
-python -m http.server 9000
-```
-
-Then open `http://localhost:8000/index.html` (or `http://localhost:9000/index.html` for the custom port).
-
-> **Note**: Opening the file directly via `file://` fails because ES modules enforce CORS policies that block local file access. Also, ensure you are using a modern browser as ES Modules are not fully supported in legacy environments.
-
-### Expected Behavior
-
-Upon successful launch, your browser should display a 3D viewport with a procedurally generated map. Use **WASD** to move the camera and **Left Click** to interact with tiles.
+Open the URL it prints (usually `http://localhost:5173`).
 
 ## Controls
 
-- **WASD**: move
-- **Shift**: sprint
-- **Right mouse drag**: rotate camera
-- **Left click**: build / inspect tile
-- **P**: pause
-- **Ctrl+S**: save
-- **Ctrl+L**: load
+| Key | Action |
+|---|---|
+| `WASD` | Move |
+| Mouse drag | Look |
+| `F` | Enter / exit car |
+| `H` | Blackout hack |
+| `T` | Toggle day / night |
 
-## Notes
+## Checks
 
-- Three.js loads via **local dependency** when using Vite; otherwise it falls back to CDNs.
-- Crises are deterministic under the same seed (for a given play pattern).
+```bash
+npm run gate
+```
+
+Runs lint, the seeded-RNG check, the sim/render boundary check, content validation,
+the production build, and a GPU-headless test that boots the real game and asserts the
+whole frame stays within its **175 draw call** budget. All of it must pass before a commit.
+
+## How it's built
+
+```
+src/sim/      pure logic — no three.js, no DOM, deterministic under a seed
+src/render/   three.js only — reads sim state, never mutates it
+src/content/  signs and missions as schema-validated JSON
+```
+
+That boundary is enforced by `npm run check:boundary`, not by good intentions. It exists
+so the renderer can be replaced without losing the game.
+
+Every visual feature proves itself in a screenshot under the draw budget before it lands.
+Evidence lives in `docs/shots/`, one set per slice.
+
+## Docs
+
+| File | What's in it |
+|---|---|
+| `AGENTS.md` | **Start here.** The laws, the architecture, the patterns, how to work |
+| `docs/CHARTER.md` | Visual target, what shipped, what's next |
+| `docs/VISUAL-GAP-ACTIONS.md` | The live work queue — 82 tracked visual items |
+| `docs/BACKLOG.md` | Long-horizon engineering and content work |
+| `docs/ASSETS.md` | Where art, audio and models come from |
+
+## Credits
+
+Bundled textures and models are CC0 — see `public/assets/CREDITS.md`.
+Code is MIT.
