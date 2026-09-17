@@ -5,8 +5,6 @@ import * as THREE from 'three';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
-import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
-import { SSAOPass } from 'three/addons/postprocessing/SSAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { getGlowTex } from './signs.js';
@@ -69,8 +67,10 @@ function buildSky() {
   return { mesh, mat };
 }
 
-export function createRenderer(canvas) {
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+// preserveDrawingBuffer costs a copy every frame, so it is opt-in: only the
+// evidence harness (?capture=1) needs a readable buffer. Play never pays for it.
+export function createRenderer(canvas, { preserveDrawingBuffer = false } = {}) {
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, preserveDrawingBuffer });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -155,155 +155,14 @@ export function updateDaylight(env, scene, bloom, n, renderer) {
   renderer.toneMappingExposure = 0.75 + 0.35 * day;
 }
 
-const VOL_FOG_SHADER = {
-  uniforms: {
-    tDiffuse: { value: null },
-    fogDensity: { value: 0.006 },
-    fogColor: { value: new THREE.Color(0x070b16) },
-    sunDirection: { value: new THREE.Vector3(-0.55, 0.52, -0.42) },
-    lightIntensity: { value: 0.2 },
-    uTime: { value: 0 },
-  },
-  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform float fogDensity;
-    uniform vec3 fogColor;
-    uniform vec3 sunDirection;
-    uniform float lightIntensity;
-    uniform float uTime;
-    varying vec2 vUv;
-    float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233)))*43758.5453); }
-    float noise2d(vec2 p){
-      vec2 i=floor(p); vec2 f=fract(p);
-      float a=hash(i), b=hash(i+vec2(1,0)), c=hash(i+vec2(0,1)), d=hash(i+vec2(1,1));
-      return mix(mix(a,b,f.x), mix(c,d,f.x), f.y);
-    }
-    float godRays(vec2 uv, vec3 sunDir, float intensity){
-      vec2 dir=uv-vec2(0.5);
-      float sunDot=dot(dir, normalize(sunDir.xy));
-      float lowSun=1.0-abs(sunDir.y);
-      float shaft=max(0.0,sunDot)*intensity*(0.5+lowSun*1.5);
-      shaft*=noise2d(uv*4.0+vec2(sin(uTime*0.15),cos(uTime*0.12)));
-      shaft*=exp(-length(dir)*1.5);
-      return shaft;
-    }
-    float lightCones(vec2 uv, vec4 color){
-      float bright=dot(color.rgb,vec3(0.299,0.587,0.114));
-      float cone=smoothstep(0.3,0.8,bright);
-      return cone*noise2d(uv*6.0+vec2(sin(uTime*0.2),cos(uTime*0.15)))*0.2;
-    }
-    void main(){
-      vec4 col=texture2D(tDiffuse,vUv);
-      vec2 noiseUV=vUv*3.0+vec2(sin(uTime*0.3),cos(uTime*0.2))*0.5;
-      float fogNoise=noise2d(noiseUV);
-      float density=fogDensity*(1.0+fogNoise*0.3);
-      float dist=length(vUv-vec2(0.5));
-      float fogFactor=1.0-exp(-density*dist*80.0);
-      float shafts=godRays(vUv,sunDirection,lightIntensity);
-      float cones=lightCones(vUv,col);
-      vec3 fogContrib=fogColor*(fogFactor+shafts+cones);
-      col.rgb=mix(col.rgb,fogContrib,fogFactor*0.5+shafts*0.3+cones*0.2);
-      gl_FragColor=col;
-    }
-  `,
-};
-
-const SSR_SHADER = {
-  uniforms: {
-    tDiffuse: { value: null },
-    tDepth: { value: null },
-    wetness: { value: 0.0 },
-    maxTrace: { value: 96.0 },
-    stepSize: { value: 0.02 },
-    fadePower: { value: 0.5 },
-    temporalAlpha: { value: 0.3 },
-    prevSSR: { value: null },
-  },
-  vertexShader: `varying vec2 vUv; void main(){ vUv=uv; gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.0); }`,
-  fragmentShader: `
-    uniform sampler2D tDiffuse;
-    uniform sampler2D tDepth;
-    uniform float wetness;
-    uniform float maxTrace;
-    uniform float stepSize;
-    uniform float fadePower;
-    uniform float temporalAlpha;
-    uniform sampler2D prevSSR;
-    varying vec2 vUv;
-    void main(){
-      vec4 col = texture2D(tDiffuse, vUv);
-      float depth = texture2D(tDepth, vUv).r;
-      if (wetness < 0.01 || depth > 0.99) { gl_FragColor = col; return; }
-      vec2 texelSize = vec2(1.0) / vec2(textureSize(tDepth, 0));
-      float dL = texture2D(tDepth, vUv - vec2(texelSize.x, 0.0)).r;
-      float dR = texture2D(tDepth, vUv + vec2(texelSize.x, 0.0)).r;
-      float dD = texture2D(tDepth, vUv - vec2(0.0, texelSize.y)).r;
-      float dU = texture2D(tDepth, vUv + vec2(0.0, texelSize.y)).r;
-      vec3 normal = normalize(vec3(dR - dL, 2.0 * depth, dU - dD));
-      vec3 viewDir = normalize(vec3(0.0, 0.0, 1.0));
-      vec3 reflectDir = reflect(-viewDir, normal);
-      float reflectStrength = abs(normal.y);
-      if (reflectStrength < 0.3) { gl_FragColor = col; return; }
-      vec2 rayStep = reflectDir.xz * stepSize / max(0.001, abs(reflectDir.y));
-      vec2 uv = vUv;
-      vec3 reflection = vec3(0.0);
-      float traceDist = 0.0;
-      float reflectionWeight = 0.0;
-      for (float i = 0.0; i < maxTrace; i++) {
-        uv += rayStep * 0.01;
-        traceDist += stepSize;
-        if (uv.x < 0.0 || uv.x > 1.0 || uv.y < 0.0 || uv.y > 1.0) break;
-        float sampleDepth = texture2D(tDepth, uv).r;
-        vec3 sampleCol = texture2D(tDiffuse, uv).rgb;
-        float heightDiff = abs(sampleDepth - depth);
-        if (heightDiff < 0.1 * traceDist) {
-          reflection = sampleCol;
-          reflectionWeight = 1.0 / (1.0 + traceDist * 0.5);
-          break;
-        }
-      }
-      if (reflectionWeight < 0.1) {
-        reflection = mix(col.rgb, vec3(0.1, 0.12, 0.15), 0.3);
-        reflectionWeight = 0.1;
-      }
-      float reflectionAmount = wetness * reflectionWeight * reflectStrength;
-      vec3 finalCol = mix(col.rgb, reflection, reflectionAmount * fadePower);
-      vec4 prev = texture2D(prevSSR, vUv);
-      finalCol = mix(finalCol, prev.rgb, temporalAlpha * 0.5);
-      gl_FragColor = vec4(finalCol, col.a);
-    }
-  `,
-};
-
 export function createComposer(renderer, scene, camera) {
   const size = new THREE.Vector2(window.innerWidth, window.innerHeight);
   const composer = new EffectComposer(renderer);
   composer.addPass(new RenderPass(scene, camera));
-  // SSAO: half-res ambient occlusion — grounds everything, kills the floating feeling.
-  const ssaoW = Math.round(window.innerWidth * 0.5);
-  const ssaoH = Math.round(window.innerHeight * 0.5);
-  const ssaoPass = new SSAOPass(scene, camera, ssaoW, ssaoH);
-  ssaoPass.kernelRadius = 4;
-  ssaoPass.minDistance = 0.001;
-  ssaoPass.maxDistance = 0.15;
-  ssaoPass.output = SSAOPass.OUTPUT.Default;
-  composer.addPass(ssaoPass);
-  // Volumetric fog: god rays + streetlight cones + noise haze.
-  const volFogPass = new ShaderPass(VOL_FOG_SHADER);
-  composer.addPass(volFogPass);
-  // SSR: screen-space reflections for wet roads.
-  const ssrPass = new ShaderPass(SSR_SHADER);
-  composer.addPass(ssrPass);
-  const ssrPrevRT = new THREE.WebGLRenderTarget(size.x, size.y, THREE.RGBAFormat);
-  ssrPass.uniforms.prevSSR.value = ssrPrevRT.texture;
   const bloom = new UnrealBloomPass(size, 0.45, 0.55, 0.85);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
-  composer._ssrPrevRT = ssrPrevRT;
-  composer._volFogPass = volFogPass;
-  composer._ssaoPass = ssaoPass;
-  return { composer, bloom, ssrPass, ssrPrevRT, volFogPass, ssaoPass };
+  return { composer, bloom };
 }
 
 export function fitRenderer(renderer, composer, camera) {
@@ -313,12 +172,4 @@ export function fitRenderer(renderer, composer, camera) {
   composer.setSize(w, h);
   camera.aspect = w / h;
   camera.updateProjectionMatrix();
-  // Resize SSR temporal buffer if present.
-  if (composer._ssrPrevRT) composer._ssrPrevRT.setSize(w, h);
-  // Resize SSAO to half-res.
-  if (composer._ssaoPass) {
-    const ssaoW = Math.round(w * 0.5);
-    const ssaoH = Math.round(h * 0.5);
-    composer._ssaoPass.setSize(ssaoW, ssaoH);
-  }
 }

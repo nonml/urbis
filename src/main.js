@@ -20,6 +20,7 @@ import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
 import { buildBlobs, updateBlobs } from './render/blobs.js';
 import { buildRain, tickRain } from './render/rain.js';
+import { captureFrame } from './render/capture.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
 import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 
@@ -27,7 +28,8 @@ const DRAW_BUDGET = 175;
 const bootStart = performance.now();
 
 const canvas = document.getElementById('scene');
-const renderer = createRenderer(canvas);
+const CAPTURE = new URLSearchParams(location.search).has('capture');
+const renderer = createRenderer(canvas, { preserveDrawingBuffer: CAPTURE });
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
 const texLoader = new THREE.TextureLoader();
 
@@ -156,7 +158,7 @@ scene.add(rain);
 const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
 scene.add(heroKey);
 
-const { composer, bloom, ssrPass, ssrPrevRT, volFogPass, ssaoPass } = createComposer(renderer, scene, camera);
+const { composer, bloom } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
 
 // Follow cam: lower and closer than before — towers loom, street glow fills
@@ -288,11 +290,7 @@ window.__game = {
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
   shot: () => {
     composer.render();
-    const blit = document.createElement('canvas');
-    blit.width = renderer.domElement.width;
-    blit.height = renderer.domElement.height;
-    blit.getContext('2d').drawImage(renderer.domElement, 0, 0);
-    return blit.toDataURL('image/png');
+    return captureFrame(renderer);
   },
 };
 
@@ -480,16 +478,6 @@ function render() {
   }
 
   renderer.info.reset();
-  // Volumetric fog: drive uniforms from scene state.
-  const vfU = volFogPass.material.uniforms;
-  vfU.fogDensity.value = scene.fog.density;
-  vfU.fogColor.value.copy(scene.fog.color);
-  vfU.sunDirection.value.copy(env.sun.position).normalize();
-  vfU.lightIntensity.value = night > 0.7 ? 0.15 : night > 0.3 ? 0.6 : 1.2;
-  vfU.uTime.value = clock.elapsed;
-  // SSR: wetness drives reflection intensity (rain = high, dry = off).
-  const wetness = clock.nightFactor * 0.8;
-  ssrPass.uniforms.wetness.value = wetness;
   composer.render();
   if (firstFrame) {
     firstFrame = false;

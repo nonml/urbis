@@ -21,8 +21,9 @@ export default defineConfig({
         baseURL: 'http://localhost:4173',
         viewport: { width: 960, height: 540 },
         trace: 'on-first-retry',
-        // Full chromium, not headless_shell — the shell has no real GPU path.
-        channel: 'chromium',
+        // Locally use installed Chrome — real GPU, and no 150 MB download.
+        // CI installs bundled chromium, where headless_shell is fine for draw counts.
+        channel: process.env.CI ? 'chromium' : 'chrome',
         launchOptions: { args: GPU_ARGS },
     },
     webServer: {

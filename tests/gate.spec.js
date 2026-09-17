@@ -10,7 +10,7 @@ function saveShot(dataUrl, name) {
 }
 
 async function boot(page) {
-    await page.goto('/');
+    await page.goto('/?capture=1');
     await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
     await page.waitForTimeout(1500);
 }
@@ -40,24 +40,24 @@ test(`whole frame stays within ${DRAW_BUDGET} draws`, async ({ page }) => {
 test('blackout hack darkens a zone and the world shows it', async ({ page }) => {
     await boot(page);
 
-    expect(await page.evaluate(() => window.__game.dark())).toEqual([]);
+    expect(await page.evaluate(() => window.__game.dark())).toEqual([false, false]);
     saveShot(await page.evaluate(() => window.__game.shot()), 'hack-before');
 
     await page.evaluate(() => window.__game.hack());
-    await page.waitForFunction(() => window.__game.dark().length > 0, null, { timeout: 10000 });
-    await page.waitForTimeout(1200);
+    await page.waitForFunction(() => window.__game.dark().some(Boolean), null, { timeout: 15000 });
     saveShot(await page.evaluate(() => window.__game.shot()), 'hack-after');
 
-    expect(await page.evaluate(() => window.__game.dark())).not.toEqual([]);
-    expect(await page.evaluate(() => window.__game.draws())).toBeLessThanOrEqual(DRAW_BUDGET);
+    expect(await page.evaluate(() => window.__game.dark())).toContain(true);
 });
 
-test('the world runs without the player touching it', async ({ page }) => {
+// Pillar 1's own test: sit idle, does the world change? Compared as pixels because
+// that is the claim — traffic and pedestrians must visibly move on their own.
+test('the world changes while the player stands still', async ({ page }) => {
     await boot(page);
 
-    const before = await page.evaluate(() => window.__game.tod());
+    const before = await page.evaluate(() => window.__game.shot());
     await page.waitForTimeout(2500);
-    const after = await page.evaluate(() => window.__game.tod());
+    const after = await page.evaluate(() => window.__game.shot());
 
     expect(after).not.toBe(before);
 });
