@@ -16,12 +16,11 @@ when it is proven, not when a month arrives.
 
 ## Debt — pay this first
 
-### Unverified in-flight work
-- **SSAO + volumetric fog pass** (`cf988a1`) — an SSAOPass and a ShaderPass volumetric
-  stage (noise fog, god rays, light cones), a light-pollution horizon band and animated
-  tone-mapping exposure landed **without a screenshot, without a measured draw count,
-  and against law 6**. Either prove it in a play-camera frame under 175 draws, or revert it.
-  This is the single most important item in this file.
+### Resolved 2026-09-17
+- **SSAO + volumetric fog + SSR** (`cf988a1`) landed unscreenshotted and broke the game:
+  291 draws against 175, and every pixel black. Removed in `56f1462` after measuring
+  each pass. See that commit for the full attribution — it is the clearest worked
+  example in this repo of why laws 1, 2 and 3 exist.
 
 ### Functions over 60 lines (law: `AGENTS.md` code taste)
 Ten pre-existing violations. Extract as you touch them; don't do a refactor sweep for
@@ -42,7 +41,7 @@ its own sake.
 
 ### Smaller
 - 26 lint warnings, all lines over 120 chars (`src/render/traffic.js`, `src/sim/street.js`).
-- The on-screen hint in `index.html` omits `F` (enter/exit car).
+- The HUD still reads "NEON BLOCK 009" — a title frozen at slice 009.
 - No audio of any kind exists yet. See `docs/ASSETS.md` for where it comes from.
 
 ---
