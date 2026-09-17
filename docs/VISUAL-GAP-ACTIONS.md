@@ -11,6 +11,57 @@ Coverage footer at the bottom proves no gap was dropped.
 
 ---
 
+## External review triage — 2026-09-18
+
+An external model was handed `docs/shots/` and returned a long critique. `docs/shots/`
+spans slice-008 to slice-023, so it reviewed a mix of current and long-superseded frames,
+and most of its sharpest claims describe the slice-008–011 era that `VISUAL-GAPS.md` was
+already built from on 2026-09-16. **Verified against the code before queueing anything.**
+
+This is the useful half of the result: several complaints are things this project already
+fixed, and that is worth recording — it is independent confirmation that slices 017–022
+landed. Do not re-open them.
+
+| Claim | Measured in code | Verdict |
+|---|---|---|
+| Edge lines ~40–50cm, cut to 10–15cm | `PlaneGeometry(0.10, …)` — 10cm | already correct |
+| Dashes → 12–15cm, 3m long, 6–9m gap | 0.10 × 3m, 6m gap | already correct |
+| Crosswalk stripes are thick slabs | 0.35m at 0.70m pitch | already correct |
+| Lane 6–7m wide, narrow to 3.0–3.5m | `ROAD_HALF = 3.5` → a 7m **two-lane** road, 3.5m per lane, car 1.8m | misread: counted two lanes as one |
+| Add an explicit 15cm vertical curb | `box(0.22, 0.15, …)` at y=0.075 | already there |
+| "Clearly not using ACES tone mapping" | `ACESFilmicToneMapping`, exposure animated 0.75→1.10 | wrong |
+| "Sky is absolute #000000" | amber light-pollution horizon band in the sky shader, night-weighted | wrong |
+| "No manhole covers, no drains" | 15 manhole covers, 0.55m radius | wrong (drains still absent) |
+| Camera too high, tilted down; put it at chest height | `lookAt` y = 1.7m on foot, rig base +0.6m, FOV 52 | already correct; matches the pre-slice-020 rig, not this one |
+
+**The metric scale is right.** Anyone told to "fix the marking widths first, it takes ten
+minutes" would spend ten minutes breaking correct values. Measure before you believe a
+review — including this one.
+
+### What survived, and where it goes
+
+- **Featureless walls at eye level.** The biggest real finding. Tracks to **VGA-043**.
+- **Fidelity mismatch** — flat-shaded trees against PBR cobblestone against box cars.
+  Real, and an art-direction decision, not a shader fix. No single VGA item owns it.
+- **No contact shadow under the car or the player.** Genuinely absent, genuinely cheap
+  as a blob decal on the existing instanced path. Not currently a VGA item.
+- **Street drains and grates.** Manholes exist; drains do not.
+- **Camera lower still, tilted up.** Legitimate taste note on top of slice 020.
+
+### Do not act on these
+
+The review asks for **SSR, SSAO and volumetric light shafts**. All three were removed in
+`56f1462` for cause: SSR declared a `tDepth` uniform that nothing bound, so it read 0.0,
+`normalize(vec3(0.0))` produced NaN, and NaN blacked out **every pixel** while the HUD
+still read 149fps — at **291 draws against a 175 budget**, with SSAO alone re-rendering
+the whole scene for +138. Re-adding them as described re-creates that exact failure.
+
+If wet-road reflections are the goal, that is **VGA-002**, and the answer there is
+planar/decal work inside the budget — not a screen-space pass. Read `docs/CHARTER.md`
+before reinstating anything that was removed.
+
+---
+
 ## A. Street reflection & wetness (the founding image)
 
 - **VGA-001 Neon-to-asphalt reflections.** ✅ DONE (VGA batch 1: static merged smears per zone for all signs + lamp heads, dynamic instanced streaks for hero + strobing pursuit, die per zone, day-subtle. Evidence `slice-013-streaks.png` + `slice-013-paintdark.png`.) Signs, lamps, and headlights smear on wet road (planar probe / SSR-lite / stretched sprite decals — implementer's choice, fixed cost). Touches: `src/render/*` + road material. Done when: night frame shows magenta/cyan smears under signs; re-shot angle matches `slice-011-market`. Draws: +2..4.

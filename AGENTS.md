@@ -305,3 +305,9 @@ task would break one of the six laws.
 - Report a draw count you estimated rather than measured.
 - Rewrite a working system because you'd have designed it differently.
 - Leave a system unwired from the frame loop and call it done.
+- Reinstate something that was removed for cause without reading why it went. SSR, SSAO
+  and volumetric fog were deleted in `56f1462` — SSR alone blacked out every pixel while
+  the fps counter read 149. External reviews keep asking for them back.
+- Act on a visual critique without measuring the claim first. One handed to an external
+  model in September asked for road markings to be cut by 60–75%; they were already at
+  real-world scale. The triage is in `docs/VISUAL-GAP-ACTIONS.md`.
