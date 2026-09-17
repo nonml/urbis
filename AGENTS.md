@@ -275,6 +275,12 @@ Three rules, each learned the expensive way:
 
 ## How to work
 
+**If the operator just says "start" or "next":** take the first open item in
+`docs/VISUAL-GAP-ACTIONS.md` and run the seven steps below. That queue closes first, by
+the operator's own call, recorded in `docs/CHARTER.md`. Do not ask which one — pick it,
+say which you picked in one line, and go. The operator can redirect with "start zoning"
+(slice 024 in `docs/ZONING.md`) or by naming a VGA id.
+
 1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
    Structural work on the city itself has its own plan in `docs/ZONING.md`.
 2. Pick the next open item. Write a ≤5-line plan before touching a file.
