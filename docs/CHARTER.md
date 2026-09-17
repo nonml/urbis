@@ -80,7 +80,7 @@ Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queu
 (82 items, most still open) and closes first per operator redirect. The feature slices
 below are the **structural** work.
 
-Next free slice number: **023**.
+Next free slice number: **024**.
 
 ### Feature slices, in order
 
