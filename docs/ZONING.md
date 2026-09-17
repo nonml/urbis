@@ -111,20 +111,33 @@ to notice one change.
 
 Each lands on its own, gate-green, with evidence at the play camera.
 
-- **024 — the sim, headless.** `src/sim/zoning.js` plus a gate test that ticks 120
-  simulated seconds and asserts stages advanced, one parcel declined, and a
-  blacked-out parcel did not move. No render. `check:boundary` must pass, which it
-  will, because this file imports nothing.
-- **025 — the lots exist.** Hoarding + skip on every parcel, `EMPTY` only, no growth.
-  Evidence: play-camera frame showing fenced lots that read as empty land, not as
-  missing geometry. This is where you find out whether the coordinates are right.
-- **026 — it grows.** Wire the sim to the instanced shells. Evidence: two play-camera
-  frames of the same parcel, minutes apart, plus a blackout frame proving the site is
-  dark and stalled. Update the gate's `world changes while the player stands still`
-  test to assert on a parcel stage, not on pixels.
-- **027 — it declines and it reads.** Demand drop visibly regresses a parcel. HUD or
-  diegetic signal so the player knows *why*. Pillar 4 is "zero ambiguity" — a building
-  that shrinks with no explanation is a bug to the player, whatever the sim thinks.
+A note on why this is three slices and not five. The tempting split is "sim first,
+headless, render later" — it is cleaner to test and it is how most codebases would do
+it. It is also illegal here: law 1 says no screenshot, no tick, and law 6 says no
+system that is not visible in a screenshot. An unwired `src/sim/zoning.js` with a green
+unit test is exactly the dead tech law 6 exists to stop, however well tested. So the
+first slice is bigger than it wants to be, and it carries its own proof.
+
+- **024 — the city builds something.** `src/sim/zoning.js`, `src/render/zoning.js`,
+  wired in `main.js`, growth running. The one slice that cannot be subdivided without
+  breaking a law. Ships with:
+  - a headless gate test that ticks 120 simulated seconds and asserts stages advanced
+    and that a blacked-out parcel did not move;
+  - two play-camera frames of the same parcel minutes apart, the second taller;
+  - a blackout frame proving the site is dark and the crane has stopped;
+  - the `world changes while the player stands still` test rewritten to assert on a
+    parcel stage instead of on pixel churn.
+
+  Expect to spend the first hour on coordinates. If a parcel clips a road, move the
+  parcel — do not move the road.
+- **025 — it declines, and the player knows why.** A demand drop visibly regresses a
+  parcel. HUD or diegetic signal carrying the reason. Pillar 4 is "zero ambiguity" — a
+  building that shrinks with no explanation is a bug to the player, whatever the sim
+  thinks. Decline logic itself lands in 024, per the model above; this slice is about
+  making it legible.
+- **026 — demand stops being a sine wave.** Feature slice 5, the district economy,
+  replaces the placeholder oscillation. At that point growth has a cause the player can
+  reach, and pillar 3 has something real to cascade into.
 
 ## What this deliberately does not do
 
