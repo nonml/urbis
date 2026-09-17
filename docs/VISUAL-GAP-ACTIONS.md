@@ -29,9 +29,9 @@ Coverage footer at the bottom proves no gap was dropped.
 
 ## C. People (the city lives — screen-true)
 
-- **VGA-011 Body system v2.** Limbs, heads with faces, height/weight/age variety, walk + idle; coats with cloth flare instead of cones. Touches: `npcs.js` (+ walkers), sim spawn data. Done when: sidewalk close-up shows 5+ distinct silhouettes. Draws: +1..3 (instanced parts).
-- **VGA-012 Fashion & cyberware.** Streetwear sets, hats/hair, glowing cyberware accents, faction-tinted outfits. Done when: 50 m read shows variety, 5 m read shows detail. Draws: +1 (atlas).
-- **VGA-013 Night readability.** Coats catch lamp/neon response (no more black blobs), heads stop glowing solo (no more floating heads), day shadows re-enabled for walkers, hero rim/key light. Done when: `re-002-blackout` + `re-011-market` angles re-shot. Draws: +1 (hero light).
+- **VGA-011 Body system v2.** ⏳ PARTIAL (re-017: flared short jackets replace cones, long legs, 1/8-scale heads, counter-swinging arms, painted faces, walker shadows; hero rebuilt to the same ratio. Same-angle frames read humanoid, but heads still ball-like past 10 m and the 5-silhouette sidewalk close-up is still open.) Touches: `npcs.js` (+ walkers), sim spawn data. Draws: +1..3 (instanced parts).
+- **VGA-012 Fashion & cyberware.** ⏳ PARTIAL (re-017: instanced hats on ~42%, glowing visors on ~25%, 5 skin tones, widened coat palette — all in sim data and rendering; not yet readable at play distance, close-up proof still open). Draws: +1 (atlas).
+- **VGA-013 Night readability.** ⏳ PARTIAL (re-017: hero key light +0 draws, coats brightened with env response up, walkers cast shadows by day; head-vs-coat contrast still strong at distance — heads need the VGA-011 close-up pass to fully land). Draws: +1 (hero light).
 - **VGA-014 Poses & tableaus.** Sit, lean, smoke (glow tip), gesture, argue, queue, perform — plus staged frozen moments (deal, arrest, busk) at fixed corners. Done when: 3 tableau frames. Draws: +1..2.
 - **VGA-015 Rain silhouettes.** Umbrellas (colors/patterns), hoods, hunched runs, shelter clustering, density thinning at peak, wet shoulders, footstep splashes. Depends on VGA-040. Done when: storm-peak vs drizzle frames differ. Draws: +2 (umbrella instancing).
 - **VGA-016 Hands carry things.** Phones (hero raised-phone pose + screen glow on face; NPC handsets), courier parcels, vendor goods, instruments for buskers, laptops. Done when: profiler job + carried prop match in one frame. Draws: +1..2.

@@ -9,7 +9,17 @@ import { getGlowTex } from './signs.js';
 
 export const bodyGeo = mergeGeometries([
   (() => { const g = new THREE.BoxGeometry(1.8, 0.55, 4.2); g.translate(0, 0.65, 0); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.6, 0.5, 2.1); g.translate(0, 1.15, -0.2); return g; })(),
+  // Sloped hood + trunk: break the shoebox with wedges, not more boxes.
+  (() => { const g = new THREE.BoxGeometry(1.7, 0.28, 1.0); g.rotateX(0.22); g.translate(0, 0.82, 1.75); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.7, 0.28, 0.9); g.rotateX(-0.22); g.translate(0, 0.82, -1.75); return g; })(),
+  // Glasshouse pulled in with a raked windshield band.
+  (() => { const g = new THREE.BoxGeometry(1.55, 0.5, 2.0); g.translate(0, 1.15, -0.2); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.5, 0.34, 0.5); g.rotateX(-0.35); g.translate(0, 1.12, 0.95); return g; })(),
+  // Bumpers + side mirrors: the details the eye checks first.
+  (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, 2.1); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, -2.1); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(0.12, 0.1, 0.2); g.translate(-0.95, 1.05, 0.5); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(0.12, 0.1, 0.2); g.translate(0.95, 1.05, 0.5); return g; })(),
 ]);
 export const wheelGeo = (() => {
   const parts = [];
@@ -18,6 +28,11 @@ export const wheelGeo = (() => {
     g.rotateZ(Math.PI / 2);
     g.translate(x, 0.35, z);
     parts.push(g);
+    // Hubs merged into the same mesh: tires stop reading as oil drums.
+    const hub = new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10);
+    hub.rotateZ(Math.PI / 2);
+    hub.translate(x, 0.35, z);
+    parts.push(hub);
   }
   return mergeGeometries(parts);
 })();
@@ -34,7 +49,7 @@ const canopyGeo = (() => {
   g.translate(0, 1.12, -0.2);
   return g;
 })();
-const hubGeo = (() => {
+export const hubGeo = (() => {
   const parts = [];
   for (const [x, z] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
     const g = new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10);
@@ -75,6 +90,7 @@ export function buildTraffic(street) {
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), CAR_COUNT);
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), CAR_COUNT);
   const glass = new THREE.InstancedMesh(canopyGeo, glassMat, CAR_COUNT);
+  const hubs = new THREE.InstancedMesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }), CAR_COUNT);
   const poolMat = new THREE.MeshBasicMaterial({
     map: getGlowTex(), color: 0x4d6a8a, transparent: true, opacity: 0.4,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -94,18 +110,19 @@ export function buildTraffic(street) {
     bodies.setColorAt(i, new THREE.Color(c.paint));
   });
   bodies.instanceColor.needsUpdate = true;
-  group.add(bodies, wheels, beams, tails, glass, pools);
-  const rig = { bodies, wheels, beams, tails, glass, pools, glows, dummy };
+  group.add(bodies, wheels, beams, tails, glass, hubs, pools);
+  const rig = { bodies, wheels, beams, tails, glass, hubs, pools, glows, dummy };
   updateTraffic(rig, street);
   return { group, rig };
 }
 
 export function updateTraffic(rig, street, camera = null) {
-  const { bodies, wheels, beams, tails, glass, pools, glows, dummy } = rig;
+  const { bodies, wheels, beams, tails, glass, hubs, pools, glows, dummy } = rig;
   street.cars.forEach((c, i) => {
     const m = placeOnCar(dummy, c, 0);
     bodies.setMatrixAt(i, m);
     wheels.setMatrixAt(i, m);
+    hubs.setMatrixAt(i, m);
     beams.setMatrixAt(i, m);
     tails.setMatrixAt(i, m);
     glass.setMatrixAt(i, m);
@@ -131,6 +148,7 @@ export function updateTraffic(rig, street, camera = null) {
   });
   bodies.instanceMatrix.needsUpdate = true;
   wheels.instanceMatrix.needsUpdate = true;
+  hubs.instanceMatrix.needsUpdate = true;
   beams.instanceMatrix.needsUpdate = true;
   tails.instanceMatrix.needsUpdate = true;
   glass.instanceMatrix.needsUpdate = true;

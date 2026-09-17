@@ -18,6 +18,7 @@ import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } 
 import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
+import { buildBlobs, updateBlobs } from './render/blobs.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
 import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
@@ -107,6 +108,8 @@ const shops = buildShops();
 scene.add(shops.group);
 const puddles = buildPuddles();
 scene.add(puddles.mesh);
+const blobs = buildBlobs();
+scene.add(blobs);
 const steam = buildSteam();
 scene.add(steam.group);
 const fx = buildHackFx();
@@ -148,6 +151,10 @@ document.body.appendChild(banner);
 
 const rain = buildRain();
 scene.add(rain);
+// Hero key: a small warm light riding the player so the closest object in
+// every frame never dissolves into the dark. Scaled by night, +0 draws.
+const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
+scene.add(heroKey);
 
 const { composer, bloom } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
@@ -419,6 +426,11 @@ function render() {
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street, camera);
+  updateBlobs(blobs, street, player, heroCar);
+  const hx = driving ? heroCar.x : player.x;
+  const hz = driving ? heroCar.z : player.z;
+  heroKey.position.set(hx, 2.4, hz);
+  heroKey.intensity = 14 * night;
   let tx = driving ? heroCar.x : player.x;
   let tz = driving ? heroCar.z : player.z;
   // Threat pull: a fresh hack drags pursuit toward the dead zone (re-012).

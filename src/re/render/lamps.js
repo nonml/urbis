@@ -60,7 +60,9 @@ export function buildLamps() {
   const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.3);
   const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const heads = new THREE.InstancedMesh(headGeo, headMat, LAMPS.length);
-  const coneGeo = new THREE.ConeGeometry(3.4, HEAD_Y, 20, 1, true);
+  // Narrow shaft, not a pyramid: the cone volume was the single most toy-like
+  // object in the frame. Pools on the ground carry the actual light.
+  const coneGeo = new THREE.ConeGeometry(1.7, HEAD_Y, 20, 1, true);
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xffc98a, transparent: true, opacity: 0.03,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,

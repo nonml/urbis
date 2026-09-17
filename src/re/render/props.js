@@ -82,6 +82,26 @@ export function buildTrees() {
     (() => { const g = new THREE.IcosahedronGeometry(1.5, 1); g.translate(0, 3.4, 0); g.scale(1, 0.85, 1); return g; })(),
     (() => { const g = new THREE.IcosahedronGeometry(1.0, 1); g.translate(0.5, 4.4, 0.3); return g; })(),
   ]);
+  // Break the lollipop: positional-hash displacement moves coincident vertices
+  // identically, so the canopy stays watertight while losing its perfect-ball
+  // silhouette. Deterministic, one-time, +0 draws.
+  {
+    const hash3 = (x, y, z) => {
+      const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
+      return s - Math.floor(s);
+    };
+    const p = canopyGeo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const ix = Math.round(p.getX(i) * 5);
+      const iy = Math.round(p.getY(i) * 5);
+      const iz = Math.round(p.getZ(i) * 5);
+      p.setXYZ(i,
+        p.getX(i) + (hash3(ix, iy, iz) - 0.5) * 0.6,
+        p.getY(i) + (hash3(iy, iz, ix) - 0.5) * 0.5,
+        p.getZ(i) + (hash3(iz, ix, iy) - 0.5) * 0.6);
+    }
+    canopyGeo.computeVertexNormals();
+  }
   const canopyMat = new THREE.MeshStandardMaterial({ color: 0x14271a, roughness: 1.0, envMapIntensity: 0.55 });
   const spots = treeSpots();
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);

@@ -11,7 +11,8 @@ export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
 export const STREET_HALF = 100;
 
-const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c];
+const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
+export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];
 const CAR_PAINTS = [0x7a1020, 0x10233d, 0x3d3d42, 0x0f3d2e, 0x4d4d10, 0x222222];
 const FIRST = ['Mara', 'Kaito', 'Iris', 'Dario', 'Yuki', 'Petra', 'Sol', 'Nadia', 'Rook', 'Esen', 'Milo', 'Aya', 'Corv', 'Lena', 'Juno', 'Theo'];
 const LAST = ['Vane', 'Kuro', 'Dax', 'Mori', 'Lark', 'Voss', 'Quill', 'Reyes', 'Hale', 'Ito', 'Fenn', 'Okafor', 'Rill', 'Sable', 'Thorn', 'Vale'];
@@ -37,7 +38,7 @@ function makeProfile(rng, i) {
 }
 
 function makeBody(rng, i) {
-  return {
+  const body = {
     dir: rng.sim() < 0.5 ? -1 : 1,
     speed: 0.9 + rng.sim() * 0.8,
     phase: rng.sim() * Math.PI * 2,
@@ -46,6 +47,13 @@ function makeBody(rng, i) {
     hurryUntil: 0,
     profile: makeProfile(rng.sim, i),
   };
+  // Appended after profile so existing names/speeds never shift.
+  // (Coats resample across the widened palette — color only, no logic reads it.)
+  body.bulk = 0.85 + rng.sim() * 0.5;
+  body.hat = rng.sim() < 0.42 ? 1 + Math.floor(rng.sim() * 3) : 0;
+  body.cyber = rng.sim() < 0.25;
+  body.skin = Math.floor(rng.sim() * SKIN_TONES.length);
+  return body;
 }
 
 function makeNSWalker(rng, i, npcSpots) {
