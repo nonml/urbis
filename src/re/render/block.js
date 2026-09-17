@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadPBRMaps, standardFromMaps, facadeMaterial } from './materials.js';
 
 const STREET_LEN = 200;
-const ROAD_HALF = 4;
+const ROAD_HALF = 3.5;
 
 function box(w, h, d, x, y, z) {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -69,21 +69,53 @@ export function buildGround(texLoader, maxAniso) {
   const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
   const curbMat = standardFromMaps(concrete, { roughness: 0.75, envMapIntensity: 0.4, color: 0x7d828c });
   const curbs = mergeGeometries([
-    box(0.3, 0.3, STREET_LEN, -(ROAD_HALF + 0.15), 0.03, 0),
-    box(0.3, 0.3, STREET_LEN, ROAD_HALF + 0.15, 0.03, 0),
-    box(0.3, 0.3, STREET_LEN, 44 - (ROAD_HALF + 0.15), 0.03, 0),
-    box(0.3, 0.3, STREET_LEN, 44 + (ROAD_HALF + 0.15), 0.03, 0),
-    box(0.3, 0.3, STREET_LEN, -44 - (ROAD_HALF + 0.15), 0.03, 0),
-    box(0.3, 0.3, STREET_LEN, -44 + (ROAD_HALF + 0.15), 0.03, 0),
-    box(58, 0.3, 0.3, 22, 0.03, -64 - (ROAD_HALF + 0.15)),
-    box(58, 0.3, 0.3, 22, 0.03, -64 + (ROAD_HALF + 0.15)),
-    box(104, 0.3, 0.3, 0, 0.03, 40 - (ROAD_HALF + 0.15)),
-    box(104, 0.3, 0.3, 0, 0.03, 40 + (ROAD_HALF + 0.15)),
+    box(0.22, 0.15, STREET_LEN, -(ROAD_HALF + 0.11), 0.075, 0),
+    box(0.22, 0.15, STREET_LEN, ROAD_HALF + 0.11, 0.075, 0),
+    box(0.22, 0.15, STREET_LEN, 44 - (ROAD_HALF + 0.11), 0.075, 0),
+    box(0.22, 0.15, STREET_LEN, 44 + (ROAD_HALF + 0.11), 0.075, 0),
+    box(0.22, 0.15, STREET_LEN, -44 - (ROAD_HALF + 0.11), 0.075, 0),
+    box(0.22, 0.15, STREET_LEN, -44 + (ROAD_HALF + 0.11), 0.075, 0),
+    box(58, 0.15, 0.22, 22, 0.075, -64 - (ROAD_HALF + 0.11)),
+    box(58, 0.15, 0.22, 22, 0.075, -64 + (ROAD_HALF + 0.11)),
+    box(104, 0.15, 0.22, 0, 0.075, 40 - (ROAD_HALF + 0.11)),
+    box(104, 0.15, 0.22, 0, 0.075, 40 + (ROAD_HALF + 0.11)),
     box(0.35, 1.0, 9, -27.8, 0.5, -32),
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
   curbMesh.receiveShadow = true;
   group.add(curbMesh);
+
+  // Curb clutter: bollards, drain grates, utility boxes — all merged, +0 draws.
+  const clutter = [];
+  // Bollards at regular intervals along each avenue curb.
+  for (const ax of [0, 44, -44]) {
+    for (let z = -80; z <= 80; z += 16) {
+      for (const side of [-1, 1]) {
+        const bx = ax + side * (ROAD_HALF + 0.5);
+        // Post
+        clutter.push(box(0.12, 0.7, 0.12, bx, 0.35, z));
+        // Cap
+        clutter.push(box(0.18, 0.06, 0.18, bx, 0.73, z));
+      }
+    }
+  }
+  // Drain grates at intersections.
+  for (const ax of [0, 44, -44]) {
+    for (const gz of [40 - ROAD_HALF - 0.5, 40 + ROAD_HALF + 0.5]) {
+      clutter.push(box(0.8, 0.02, 0.4, ax, 0.03, gz));
+    }
+  }
+  // Utility boxes on the wider sidewalk sections.
+  const boxPositions = [[-6.2, -40], [6.2, -20], [-50.2, 0], [50.2, 16], [-6.2, 36], [6.2, 56]];
+  for (const [bx, bz] of boxPositions) {
+    clutter.push(box(0.6, 1.0, 0.5, bx, 0.5, bz));
+  }
+  const clutterMesh = new THREE.Mesh(mergeGeometries(clutter), new THREE.MeshStandardMaterial({
+    color: 0x2a2d33, roughness: 0.8, metalness: 0.3,
+  }));
+  clutterMesh.castShadow = true;
+  clutterMesh.receiveShadow = true;
+  group.add(clutterMesh);
 
   const groundBase = new THREE.Mesh(
     new THREE.PlaneGeometry(700, 700),
@@ -101,16 +133,17 @@ export function buildGround(texLoader, maxAniso) {
 function buildMarkings() {
   const quads = [[], []];
   const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
-  const dash = new THREE.PlaneGeometry(0.13, 3);
+  // Center dashes: 10cm wide, 3m long, 6m gap (real road standard).
+  const dash = new THREE.PlaneGeometry(0.10, 3);
   for (const ax of [0, 44, -44]) {
-    for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 8) {
+    for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 6) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
       q.translate(ax, 0.02, z);
       push(q, z);
     }
   }
-  const dashX = new THREE.PlaneGeometry(2, 0.15);
+  const dashX = new THREE.PlaneGeometry(2, 0.10);
   for (let x = -4; x <= 48; x += 5) {
     const q = dashX.clone();
     q.rotateX(-Math.PI / 2);
@@ -123,37 +156,38 @@ function buildMarkings() {
     q.translate(x, 0.02, 40);
     push(q, 40);
   }
-  const stripe = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  // Crosswalk stripes: 35cm wide, tight 70cm pitch.
+  const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
     const q = stripe.clone();
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
-    q.translate(0, 0.02, 20 + i * 1.1);
+    q.translate(0, 0.02, 20 + i * 0.7);
     push(q, 20);
   }
-  const stripeE = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  const stripeE = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
     const q = stripeE.clone();
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
-    q.translate(44, 0.02, -20 + i * 1.1);
+    q.translate(44, 0.02, -20 + i * 0.7);
     push(q, -20);
   }
-  const stripeW = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  const stripeW = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
   for (let i = -3; i <= 3; i++) {
     const q = stripeW.clone();
     q.rotateX(-Math.PI / 2);
     q.rotateY(Math.PI / 2);
-    q.translate(-44, 0.02, 10 + i * 1.1);
+    q.translate(-44, 0.02, 10 + i * 0.7);
     push(q, 10);
   }
   // Zebra crossings over the E-W connector (z=40) at each avenue.
-  const stripeC = new THREE.PlaneGeometry(0.5, ROAD_HALF * 2 - 1);
+  const stripeC = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
   for (const ax of [-44, 0, 44]) {
     for (let i = -3; i <= 3; i++) {
       const q = stripeC.clone();
       q.rotateX(-Math.PI / 2);
-      q.translate(ax + i * 1.1, 0.02, 40);
+      q.translate(ax + i * 0.7, 0.02, 40);
       push(q, 40);
     }
   }
@@ -281,6 +315,13 @@ export function buildTowers(texLoader, maxAniso) {
     (idx % 2 === 0 ? podiumsA : podiumsB).push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
+    // Door recess: dark inset on the street-facing podium face.
+    const doorW = Math.min(w * 0.35, 2.4);
+    const doorH = 3.0;
+    const faceZ = cz + (d + 1.2) / 2 + 0.01;
+    caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
+    // Small canopy over the door.
+    caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
     (idx % 2 === 0 ? FA : FB).push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {

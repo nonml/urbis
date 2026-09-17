@@ -75,39 +75,51 @@ function treeSpots() {
 export function buildTrees() {
   const group = new THREE.Group();
   const rand = mulberry32(77);
-  const trunkGeo = new THREE.CylinderGeometry(0.09, 0.14, 2.6, 7);
-  trunkGeo.translate(0, 1.3, 0);
+  // Tapered trunk with slight bend — reads as wood, not a pipe.
+  const trunkGeo = new THREE.CylinderGeometry(0.06, 0.16, 3.0, 8);
+  trunkGeo.translate(0, 1.5, 0);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
+  // Multi-cluster canopy: 3 overlapping blobs at different heights for organic silhouette.
   const canopyGeo = mergeGeometries([
-    (() => { const g = new THREE.IcosahedronGeometry(1.5, 1); g.translate(0, 3.4, 0); g.scale(1, 0.85, 1); return g; })(),
-    (() => { const g = new THREE.IcosahedronGeometry(1.0, 1); g.translate(0.5, 4.4, 0.3); return g; })(),
+    (() => { const g = new THREE.IcosahedronGeometry(1.6, 2); g.translate(0, 3.2, 0); g.scale(1, 0.75, 1); return g; })(),
+    (() => { const g = new THREE.IcosahedronGeometry(1.1, 2); g.translate(0.6, 4.2, 0.3); return g; })(),
+    (() => { const g = new THREE.IcosahedronGeometry(0.8, 2); g.translate(-0.4, 4.8, -0.2); return g; })(),
   ]);
-  // Break the lollipop: positional-hash displacement moves coincident vertices
-  // identically, so the canopy stays watertight while losing its perfect-ball
-  // silhouette. Deterministic, one-time, +0 draws.
+  // Branch stubs: 2–3 short limbs poking from the trunk into the canopy.
+  const branchGeo = mergeGeometries([
+    (() => { const g = new THREE.CylinderGeometry(0.03, 0.06, 1.0, 5); g.rotateZ(0.6); g.translate(0.35, 2.6, 0); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.025, 0.05, 0.8, 5); g.rotateZ(-0.5); g.translate(-0.3, 3.0, 0.2); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.02, 0.04, 0.6, 5); g.rotateX(0.4); g.translate(0.1, 2.2, -0.35); return g; })(),
+  ]);
+  // Organic displacement: break the perfect icosahedron silhouette.
   {
     const hash3 = (x, y, z) => {
       const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
       return s - Math.floor(s);
     };
-    const p = canopyGeo.attributes.position;
-    for (let i = 0; i < p.count; i++) {
-      const ix = Math.round(p.getX(i) * 5);
-      const iy = Math.round(p.getY(i) * 5);
-      const iz = Math.round(p.getZ(i) * 5);
-      p.setXYZ(i,
-        p.getX(i) + (hash3(ix, iy, iz) - 0.5) * 0.6,
-        p.getY(i) + (hash3(iy, iz, ix) - 0.5) * 0.5,
-        p.getZ(i) + (hash3(iz, ix, iy) - 0.5) * 0.6);
+    for (const geo of [canopyGeo, branchGeo]) {
+      const p = geo.attributes.position;
+      for (let i = 0; i < p.count; i++) {
+        const ix = Math.round(p.getX(i) * 4);
+        const iy = Math.round(p.getY(i) * 4);
+        const iz = Math.round(p.getZ(i) * 4);
+        p.setXYZ(i,
+          p.getX(i) + (hash3(ix, iy, iz) - 0.5) * 0.45,
+          p.getY(i) + (hash3(iy, iz, ix) - 0.5) * 0.35,
+          p.getZ(i) + (hash3(iz, ix, iy) - 0.5) * 0.45);
+      }
+      geo.computeVertexNormals();
     }
-    canopyGeo.computeVertexNormals();
   }
   const canopyMat = new THREE.MeshStandardMaterial({ color: 0x14271a, roughness: 1.0, envMapIntensity: 0.55 });
+  const branchMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
   const spots = treeSpots();
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
   const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, spots.length);
+  const branches = new THREE.InstancedMesh(branchGeo, branchMat, spots.length);
   trunks.castShadow = true;
   canopies.castShadow = true;
+  branches.castShadow = true;
   const dummy = new THREE.Object3D();
   spots.forEach(([x, z], i) => {
     const s = 0.8 + rand() * 0.5;
@@ -117,9 +129,11 @@ export function buildTrees() {
     dummy.updateMatrix();
     trunks.setMatrixAt(i, dummy.matrix);
     canopies.setMatrixAt(i, dummy.matrix);
+    branches.setMatrixAt(i, dummy.matrix);
   });
   trunks.instanceMatrix.needsUpdate = true;
   canopies.instanceMatrix.needsUpdate = true;
-  group.add(trunks, canopies);
+  branches.instanceMatrix.needsUpdate = true;
+  group.add(trunks, canopies, branches);
   return group;
 }

@@ -32,7 +32,7 @@ const maxAniso = renderer.capabilities.getMaxAnisotropy();
 const texLoader = new THREE.TextureLoader();
 
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(58, window.innerWidth / window.innerHeight, 0.1, 400);
+const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 400);
 
 const env = buildAtmosphere(scene, renderer);
 const spots = env.spots;
@@ -156,12 +156,12 @@ scene.add(rain);
 const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
 scene.add(heroKey);
 
-const { composer, bloom } = createComposer(renderer, scene, camera);
+const { composer, bloom, ssrPass, ssrPrevRT, volFogPass, ssaoPass } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
 
 // Follow cam: lower and closer than before — towers loom, street glow fills
 // the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
-const cam = { yaw: Math.PI, pitch: 0.26, dist: 5.5 };
+const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5 };
 let dragging = false;
 let lastDragT = -10;
 let lastPX = 0;
@@ -246,16 +246,16 @@ function toggleVehicle() {
     player.mode = 'drive';
     avatar.group.visible = false;
     missionOnEnterCar(mission);
-    cam.dist = 9;
-    cam.pitch = 0.3;
+    cam.dist = 7;
+    cam.pitch = 0.22;
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
     player.x = Math.max(-52, Math.min(70, heroCar.x + 1.8));
     player.z = Math.max(-68, Math.min(100, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
-    cam.dist = 5.5;
-    cam.pitch = 0.26;
+    cam.dist = 4.5;
+    cam.pitch = 0.18;
   }
 }
 
@@ -411,7 +411,7 @@ function render() {
   tickHackFx(fx, dt);
   tickRiver(river, dt);
   const night = clock.nightFactor;
-  updateDaylight(env, scene, bloom, night);
+  updateDaylight(env, scene, bloom, night, renderer);
   for (const m of towers.facadeMats) {
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);
@@ -472,6 +472,16 @@ function render() {
   }
 
   renderer.info.reset();
+  // Volumetric fog: drive uniforms from scene state.
+  const vfU = volFogPass.material.uniforms;
+  vfU.fogDensity.value = scene.fog.density;
+  vfU.fogColor.value.copy(scene.fog.color);
+  vfU.sunDirection.value.copy(env.sun.position).normalize();
+  vfU.lightIntensity.value = night > 0.7 ? 0.15 : night > 0.3 ? 0.6 : 1.2;
+  vfU.uTime.value = clock.elapsed;
+  // SSR: wetness drives reflection intensity (rain = high, dry = off).
+  const wetness = clock.nightFactor * 0.8;
+  ssrPass.uniforms.wetness.value = wetness;
   composer.render();
   if (firstFrame) {
     firstFrame = false;

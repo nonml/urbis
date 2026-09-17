@@ -206,7 +206,26 @@ export function buildPlayerCar(scene, car) {
   beacon.scale.set(1.6, 3.2, 1);
   group.add(beacon);
   group.add(paint, wheels, beams, tails, canopy, hubs, pool);
-  const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot, beacon };
+  // Contact shadow under the hero car.
+  const carBlobC = document.createElement('canvas');
+  carBlobC.width = carBlobC.height = 64;
+  const carBlobG = carBlobC.getContext('2d');
+  const carBlobGrad = carBlobG.createRadialGradient(32, 32, 0, 32, 32, 32);
+  carBlobGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
+  carBlobGrad.addColorStop(0.6, 'rgba(0,0,0,0.2)');
+  carBlobGrad.addColorStop(1, 'rgba(0,0,0,0)');
+  carBlobG.fillStyle = carBlobGrad;
+  carBlobG.fillRect(0, 0, 64, 64);
+  const carBlobTex = new THREE.CanvasTexture(carBlobC);
+  carBlobTex.colorSpace = THREE.SRGBColorSpace;
+  const carBlobMat = new THREE.MeshBasicMaterial({
+    map: carBlobTex, transparent: true, depthWrite: false, fog: false,
+  });
+  const carBlob = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 5.0), carBlobMat);
+  carBlob.rotation.x = -Math.PI / 2;
+  carBlob.position.y = 0.01;
+  group.add(carBlob);
+  const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot, beacon, carBlob };
   updatePlayerCar(rig, car, false);
   return rig;
 }
