@@ -36,7 +36,7 @@ Coverage footer at the bottom proves no gap was dropped.
 - **VGA-015 Rain silhouettes.** Umbrellas (colors/patterns), hoods, hunched runs, shelter clustering, density thinning at peak, wet shoulders, footstep splashes. Depends on VGA-040. Done when: storm-peak vs drizzle frames differ. Draws: +2 (umbrella instancing).
 - **VGA-016 Hands carry things.** Phones (hero raised-phone pose + screen glow on face; NPC handsets), courier parcels, vendor goods, instruments for buskers, laptops. Done when: profiler job + carried prop match in one frame. Draws: +1..2.
 - **VGA-017 Drivers & foot cops.** Driver silhouette + cabin in every car; uniformed officer NPCs, patrol pairs, corner standing. Done when: chase-cam shows a driver; corner shows patrol. Draws: +1.
-- **VGA-018 Crowd density.** Crowd counts that sell markets/crossings (with LOD discipline to protect budget). Touches: spawn counts + VGA-011 variety. Done when: crossing frame reads busy. Draws: 0 (instances), +perf watch.
+- **VGA-018 Crowd density.** ⏳ PARTIAL (re-019: 60→72 walkers, 14 curb-parked cars riding the same instanced meshes for +0 draws — streets read occupied in `re-019-street/north.png`; true market/crossing crush + LOD discipline still open). Touches: spawn counts + VGA-011 variety. Draws: 0 (instances), +perf watch.
 
 ## D. Cars (photographable traffic)
 

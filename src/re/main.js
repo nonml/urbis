@@ -108,7 +108,7 @@ const shops = buildShops();
 scene.add(shops.group);
 const puddles = buildPuddles();
 scene.add(puddles.mesh);
-const blobs = buildBlobs();
+const blobs = buildBlobs(street);
 scene.add(blobs);
 const steam = buildSteam();
 scene.add(steam.group);

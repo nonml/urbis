@@ -4,7 +4,6 @@
 // plus a real headlight spot so wet asphalt answers the beams.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { CAR_COUNT } from '../sim/street.js';
 import { getGlowTex } from './signs.js';
 
 export const bodyGeo = mergeGeometries([
@@ -84,25 +83,27 @@ function placeOnCar(dummy, car, yOff) {
 export function buildTraffic(street) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
-  const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.24, metalness: 0.6, envMapIntensity: 1.9 }), CAR_COUNT);
+  // Sized by the street, not the moving count: parked cars ride free.
+  const N = street.cars.length;
+  const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.24, metalness: 0.6, envMapIntensity: 1.9 }), N);
   bodies.castShadow = true;
-  const wheels = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }), CAR_COUNT);
-  const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), CAR_COUNT);
-  const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), CAR_COUNT);
-  const glass = new THREE.InstancedMesh(canopyGeo, glassMat, CAR_COUNT);
-  const hubs = new THREE.InstancedMesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }), CAR_COUNT);
+  const wheels = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }), N);
+  const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
+  const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), N);
+  const glass = new THREE.InstancedMesh(canopyGeo, glassMat, N);
+  const hubs = new THREE.InstancedMesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }), N);
   const poolMat = new THREE.MeshBasicMaterial({
     map: getGlowTex(), color: 0x4d6a8a, transparent: true, opacity: 0.4,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
-  const pools = new THREE.InstancedMesh(poolGeo, poolMat, CAR_COUNT);
+  const pools = new THREE.InstancedMesh(poolGeo, poolMat, N);
   const glows = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(2.4, 1.4),
     new THREE.MeshBasicMaterial({
       map: getGlowTex(), color: 0xcfe6ff, transparent: true, opacity: 0.5,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }),
-    CAR_COUNT
+    N
   );
   glows.frustumCulled = false;
   group.add(glows);
@@ -123,9 +124,19 @@ export function updateTraffic(rig, street, camera = null) {
     bodies.setMatrixAt(i, m);
     wheels.setMatrixAt(i, m);
     hubs.setMatrixAt(i, m);
+    glass.setMatrixAt(i, m);
+    if (c.parked) {
+      // Dark and quiet: parked cars wear no headlight glow.
+      dummy.scale.set(0, 0, 0);
+      dummy.updateMatrix();
+      beams.setMatrixAt(i, dummy.matrix);
+      pools.setMatrixAt(i, dummy.matrix);
+      glows.setMatrixAt(i, dummy.matrix);
+      tails.setMatrixAt(i, m);
+      return;
+    }
     beams.setMatrixAt(i, m);
     tails.setMatrixAt(i, m);
-    glass.setMatrixAt(i, m);
     if (c.axis === 'x') {
       dummy.position.set(c.x + c.dir * 3.5, 0.05, c.z);
     } else {

@@ -1,7 +1,6 @@
 // Contact shadows: one instanced dark ellipse under every walker, car, and the
 // hero. Floating objects read as toys; this grounds them for +1 draw.
 import * as THREE from 'three';
-import { NPC_COUNT, CAR_COUNT } from '../sim/street.js';
 
 function blobTexture() {
   const c = document.createElement('canvas');
@@ -17,13 +16,13 @@ function blobTexture() {
   return tex;
 }
 
-export function buildBlobs() {
+export function buildBlobs(street) {
   const geo = new THREE.PlaneGeometry(1, 1);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({
     map: blobTexture(), transparent: true, opacity: 0.5, depthWrite: false,
   });
-  const mesh = new THREE.InstancedMesh(geo, mat, NPC_COUNT + CAR_COUNT + 1);
+  const mesh = new THREE.InstancedMesh(geo, mat, street.npcs.length + street.cars.length + 1);
   mesh.renderOrder = 1;
   return mesh;
 }

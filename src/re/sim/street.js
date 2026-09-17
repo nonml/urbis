@@ -2,8 +2,15 @@
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
 
-export const NPC_COUNT = 60;
+export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
+// Curb parking slots: [avenueX, side, z]. Static, never ticked — density for
+// +0 draws (they ride the same traffic InstancedMeshes as moving cars).
+const PARKED_SLOTS = [
+  [0, 1, -70], [0, -1, -52], [0, 1, -30], [0, -1, -12], [0, 1, 8], [0, -1, 26],
+  [44, 1, -58], [44, -1, -34], [44, 1, -8], [44, -1, 54], [44, 1, 72],
+  [-44, -1, -64], [-44, 1, -20], [-44, -1, 60],
+];
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
@@ -121,12 +128,24 @@ export function createStreet(seed) {
   }
   const npcs = [];
   for (let i = 0; i < NPC_COUNT; i++) {
-    npcs.push(i < 48 ? makeNSWalker(rng, i, npcSpots) : makeEWWalker(rng, i));
+    if (i < 48 || i >= 60) npcs.push(makeNSWalker(rng, i, npcSpots));
+    else npcs.push(makeEWWalker(rng, i));
   }
   const cars = [];
   for (let i = 0; i < CAR_COUNT; i++) {
     cars.push(i < 12 ? makeNSCar(rng, i) : makeEWCar(rng, i));
   }
+  PARKED_SLOTS.forEach(([ax, side, z], k) => {
+    cars.push({
+      axis: 'z',
+      lane: ax + side * 3.4,
+      dir: side > 0 ? 1 : -1,
+      z,
+      speed: 0,
+      parked: true,
+      paint: CAR_PAINTS[(k * 5 + 3) % CAR_PAINTS.length],
+    });
+  });
   return {
     time: 0,
     npcs,
@@ -230,6 +249,7 @@ export function tickStreet(state, dt) {
     n.phase += dt * (dark ? 0 : v * 4);
   }
   for (const c of state.cars) {
+    if (c.parked) continue;
     if (c.axis === 'x') {
       c.x += c.dir * c.speed * dt;
       const lo = (c.xMin ?? -52) - 3;
