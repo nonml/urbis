@@ -92,7 +92,8 @@ Next free slice number: **023**.
    Pairs with VGA-078. Salvages old Q3/Q13.
 4. **Zoning + growth** — the Cities:Skylines leg, currently missing. Zones grow through
    a staged pipeline; the skyline changes because the city decided it, not because
-   an artist placed a tower.
+   an artist placed a tower. **Planned in `docs/ZONING.md`** (slices 024–027), which
+   also records why the existing 68 towers stay merged and static.
 5. **District economy** — jobs, wealth and demand per district, feeding growth and
    giving consequence cascades something real to move (VGA-077 faction paint reads it).
 

@@ -18,8 +18,9 @@ dark towers with lit windows. It sits at the intersection of three games:
 2. **GTA** — freedom, vehicles, pursuit, emergent chaos at street level.
 3. **Cities: Skylines** — systemic life. Zones grow, economies shift, the city breathes.
 
-The third leg is **designed but not yet built** — see `docs/CHARTER.md`. Do not pretend
-it exists, and do not quietly drop it from the vision.
+The third leg is **designed but not yet built** — the plan is `docs/ZONING.md`, the
+roadmap around it is `docs/CHARTER.md`. Do not pretend it exists, and do not quietly
+drop it from the vision.
 
 ### Five pillars — every task must serve at least one
 
@@ -210,6 +211,7 @@ Placement lists live at the call site, not inside the loader.
 ## How to work
 
 1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
+   Structural work on the city itself has its own plan in `docs/ZONING.md`.
 2. Pick the next open item. Write a ≤5-line plan before touching a file.
 3. Build the smallest thing that satisfies it.
 4. `npm run gate`. Green, all of it.
