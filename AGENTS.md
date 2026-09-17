@@ -107,6 +107,15 @@ Things that will waste an hour if you learn them by discovery:
 - **`dark()` returns `[bool, bool]`**, one per power zone — not a list of dark zone ids.
 - **`tod()` is not a clock.** `nightFactor` is static until `T` is pressed. It cannot be
   used to prove the world is advancing on its own.
+- **A 50 ms sampler misses draw peaks.** Slice 024 measured 165 by polling every
+  50 ms and 184 by reading `draws()` on every `requestAnimationFrame`. Anything that
+  runs for a handful of frames — a probe, a spawn, a re-bake — hides between samples.
+  Sweep every frame before you claim a peak.
+- **A cube render target as `envMap` is not a mirror on a standard material.** three
+  routes `MeshStandardMaterial.envMap` through PMREM, caches the result per texture,
+  and only refreshes it when `texture.needsPMREMUpdate` is set — which only
+  `CubeCamera.update()` does. A hand-rolled probe bakes black once and stays black,
+  and the material renders as unlit metal. `MeshBasicMaterial` reads the cube raw.
 - **SwiftShader is banned for timing.** Draw counts are fine on it — the counter is
   CPU-side — but any fps or ms number off a software rasteriser is a lie.
 
