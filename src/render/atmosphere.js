@@ -130,7 +130,7 @@ export function buildAtmosphere(scene, renderer) {
   moonGlow.position.set(45, 60, -90);
   moonGlow.scale.set(40, 40, 1);
   scene.add(moonGlow);
-  return { spots, skyMat: sky.mat, sun, moon, bounce, hemi, moonGlowMat: moonGlow.material };
+  return { spots, skyMat: sky.mat, skyMesh: sky.mesh, sun, moon, bounce, hemi, moonGlowMat: moonGlow.material };
 }
 
 const _fog = new THREE.Color();

@@ -138,6 +138,7 @@ function buildAlleyGlows(zoneMats) {
       blending: THREE.AdditiveBlending, depthWrite: false,
     });
     const m = new THREE.Mesh(new THREE.PlaneGeometry(6, 10), mat);
+    m.userData.mirror = true; // street-level wash: the one sign-layer thing road puddles can see
     m.position.set(d.x, 5, d.z);
     m.rotation.y = d.x > 0 ? -Math.PI / 2 : Math.PI / 2;
     g.add(m);

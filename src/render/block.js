@@ -375,6 +375,18 @@ export function buildTowers(texLoader, maxAniso) {
     m.receiveShadow = true;
     group.add(m);
   }
+  // Mirror proxy (VGA-002): one merged copy of every facade per power zone, so
+  // the reflection probe redraws the city in two passes instead of six. Water
+  // cannot tell glass from concrete at reflection scale, so all three
+  // architectures borrow the glass material — and each zone still dies with
+  // its own lights.
+  const mirrorProxies = facades[0].map((_, zone) => {
+    const geos = facades.flatMap((zoned) => zoned[zone]);
+    const m = new THREE.Mesh(mergeGeometries(geos), mats.kinds[0][zone]);
+    m.castShadow = false;
+    m.receiveShadow = false;
+    return m;
+  });
   const capMat = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.9 });
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
@@ -388,7 +400,7 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return { group, beacons: beaconPts, facadeMats: mats.facadeMats, zoneMats: mats.zoneMats };
+  return { group, beacons: beaconPts, facadeMats: mats.facadeMats, zoneMats: mats.zoneMats, mirrorProxies };
 }
 
 // Horizon promise (VGA-054): lit-window ring beyond the playable blocks.

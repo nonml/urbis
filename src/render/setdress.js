@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { mulberry32 } from '../sim/rng.js';
+import { zoneAt } from '../sim/street.js';
 import { loadPBRMaps, standardFromMaps } from './materials.js';
 
 const SHOPS = [
@@ -100,28 +101,112 @@ function blobTexture() {
 
 const PUDDLES = [
   // x, z, size, surface y (0.025 road / 0.145 sidewalk)
-  [-1.5, 12, 7, 0.025], [2.2, -8, 9, 0.025], [42.5, 4, 8, 0.025], [46, -24, 6, 0.025],
+  // First entry is the hero puddle: left-lane water a few metres from the start
+  // camera, clear of the z=20 zebra. Both facts are the whole slice — water far
+  // down the street is a few grey pixels, and a mirror laid over crosswalk paint
+  // reads as a stain rather than as water.
+  [-1.5, 25.5, 8, 0.025], [2.2, -8, 9, 0.025], [42.5, 4, 8, 0.025], [46, -24, 6, 0.025],
   [20, -64, 8, 0.025], [1.2, 34, 6, 0.025], [43, 30, 7, 0.025],
   [-5.9, -3, 4, 0.145], [5.9, 30, 4, 0.145], [38.2, 22, 4, 0.145],
   [49.8, -12, 4, 0.145], [16, -69.3, 5, 0.145], [0.5, 2, 6, 0.025],
 ];
 
+// Mirror puddles (VGA-002). The water reflects the city itself, sampled from a
+// cube the street re-shoots only when the light changes. A probe running every
+// frame cost 16 draws of the 175, and a standard material would have paid a
+// PMREM blur chain on top; a basic material reads the cube raw, so the water is
+// two draws and the probe only spends when the light it mirrors has moved.
+const MIRROR_LAYER = 1;
+const MIRROR_FACES = [0, 1, 2, 4, 5]; // px nx py pz nz — a flat mirror never looks down
+const MIRROR_SIZE = 512;
+const MIRROR_EYE_Y = 0.3;      // just above the water, so near geometry lines up
+const MIRROR_MAX_AGE = 6;      // seconds before the city is re-shot anyway
+const MIRROR_MOVE = 20;        // metres of travel that make the old cube wrong
+const MIRROR_GAIN = 3.0;       // the cube is already tone-mapped once; lift it back
+const WATER_TINT = 0x0a0e14;   // the water itself darkens the asphalt it covers
+const MIRROR_FLOOR = 0.12;     // a dead zone still holds a trace of skyglow
+
 export function buildPuddles() {
-  const geos = [];
+  const geos = [[], []];
   for (const [x, z, size, y] of PUDDLES) {
     const q = new THREE.PlaneGeometry(size, size * 0.7);
     q.rotateX(-Math.PI / 2);
     q.rotateY((x * 7 + z * 3) % 3);
     q.translate(x, y, z);
-    geos.push(q);
+    geos[zoneAt(z)].push(q);
   }
-  const mat = new THREE.MeshPhysicalMaterial({
-    color: 0x0a0e14, metalness: 0.9, roughness: 0.04, envMapIntensity: 2.4,
-    iridescence: 0.55, iridescenceIOR: 1.32,
-    transparent: true, alphaMap: blobTexture(), depthWrite: false,
-  });
-  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
-  return { mesh, mat };
+  // One mesh per power zone, like the facades: a blackout has to kill the
+  // reflections in its own zone only, and reflectivity is the dimmer.
+  const edge = blobTexture();
+  const group = new THREE.Group();
+  const mats = geos.map(() => new THREE.MeshBasicMaterial({
+    color: WATER_TINT, combine: THREE.AddOperation, reflectivity: MIRROR_GAIN,
+    transparent: true, alphaMap: edge, depthWrite: false,
+  }));
+  for (const [zone, zoneGeos] of geos.entries()) {
+    group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone]));
+  }
+  return { group, mats };
+}
+
+// Zone dimmer: the mirror dies with the lights it reflects (VGA-010).
+export function setPuddleGlow(puddles, zone, glow) {
+  puddles.mats[zone].reflectivity = MIRROR_GAIN * (MIRROR_FLOOR + (1 - MIRROR_FLOOR) * glow);
+}
+
+export function buildCityMirror() {
+  const rt = new THREE.WebGLCubeRenderTarget(MIRROR_SIZE);
+  const cubeCamera = new THREE.CubeCamera(0.3, 260, rt);
+  for (const faceCam of cubeCamera.children) faceCam.layers.set(MIRROR_LAYER);
+  return { cubeCamera, texture: rt.texture, pending: 0, at: -MIRROR_MAX_AGE, x: 0, z: 0 };
+}
+
+// Everything the water is allowed to see. Lights ride along at +0 draws —
+// without them the probe renders unlit facades and every mirror comes back
+// black except the emissive windows.
+export function showInMirror(...objects) {
+  for (const o of objects) o.layers.enable(MIRROR_LAYER);
+}
+
+// Proxy geometry: seen by the water, never by the player.
+export function onlyInMirror(...objects) {
+  for (const o of objects) o.layers.set(MIRROR_LAYER);
+}
+
+export function cityMirrorStale(mirror, time, x, z) {
+  if (mirror.pending > 0) return false;
+  return time - mirror.at > MIRROR_MAX_AGE || Math.hypot(x - mirror.x, z - mirror.z) > MIRROR_MOVE;
+}
+
+export function requestCityMirror(mirror, time, x, z) {
+  mirror.cubeCamera.position.set(x, MIRROR_EYE_Y, z);
+  mirror.cubeCamera.updateMatrixWorld();
+  mirror.pending = MIRROR_FACES.length;
+  mirror.at = time;
+  mirror.x = x;
+  mirror.z = z;
+}
+
+// One face per frame: a whole cube in a single frame would spike the budget by
+// five times the cost of the frame it interrupts.
+export function tickCityMirror(renderer, scene, mirror) {
+  if (mirror.pending <= 0) return;
+  const face = MIRROR_FACES[MIRROR_FACES.length - mirror.pending];
+  mirror.pending--;
+  const { cubeCamera } = mirror;
+  if (cubeCamera.coordinateSystem !== renderer.coordinateSystem) {
+    cubeCamera.coordinateSystem = renderer.coordinateSystem;
+    cubeCamera.updateCoordinateSystem();
+  }
+  const prevTarget = renderer.getRenderTarget();
+  const prevFace = renderer.getActiveCubeFace();
+  const prevLevel = renderer.getActiveMipmapLevel();
+  const prevShadows = renderer.shadowMap.autoUpdate;
+  renderer.shadowMap.autoUpdate = false;   // the probe reuses the frame's shadow map
+  renderer.setRenderTarget(cubeCamera.renderTarget, face);
+  renderer.render(scene, cubeCamera.children[face]);
+  renderer.setRenderTarget(prevTarget, prevFace, prevLevel);
+  renderer.shadowMap.autoUpdate = prevShadows;
 }
 
 const VENTS = [

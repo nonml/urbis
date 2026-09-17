@@ -13,7 +13,10 @@ import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
 import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
-import { buildShops, buildPuddles, buildSteam, tickSteam, buildBeacons, buildStars } from './render/setdress.js';
+import {
+  buildShops, buildPuddles, setPuddleGlow, buildCityMirror, showInMirror, onlyInMirror,
+  cityMirrorStale, requestCityMirror, tickCityMirror, buildSteam, tickSteam, buildBeacons, buildStars,
+} from './render/setdress.js';
 import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } from './render/hackfx.js';
 import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
@@ -25,6 +28,11 @@ import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRen
 import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 
 const DRAW_BUDGET = 175;
+// One cube face of the reflection world, measured; the margin is the room a
+// spawn needs to land in the same frame without the probe pushing it over.
+const MIRROR_FACE_DRAWS = 5;
+const MIRROR_MARGIN = 10;
+let lastDraws = 0;
 const bootStart = performance.now();
 
 const canvas = document.getElementById('scene');
@@ -109,7 +117,19 @@ scene.add(avatar.group);
 const shops = buildShops(texLoader, maxAniso);
 scene.add(shops.group);
 const puddles = buildPuddles();
-scene.add(puddles.mesh);
+scene.add(puddles.group);
+const mirror = buildCityMirror();
+for (const m of puddles.mats) m.envMap = mirror.texture;
+// The reflection world (VGA-002): sky, skyline, the two merged tower proxies
+// and the alley washes — what a near-horizontal mirror ray off road water can
+// actually hit. Sign faces sit too high to land in a puddle; their road read is
+// the VGA-001 streaks. Lights ride along at +0 draws, or the probe renders
+// unlit facades and every mirror comes back black but for the emissive windows.
+showInMirror(env.skyMesh, skyline.mesh);
+onlyInMirror(...towers.mirrorProxies);
+for (const proxy of towers.mirrorProxies) scene.add(proxy);
+showInMirror(env.sun, env.moon, env.bounce, env.hemi, ...spots);
+signs.group.traverse((o) => { if (o.isMesh && o.userData.mirror) showInMirror(o); });
 const blobs = buildBlobs(street);
 scene.add(blobs);
 const steam = buildSteam();
@@ -156,6 +176,7 @@ scene.add(rain);
 // Hero key: a small warm light riding the player so the closest object in
 // every frame never dissolves into the dark. Scaled by night, +0 draws.
 const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
+heroKey.layers.enable(1);
 scene.add(heroKey);
 
 const { composer, bloom } = createComposer(renderer, scene, camera);
@@ -384,6 +405,7 @@ function render() {
     const dark = isDark(street, z);
     if (DARK[z] !== dark) {
       DARK[z] = dark;
+      requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
       missionOnBlackout(mission, DARK, street.time);
     }
     const b = glows[z] >= 1 ? 1 : glows[z] <= 0 ? 0 : blink(street.time, z * 3.7);
@@ -396,6 +418,7 @@ function render() {
       m.emissiveIntensity = 0.75 * nf * b;
       m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
     }
+    setPuddleGlow(puddles, z, b);
     setSlit(fx, z, b);
     streakMeshes[z].material.opacity = 0.55 * nf * b;
     const mk = markingMats[z];
@@ -424,7 +447,6 @@ function render() {
   }
   groundMats.road.envMapIntensity = 0.85 - 0.15 * (1 - night);
   groundMats.walk.envMapIntensity = 0.5 - 0.15 * (1 - night);
-  puddles.mat.envMapIntensity = 1.2 + 1.4 * night;
   lamps.setDaylight(night);
   stars.material.opacity = 0.75 * night;
   skyline.mat.color.setScalar(0.12 + 0.88 * night);
@@ -478,11 +500,22 @@ function render() {
   }
 
   renderer.info.reset();
+  // The city mirror re-shoots one cube face per frame, and only when it has gone
+  // stale: five frames of one extra pass after a blackout, a day/night flip, or a
+  // block of travel. Steady state is zero. A face only goes in if the last frame
+  // left room for it — law 3 is the whole frame, probe included.
+  if (cityMirrorStale(mirror, street.time, camera.position.x, camera.position.z)) {
+    requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
+  }
+  if (lastDraws + MIRROR_FACE_DRAWS + MIRROR_MARGIN <= DRAW_BUDGET) {
+    tickCityMirror(renderer, scene, mirror);
+  }
   composer.render();
   if (firstFrame) {
     firstFrame = false;
     bootMs = Math.round(now - bootStart);
   }
+  lastDraws = renderer.info.render.calls;
   fpsAcc += dt;
   fpsN++;
   hudTimer += dt;
