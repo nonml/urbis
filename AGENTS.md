@@ -80,6 +80,45 @@ npm run gate         # everything below, in order — must be green before you c
 
 ---
 
+## Prove it
+
+Law 1 demands a screenshot and law 2 demands a measured number. Here is how to get both.
+You do not need Claude to do this — any agent that can drive Playwright can.
+
+`window.__game` (defined at the bottom of `src/main.js`) is the probe. Drive the built
+game on `npm run preview` (port 4173), not the dev server:
+
+```js
+await page.goto('http://localhost:4173/?capture=1');
+await page.waitForFunction(() => window.__game?.draws() > 0);
+const png = await page.evaluate(() => window.__game.shot()); // data URL
+const draws = await page.evaluate(() => window.__game.draws());
+```
+
+Things that will waste an hour if you learn them by discovery:
+
+- **`?capture=1` is mandatory for screenshots.** The renderer only sets
+  `preserveDrawingBuffer` behind that flag, so normal play pays nothing for it. Without
+  it every capture is pure black and you will misdiagnose it as a render bug. It has
+  happened in this repo.
+- **Use `channel: 'chrome'` locally, bundled chromium in CI.** Playwright's chromium
+  download stalls on the operator's machine. `playwright.config.js` already branches on
+  `process.env.CI`; don't "fix" it.
+- **`dark()` returns `[bool, bool]`**, one per power zone — not a list of dark zone ids.
+- **`tod()` is not a clock.** `nightFactor` is static until `T` is pressed. It cannot be
+  used to prove the world is advancing on its own.
+- **SwiftShader is banned for timing.** Draw counts are fine on it — the counter is
+  CPU-side — but any fps or ms number off a software rasteriser is a lie.
+
+### Draw accounting
+
+`renderer.info.render.calls` is the only number that counts, and it counts the *whole*
+frame including the shadow pass. **A mesh with `castShadow = true` costs two draws, not
+one.** Slice 023 added two merged meshes and the counter moved by four. Declare the
+measured delta in your commit, not the one you expected.
+
+---
+
 ## Architecture
 
 ```
@@ -183,6 +222,32 @@ loadPropInstances('assets/models/fire_hydrant/fire_hydrant_1k.gltf', [
 ```
 
 Placement lists live at the call site, not inside the loader.
+
+### Patch a material's shader
+
+When a stock `MeshStandardMaterial` almost does what you want, patch it — do not write a
+`ShaderMaterial` and lose the lighting. Two materials in `src/render/materials.js` do
+this (`facadeMaterial`, `concreteFacadeMaterial`); copy their shape:
+
+```js
+mat.onBeforeCompile = (sh) => {
+  sh.uniforms.uThing = mat.userData.uThing;        // keep the handle to animate it
+  sh.fragmentShader = sh.fragmentShader.replace('#include <map_fragment>', '...');
+  if (!sh.fragmentShader.includes('myToken')) console.error('[thing] patch missed');
+};
+mat.customProgramCacheKey = () => 'thing';          // or every instance recompiles
+```
+
+Three rules, each learned the expensive way:
+
+- **Always include the miss guard.** three.js renames chunks between versions and a
+  failed `.replace()` is silent — the material compiles, renders subtly wrong, and you
+  chase it for an hour. This is the one place `console.error` is allowed.
+- **Always set `customProgramCacheKey`**, or each material with the same patch compiles
+  its own program.
+- **Never leave a uniform unbound.** A declared-but-never-assigned `sampler2D` reads as
+  0.0, and `normalize(vec3(0.0))` is NaN, and NaN eats the frame. That is exactly how
+  this project shipped a black screen at 291 draws — see `docs/CHARTER.md`.
 
 ---
 
