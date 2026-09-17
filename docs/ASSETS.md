@@ -34,7 +34,8 @@ Audited 2026-09-17. Most of the harvest **is** wired. Note that `loadPBRMaps(tex
 maxAniso, '<dir>', ...)` builds paths from a directory argument, so grepping for literal
 `assets/...` strings undercounts badly — do not audit that way. Wired today: asphalt,
 paving_slabs and concrete in `buildGround()`; plaster_rough and plaster_painted as tower
-podiums A and B; both facade glass sets.
+podiums A and B; both facade glass sets; metalplates006 on shop canopies; concrete_wall_008
+on every third tower.
 
 One item is genuinely unused (`metalplates006` went onto shop canopies in slice 022, `concrete_wall_008` onto tower facades in slice 023):
 
@@ -42,9 +43,13 @@ One item is genuinely unused (`metalplates006` went onto shop canopies in slice 
 |---|---|---|
 | `models/street_lamp_01/` | 2.1 MB | **VGA-036** "lamp heads as fixtures, not floating bars". Not a texture swap: `buildLamps()` returns `heads` and `poolsByZone`, both load-bearing for the blackout cascade |
 
-**VGA-041** ("two more facade materials so the district isn't one glass") is still open,
-but it needs *new* textures — the plaster sets are already spoken for by the podiums.
-Harvest for it rather than assuming something spare is lying around.
+**VGA-041** ("two more facade materials so the district isn't one glass") is half closed:
+concrete_wall_008 is the second architecture as of slice 023. The third needs a *new*
+harvest — brick, corrugated metal or stone. The plaster sets are spoken for by the
+podiums, so do not assume something spare is lying around.
+
+The Poly Haven layout is no longer a blocker: `loadPolyHavenMaps()` handles
+`Diffuse`/`nor_gl`/`arm` directly, so anything from that library drops straight in.
 
 ---
 
