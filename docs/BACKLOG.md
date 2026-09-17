@@ -32,7 +32,7 @@ its own sake.
 | `updateDaylight()` | `src/render/atmosphere.js` | **141** |
 | `buildMarkings()` | `src/render/block.js` | **138** |
 | `buildLamps()` | `src/render/lamps.js` | 115 |
-| `buildTowers()` | `src/render/block.js` | 111 |
+| `buildTowers()` | `src/render/block.js` | 79 (was 111; material setup extracted in slice 023) |
 | `buildGround()` | `src/render/block.js` | 108 |
 | `updateNPCs()` | `src/render/npcs.js` | 71 |
 | `buildHackFx()` | `src/render/hackfx.js` | 69 |

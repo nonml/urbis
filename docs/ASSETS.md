@@ -36,12 +36,11 @@ maxAniso, '<dir>', ...)` builds paths from a directory argument, so grepping for
 paving_slabs and concrete in `buildGround()`; plaster_rough and plaster_painted as tower
 podiums A and B; both facade glass sets.
 
-Two items are genuinely unused (`metalplates006` was wired onto shop canopies in slice 022):
+One item is genuinely unused (`metalplates006` went onto shop canopies in slice 022, `concrete_wall_008` onto tower facades in slice 023):
 
 | Unused asset | Size | What it could answer |
 |---|---|---|
 | `models/street_lamp_01/` | 2.1 MB | **VGA-036** "lamp heads as fixtures, not floating bars". Not a texture swap: `buildLamps()` returns `heads` and `poolsByZone`, both load-bearing for the blackout cascade |
-| `concrete_wall_008/` | 2.0 MB | A second wall material. Blocked on a loader gap: Poly Haven ships `Diffuse`/`nor_gl`/`arm` (packed occlusion-roughness-metalness) and `loadPBRMaps` expects ambientCG's separate maps |
 
 **VGA-041** ("two more facade materials so the district isn't one glass") is still open,
 but it needs *new* textures — the plaster sets are already spoken for by the podiums.
@@ -132,7 +131,7 @@ not by prop detail, which helps; but every batch needs a play-camera frame befor
 
 1. Re-harvest for **VGA-041** (two more facade materials) — the highest-value gap that
    needs only a download.
-2. Teach `loadPBRMaps` the Poly Haven ARM layout, which unlocks `concrete_wall_008`
+2. ~~Teach the loader the Poly Haven ARM layout~~ — done in slice 023. `loadPolyHavenMaps()` in `src/render/materials.js` reads `Diffuse`/`nor_gl`/`arm`, feeding the packed map to both roughness (green) and metalness (blue). The whole Poly Haven library now loads with no repacking
    and the rest of that library.
 3. Stand up `trellis.cpp` + Blender for the props that genuinely don't exist —
    VGA-030 civic furniture, VGA-031 commerce clutter, VGA-042 rooftop furniture,

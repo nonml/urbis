@@ -65,6 +65,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 020 | Paint discipline, skyglow lift, closer camera | — | `slice-020-street/-north.png` |
 | 021 | Repo unified, measured gate, black-frame fix | **151** | `slice-021-fixed-frame.png` |
 | 022 | Shop canopies wear metalplates006 | **151** (+0) | `slice-022-canopy-day.png` |
+| 023 | Poly Haven ARM loader; concrete towers as a second architecture | **155** (+4) | `slice-023-day/-night/-blackout.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were

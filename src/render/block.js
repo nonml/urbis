@@ -2,7 +2,7 @@
 // per-object draws for repeated things are banned (charter law #4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadPBRMaps, standardFromMaps, facadeMaterial } from './materials.js';
+import { loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial } from './materials.js';
 
 const STREET_LEN = 200;
 const ROAD_HALF = 3.5;
@@ -268,51 +268,61 @@ const TERMINUS_TOWERS = [
   [22, 106, 12, 52, 11], [-22, 106, 12, 48, 11],
 ];
 
-export function buildTowers(texLoader, maxAniso) {
-  const avenues = [0, 44, -44];
-  const group = new THREE.Group();
-  const color = texLoader.load('assets/facade_glass_night/color.jpg');
-  color.colorSpace = THREE.SRGBColorSpace;
-  const emission = texLoader.load('assets/facade_glass_night/emission.jpg');
-  emission.colorSpace = THREE.SRGBColorSpace;
-  const normal = texLoader.load('assets/facade_glass_night/normal.jpg');
-  const rough = texLoader.load('assets/facade_glass_night/roughness.jpg');
-  const metal = texLoader.load('assets/facade_glass_night/metalness.jpg');
-  for (const t of [color, emission, normal, rough, metal]) {
+const FACADE_MAPS = [
+  ['color', 'color', true], ['emission', 'emission', true],
+  ['normal', 'normal', false], ['rough', 'roughness', false], ['metal', 'metalness', false],
+];
+
+// Three facade architectures so the skyline is not one tower repeated: lit curtain
+// glass in two tints, and poured concrete with the same windows punched through it.
+// Each architecture carries a per-zone twin, because a blackout has to kill one
+// zone's windows and leave the other burning. That is one draw per material and it
+// is the price of the hack reading at all.
+function towerMaterials(texLoader, maxAniso) {
+  const nightMaps = {};
+  for (const [slot, file, srgb] of FACADE_MAPS) {
+    const t = texLoader.load(`assets/facade_glass_night/${file}.jpg`);
+    if (srgb) t.colorSpace = THREE.SRGBColorSpace;
     t.wrapS = t.wrapT = THREE.RepeatWrapping;
     t.anisotropy = maxAniso;
+    nightMaps[slot] = t;
   }
   const dayColor = texLoader.load('assets/facade_glass/color.jpg');
   dayColor.colorSpace = THREE.SRGBColorSpace;
   dayColor.wrapS = dayColor.wrapT = THREE.RepeatWrapping;
   dayColor.anisotropy = maxAniso;
-  const nightMaps = { color, emission, normal, rough, metal };
-  const facadeMatA = facadeMaterial(nightMaps, dayColor, 0x9aa2ae);
-  const facadeMatB = facadeMaterial(nightMaps, dayColor, 0x8a94a8);
-  // Per-zone material twins: blackouts kill windows one zone at a time (+2 draws).
-  const facadeMatA1 = facadeMaterial(nightMaps, dayColor, 0x9aa2ae);
-  const facadeMatB1 = facadeMaterial(nightMaps, dayColor, 0x8a94a8);
-  for (const m of [facadeMatA, facadeMatB, facadeMatA1, facadeMatB1]) {
-    m.userData.baseTint = m.color.clone();
-  }
-  const podiumMapsA = loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2);
-  const podiumMatA = standardFromMaps(podiumMapsA, { roughness: 0.85, envMapIntensity: 0.35, color: 0x54575f });
-  const podiumMapsB = loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2);
-  const podiumMatB = standardFromMaps(podiumMapsB, { roughness: 0.8, envMapIntensity: 0.35, color: 0x4e5158 });
-  const facadesA = [];
-  const facadesB = [];
-  const facadesA1 = [];
-  const facadesB1 = [];
-  const podiumsA = [];
-  const podiumsB = [];
+  const concrete = loadPolyHavenMaps(texLoader, maxAniso, 'concrete_wall_008', 1, 1);
+  const kinds = [
+    () => facadeMaterial(nightMaps, dayColor, 0x9aa2ae),
+    () => facadeMaterial(nightMaps, dayColor, 0x8a94a8),
+    () => concreteFacadeMaterial(concrete, nightMaps.emission, 0x767a83),
+  ].map((make) => [make(), make()]);
+  for (const zoned of kinds) for (const m of zoned) m.userData.baseTint = m.color.clone();
+  const podium = [
+    [loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2), 0.85, 0x54575f],
+    [loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2), 0.8, 0x4e5158],
+  ].map(([maps, roughness, color]) => standardFromMaps(maps, { roughness, envMapIntensity: 0.35, color }));
+  return {
+    kinds,
+    podium,
+    // Only glass crossfades day to night in-shader; concrete looks the same at noon.
+    facadeMats: [...kinds[0], ...kinds[1]],
+    zoneMats: [kinds.map((twins) => twins[0]), kinds.map((twins) => twins[1])],
+  };
+}
+
+export function buildTowers(texLoader, maxAniso) {
+  const avenues = [0, 44, -44];
+  const group = new THREE.Group();
+  const mats = towerMaterials(texLoader, maxAniso);
+  const facades = mats.kinds.map(() => [[], []]);
+  const podiums = mats.podium.map(() => []);
   const caps = [];
   const beaconPts = [];
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   function emitTower(cx, cz, w, h, d, idx) {
-    const zn = cz < 0 ? 0 : 1;
-    const FA = zn === 0 ? facadesA : facadesA1;
-    const FB = zn === 0 ? facadesB : facadesB1;
-    (idx % 2 === 0 ? podiumsA : podiumsB).push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
+    const shaft = facades[idx % facades.length][cz < 0 ? 0 : 1];
+    podiums[idx % podiums.length].push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
     // Door recess: dark inset on the street-facing podium face.
@@ -322,13 +332,13 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
     // Small canopy over the door.
     caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
-    (idx % 2 === 0 ? FA : FB).push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
+    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * 0.72;
       const uh = h * 0.3;
       const ud = d * 0.72;
-      FA.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
+      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
       topY = h + uh;
     }
     caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
@@ -354,8 +364,12 @@ export function buildTowers(texLoader, maxAniso) {
   for (const [x, z, w, h, d] of TERMINUS_TOWERS) {
     emitTower(x, z, w, h, d, idx++);
   }
-  const zoneMats = [[facadeMatA, facadeMatB], [facadeMatA1, facadeMatB1]];
-  for (const [geos, mat] of [[facadesA, facadeMatA], [facadesB, facadeMatB], [facadesA1, facadeMatA1], [facadesB1, facadeMatB1], [podiumsA, podiumMatA], [podiumsB, podiumMatB]]) {
+  const batches = [
+    ...facades.flatMap((zoned, kind) => zoned.map((geos, zone) => [geos, mats.kinds[kind][zone]])),
+    ...podiums.map((geos, i) => [geos, mats.podium[i]]),
+  ];
+  for (const [geos, mat] of batches) {
+    if (!geos.length) throw new Error('buildTowers: empty batch would leave a material unlit');
     const m = new THREE.Mesh(mergeGeometries(geos), mat);
     m.castShadow = true;
     m.receiveShadow = true;
@@ -374,7 +388,7 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return { group, beacons: beaconPts, facadeMats: [facadeMatA, facadeMatB, facadeMatA1, facadeMatB1], zoneMats };
+  return { group, beacons: beaconPts, facadeMats: mats.facadeMats, zoneMats: mats.zoneMats };
 }
 
 // Horizon promise (VGA-054): lit-window ring beyond the playable blocks.

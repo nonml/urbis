@@ -26,6 +26,19 @@ export function loadPBRMaps(texLoader, maxAniso, dir, fileStem, rx, ry, names = 
   return maps;
 }
 
+// Poly Haven packs ambient occlusion, roughness and metalness into one arm.jpg.
+// three reads roughness from green and metalness from blue, so the one texture
+// fills both slots and the whole library loads without repacking.
+export function loadPolyHavenMaps(texLoader, maxAniso, dir, rx, ry) {
+  const arm = load(texLoader, maxAniso, `${dir}/arm.jpg`, false, rx, ry);
+  return {
+    albedo: load(texLoader, maxAniso, `${dir}/Diffuse.jpg`, true, rx, ry),
+    normal: load(texLoader, maxAniso, `${dir}/nor_gl.jpg`, false, rx, ry),
+    rough: arm,
+    metal: arm,
+  };
+}
+
 // Day/night facade: one material, two albedos mixed in-shader by uNight.
 // The emissive windows fade separately via emissiveIntensity (0 by day).
 // Same merged geometry, same draw count, no pop — the whole wall crossfades.
@@ -63,12 +76,44 @@ export function facadeMaterial(nightMaps, dayColorTex, tint) {
   return mat;
 }
 
+// Concrete tower: the same window map the glass towers glow with, read as geometry
+// instead of light. A window punched in concrete is a hole — dark and glassy by day,
+// lit at night — so the map darkens and polishes the diffuse as well as feeding
+// emissive. One texture, two readings, no second map to ship.
+export function concreteFacadeMaterial(maps, windowMap, tint) {
+  const mat = standardFromMaps(maps, {
+    emissiveMap: windowMap,
+    emissiveIntensity: 0.75,
+    roughness: 0.95,
+    envMapIntensity: 0.4,
+    color: tint,
+  });
+  mat.onBeforeCompile = (sh) => {
+    const before = sh.fragmentShader;
+    sh.fragmentShader = before
+      .replace(
+        '#include <roughnessmap_fragment>',
+        '#include <roughnessmap_fragment>\nvec3 windowTexel = texture2D( emissiveMap, vEmissiveMapUv ).rgb;\nfloat windowMask = max( max( windowTexel.r, windowTexel.g ), windowTexel.b );\nroughnessFactor *= 1.0 - 0.6 * windowMask;'
+      )
+      .replace(
+        '#include <emissivemap_fragment>',
+        'diffuseColor.rgb *= 1.0 - 0.85 * windowMask;\n#include <emissivemap_fragment>'
+      );
+    if (!sh.fragmentShader.includes('windowMask')) console.error('[concrete] patch missed');
+  };
+  mat.customProgramCacheKey = () => 'concrete-facade';
+  return mat;
+}
+
 export function standardFromMaps(maps, opts) {
   return new THREE.MeshStandardMaterial({
     map: maps.albedo,
     normalMap: maps.normal,
     roughnessMap: maps.rough,
     metalnessMap: maps.metal ?? null,
+    emissiveMap: opts.emissiveMap ?? null,
+    emissive: opts.emissiveMap ? 0xffffff : 0x000000,
+    emissiveIntensity: opts.emissiveIntensity ?? 1.0,
     roughness: opts.roughness ?? 1.0,
     metalness: opts.metalness ?? 0.0,
     envMapIntensity: opts.envMapIntensity ?? 1.0,
