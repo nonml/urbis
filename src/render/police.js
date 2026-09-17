@@ -1,8 +1,7 @@
 // Pursuit cars: hero-grade meshes with police paint and alternating lightbars.
 // Hidden (visible=false) until heat calls them — zero draws when clean.
 import * as THREE from 'three';
-import { bodyGeo, wheelGeo, beamGeo, tailGeo, poolGeo } from './traffic.js';
-import { getGlowTex } from './signs.js';
+import { bodyGeo, wheelGeo, beamGeo, tailGeo } from './traffic.js';
 
 const RED_HOT = new THREE.Color(0xff2222);
 const RED_DIM = new THREE.Color(0x440000);
@@ -29,12 +28,7 @@ export function buildPursuitCar() {
   const blueMat = new THREE.MeshBasicMaterial({ color: BLUE_DIM.clone() });
   const blue = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.14, 0.28), blueMat);
   blue.position.set(0.3, 1.55, -0.2);
-  const pool = new THREE.Mesh(poolGeo, new THREE.MeshBasicMaterial({
-    map: getGlowTex(), color: 0x4d6a8a, transparent: true, opacity: 0.4,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  pool.position.y = 0.05;
-  group.add(paint, wheels, beams, tails, barBase, red, blue, pool);
+  group.add(paint, wheels, beams, tails, barBase, red, blue);
   group.visible = false;
   return { group, redMat, blueMat };
 }

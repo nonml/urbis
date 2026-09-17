@@ -61,11 +61,84 @@ export const hubGeo = (() => {
 const glassMat = new THREE.MeshStandardMaterial({
   color: 0x0a121c, metalness: 0.9, roughness: 0.06, envMapIntensity: 2.2,
 });
-export const poolGeo = (() => {
-  const g = new THREE.PlaneGeometry(5, 8);
-  g.rotateX(-Math.PI / 2);
+// Headlight throw (VGA-004): two lens pools per car, laid along the heading and
+// stretched by speed, so a lit car reads as a car coming at you instead of a
+// quad floating on the road. Each lens is a trapezoid — narrow at the bumper,
+// spreading downroad — and the pair lives in one merged geometry, so it costs
+// exactly what the single oval cost. The traffic set stays one instanced draw.
+const POOL_NEAR = 1.6;        // the throw starts just past the bumper
+const POOL_FAR = 11;
+const POOL_NEAR_HALF = 0.45;  // lens-wide at the car
+const POOL_FAR_HALF = 1.5;    // spread downroad; the pair overlaps out there
+const POOL_LENS_X = 0.6;      // sits under the beam quads on the nose
+const POOL_Y = 0.045;
+const THROW_IDLE = 0.5;       // creeping: a short spill at the bumper
+const THROW_SPEED = 9;        // m/s that earns the full throw
+// Hero and pursuit cars ride the same instanced set: every lit car on the map
+// lays its throw in one draw, instead of one pool mesh each.
+const POOL_EXTRA = 3;
+const POOL_FADE_NEAR = 2.0;   // a throw you are standing inside is a white frame,
+const POOL_FADE_FAR = 6.0;    // so it shrinks away as its car reaches the camera
+
+function throwScale(speed) {
+  return THROW_IDLE + (1 - THROW_IDLE) * Math.min(1, Math.abs(speed) / THROW_SPEED);
+}
+
+function poolFade(x, z, cam) {
+  if (!cam) return 1;
+  const d = Math.hypot(x - cam.position.x, z - cam.position.z);
+  return Math.max(0, Math.min(1, (d - POOL_FADE_NEAR) / (POOL_FADE_FAR - POOL_FADE_NEAR)));
+}
+
+// Dark at the lens, hot a few metres out, gone by the far end, soft at both
+// flanks — the shape wet asphalt actually takes. A centred radial blob reads as
+// a puddle of light parked under the car, which is the floating-quad look this
+// item exists to kill.
+function throwTexture() {
+  const c = document.createElement('canvas');
+  c.width = c.height = 64;
+  const g = c.getContext('2d');
+  const along = g.createLinearGradient(0, 0, 0, 64);
+  along.addColorStop(0, 'rgba(255,255,255,0.15)');
+  along.addColorStop(0.18, 'rgba(255,255,255,0.85)');
+  along.addColorStop(0.55, 'rgba(255,255,255,0.32)');
+  along.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = along;
+  g.fillRect(0, 0, 64, 64);
+  g.globalCompositeOperation = 'destination-in';
+  const across = g.createLinearGradient(0, 0, 64, 0);
+  across.addColorStop(0, 'rgba(0,0,0,0)');
+  across.addColorStop(0.5, 'rgba(0,0,0,1)');
+  across.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = across;
+  g.fillRect(0, 0, 64, 64);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+const throwTex = { current: null };
+function getThrowTex() {
+  if (!throwTex.current) throwTex.current = throwTexture();
+  return throwTex.current;
+}
+
+// v = 1 at the bumper end, which is where the canvas above starts.
+function lensGeo(sx) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([
+    sx - POOL_NEAR_HALF, 0, POOL_NEAR, sx + POOL_NEAR_HALF, 0, POOL_NEAR,
+    sx - POOL_FAR_HALF, 0, POOL_FAR, sx + POOL_FAR_HALF, 0, POOL_FAR,
+  ], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 1, 1, 1, 0, 0, 1, 0], 2));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute([
+    0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0,
+  ], 3));
+  g.setIndex([0, 2, 1, 2, 3, 1]);
   return g;
-})();
+}
+
+const poolGeo = mergeGeometries([lensGeo(-POOL_LENS_X), lensGeo(POOL_LENS_X)]);
 
 const TAIL_DIM = new THREE.Color(0x7a140e);
 const TAIL_BRAKE = new THREE.Color(0xff2a20);
@@ -93,10 +166,10 @@ export function buildTraffic(street) {
   const glass = new THREE.InstancedMesh(canopyGeo, glassMat, N);
   const hubs = new THREE.InstancedMesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }), N);
   const poolMat = new THREE.MeshBasicMaterial({
-    map: getGlowTex(), color: 0x4d6a8a, transparent: true, opacity: 0.4,
+    map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
-  const pools = new THREE.InstancedMesh(poolGeo, poolMat, N);
+  const pools = new THREE.InstancedMesh(poolGeo, poolMat, N + POOL_EXTRA);
   const glows = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(2.4, 1.4),
     new THREE.MeshBasicMaterial({
@@ -113,6 +186,7 @@ export function buildTraffic(street) {
   bodies.instanceColor.needsUpdate = true;
   group.add(bodies, wheels, beams, tails, glass, hubs, pools);
   const rig = { bodies, wheels, beams, tails, glass, hubs, pools, glows, dummy };
+  updateCarPools(rig, [0, 0, 0].map(() => ({ x: 0, z: 0, yaw: 0, speed: 0, on: false })));
   updateTraffic(rig, street);
   return { group, rig };
 }
@@ -137,13 +211,11 @@ export function updateTraffic(rig, street, camera = null) {
     }
     beams.setMatrixAt(i, m);
     tails.setMatrixAt(i, m);
-    if (c.axis === 'x') {
-      dummy.position.set(c.x + c.dir * 3.5, 0.05, c.z);
-    } else {
-      dummy.position.set(c.x ?? c.lane, 0.05, c.z + c.dir * 3.5);
-    }
-    dummy.rotation.set(0, 0, 0);
-    dummy.scale.set(1, 1, 1);
+    // The pool rides the car's heading, not the world axis: before this,
+    // connector traffic threw its light across the street it was crossing.
+    placeOnCar(dummy, c, POOL_Y);
+    const fade = poolFade(c.x ?? c.lane, c.z, camera);
+    dummy.scale.set(fade, 1, throwScale(c.speed) * fade);
     dummy.updateMatrix();
     pools.setMatrixAt(i, dummy.matrix);
     if (c.axis === 'x') {
@@ -167,6 +239,21 @@ export function updateTraffic(rig, street, camera = null) {
   glows.instanceMatrix.needsUpdate = true;
 }
 
+
+export function updateCarPools(rig, cars, camera = null) {
+  const { pools, dummy } = rig;
+  const base = pools.count - POOL_EXTRA;
+  cars.forEach((c, i) => {
+    dummy.position.set(c.x, POOL_Y, c.z);
+    dummy.rotation.set(0, c.yaw, 0);
+    const fade = c.on ? poolFade(c.x, c.z, camera) : 0;
+    dummy.scale.set(fade, 1, throwScale(c.speed) * fade);
+    dummy.updateMatrix();
+    pools.setMatrixAt(base + i, dummy.matrix);
+  });
+  pools.instanceMatrix.needsUpdate = true;
+}
+
 // --- Hero car (player-driven): own materials, brake lights, real headlight spot.
 export function buildPlayerCar(scene, car) {
   const group = new THREE.Group();
@@ -180,11 +267,6 @@ export function buildPlayerCar(scene, car) {
   const tails = new THREE.Mesh(tailGeo, tailMat);
   const canopy = new THREE.Mesh(canopyGeo, glassMat);
   const hubs = new THREE.Mesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }));
-  const pool = new THREE.Mesh(poolGeo, new THREE.MeshBasicMaterial({
-    map: getGlowTex(), color: 0x6a8ab0, transparent: true, opacity: 0.5,
-    blending: THREE.AdditiveBlending, depthWrite: false,
-  }));
-  pool.position.y = 0.05;
   const glows = [];
   for (const sx of [-0.55, 0.55]) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -205,7 +287,7 @@ export function buildPlayerCar(scene, car) {
   }));
   beacon.scale.set(1.6, 3.2, 1);
   group.add(beacon);
-  group.add(paint, wheels, beams, tails, canopy, hubs, pool);
+  group.add(paint, wheels, beams, tails, canopy, hubs);
   // Contact shadow under the hero car.
   const carBlobC = document.createElement('canvas');
   carBlobC.width = carBlobC.height = 64;
@@ -225,7 +307,7 @@ export function buildPlayerCar(scene, car) {
   carBlob.rotation.x = -Math.PI / 2;
   carBlob.position.y = 0.01;
   group.add(carBlob);
-  const rig = { group, paint, wheels, beams, tails, tailMat, pool, glows, spot, beacon, carBlob };
+  const rig = { group, paint, wheels, beams, tails, tailMat, glows, spot, beacon, carBlob };
   updatePlayerCar(rig, car, false);
   return rig;
 }

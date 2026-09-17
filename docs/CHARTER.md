@@ -67,6 +67,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 022 | Shop canopies wear metalplates006 | **151** (+0) | `slice-022-canopy-day.png` |
 | 023 | Poly Haven ARM loader; concrete towers as a second architecture | **155** (+4) | `slice-023-day/-night/-blackout.png` |
 | 024 | Puddle mirrors — baked city cube, per-zone water (VGA-002) | **156** (+1, 173 peak) | `slice-024-night/-day/-blackout.png` |
+| 025 | Headlight throw — heading-aligned, speed-stretched, instanced (VGA-004) | **156** (−1, 172 peak) | `slice-025-avenue/-cross/-dark.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
@@ -81,7 +82,7 @@ Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queu
 (82 items, most still open) and closes first per operator redirect. The feature slices
 below are the **structural** work.
 
-Next free slice number: **025**.
+Next free slice number: **026**.
 
 ### Feature slices, in order
 

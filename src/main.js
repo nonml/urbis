@@ -10,7 +10,7 @@ import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
-import { buildTraffic, updateTraffic, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
+import { buildTraffic, updateTraffic, updateCarPools, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
 import { buildPursuitCar, updatePursuit } from './render/police.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
 import {
@@ -455,6 +455,13 @@ function render() {
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street, camera);
+  // Hero and pursuit throws ride the traffic pool set (VGA-004): three more
+  // instances, no extra draw. The hero keeps its lights on parked — the beacon
+  // is the other half of finding the car again.
+  updateCarPools(traffic.rig, [
+    { x: heroCar.x, z: heroCar.z, yaw: heroCar.yaw, speed: heroCar.speed, on: true },
+    ...wanted.pursuit.map((p) => ({ x: p.x, z: p.z, yaw: p.yaw, speed: p.speed, on: p.active })),
+  ], camera);
   updateBlobs(blobs, street, player, heroCar);
   const hx = driving ? heroCar.x : player.x;
   const hz = driving ? heroCar.z : player.z;
