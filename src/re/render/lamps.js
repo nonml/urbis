@@ -60,11 +60,24 @@ export function buildLamps() {
   const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.3);
   const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const heads = new THREE.InstancedMesh(headGeo, headMat, LAMPS.length);
-  // Narrow shaft, not a pyramid: the cone volume was the single most toy-like
-  // object in the frame. Pools on the ground carry the actual light.
-  const coneGeo = new THREE.ConeGeometry(1.7, HEAD_Y, 20, 1, true);
+  // Shafts fade head-to-ground via a gradient alphaMap: light falloff, not a
+  // solid pyramid. Same instanced mesh, +0 draws (VGA-082 partial).
+  const shaftTex = (() => {
+    const c = document.createElement('canvas');
+    c.width = 4;
+    c.height = 128;
+    const g = c.getContext('2d');
+    const grad = g.createLinearGradient(0, 0, 0, 128);
+    grad.addColorStop(0, '#909090');
+    grad.addColorStop(0.55, '#404040');
+    grad.addColorStop(1, '#000000');
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 4, 128);
+    return new THREE.CanvasTexture(c);
+  })();
+  const coneGeo = new THREE.ConeGeometry(1.5, HEAD_Y, 20, 1, true);
   const coneMat = new THREE.MeshBasicMaterial({
-    color: 0xffc98a, transparent: true, opacity: 0.03,
+    color: 0xffc98a, transparent: true, opacity: 0.05, alphaMap: shaftTex,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
   });
   const cones = new THREE.InstancedMesh(coneGeo, coneMat, LAMPS.length);

@@ -1,5 +1,25 @@
-// Player avatar: long raincoat silhouette + lit visor. Reads at night, cheap up close.
+// Player avatar: short jacket, long legs, small head with hair + face.
+// The beige ball was the closest toy in every frame; this kills it for +0 draws.
 import * as THREE from 'three';
+
+function heroFaceTexture() {
+  // SphereGeometry faces +z at u=0.25: eyes flank it, hair caps v<0.38.
+  const c = document.createElement('canvas');
+  c.width = 64;
+  c.height = 64;
+  const g = c.getContext('2d');
+  g.fillStyle = '#9a7b62';
+  g.fillRect(0, 0, 64, 64);
+  g.fillStyle = '#14100c';
+  g.fillRect(0, 0, 64, 24);
+  g.fillStyle = '#1a1210';
+  g.beginPath(); g.ellipse(12, 36, 3, 4, 0, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(20, 36, 3, 4, 0, 0, Math.PI * 2); g.fill();
+  g.fillRect(12, 46, 8, 2);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
 
 export function buildPlayer() {
   const group = new THREE.Group();
@@ -9,7 +29,7 @@ export function buildPlayer() {
   coat.castShadow = true;
   const head = new THREE.Mesh(
     new THREE.SphereGeometry(0.12, 12, 10),
-    new THREE.MeshStandardMaterial({ color: 0x9a7b62, roughness: 0.6 })
+    new THREE.MeshStandardMaterial({ map: heroFaceTexture(), roughness: 0.6 })
   );
   head.position.y = 1.70;
   const visor = new THREE.Mesh(

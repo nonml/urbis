@@ -145,7 +145,7 @@ Coverage footer at the bottom proves no gap was dropped.
 
 - **VGA-080 Filmic identity.** Grade with intent (teal-orange pressure), grain, halation, vignette discipline, night/day variants. Done when: grade on/off split frame. Draws: +1 (post).
 - **VGA-081 Depth & lens.** DoF/bokeh option, lens droplets + runs in rain, highlight fringing, spray blur at speed. Done when: photo framescene. Draws: +1..2.
-- **VGA-082 Light discipline.** Cone geometry replaced (soft shader volumes honoring occlusion), bloom thresholds so paint stays paint, night grounding via blob shadows + AO decals. Done when: `re-003-secret` angle re-shot — no pyramids. Draws: +1.
+- **VGA-082 Light discipline.** ⏳ PARTIAL (re-018: cones slimmed 3.4→1.5 with head-to-ground gradient falloff + contact-shadow blobs under all walkers/cars/hero, same draw count; true occluding soft volumes + bloom-threshold tuning still open). Done when: `re-003-secret` angle re-shot — no pyramids. Draws: +1.
 
 ---
 
