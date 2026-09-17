@@ -13,7 +13,7 @@ const SUN_DIR = new THREE.Vector3(-0.55, 0.52, -0.42).normalize();
 const DAY_TOP = new THREE.Color(0x2f66a8);
 const DAY_HOR = new THREE.Color(0xc3cfdd);
 const NIGHT_TOP = new THREE.Color(0x020409);
-const NIGHT_HOR = new THREE.Color(0x0a1020);
+const NIGHT_HOR = new THREE.Color(0x201a24);
 const DAY_FOG = new THREE.Color(0x9fb4cc);
 const NIGHT_FOG = new THREE.Color(0x070b16);
 const DAY_SKY = new THREE.Color(0xbdd3e8);
@@ -144,7 +144,7 @@ export function updateDaylight(env, scene, bloom, n) {
   scene.fog.density = 0.012 - 0.0055 * day;
   scene.background = null; // sky dome owns the background
   env.moonGlowMat.opacity = 0.5 * n;
-  bloom.threshold = 0.85 + 0.07 * day;
+  bloom.threshold = 0.92 + 0.05 * day;
   bloom.strength = 0.45 - 0.1 * day;
 }
 

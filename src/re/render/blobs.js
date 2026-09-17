@@ -20,7 +20,7 @@ export function buildBlobs(street) {
   const geo = new THREE.PlaneGeometry(1, 1);
   geo.rotateX(-Math.PI / 2);
   const mat = new THREE.MeshBasicMaterial({
-    map: blobTexture(), transparent: true, opacity: 0.5, depthWrite: false,
+    map: blobTexture(), transparent: true, opacity: 0.65, depthWrite: false,
   });
   const mesh = new THREE.InstancedMesh(geo, mat, street.npcs.length + street.cars.length + 1);
   mesh.renderOrder = 1;

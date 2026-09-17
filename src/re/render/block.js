@@ -101,9 +101,9 @@ export function buildGround(texLoader, maxAniso) {
 function buildMarkings() {
   const quads = [[], []];
   const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
-  const dash = new THREE.PlaneGeometry(0.15, 2);
+  const dash = new THREE.PlaneGeometry(0.13, 3);
   for (const ax of [0, 44, -44]) {
-    for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 5) {
+    for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 8) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
       q.translate(ax, 0.02, z);
@@ -158,7 +158,7 @@ function buildMarkings() {
     }
   }
   // Edge lines split at the zone boundary — same look, two draws.
-  const edge = new THREE.PlaneGeometry(0.12, STREET_LEN / 2);
+  const edge = new THREE.PlaneGeometry(0.10, STREET_LEN / 2);
   for (const ax of [0, 44, -44]) {
     for (const ex of [ax - 3.7, ax + 3.7]) {
       for (const [zc, zs] of [[-STREET_LEN / 4, 0], [STREET_LEN / 4, 1]]) {
@@ -172,7 +172,7 @@ function buildMarkings() {
   const mats = [];
   const meshes = quads.map((list) => {
     const mat = new THREE.MeshStandardMaterial({
-      color: 0xd8dce2, emissive: 0x8f959e, emissiveIntensity: 0.05, roughness: 0.6,
+      color: 0xb8bcc2, emissive: 0x6a7078, emissiveIntensity: 0.015, roughness: 0.6,
     });
     mats.push(mat);
     return new THREE.Mesh(mergeGeometries(list), mat);

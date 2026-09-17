@@ -159,8 +159,9 @@ scene.add(heroKey);
 const { composer, bloom } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
 
-// Follow cam: drag looks, wheel dollies. WASD moves player / drives car.
-const cam = { yaw: Math.PI, pitch: 0.34, dist: 7 };
+// Follow cam: lower and closer than before — towers loom, street glow fills
+// the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
+const cam = { yaw: Math.PI, pitch: 0.26, dist: 5.5 };
 let dragging = false;
 let lastDragT = -10;
 let lastPX = 0;
@@ -253,8 +254,8 @@ function toggleVehicle() {
     player.z = Math.max(-68, Math.min(100, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
-    cam.dist = 7;
-    cam.pitch = 0.34;
+    cam.dist = 5.5;
+    cam.pitch = 0.26;
   }
 }
 
@@ -394,7 +395,7 @@ function render() {
     const mk = markingMats[z];
     mk.color.setScalar((0.25 + 0.75 * nf) * (0.05 + 0.95 * b));
     mk.envMapIntensity = 0.1 + 0.6 * nf * b;
-    mk.emissiveIntensity = 0.05 * nf * b;
+    mk.emissiveIntensity = 0.015 * nf * b;
   }
   updateCarStreaks(carStreaks, heroCar, driving, wanted.pursuit, nf, street.time);
   signs.tick(signs.zoneMats, signs.zoneSprites, glows, street.time, nf);
