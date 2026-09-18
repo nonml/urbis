@@ -281,33 +281,81 @@ const FACADE_MAPS = [
 // What the pane emits, not what colour it is. A flat amber rectangle is a
 // lightbox; a shop is a bright ceiling, a dim floor and stock in between, and
 // at play distance that gradient plus a few dark verticals is the whole read.
-// Every pane maps this once, so the district costs one 128x64 canvas.
-function shopInteriorTexture() {
-  const c = document.createElement('canvas');
-  c.width = 128;
-  c.height = 64;
-  const g = c.getContext('2d');
-  const wash = g.createLinearGradient(0, 0, 0, 64);
-  wash.addColorStop(0, '#ffdcae');
-  wash.addColorStop(0.28, '#e8a863');
-  wash.addColorStop(0.72, '#8a5a30');
-  wash.addColorStop(1, '#241708');
+//
+// Four of them, in one 256x128 atlas, because the thing that gave the old
+// single-cell version away was not any one pane — it was twenty identical
+// amber panes in a row down the block. Each trade also gets its own colour
+// temperature, so the street stops being lit by one bulb.
+const SHOP_KINDS = [
+  { wash: ['#eef6ff', '#d4e3f4', '#9db2c8', '#3c4a5a'], spill: '#dbe8ff' },  // grocery
+  { wash: ['#ffe0b0', '#efad70', '#9a663a', '#4a301a'], spill: '#ffb066' },  // noodle bar
+  { wash: ['#dff6ff', '#a8dcef', '#5d8b9e', '#2c424c'], spill: '#bfe4f5' },  // laundromat
+  { wash: ['#ffd9ec', '#e894c1', '#95496d', '#452032'], spill: '#ffa8d0' },  // boutique
+];
+
+function paintShopCell(g, kind, ox, oy) {
+  const w = 128;
+  const h = 64;
+  const wash = g.createLinearGradient(0, oy, 0, oy + h);
+  const stops = SHOP_KINDS[kind].wash;
+  [0, 0.28, 0.72, 1].forEach((t, i) => wash.addColorStop(t, stops[i]));
   g.fillStyle = wash;
-  g.fillRect(0, 0, 128, 64);
-  g.fillStyle = 'rgba(255,240,215,0.85)';
-  g.fillRect(0, 2, 128, 5);           // ceiling strip
-  g.fillStyle = 'rgba(20,12,6,0.72)';
-  for (const [x, w, top] of [[12, 9, 22], [31, 6, 30], [58, 11, 18], [83, 7, 27], [104, 10, 24]]) {
-    g.fillRect(x, top, w, 64 - top);  // shelving and stock
+  g.fillRect(ox, oy, w, h);
+  g.fillStyle = 'rgba(255,255,255,0.9)';
+  g.fillRect(ox, oy + 2, w, 5);                                  // ceiling strip
+  const ink = 'rgba(14,10,6,0.74)';
+  g.fillStyle = ink;
+  if (kind === 0) {
+    for (const x of [10, 34, 58, 82, 106]) g.fillRect(ox + x, oy + 20, 12, 44);
+    g.fillRect(ox, oy + 40, w, 2);                               // aisle shelf line
+  } else if (kind === 1) {
+    g.fillRect(ox + 8, oy + 46, w - 16, 12);                     // counter
+    g.fillRect(ox + 52, oy + 24, 7, 18);                         // cook behind it
+    g.fillRect(ox + 51, oy + 18, 9, 7);
+    for (const x of [22, 46, 70, 94]) g.fillRect(ox + x, oy + 7, 3, 9);  // pendant stems
+  } else if (kind === 2) {
+    for (const x of [14, 44, 74, 104]) {                         // washer drums
+      g.fillRect(ox + x - 10, oy + 26, 22, 30);
+      g.fillStyle = 'rgba(230,248,255,0.55)';
+      g.beginPath(); g.arc(ox + x, oy + 40, 7, 0, Math.PI * 2); g.fill();
+      g.fillStyle = ink;
+    }
+  } else {
+    for (const x of [30, 96]) {                                  // two mannequins
+      g.fillRect(ox + x - 3, oy + 22, 6, 34);
+      g.fillRect(ox + x - 5, oy + 16, 10, 7);
+    }
+    g.fillRect(ox + 56, oy + 44, 18, 20);                        // a low plinth
   }
-  g.fillStyle = 'rgba(12,8,4,0.8)';
-  g.fillRect(44, 34, 5, 30);          // a figure at the counter
-  g.fillRect(43, 29, 7, 6);
   g.fillStyle = 'rgba(10,7,4,0.9)';
-  g.fillRect(0, 58, 128, 6);          // the sill's own shadow
+  g.fillRect(ox, oy + h - 6, w, 6);                              // the sill's shadow
+}
+
+function shopInteriorAtlas() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 128;
+  const g = c.getContext('2d');
+  for (let k = 0; k < 4; k += 1) paintShopCell(g, k, (k % 2) * 128, k < 2 ? 0 : 64);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  // No mips: a half-resolution mip of a 2x2 atlas bleeds the noodle bar into
+  // the laundromat, and these panes are never far enough away to need them.
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
   return tex;
+}
+
+// Point a pane's UVs at one atlas cell. Canvas row 0 is the top, and a
+// CanvasTexture flips Y, so cells 0 and 1 live in the upper half of UV space.
+function uvCell(geo, kind) {
+  const uv = geo.attributes.uv;
+  const cu = (kind % 2) * 0.5;
+  const cv = kind < 2 ? 0.5 : 0;
+  for (let i = 0; i < uv.count; i += 1) {
+    uv.setXY(i, cu + uv.getX(i) * 0.5, cv + uv.getY(i) * 0.5);
+  }
+  return geo;
 }
 
 function towerMaterials(texLoader, maxAniso) {
@@ -337,7 +385,7 @@ function towerMaterials(texLoader, maxAniso) {
   // Ground-floor glazing, one material per power zone. It has to be zoned:
   // a shopfront still burning through a blackout is exactly the dishonesty
   // VGA-007 was opened for. Emissive is driven from main with the lamps.
-  const interior = shopInteriorTexture();
+  const interior = shopInteriorAtlas();
   const shopGlass = [0, 1].map(() => {
     const m = new THREE.MeshStandardMaterial({
       color: 0x11161d, emissive: 0xffffff, emissiveIntensity: 0, emissiveMap: interior,
@@ -389,7 +437,7 @@ export function buildTowers(texLoader, maxAniso) {
   const SHOP_MARGIN = 1.5;     // solid pier each side of the glazing
   const AWNING_OUT = 0.85;
   const SPILL_OUT = 1.9;       // pool centre, just off the kerb side of the glass
-  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], pod) {
+  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], pod, idx) {
     const alongZ = fx !== 0;
     const pw = w + 1.2;
     const pd = d + 1.2;
@@ -418,12 +466,18 @@ export function buildTowers(texLoader, maxAniso) {
       for (let i = 0; i < bays; i++) {
         const u = -run / 2 + i * (bayW + pier) + bayW / 2;
         const [gx, gz] = at(u, 0.02);
-        shopGeos[zone].push(faceBox(bayW, gh, 0.08, gx, midY, gz, alongZ));
+        // Which trade this tenancy is. Stepping by a number coprime with 4
+        // across both the block index and the bay index means no two
+        // neighbours match and no block repeats the block before it.
+        const kind = (idx * 3 + i) % SHOP_KINDS.length;
+        shopGeos[zone].push(uvCell(faceBox(bayW, gh, 0.08, gx, midY, gz, alongZ), kind));
         // Spill on the pavement. A lit window with dark ground under it is a
         // sticker; this rides the existing per-zone pool mesh, so it is free
         // and it dies in a blackout with everything else.
         const [lx, lz] = at(u, SPILL_OUT);
-        shopPools.push({ x: lx, z: lz, size: Math.min(bayW * 1.5, 7), color: '#ffb066', zone });
+        shopPools.push({
+          x: lx, z: lz, size: Math.min(bayW * 1.5, 7), color: SHOP_KINDS[kind].spill, zone,
+        });
         // Mullions inside a bay: the vertical rhythm that says shopfront.
         for (const mu of [-bayW / 4, bayW / 4]) {
           const [mx, mz] = at(u + mu, 0.09);
@@ -461,7 +515,7 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
     // Small canopy over the door.
     caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
-    if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod);
+    if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
     shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
@@ -518,7 +572,9 @@ export function buildTowers(texLoader, maxAniso) {
     m.receiveShadow = false;
     return m;
   });
-  const capMat = new THREE.MeshStandardMaterial({ color: 0x0b0d12, roughness: 0.9 });
+  const capMat = new THREE.MeshStandardMaterial({
+    color: 0x1b1f27, roughness: 0.78, metalness: 0.15, envMapIntensity: 0.7,
+  });
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
   group.add(capMesh);
