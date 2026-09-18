@@ -1,5 +1,7 @@
 // Player vehicle: arcade handling, pure data. No collision yet —
 // road-clamped only (cutover polish will add poles, cars, facades).
+import { DRIVE_BOUNDS, clampToBounds } from './world.js';
+
 export const CAR_TOP = 12;
 export const CAR_REVERSE = 4;
 const ACCEL = 9;
@@ -30,7 +32,11 @@ export function tickPlayerCar(car, input, dt) {
   car.yaw += input.steer * TURN * grip * dt;
   car.x += Math.sin(car.yaw) * car.speed * dt;
   car.z += Math.cos(car.yaw) * car.speed * dt;
-  if (car.x < -52 || car.x > 52) { car.x = Math.max(-52, Math.min(52, car.x)); car.speed = 0; }
-  if (car.z < -68 || car.z > 100) { car.z = Math.max(-68, Math.min(100, car.z)); car.speed = 0; }
+  const inside = clampToBounds(DRIVE_BOUNDS, car.x, car.z);
+  if (inside.hit) {
+    car.x = inside.x;
+    car.z = inside.z;
+    car.speed = 0;
+  }
   return { braking };
 }

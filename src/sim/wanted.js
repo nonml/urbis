@@ -1,5 +1,7 @@
 // Wanted: heat 0-3, pursuit cars that seek the player, busted on catch.
 // Crimes: blackouts (+1). Speeding holds heat. Darkness + distance shed it.
+import { DRIVE_BOUNDS, clampToBounds } from './world.js';
+
 export const MAX_HEAT = 3;
 export const PURSUIT_SPEED = 10;
 const CATCH_DIST_FOOT = 3.5;
@@ -48,6 +50,25 @@ function syncPursuit(w) {
   w.pursuit.forEach((p, i) => { p.active = i < want; });
 }
 
+// One chase car's step. Returns its distance to the target *before* it moved,
+// which is the distance the catch test has always read.
+function stepPursuit(p, tx, tz, dt) {
+  const dx = tx - p.x;
+  const dz = tz - p.z;
+  const d = Math.hypot(dx, dz);
+  let diff = Math.atan2(dx, dz) - p.yaw;
+  while (diff > Math.PI) diff -= Math.PI * 2;
+  while (diff < -Math.PI) diff += Math.PI * 2;
+  p.yaw += Math.max(-1, Math.min(1, diff * 3)) * 1.8 * dt;
+  p.speed += ((d > 6 ? PURSUIT_SPEED : PURSUIT_SPEED * 0.4) - p.speed) * Math.min(1, dt * 2);
+  const inside = clampToBounds(
+    DRIVE_BOUNDS, p.x + Math.sin(p.yaw) * p.speed * dt, p.z + Math.cos(p.yaw) * p.speed * dt
+  );
+  p.x = inside.x;
+  p.z = inside.z;
+  return d;
+}
+
 // tx,tz target pos. cover=true when target hides in a dark zone.
 export function tickWanted(w, dt, tx, tz, inCar, carSpeed, cover, time) {
   if (isBusted(w, time)) return 'busted';
@@ -65,21 +86,7 @@ export function tickWanted(w, dt, tx, tz, inCar, carSpeed, cover, time) {
   }
   let nearest = Infinity;
   for (const p of w.pursuit) {
-    if (!p.active) continue;
-    const dx = tx - p.x;
-    const dz = tz - p.z;
-    const d = Math.hypot(dx, dz);
-    nearest = Math.min(nearest, d);
-    const want = Math.atan2(dx, dz);
-    let diff = want - p.yaw;
-    while (diff > Math.PI) diff -= Math.PI * 2;
-    while (diff < -Math.PI) diff += Math.PI * 2;
-    p.yaw += Math.max(-1, Math.min(1, diff * 3)) * 1.8 * dt;
-    p.speed += ((d > 6 ? PURSUIT_SPEED : PURSUIT_SPEED * 0.4) - p.speed) * Math.min(1, dt * 2);
-    p.x += Math.sin(p.yaw) * p.speed * dt;
-    p.z += Math.cos(p.yaw) * p.speed * dt;
-    p.x = Math.max(-52, Math.min(52, p.x));
-    p.z = Math.max(-68, Math.min(100, p.z));
+    if (p.active) nearest = Math.min(nearest, stepPursuit(p, tx, tz, dt));
   }
   if (w.heat === 0) {
     w.catchT = 0;

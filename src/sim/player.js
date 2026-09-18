@@ -1,7 +1,8 @@
 // On-foot player state. Pure data — render reads, main ticks.
+import { WALK_BOUNDS, clampToBounds } from './world.js';
+
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
-export const BOUNDS = { minX: -52, maxX: 70, minZ: -68, maxZ: 100 };
 
 export function createPlayer() {
   return {
@@ -21,8 +22,9 @@ export function tickPlayer(player, input, dt) {
   if (player.speed > 0.05) {
     player.x += input.mx * player.speed * dt;
     player.z += input.mz * player.speed * dt;
-    player.x = Math.max(BOUNDS.minX, Math.min(BOUNDS.maxX, player.x));
-    player.z = Math.max(BOUNDS.minZ, Math.min(BOUNDS.maxZ, player.z));
+    const inside = clampToBounds(WALK_BOUNDS, player.x, player.z);
+    player.x = inside.x;
+    player.z = inside.z;
     // Only steer while there is actually a direction to steer to. Coasting to
     // a stop still runs this block with a zero input vector, and atan2(0, 0) is
     // 0 — so releasing the key used to spin the hero round to face world +Z,
