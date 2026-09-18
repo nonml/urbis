@@ -73,7 +73,7 @@ export function buildNPCs(street) {
   bakeVerticalShade(armGeo, 1.42);
   const coatMat = new THREE.MeshStandardMaterial({
     roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, vertexColors: true,
-    ...coatFabric(0.5),
+    ...coatFabric(0.34),
   });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
   bodies.castShadow = true;

@@ -62,7 +62,7 @@ function fabricNormalMap() {
   _fabric = new THREE.CanvasTexture(c);
   _fabric.wrapS = THREE.RepeatWrapping;
   _fabric.wrapT = THREE.RepeatWrapping;
-  _fabric.repeat.set(4, 4);
+  _fabric.repeat.set(2.4, 2.4);
   return _fabric;
 }
 
@@ -128,7 +128,7 @@ export function buildPlayer() {
   bakeVerticalShade(coatGeo, 0);
   const coatMat = new THREE.MeshStandardMaterial({
     color: 0x112b32, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9, vertexColors: true,
-    ...coatFabric(0.62),
+    ...coatFabric(0.4),
   });
   const coat = new THREE.Mesh(coatGeo, coatMat);
   coat.castShadow = true;

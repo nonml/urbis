@@ -506,6 +506,91 @@ function podiumSkin(cx, cz, pw, pd, caps, pod) {
   caps.push(box(0.48, 0.62, 0.8, cx - pw * 0.3, 3.5, cz - pd / 2 - 0.34));
 }
 
+// Flyposting. A podium wall with pilasters on it is still a clean wall, and
+// clean is the last thing a ground floor is: the surface people can reach is
+// the one that gets covered. Four bills in a 2x2 atlas, planted in clusters
+// with a little rotation and a little overlap, on every face of every podium
+// — one mesh, one material, one draw for the whole district.
+const POSTER_INK = ['#c8342a', '#1d5ca8', '#d8a417', '#2a8f68'];
+
+function paintPoster(g, k, ox, oy) {
+  const S = 128;
+  g.fillStyle = k % 2 ? '#d8d2c4' : '#b9b3a6';
+  g.fillRect(ox, oy, S, S);
+  g.fillStyle = POSTER_INK[k];
+  if (k === 0) {
+    g.fillRect(ox + 8, oy + 10, S - 16, 44);
+    g.fillStyle = '#1b1712';
+    for (let i = 0; i < 5; i += 1) g.fillRect(ox + 14, oy + 66 + i * 11, S - 28 - (i % 3) * 18, 5);
+  } else if (k === 1) {
+    g.beginPath(); g.arc(ox + S / 2, oy + 52, 34, 0, Math.PI * 2); g.fill();
+    g.fillStyle = '#17141a';
+    g.fillRect(ox + 10, oy + 96, S - 20, 8);
+    g.fillRect(ox + 26, oy + 110, S - 52, 6);
+  } else if (k === 2) {
+    for (let i = 0; i < 4; i += 1) g.fillRect(ox + 10, oy + 12 + i * 30, S - 20, 18);
+    g.fillStyle = '#1b1712';
+    g.fillRect(ox + 10, oy + 116, S - 20, 6);
+  } else {
+    g.fillRect(ox + 12, oy + 14, 46, S - 30);
+    g.fillStyle = '#17141a';
+    for (let i = 0; i < 7; i += 1) g.fillRect(ox + 66, oy + 20 + i * 14, 48 - (i % 2) * 16, 6);
+  }
+  g.fillStyle = 'rgba(12,10,8,0.5)';
+  g.fillRect(ox, oy, S, 3);
+  g.fillRect(ox, oy + S - 3, S, 3);
+}
+
+function posterAtlas() {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  const g = c.getContext('2d');
+  for (let k = 0; k < 4; k += 1) paintPoster(g, k, (k % 2) * 128, k < 2 ? 0 : 128);
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
+function posterCell(geo, k) {
+  const uv = geo.attributes.uv;
+  const cu = (k % 2) * 0.5;
+  const cv = k < 2 ? 0.5 : 0;
+  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, cu + uv.getX(i) * 0.5, cv + uv.getY(i) * 0.5);
+  return geo;
+}
+
+// Bills go on all four faces, seeded off the tower index so the same wall
+// carries the same bills every run. They cluster and overlap rather than
+// spacing out politely: evenly spaced posters read as signage, and a stack
+// of them half over each other reads as a wall nobody owns. Pasted at 0.03
+// off the plaster so they sit behind the pilasters, not in front of them.
+function posterCluster(out, at, span, base, idx, f) {
+  const n = 2 + ((idx * 7 + f) % 3);
+  for (let i = 0; i < n; i += 1) {
+    const seed = idx * 31 + f * 11 + i * 7 + base * 3;
+    const h = 0.58 + ((seed % 5) * 0.11);
+    const geo = posterCell(new THREE.PlaneGeometry(h * 0.72, h), (seed * 5) % 4);
+    geo.rotateZ((((seed * 13) % 11) - 5) * 0.014);
+    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17));
+    if (Math.abs(base) < span / 2) out.push(geo);
+  }
+}
+
+function posterWall(out, cx, cz, pw, pd, idx) {
+  for (let f = 0; f < 4; f += 1) {
+    const alongZ = f < 2;
+    const dir = f % 2 ? 1 : -1;
+    const span = (alongZ ? pd : pw) - 1.6;
+    const t = (alongZ ? pw : pd) / 2 + 0.03;
+    const at = (geo, u, y) => {
+      geo.rotateY(alongZ ? dir * Math.PI / 2 : (dir > 0 ? 0 : Math.PI));
+      geo.translate(alongZ ? cx + dir * t : cx + u, y, alongZ ? cz + u : cz + dir * t);
+    };
+    for (const base of [-span * 0.28, span * 0.3]) posterCluster(out, at, span, base, idx, f);
+  }
+}
+
 // A box laid flat against a podium face. `alongZ` says the face normal points
 // down X, so the pane's width runs in Z instead.
 function faceBox(wide, tall, thick, x, y, z, alongZ) {
@@ -522,6 +607,7 @@ export function buildTowers(texLoader, maxAniso) {
   const shopGeos = [[], []];
   const shopPools = [];
   const beaconPts = [];
+  const posters = [];
   // The eye-level pass. A 4.2m plaster box with one narrow door is the single
   // biggest reason the street reads as a model: at walking distance a wall has
   // to have a base, a rhythm, a shopfront and something casting a shadow on it.
@@ -603,6 +689,7 @@ export function buildTowers(texLoader, maxAniso) {
     const pod = podiums[idx % podiums.length];
     pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, pod);
+    posterWall(posters, cx, cz, w + 1.2, d + 1.2, idx);
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
     // Door recess: dark inset on the street-facing podium face.
@@ -672,6 +759,11 @@ export function buildTowers(texLoader, maxAniso) {
   const capMat = new THREE.MeshStandardMaterial({
     color: 0x1b1f27, roughness: 0.78, metalness: 0.15, envMapIntensity: 0.7,
   });
+  const posterMesh = new THREE.Mesh(mergeGeometries(posters), new THREE.MeshStandardMaterial({
+    map: posterAtlas(), roughness: 0.94, metalness: 0, side: THREE.DoubleSide,
+  }));
+  posterMesh.receiveShadow = true;
+  group.add(posterMesh);
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
   group.add(capMesh);
