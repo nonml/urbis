@@ -178,10 +178,24 @@ export function buildPlayer() {
   // near-black base — a black pack on a dark coat is a silhouette with nothing
   // in it, and that read as one shape rather than a person carrying something.
   const kitGeo = mergeGeometries([
-    shade(new THREE.BoxGeometry(0.28, 0.34, 0.16), [0, 1.23, -0.25], 3.2),
-    shade(new THREE.BoxGeometry(0.29, 0.07, 0.17), [0, 1.37, -0.252], 4.6),
-    shade(new THREE.BoxGeometry(0.06, 0.26, 0.05), [-0.11, 1.34, -0.155], 2.0),
-    shade(new THREE.BoxGeometry(0.06, 0.26, 0.05), [0.11, 1.34, -0.155], 2.0),
+    shade(new THREE.BoxGeometry(0.28, 0.31, 0.16), [0, 1.29, -0.25], 2.3),
+    // Belt. A coat with a waist is a garment; a coat without one is a cone
+    // with a gradient painted on it, and the vertex ramp alone was never
+    // going to carry the break on its own.
+    (() => {
+      const g = new THREE.TorusGeometry(0.247, 0.026, 6, 20);
+      g.rotateX(Math.PI / 2);
+      g.scale(1.02, 1, 0.70);
+      g.translate(0, 1.07, 0);
+      return shade(g, [0, 0, 0], 1.5);
+    })(),
+    (() => {
+      const g = new THREE.BoxGeometry(0.09, 0.075, 0.05);
+      return shade(g, [0.055, 1.07, 0.176], 3.4);
+    })(),
+    shade(new THREE.BoxGeometry(0.29, 0.07, 0.17), [0, 1.42, -0.252], 3.9),
+    shade(new THREE.BoxGeometry(0.06, 0.24, 0.05), [-0.11, 1.38, -0.155], 1.6),
+    shade(new THREE.BoxGeometry(0.06, 0.24, 0.05), [0.11, 1.38, -0.155], 1.6),
     (() => {
       const g = new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
       g.scale(0.90, 1.08, 1.02);
