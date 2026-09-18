@@ -1,22 +1,42 @@
 // Living-street sim: sidewalk walkers, lane traffic, lamp-zone blackout hack.
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
+import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUE_X, way, wayLength } from './world.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
+
+const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
+const PLAZA = way('plaza');
+const SOUTH = way('south');
+
+// Parked cars sit just inside the kerb, and walkers keep two lines each side of
+// an avenue: one off the kerb, one up against the shopfronts.
+const PARKED_LANE_OUT = 3.4;
+const KERB_LANE_OUT = ROAD_HALF_WIDTH + 2.2;
+const WALL_LANE_OUT = ROAD_HALF_WIDTH + 2.7;
+// A walker on a crossing's footway, and how far short of the junction mouth
+// they turn back.
+const SOUTH_WALK_OUT = 5.5;
+const PLAZA_WALK_OUT = 5.2;
+const WALK_INSET = 2;
+
 // Curb parking slots: [avenueX, side, z]. Static, never ticked — density for
 // +0 draws (they ride the same traffic InstancedMeshes as moving cars).
 const PARKED_SLOTS = [
-  [0, 1, -70], [0, -1, -52], [0, 1, -30], [0, -1, -12], [0, 1, 8], [0, -1, 26],
-  [44, 1, -58], [44, -1, -34], [44, 1, -8], [44, -1, 54], [44, 1, 72],
-  [-44, -1, -64], [-44, 1, -20], [-44, -1, 60],
+  [MAIN_X, 1, -70], [MAIN_X, -1, -52], [MAIN_X, 1, -30],
+  [MAIN_X, -1, -12], [MAIN_X, 1, 8], [MAIN_X, -1, 26],
+  [EAST_X, 1, -58], [EAST_X, -1, -34], [EAST_X, 1, -8], [EAST_X, -1, 54], [EAST_X, 1, 72],
+  [WEST_X, -1, -64], [WEST_X, 1, -20], [WEST_X, -1, 60],
 ];
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
 export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
-export const STREET_HALF = 100;
+// Half an avenue's run. Walkers and traffic wrap here, so the loop is exactly
+// as long as the tarmac is.
+export const STREET_HALF = wayLength(way('main')) / 2;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
 export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];
@@ -80,9 +100,12 @@ function makeNSWalker(rng, i, npcSpots) {
 function makeEWWalker(rng, i) {
   // Cross-street walkers: stroll the connector sidewalks (E-W), not the avenues.
   const onSouth = i >= 56;
-  const z = onSouth ? -58.5 : (rng.sim() < 0.5 ? 34.8 : 45.2);
-  const xMin = onSouth ? -5 : -50;
-  const xMax = onSouth ? 49 : 50;
+  const z = onSouth
+    ? SOUTH.z + SOUTH_WALK_OUT
+    : PLAZA.z + (rng.sim() < 0.5 ? -PLAZA_WALK_OUT : PLAZA_WALK_OUT);
+  const cross = onSouth ? SOUTH : PLAZA;
+  const xMin = cross.x0 + WALK_INSET;
+  const xMax = cross.x1 - WALK_INSET;
   return {
     axis: 'x',
     x: xMin + rng.sim() * (xMax - xMin),
@@ -95,10 +118,10 @@ function makeEWWalker(rng, i) {
 
 function makeNSCar(rng, i) {
   const dir = i % 2 === 0 ? 1 : -1;
-  const avenue = [0, 44, -44][i % 3];
+  const avenue = AVENUE_X[i % AVENUE_X.length];
   return {
     axis: 'z',
-    lane: avenue + (dir > 0 ? 2 : -2),
+    lane: avenue + dir * LANE_OFFSET,
     dir,
     z: -STREET_HALF + ((i * 37) % 12) / 12 * STREET_HALF * 2,
     speed: 7 + rng.sim() * 3,
@@ -108,16 +131,16 @@ function makeNSCar(rng, i) {
 }
 
 function makeEWCar(rng, i) {
-  // Cross-street traffic: run the z=40 connector + south road E-W.
+  // Cross-street traffic: run the plaza connector + south road E-W.
   const onSouth = i >= 15;
-  const base = onSouth ? -64 : 40;
+  const cross = onSouth ? SOUTH : PLAZA;
   const dir = i % 2 === 0 ? 1 : -1;
-  const xMin = onSouth ? -7 : -52;
-  const xMax = onSouth ? 51 : 52;
+  const xMin = cross.x0;
+  const xMax = cross.x1;
   return {
     axis: 'x',
     x: xMin + ((i * 53) % 10) / 10 * (xMax - xMin),
-    z: base + (dir > 0 ? 2 : -2),
+    z: cross.z + dir * LANE_OFFSET,
     dir,
     speed: 7 + rng.sim() * 3,
     paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
@@ -130,8 +153,11 @@ function makeEWCar(rng, i) {
 export function createStreet(seed) {
   const rng = createStreams(seed);
   const npcSpots = [];
-  for (const baseX of [0, 44, -44]) {
-    npcSpots.push(baseX - 6.2, baseX - 5.7, baseX + 5.7, baseX + 6.2);
+  for (const baseX of AVENUE_X) {
+    npcSpots.push(
+      baseX - WALL_LANE_OUT, baseX - KERB_LANE_OUT,
+      baseX + KERB_LANE_OUT, baseX + WALL_LANE_OUT
+    );
   }
   const npcs = [];
   for (let i = 0; i < NPC_COUNT; i++) {
@@ -145,7 +171,7 @@ export function createStreet(seed) {
   PARKED_SLOTS.forEach(([ax, side, z], k) => {
     cars.push({
       axis: 'z',
-      lane: ax + side * 3.4,
+      lane: ax + side * PARKED_LANE_OUT,
       dir: side > 0 ? 1 : -1,
       z,
       speed: 0,
@@ -245,8 +271,8 @@ export function tickStreet(state, dt) {
     if (hurrying && !dark) v *= 1.6;
     if (n.axis === 'x') {
       n.x += n.dir * v * dt;
-      const lo = n.xMin ?? -50;
-      const hi = n.xMax ?? 50;
+      const lo = n.xMin ?? PLAZA.x0 + WALK_INSET;
+      const hi = n.xMax ?? PLAZA.x1 - WALK_INSET;
       if (n.x > hi) n.x = lo;
       if (n.x < lo) n.x = hi;
     } else {
@@ -260,8 +286,8 @@ export function tickStreet(state, dt) {
     if (c.parked) continue;
     if (c.axis === 'x') {
       c.x += c.dir * c.speed * dt;
-      const lo = (c.xMin ?? -52) - 3;
-      const hi = (c.xMax ?? 52) + 3;
+      const lo = (c.xMin ?? PLAZA.x0) - 3;
+      const hi = (c.xMax ?? PLAZA.x1) + 3;
       if (c.x > hi) c.x = lo;
       if (c.x < lo) c.x = hi;
     } else {
