@@ -3,7 +3,7 @@
 // the walker freezes. Hats/visors hide via zero-scale for wearers without.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { bakeVerticalShade, coatFabric } from './player.js';
+import { bakeVerticalShade, coatFabric, weaveUVs } from './player.js';
 import { NPC_COUNT, SKIN_TONES, isDark, zoneAt } from '../sim/street.js';
 
 const HAT_COLORS = [0x14161c, 0x3a2a1a, 0x1a3a4a, 0x5c1f2e];
@@ -69,11 +69,11 @@ export function buildNPCs(street) {
   // gradient the hero has. One attribute, no extra draw, no extra material.
   const armGeo = new THREE.CylinderGeometry(0.055, 0.065, 0.55, 7);
   armGeo.translate(0, -0.275, 0);
-  bakeVerticalShade(coatGeo, 0.02);
-  bakeVerticalShade(armGeo, 1.42);
+  bakeVerticalShade(weaveUVs(coatGeo), 0.02);
+  bakeVerticalShade(weaveUVs(armGeo), 1.42);
   const coatMat = new THREE.MeshStandardMaterial({
     roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, vertexColors: true,
-    ...coatFabric(0.34),
+    ...coatFabric(0.42),
   });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
   bodies.castShadow = true;

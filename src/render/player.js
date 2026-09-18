@@ -62,8 +62,23 @@ function fabricNormalMap() {
   _fabric = new THREE.CanvasTexture(c);
   _fabric.wrapS = THREE.RepeatWrapping;
   _fabric.wrapT = THREE.RepeatWrapping;
-  _fabric.repeat.set(2.4, 2.4);
+  _fabric.repeat.set(1, 1);
   return _fabric;
+}
+
+// A lathe gives each profile segment an equal slice of UV v regardless of how
+// tall it is, so a 0.12m shoulder and a 0.30m skirt get the same slice and the
+// weave bunches into a visible crosshatch over the lower coat. Project from
+// world space instead and the cloth is the same density everywhere.
+export function weaveUVs(geo, per = 6) {
+  const pos = geo.attributes.position;
+  const uv = new Float32Array(pos.count * 2);
+  for (let i = 0; i < pos.count; i += 1) {
+    uv[i * 2] = (pos.getX(i) + pos.getZ(i)) * per;
+    uv[i * 2 + 1] = pos.getY(i) * per;
+  }
+  geo.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  return geo;
 }
 
 export function coatFabric(scale) {
@@ -125,10 +140,10 @@ export function buildPlayer() {
     (() => { const g = new THREE.BoxGeometry(0.50, 0.13, 0.24); g.translate(0, 1.44, 0); return g; })(),
     (() => { const g = new THREE.CylinderGeometry(0.135, 0.152, 0.15, 10); g.translate(0, 1.55, -0.01); return g; })(),
   ]);
-  bakeVerticalShade(coatGeo, 0);
+  bakeVerticalShade(weaveUVs(coatGeo), 0);
   const coatMat = new THREE.MeshStandardMaterial({
     color: 0x112b32, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9, vertexColors: true,
-    ...coatFabric(0.4),
+    ...coatFabric(0.5),
   });
   const coat = new THREE.Mesh(coatGeo, coatMat);
   coat.castShadow = true;
@@ -152,7 +167,7 @@ export function buildPlayer() {
   legR.position.set(0.11, 0.72, 0);
   const armGeo = new THREE.CylinderGeometry(0.062, 0.072, 0.54, 7);
   armGeo.translate(0, -0.26, 0);
-  bakeVerticalShade(armGeo, 1.40);
+  bakeVerticalShade(weaveUVs(armGeo), 1.40);
   const armL = new THREE.Mesh(armGeo, coatMat);
   armL.position.set(-0.252, 1.40, 0);
   const armR = new THREE.Mesh(armGeo, coatMat);
