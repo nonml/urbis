@@ -80,7 +80,7 @@ before reinstating anything that was removed.
 
 ## C. People (the city lives — screen-true)
 
-- **VGA-011 Body system v2.** ⏳ PARTIAL (slice 017: flared short jackets replace cones, long legs, 1/8-scale heads, counter-swinging arms, painted faces, walker shadows; hero rebuilt to the same ratio. Same-angle frames read humanoid, but heads still ball-like past 10 m and the 5-silhouette sidewalk close-up is still open.) Touches: `npcs.js` (+ walkers), sim spawn data. Draws: +1..3 (instanced parts).
+- **VGA-011 Body system v2.** ⏳ PARTIAL (slice 017 + slice 027. Slice 027 answered the ball-head note: skull and hair cap merge into one head geometry and the cap rides a vertex-colour multiplier, so each walker's own skin tone darkens to hair with no second draw and no second material. Coats got the same squash-and-yoke as the hero, hems narrowed 0.40→0.31, shoes merged into the leg mesh. +0 draws. The 5-silhouette sidewalk close-up is still open.) Touches: `npcs.js` (+ walkers), sim spawn data. Draws: +1..3 (instanced parts).
 - **VGA-012 Fashion & cyberware.** ⏳ PARTIAL (slice 017: instanced hats on ~42%, glowing visors on ~25%, 5 skin tones, widened coat palette — all in sim data and rendering; not yet readable at play distance, close-up proof still open). Draws: +1 (atlas).
 - **VGA-013 Night readability.** ⏳ PARTIAL (slice 017: hero key light +0 draws, coats brightened with env response up, walkers cast shadows by day; head-vs-coat contrast still strong at distance — heads need the VGA-011 close-up pass to fully land). Draws: +1 (hero light).
 - **VGA-014 Poses & tableaus.** Sit, lean, smoke (glow tip), gesture, argue, queue, perform — plus staged frozen moments (deal, arrest, busk) at fixed corners. Done when: 3 tableau frames. Draws: +1..2.
@@ -133,7 +133,7 @@ before reinstating anything that was removed.
 
 ## I. Nature & valley (a place, not a rim)
 
-- **VGA-046 Trees v2.** 3+ species, seasonal color (one red block), backlit translucency (no more black cutouts), sway, drip rings, droop in downpour. Done when: valley + park day frames. Draws: +1..2.
+- **VGA-046 Trees v2.** ⏳ PARTIAL (slice 027: the canopy was three big displaced icosahedra, and a convex green outline at play distance reads as a boulder, not a tree. It is now ten small leaf clumps on an asymmetric shell, so the silhouette has notches; a baked sky-occlusion gradient down the canopy darkens the underside to 0.42; per-instance leaf colour across five greens kills the clone row, and the east avenue turns to four autumn ochres — the seasonal block this item asked for. Trunks lightened 1a1410→2c251c, non-uniform per-tree scale. Evidence `slice-027-trees-day.png` + `slice-027-street-night.png`. 158 draws steady, 164 peak — +0, all three tree meshes stayed instanced. Species count still one, no sway, no backlit translucency.) Draws: +0.
 - **VGA-047 Grass v2.** Tufts that read as grass (not scribbles), wind streaks, wet flattening, dirt blend strips at every concrete edge. Done when: bank close-up. Draws: +0..1.
 - **VGA-048 Mountains v2.** Strata, snow, transmission towers, foothill blend, tree-line, mist snagging peaks. Done when: promenade vista shows a range, not stamps. Draws: +1.
 - **VGA-049 River v2.** Foam lines, rocks, reeds, muddy waterline, rain pitting, faster flow texture in storm; docks, buoys, one boat. Done when: river close-up + vista. Draws: +2..3.
@@ -169,7 +169,7 @@ before reinstating anything that was removed.
 
 ## N. Hero (the back you stare at)
 
-- **VGA-067 The back.** Jacket, collar, backpack, hair, phone-in-hand with raised-phone pose + screen glow on face; visible weapon with muzzle flash + impact sparks + decals. Night rim/key so the hero never vanishes. Done when: hero orbit + night + action frames. Draws: +2..3.
+- **VGA-067 The back.** ⏳ PARTIAL (slice 027: the hero was a lathe cone with a bare ball on top — a chess pawn, and it is dead centre of every frame. The coat now squashes to 1.24×0.80 so it is wide across and thin front-to-back, carries a merged shoulder yoke and collar, and the hem narrowed 0.38→0.30. Hair cap merged into the backpack mesh, boots merged into the leg mesh, so both cost nothing and the boots ride the walk cycle. Head squashed off-sphere. Evidence `slice-027-sidewalk-day.png` + `slice-027-street-night.png`. +0 draws. Phone pose, weapon and night rim still open.) Draws: +0.
 
 ## O. Police & pursuit (the net that closes)
 

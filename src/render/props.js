@@ -8,6 +8,23 @@ import { mulberry32 } from '../sim/rng.js';
 
 // Static decor — placement lists live at the call site, not here.
 
+// Leaf clumps: [x, y, z, radius]. Roughly a shell from y2.7 to y5.1, deliberately
+// asymmetric so no two profiles of the same tree read the same.
+const CANOPY_CLUMPS = [
+  [0, 3.05, 0, 1.15], [0.88, 3.30, 0.28, 0.82], [-0.78, 3.20, -0.38, 0.86],
+  [0.26, 3.90, -0.72, 0.72], [-0.36, 4.02, 0.66, 0.68], [0.56, 4.48, 0.16, 0.58],
+  [-0.62, 4.40, -0.22, 0.54], [0.04, 4.92, 0.06, 0.48], [1.12, 2.85, -0.52, 0.52],
+  [-1.08, 2.95, 0.50, 0.58],
+];
+const CANOPY_LOW = 2.3;      // shaded underside
+const CANOPY_HIGH = 5.3;     // the face the sky actually reaches
+const CANOPY_FLOOR = 0.42;   // how dark the underside goes
+// Summer greens, plus one ochre and one rust: a street of identical green is
+// the other half of the moulded look. Index picked per tree, so a whole block
+// can turn — see the autumn run in buildTrees().
+const LEAF_GREENS = [0x35502c, 0x2a4526, 0x3d5730, 0x24401f, 0x466033];
+const LEAF_AUTUMN = [0x8a5a1c, 0x9c4a18, 0x7a5520, 0xa8621f];
+
 function clean(geo) {
   const g = geo.index ? geo.toNonIndexed() : geo;
   for (const name of Object.keys(g.attributes)) {
@@ -78,13 +95,17 @@ export function buildTrees() {
   // Tapered trunk with slight bend — reads as wood, not a pipe.
   const trunkGeo = new THREE.CylinderGeometry(0.06, 0.16, 3.0, 8);
   trunkGeo.translate(0, 1.5, 0);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
-  // Multi-cluster canopy: 3 overlapping blobs at different heights for organic silhouette.
-  const canopyGeo = mergeGeometries([
-    (() => { const g = new THREE.IcosahedronGeometry(1.6, 2); g.translate(0, 3.2, 0); g.scale(1, 0.75, 1); return g; })(),
-    (() => { const g = new THREE.IcosahedronGeometry(1.1, 2); g.translate(0.6, 4.2, 0.3); return g; })(),
-    (() => { const g = new THREE.IcosahedronGeometry(0.8, 2); g.translate(-0.4, 4.8, -0.2); return g; })(),
-  ]);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2c251c, roughness: 0.95 });
+  // Canopy as a cluster of leaf clumps, not three big spheres. Three spheres
+  // give a convex outline, and a convex green outline at play distance reads as
+  // a boulder — that is the single thing that made these trees look moulded.
+  // Ten small clumps on a rough shell put notches in the silhouette instead.
+  const canopyGeo = mergeGeometries(CANOPY_CLUMPS.map(([x, y, z, r]) => {
+    const g = new THREE.IcosahedronGeometry(r, 1);
+    g.scale(1, 0.85, 1);
+    g.translate(x, y, z);
+    return g;
+  }));
   // Branch stubs: 2–3 short limbs poking from the trunk into the canopy.
   const branchGeo = mergeGeometries([
     (() => { const g = new THREE.CylinderGeometry(0.03, 0.06, 1.0, 5); g.rotateZ(0.6); g.translate(0.35, 2.6, 0); return g; })(),
@@ -97,21 +118,38 @@ export function buildTrees() {
       const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
       return s - Math.floor(s);
     };
-    for (const geo of [canopyGeo, branchGeo]) {
+    // Clumps are small now, so they get a small jitter; a 0.45 shove that suited
+    // 1.6m spheres turns a 0.5m clump inside out.
+    for (const [geo, amp] of [[canopyGeo, 0.16], [branchGeo, 0.4]]) {
       const p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) {
         const ix = Math.round(p.getX(i) * 4);
         const iy = Math.round(p.getY(i) * 4);
         const iz = Math.round(p.getZ(i) * 4);
         p.setXYZ(i,
-          p.getX(i) + (hash3(ix, iy, iz) - 0.5) * 0.45,
-          p.getY(i) + (hash3(iy, iz, ix) - 0.5) * 0.35,
-          p.getZ(i) + (hash3(iz, ix, iy) - 0.5) * 0.45);
+          p.getX(i) + (hash3(ix, iy, iz) - 0.5) * amp,
+          p.getY(i) + (hash3(iy, iz, ix) - 0.5) * amp * 0.8,
+          p.getZ(i) + (hash3(iz, ix, iy) - 0.5) * amp);
       }
       geo.computeVertexNormals();
     }
   }
-  const canopyMat = new THREE.MeshStandardMaterial({ color: 0x14271a, roughness: 1.0, envMapIntensity: 0.55 });
+  // Baked sky occlusion down the canopy. Foliage is dark underneath and bright
+  // where the sky reaches it; without that gradient a green shell is just a
+  // shape, however broken its outline. Costs nothing at runtime.
+  {
+    const p = canopyGeo.attributes.position;
+    const shade = new Float32Array(p.count * 3);
+    for (let i = 0; i < p.count; i++) {
+      const t = (p.getY(i) - CANOPY_LOW) / (CANOPY_HIGH - CANOPY_LOW);
+      const v = CANOPY_FLOOR + (1 - CANOPY_FLOOR) * Math.max(0, Math.min(1, t)) ** 0.8;
+      shade[i * 3] = shade[i * 3 + 1] = shade[i * 3 + 2] = v;
+    }
+    canopyGeo.setAttribute('color', new THREE.BufferAttribute(shade, 3));
+  }
+  const canopyMat = new THREE.MeshStandardMaterial({
+    roughness: 1.0, envMapIntensity: 0.55, vertexColors: true,
+  });
   const branchMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
   const spots = treeSpots();
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
@@ -121,16 +159,22 @@ export function buildTrees() {
   canopies.castShadow = true;
   branches.castShadow = true;
   const dummy = new THREE.Object3D();
+  const leaf = new THREE.Color();
   spots.forEach(([x, z], i) => {
     const s = 0.8 + rand() * 0.5;
     dummy.position.set(x, 0, z);
     dummy.rotation.set(0, rand() * 6.28, 0);
-    dummy.scale.set(s, s, s);
+    // Non-uniform scale: real street trees are not spheres on sticks.
+    dummy.scale.set(s * (0.88 + rand() * 0.26), s, s * (0.88 + rand() * 0.26));
     dummy.updateMatrix();
     trunks.setMatrixAt(i, dummy.matrix);
     canopies.setMatrixAt(i, dummy.matrix);
     branches.setMatrixAt(i, dummy.matrix);
+    // The east avenue has turned; every other street is still in leaf.
+    const palette = x > 30 && x < 55 ? LEAF_AUTUMN : LEAF_GREENS;
+    canopies.setColorAt(i, leaf.setHex(palette[Math.floor(rand() * palette.length)]));
   });
+  canopies.instanceColor.needsUpdate = true;
   trunks.instanceMatrix.needsUpdate = true;
   canopies.instanceMatrix.needsUpdate = true;
   branches.instanceMatrix.needsUpdate = true;

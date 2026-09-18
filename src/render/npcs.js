@@ -23,24 +23,56 @@ function faceTexture() {
   return tex;
 }
 
+// Skull plus a hair cap in one mesh. The cap is not a second draw and not a
+// second material: it rides a vertex-colour multiplier, so the instance's skin
+// tone darkens to hair where the cap is. A bare sphere at head scale is the
+// detail the eye uses to decide a crowd is made of dolls.
+const HAIR_SHADE = 0.17;
+function headWithHairGeo() {
+  const skull = new THREE.SphereGeometry(0.11, 10, 8);
+  skull.scale(0.92, 1.12, 1.0);
+  skull.translate(0, 1.68, 0);
+  const hair = new THREE.SphereGeometry(0.116, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.6);
+  hair.scale(0.95, 1.14, 1.06);
+  hair.translate(0, 1.678, -0.006);
+  const geo = mergeGeometries([skull, hair]);
+  const n = skull.attributes.position.count;
+  const shade = new Float32Array(geo.attributes.position.count * 3).fill(1);
+  for (let i = n; i < geo.attributes.position.count; i++) {
+    shade[i * 3] = shade[i * 3 + 1] = shade[i * 3 + 2] = HAIR_SHADE;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(shade, 3));
+  return geo;
+}
+
 export function buildNPCs(street) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
   // Short rain jacket + long legs + small head: human ratio, not garden gnome.
   // Jacket hem sits at 0.70 so most of the leg reads; head is ~1/8 of height.
-  const profile = [[0.40, 0], [0.36, 0.25], [0.28, 0.55], [0.23, 0.75], [0.21, 0.85]]
+  const profile = [[0.31, 0], [0.295, 0.25], [0.255, 0.55], [0.225, 0.75], [0.21, 0.85]]
     .map(([r, y]) => new THREE.Vector2(r, y));
-  const coatGeo = new THREE.LatheGeometry(profile, 9);
-  coatGeo.translate(0, 0.70, 0);
+  const coatLathe = new THREE.LatheGeometry(profile, 9);
+  coatLathe.translate(0, 0.70, 0);
+  // Wide across, thin front-to-back, with a shoulder line the head sits
+  // between. A body of revolution with a ball on top is a chess pawn from
+  // every angle, and that is what a crowd of these read as at play distance.
+  coatLathe.scale(1.22, 1, 0.80);
+  const coatGeo = mergeGeometries([
+    coatLathe,
+    (() => { const g = new THREE.BoxGeometry(0.48, 0.12, 0.24); g.translate(0, 1.46, 0); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.10, 0.12, 0.13, 9); g.translate(0, 1.56, 0); return g; })(),
+  ]);
   const coatMat = new THREE.MeshStandardMaterial({ roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1 });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
   bodies.castShadow = true;
-  const headGeo = new THREE.SphereGeometry(0.11, 10, 8);
-  headGeo.translate(0, 1.68, 0);
-  const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6 });
-  const heads = new THREE.InstancedMesh(headGeo, headMat, NPC_COUNT);
-  const legGeo = new THREE.CylinderGeometry(0.08, 0.10, 0.85, 8);
-  legGeo.translate(0, -0.425, 0);
+  const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, vertexColors: true });
+  const heads = new THREE.InstancedMesh(headWithHairGeo(), headMat, NPC_COUNT);
+  // Shoe merged into the leg: rides the walk cycle, costs nothing.
+  const legGeo = mergeGeometries([
+    (() => { const g = new THREE.CylinderGeometry(0.08, 0.10, 0.85, 8); g.translate(0, -0.425, 0); return g; })(),
+    (() => { const g = new THREE.BoxGeometry(0.14, 0.09, 0.27); g.translate(0, -0.805, 0.045); return g; })(),
+  ]);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x0b0d11, roughness: 0.85 });
   const legL = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
   const legR = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
