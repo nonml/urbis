@@ -675,6 +675,25 @@ export function buildTowers(texLoader, maxAniso) {
       caps.push(faceBox(run + 0.3, 0.14, 0.24, sx, SHOP_SILL - 0.05, sz, alongZ));
       const [ax2, az2] = at(0, AWNING_OUT / 2);
       caps.push(faceBox(run + 0.5, 0.12, AWNING_OUT, ax2, SHOP_HEAD + 0.18, az2, alongZ));
+      // A canopy is a plate held up by something, with an edge that hangs.
+      // Without the valance and the brackets it is a slab floating off a
+      // wall, which is most of why the awnings read as black voids rather
+      // than as awnings.
+      const [vx, vz] = at(0, AWNING_OUT - 0.04);
+      caps.push(faceBox(run + 0.5, 0.26, 0.07, vx, SHOP_HEAD + 0.01, vz, alongZ));
+      const stays = Math.max(2, Math.round(run / 3.2));
+      for (let k = 0; k <= stays; k += 1) {
+        const u = -run / 2 + (run / stays) * k;
+        const [bx, bz] = at(u, AWNING_OUT / 2);
+        const b = alongZ
+          ? new THREE.BoxGeometry(AWNING_OUT * 1.25, 0.07, 0.07)
+          : new THREE.BoxGeometry(0.07, 0.07, AWNING_OUT * 1.25);
+        b.translate(0, 0, 0);
+        b.rotateZ(alongZ ? dir * 0.42 : 0);
+        b.rotateX(alongZ ? 0 : -dir * 0.42);
+        b.translate(bx, SHOP_HEAD - 0.06, bz);
+        caps.push(b);
+      }
     }
     // Pilasters in podium plaster, so they self-shadow and the lamps rake them.
     for (const u of [-span / 2 + 0.45, span / 2 - 0.45]) {
