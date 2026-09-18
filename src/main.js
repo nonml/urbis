@@ -26,7 +26,7 @@ import { buildBlobs, updateBlobs } from './render/blobs.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { captureFrame } from './render/capture.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
-import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
+import { buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -57,8 +57,6 @@ const skyline = buildSkyline(texLoader, maxAniso);
 scene.add(skyline.mesh);
 const stars = buildStars();
 scene.add(stars);
-const river = buildRiver(texLoader, maxAniso);
-scene.add(river.mesh);
 scene.add(buildGrassGround());
 scene.add(buildGrassTufts());
 scene.add(buildMountains());
@@ -213,7 +211,7 @@ if (spawnPreset === 'east') {
 } else if (spawnPreset === 'shop') {
   player.x = 3.5;
   player.z = 7;
-} else if (spawnPreset === 'river') {
+} else if (spawnPreset === 'promenade') {
   player.x = -6;
   player.z = -32;
   cam.yaw = -Math.PI / 2;
@@ -225,9 +223,9 @@ if (spawnPreset === 'east') {
   player.x = 2;
   player.z = 70;
   cam.yaw = Math.PI;
-} else if (spawnPreset === 'bank') {
-  // On the west bank of the channel, a third of a metre down the slope, looking
-  // across the water. The bed itself is deeper but it is under an opaque river.
+} else if (spawnPreset === 'westflank') {
+  // The ground the river channel used to cut, looking across it: verge swell
+  // now, no trench, nothing to fall into.
   player.x = -36.5;
   player.z = -60;
   cam.yaw = Math.PI / 2;
@@ -455,7 +453,6 @@ function render() {
   tickRain(rain, clock.elapsed);
   tickSteam(steam, clock.elapsed, dt);
   tickHackFx(fx, dt);
-  tickRiver(river, dt);
   const night = clock.nightFactor;
   updateDaylight(env, scene, bloom, night, renderer);
   grade.uniforms.uNight.value = night;

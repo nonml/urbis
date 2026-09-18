@@ -38,11 +38,10 @@ export function tickPlayerCar(car, input, dt) {
     car.z = inside.z;
     car.speed = 0;
   }
-  // The wheels are on the ground, always. No slope limit: off the tarmac but
-  // clear of the river the field never exceeds 17 degrees, which a car may
-  // honestly climb. The exception is the channel wall at 51 degrees — and the
-  // drive box still reaches it, because nothing stops a car driving into the
-  // river. Following the ground makes that drive look like what it is.
+  // The wheels are on the ground, always. No slope limit, because there is
+  // nothing to limit: with the river channel gone the steepest gradient inside
+  // DRIVE_BOUNDS is 4 degrees, measured over the whole box at 0.25 m. A car
+  // cannot reach anything it could not drive up.
   car.y = heightAt(car.x, car.z);
   return { braking };
 }

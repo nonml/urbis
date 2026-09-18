@@ -34,9 +34,9 @@ const DOWNTOWN = {
     { id: 'plaza', z: 40, x0: -52, x1: 52, lanes: 2 },
     { id: 'south', z: -64, x0: -7, x1: 51, lanes: 2 },
   ],
-  // Where a person may go: the whole district floor. West edge is the river
-  // verge, east edge is the far side of the pocket park and the two infill
-  // towers flanking it (the pocket park slab in render/landscape.js, block.js:265).
+  // Where a person may go: the whole district floor. West edge is the far verge
+  // beyond the west avenue, east edge is the far side of the pocket park and
+  // the two infill towers flanking it (block.js:265).
   walk: { minX: -52, maxX: 70, minZ: -68, maxZ: 100 },
   // Where a car may go. Narrower on the east because the tarmac ends there —
   // the plaza crossing is 104 m of road centred on x = 0, so the network itself
@@ -179,21 +179,24 @@ export function laneCenterLine(edge, dir) {
 // ---------------------------------------------------------------------------
 // The ground gets a Y.
 //
-// The field is non-negative everywhere except the river channel: every base in
-// this world sits at y <= 0 (buildings at 0, the ground plane at -0.08, the
-// mountains at -4), so relief that only rises can bury a base but never expose
-// one, and the shipped skyline cannot break.
+// The field never goes below zero. Every base in this world sits at y <= 0
+// (buildings at 0, the ground plane at -0.08, the mountains at -4), so relief
+// that only rises can bury a base but never expose one, and the shipped skyline
+// cannot break. There was one dip once — a river channel, cut so the water
+// would be visible under an opaque ground plane — and it went with the river:
+// it put a 51-degree wall inside the drivable box with nothing to stop a car
+// falling in, and the deepest ground it made was under the water anyway.
 //
-// The channel is the one dip, and it earns the exception because without it the
-// river is invisible — the ground plane at -0.08 is opaque and the water sits
-// under it at -0.5. It is confined to the 9.5 m of ground between two pieces of
-// paving it must not undercut: avenue -44's east walkway ends at x = -37.5
-// (block.js puts it at ROAD_HALF + 1.5, three metres wide) and the promenade
-// slab starts at x = -28. The drop reaches zero at -37.4 and -28.2.
+// It lives here, in world.js, and not in a terrain.js that world.js re-exports,
+// which is the split anyone reading this will be tempted to make. It cannot be
+// made: the field derives its flat footprints from DISTRICTS, so terrain.js
+// would import world.js while world.js re-exported terrain.js, and whichever
+// module the bundler happened to evaluate first would decide whether DISTRICTS
+// was still in its temporal dead zone when these tables are built. A cycle that
+// works by luck is worse than a long file.
 //
-// It lives here, beside the road graph, because the graph is what decides where
-// the ground must stay flat — and because a mover asking how high the ground is
-// must not have to reach into the renderer to find out (law 5).
+// A mover asking how high the ground is must not have to reach into the
+// renderer to find out (law 5), which is why it is on this side of the line.
 const TERRAIN_SEED = 70413;
 // Below SHOP_SILL (0.55 in block.js), so a swell never buries a shopfront.
 const VERGE_RISE = 0.45;
@@ -204,26 +207,12 @@ const FLAT_BLEND = 11;
 // Beyond the built district the relief opens up over this distance.
 const WILD_BLEND = 70;
 
-// A carriageway stays dead flat across its own width plus the walkway beside it
-// (block.js lays 3 m slabs along the avenues, 2.4 m along the crossings) plus a
-// tenth of a metre, so the blend starts off the paving and the street frame
-// never tilts.
+// A carriageway stays dead flat across its own width plus the 3 m walkway
+// block.js lays beside it, plus a tenth of a metre, so the blend starts off the
+// paving and the street frame never tilts.
 const AVENUE_WALKWAY = 3;
-const CROSSING_WALKWAY = 2.4;
 const FLAT_MARGIN = 0.1;
 const ROAD_FLAT_HALF = ROAD_HALF_WIDTH + AVENUE_WALKWAY + FLAT_MARGIN;
-// A causeway takes no margin: it is held flat by the 1.2 m pier blend, which is
-// the skirt, and widening it would push the river's cut ends out into the open.
-const CAUSEWAY_HALF = ROAD_HALF_WIDTH + CROSSING_WALKWAY;
-
-// The river bed, as a rect: cx, cz, half-width of the flat bed, half-length.
-// BED_DROP leaves roughly half a metre of water over the bed at y = -0.5; the
-// banks run out over BANK_RUN and reach zero clear of the paving on both sides.
-// The half-length stops short of the water plane's 280 m so its cut ends stay
-// buried under rising ground instead of showing as a straight edge.
-export const RIVER_CHANNEL = [-32.8, -5, 2.1, 136];
-const BANK_RUN = 2.5;
-const BED_DROP = 1.1;
 
 // Footprints that stay dead flat. Every road in the graph makes its own — add an
 // avenue and the ground under it flattens without anyone editing a table.
@@ -240,42 +229,11 @@ function roadFlatRects() {
   return rects;
 }
 
-// The one flat footprint that is not a road: the river promenade, a paved deck
-// block.js lays between the west avenue and the water. Nothing in the graph
-// describes it, so it stays data.
+// The one flat footprint that is not a road: the promenade, a 22 x 9 m paved
+// deck block.js lays at (-17, -32). Nothing in the graph describes a deck, so
+// it stays data.
 const PROMENADE = [-17, -32, 11, 4.5];
 const FLAT_RECTS = [...roadFlatRects(), PROMENADE];
-
-// Ten of the 68 towers are built out over the channel corridor — avenue -44's
-// east row overlaps the water by 6.0 to 7.5 m each, two infill towers clip its
-// east bank, and the north terminus clips its west (every footprint that meets
-// x -38..-28 was enumerated from block.js TOWERS via emitTower's
-// ax + side * (8.5 + d / 2), not guessed). They are not mine to move, so the
-// ground is held up under them and the river narrows past each one instead:
-// piers standing in the water, not towers hanging over a hole.
-const PIER_BLEND = 1.2;
-const TOWER_ABUTMENTS = [
-  [-30.5, -44, 5.5, 5], [-30, -26, 6.5, 5.5], [-30.5, -6, 5, 5], [-30.5, 12, 6, 5],
-  [-30, 30, 7, 5.5], [-30.5, 50, 5, 5], [-30, 78, 7, 5.5],
-  [-22, -24, 7, 6], [-22, 70, 7, 6], [-44, 104, 7, 6],
-];
-
-// A crossing that spans the channel holds its own ground up and crosses on an
-// earth causeway — which is where a bridge goes. Derived, so a second crossing
-// over the water causeways itself.
-function causewayRects() {
-  const rects = [];
-  for (const d of DISTRICTS) {
-    for (const cr of d.crossings) {
-      if (spans(cr.x0, cr.x1, RIVER_CHANNEL[0])) {
-        rects.push([(cr.x0 + cr.x1) / 2, cr.z, (cr.x1 - cr.x0) / 2, CAUSEWAY_HALF]);
-      }
-    }
-  }
-  return rects;
-}
-
-const CHANNEL_ABUTMENTS = [...TOWER_ABUTMENTS, ...causewayRects()];
 
 // The built district as one rect (cx, cz, half-width, half-depth). Inside it the
 // relief is the verge swell only, so the 68 merged towers and the skyline ring
@@ -331,28 +289,15 @@ function holdFlat(rects, blend, x, z) {
   return held;
 }
 
-function flatness(x, z) {
-  return Math.max(holdFlat(FLAT_RECTS, FLAT_BLEND, x, z),
-    holdFlat(CHANNEL_ABUTMENTS, PIER_BLEND, x, z));
-}
-
-// How far the ground falls toward the river bed. The abutments hold it up, so
-// the channel closes under a tower or a street and reopens past it.
-function channelDrop(x, z) {
-  const bed = 1 - smoothstep01(rectDistance(x, z, ...RIVER_CHANNEL) / BANK_RUN);
-  if (bed <= 0) return 0;
-  return BED_DROP * bed * (1 - holdFlat(CHANNEL_ABUTMENTS, PIER_BLEND, x, z));
-}
-
 function wildness(x, z) {
   return smoothstep01(rectDistance(x, z, ...DISTRICT_RELIEF) / WILD_BLEND);
 }
 
-// Ground elevation in metres above the ground plane. Exactly zero on every road,
-// negative only in the river channel.
+// Ground elevation in metres above the ground plane. Exactly zero on every road
+// and never negative anywhere.
 export function heightAt(x, z) {
-  const open = 1 - flatness(x, z);
+  const open = 1 - holdFlat(FLAT_RECTS, FLAT_BLEND, x, z);
   const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
   const hills = HILL_RISE * band01(HILL_WAVES, x, z) * wildness(x, z);
-  return open * (swell + hills) - channelDrop(x, z);
+  return open * (swell + hills);
 }

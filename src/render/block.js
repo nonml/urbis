@@ -3,7 +3,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial } from './materials.js';
-import { displaceToTerrain, RIVER_STRIP } from './landscape.js';
+import { displaceToTerrain } from './landscape.js';
 
 const STREET_LEN = 200;
 const ROAD_HALF = 3.5;
@@ -134,32 +134,12 @@ export function buildGround(texLoader, maxAniso) {
   return { group, mats, markings: markings.mats };
 }
 
-// A 4 m quad cannot describe a 9 m trench — it interpolates straight over the
-// top and hides the water. Drop the quads above the river and let the 1 m bank
-// mesh own that strip; RIVER_STRIP's edges sit on this grid's own lines, so the
-// hole is square and the bank's side faces cover it.
-function cutRiverStrip(geo) {
-  const pos = geo.attributes.position;
-  const idx = geo.index.array;
-  const kept = [];
-  for (let i = 0; i < idx.length; i += 3) {
-    const a = idx[i], b = idx[i + 1], c = idx[i + 2];
-    const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
-    const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
-    const over = cx > RIVER_STRIP.x0 && cx < RIVER_STRIP.x1
-      && cz > RIVER_STRIP.z0 && cz < RIVER_STRIP.z1;
-    if (!over) kept.push(a, b, c);
-  }
-  geo.setIndex(kept);
-  return geo;
-}
-
 function terrainBase() {
   const cells = GROUND_EXTENT / GROUND_CELL;
   const geo = new THREE.PlaneGeometry(GROUND_EXTENT, GROUND_EXTENT, cells, cells);
   geo.rotateX(-Math.PI / 2);
   const mesh = new THREE.Mesh(
-    cutRiverStrip(displaceToTerrain(geo)),
+    displaceToTerrain(geo),
     new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 1, metalness: 0 })
   );
   mesh.position.y = -0.08;
@@ -270,7 +250,7 @@ function buildMarkings() {
 
 const TOWERS = [
   // side, z-center, width, height, depth
-  // (west row omits z=-32: the promenade gap to the river)
+  // (west row omits z=-32: the gap onto the promenade deck)
   [-1, -48, 12, 34, 10], [-1, -14, 14, 44, 11],
   [-1, 6, 11, 28, 10], [-1, 24, 13, 38, 10], [-1, 44, 10, 24, 10],
   [1, -44, 11, 26, 10], [1, -26, 13, 40, 11], [1, -6, 10, 30, 10],
@@ -847,7 +827,7 @@ export function buildSkyline(texLoader, maxAniso) {
   emission.wrapS = emission.wrapT = THREE.RepeatWrapping;
   emission.anisotropy = maxAniso;
   const RING = [
-    // x, z, w, h, d — east wall, north rim, south rim (west stays open river valley)
+    // x, z, w, h, d — east wall, north rim, south rim (west stays open valley)
     [110, -70, 22, 64, 18], [128, -30, 26, 88, 20], [112, 10, 20, 52, 16],
     [130, 50, 24, 72, 18], [108, 82, 20, 58, 16],
     [-20, 112, 24, 66, 18], [20, 118, 20, 84, 16], [60, 110, 26, 56, 20],
