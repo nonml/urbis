@@ -415,7 +415,12 @@ function render() {
     signPoolMeshes[z].material.opacity = 0.5 * nf * b;
     spots[z].intensity = 45 * nf * b;
     for (const m of towers.zoneMats[z]) {
-      m.emissiveIntensity = 0.75 * nf * b * (m.userData.emissiveScale ?? 1);
+      // dayFloor: a tower's windows go dark at noon, but a shop keeps its
+      // lights on, and without that the glazing reads as a black hole in a
+      // sunlit wall. Zero for everything that isn't a shopfront.
+      const floor = m.userData.dayFloor ?? 0;
+      const lit = floor + (1 - floor) * nf;
+      m.emissiveIntensity = 0.75 * lit * b * (m.userData.emissiveScale ?? 1);
       m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
     }
     setPuddleGlow(puddles, z, b);

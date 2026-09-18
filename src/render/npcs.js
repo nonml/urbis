@@ -3,6 +3,7 @@
 // the walker freezes. Hats/visors hide via zero-scale for wearers without.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { bakeVerticalShade } from './player.js';
 import { NPC_COUNT, SKIN_TONES, isDark, zoneAt } from '../sim/street.js';
 
 const HAT_COLORS = [0x14161c, 0x3a2a1a, 0x1a3a4a, 0x5c1f2e];
@@ -57,13 +58,22 @@ export function buildNPCs(street) {
   // Wide across, thin front-to-back, with a shoulder line the head sits
   // between. A body of revolution with a ball on top is a chess pawn from
   // every angle, and that is what a crowd of these read as at play distance.
-  coatLathe.scale(1.22, 1, 0.80);
+  coatLathe.scale(1.02, 1, 0.68);
   const coatGeo = mergeGeometries([
     coatLathe,
     (() => { const g = new THREE.BoxGeometry(0.48, 0.12, 0.24); g.translate(0, 1.46, 0); return g; })(),
     (() => { const g = new THREE.CylinderGeometry(0.10, 0.12, 0.13, 9); g.translate(0, 1.56, 0); return g; })(),
   ]);
-  const coatMat = new THREE.MeshStandardMaterial({ roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1 });
+    // Instance tint multiplies the baked shade, so every walker keeps its own
+  // coat colour and gains the same sky-on-the-shoulders, dark-at-the-hem
+  // gradient the hero has. One attribute, no extra draw, no extra material.
+  const armGeo = new THREE.CylinderGeometry(0.055, 0.065, 0.55, 7);
+  armGeo.translate(0, -0.275, 0);
+  bakeVerticalShade(coatGeo, 0.02);
+  bakeVerticalShade(armGeo, 1.42);
+  const coatMat = new THREE.MeshStandardMaterial({
+    roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, vertexColors: true,
+  });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
   bodies.castShadow = true;
   const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, vertexColors: true });
@@ -76,8 +86,6 @@ export function buildNPCs(street) {
   const legMat = new THREE.MeshStandardMaterial({ color: 0x0b0d11, roughness: 0.85 });
   const legL = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
   const legR = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
-  const armGeo = new THREE.CylinderGeometry(0.055, 0.065, 0.55, 7);
-  armGeo.translate(0, -0.275, 0);
   const armL = new THREE.InstancedMesh(armGeo, coatMat, NPC_COUNT);
   const armR = new THREE.InstancedMesh(armGeo, coatMat, NPC_COUNT);
   const hatGeo = mergeGeometries([
@@ -174,7 +182,7 @@ export function updateNPCs(rig, street) {
     dummy.updateMatrix();
     legR.setMatrixAt(i, dummy.matrix);
     // Arms hang from the shoulders, counter-swinging the legs.
-    const sx = 0.26 * (n.bulk ?? 1);
+    const sx = 0.215 * (n.bulk ?? 1);
     const sy = 1.42 * n.h + bob;
     dummy.position.set(n.x + Math.cos(yaw) * sx, sy, n.z - Math.sin(yaw) * sx);
     dummy.rotation.set(-swing * 0.7, yaw, 0, 'YXZ');

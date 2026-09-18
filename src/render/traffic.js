@@ -46,7 +46,7 @@ export const trimGeo = mergeGeometries([
 // z-fought, and the rim cost a draw per fleet on top. One mesh, no fight,
 // and every car on the map gets its rims back for free.
 const TYRE_SHADE = 0.05;
-const RIM_SHADE = 0.62;
+const RIM_SHADE = 0.34;
 export const WHEEL_HUBS = [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]];
 export const wheelGeo = (() => {
   const parts = [];
@@ -54,7 +54,7 @@ export const wheelGeo = (() => {
   for (const [x, z] of WHEEL_HUBS) {
     for (const [geo, shade] of [
       [new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12), TYRE_SHADE],
-      [new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10), RIM_SHADE],
+      [new THREE.CylinderGeometry(0.155, 0.155, 0.27, 10), RIM_SHADE],
     ]) {
       geo.rotateZ(Math.PI / 2);
       geo.translate(x, 0.35, z);
@@ -73,7 +73,7 @@ export const wheelGeo = (() => {
 })();
 export function wheelMaterial() {
   return new THREE.MeshStandardMaterial({
-    color: 0xd6dbe2, roughness: 0.72, metalness: 0.4, vertexColors: true,
+    color: 0xc2c8d0, roughness: 0.55, metalness: 0.6, vertexColors: true,
   });
 }
 export const beamGeo = mergeGeometries([

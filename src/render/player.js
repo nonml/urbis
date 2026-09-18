@@ -21,22 +21,65 @@ function heroFaceTexture() {
   return tex;
 }
 
+// Cloth is never one value. A coat catches sky on the shoulders, goes dark in
+// the waist break, and loses all light at the hem where the ground occludes it.
+// Baked into the vertices, so the whole gradient costs no draw and no material.
+const COAT_RAMP = [[0.68, 0.46], [0.90, 0.74], [1.18, 0.57], [1.40, 0.95], [1.62, 1.0]];
+
+function rampAt(y) {
+  if (y <= COAT_RAMP[0][0]) return COAT_RAMP[0][1];
+  for (let i = 1; i < COAT_RAMP.length; i += 1) {
+    const [y1, v1] = COAT_RAMP[i];
+    if (y > y1) continue;
+    const [y0, v0] = COAT_RAMP[i - 1];
+    return v0 + (v1 - v0) * ((y - y0) / (y1 - y0));
+  }
+  return COAT_RAMP[COAT_RAMP.length - 1][1];
+}
+
+export function bakeVerticalShade(geo, yOffset, ramp = rampAt) {
+  const pos = geo.attributes.position;
+  const col = new Float32Array(pos.count * 3);
+  for (let i = 0; i < pos.count; i += 1) {
+    const v = ramp(pos.getY(i) + yOffset);
+    col[i * 3] = v; col[i * 3 + 1] = v; col[i * 3 + 2] = v;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
+// Flat vertex tint on one part before it is merged into a shared mesh: the
+// cheap way to give one material several readable values.
+function shade(geo, [x, y, z], v) {
+  geo.translate(x, y, z);
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n * 3).fill(v);
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
 export function buildPlayer() {
   const group = new THREE.Group();
-  const coatProfile = [[0.30, 0], [0.285, 0.20], [0.245, 0.50], [0.215, 0.70], [0.20, 0.82]]
+  // A cone flaring wider at the hem than at the shoulder is a chess pawn. The
+  // hem comes in under the shoulder line and the waist nips, so the silhouette
+  // reads as a person in a coat from behind instead of a game piece.
+  const coatProfile = [[0.255, 0], [0.247, 0.20], [0.222, 0.50], [0.248, 0.70], [0.232, 0.82]]
     .map(([r, y]) => new THREE.Vector2(r, y));
   const coatLathe = new THREE.LatheGeometry(coatProfile, 10);
   coatLathe.translate(0, 0.68, 0);
   // A body of revolution is a chess pawn. People are wide across and thin
   // front-to-back, and they have a shoulder line the head sits between — this
   // squash plus the yoke below is what turns the cone into a back to follow.
-  coatLathe.scale(1.24, 1, 0.80);
+  coatLathe.scale(1.02, 1, 0.68);
   const coatGeo = mergeGeometries([
     coatLathe,
-    (() => { const g = new THREE.BoxGeometry(0.50, 0.13, 0.25); g.translate(0, 1.44, 0); return g; })(),
-    (() => { const g = new THREE.CylinderGeometry(0.115, 0.135, 0.14, 10); g.translate(0, 1.55, -0.01); return g; })(),
+    (() => { const g = new THREE.BoxGeometry(0.50, 0.13, 0.24); g.translate(0, 1.44, 0); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.135, 0.152, 0.15, 10); g.translate(0, 1.55, -0.01); return g; })(),
   ]);
-  const coatMat = new THREE.MeshStandardMaterial({ color: 0x0e2a30, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9 });
+  bakeVerticalShade(coatGeo, 0);
+  const coatMat = new THREE.MeshStandardMaterial({
+    color: 0x112b32, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9, vertexColors: true,
+  });
   const coat = new THREE.Mesh(coatGeo, coatMat);
   coat.castShadow = true;
   const headGeo = new THREE.SphereGeometry(0.13, 12, 10);
@@ -46,11 +89,6 @@ export function buildPlayer() {
     new THREE.MeshStandardMaterial({ map: heroFaceTexture(), roughness: 0.6 })
   );
   head.position.y = 1.70;
-  const visor = new THREE.Mesh(
-    new THREE.BoxGeometry(0.17, 0.04, 0.04),
-    new THREE.MeshBasicMaterial({ color: 0x54f0ff })
-  );
-  visor.position.set(0, 1.71, 0.11);
   const legMat = new THREE.MeshStandardMaterial({ color: 0x090b0e, roughness: 0.85 });
   // Boot merged into the leg, so both feet ride the walk cycle for free. A leg
   // that ends in a flat cylinder cap is the last thing that read as a peg.
@@ -62,28 +100,37 @@ export function buildPlayer() {
   legL.position.set(-0.11, 0.72, 0);
   const legR = new THREE.Mesh(legGeo, legMat);
   legR.position.set(0.11, 0.72, 0);
-  const armGeo = new THREE.CylinderGeometry(0.055, 0.065, 0.52, 7);
+  const armGeo = new THREE.CylinderGeometry(0.062, 0.072, 0.54, 7);
   armGeo.translate(0, -0.26, 0);
+  bakeVerticalShade(armGeo, 1.40);
   const armL = new THREE.Mesh(armGeo, coatMat);
-  armL.position.set(-0.235, 1.40, 0);
+  armL.position.set(-0.252, 1.40, 0);
   const armR = new THREE.Mesh(armGeo, coatMat);
-  armR.position.set(0.235, 1.40, 0);
-  // One dark-kit mesh: pack plus the hair cap. Same material, so the head stops
-  // being a bare ball without costing a draw.
+  armR.position.set(0.252, 1.40, 0);
+  // One dark-kit mesh: pack, its straps and lid, plus the hair cap. All one
+  // material, so the back of the hero gains the only object the player stares
+  // at all game without costing a draw. The shades are vertex multipliers on a
+  // near-black base — a black pack on a dark coat is a silhouette with nothing
+  // in it, and that read as one shape rather than a person carrying something.
   const kitGeo = mergeGeometries([
-    (() => { const g = new THREE.BoxGeometry(0.20, 0.24, 0.11); g.translate(0, 1.25, -0.21); return g; })(),
+    shade(new THREE.BoxGeometry(0.28, 0.34, 0.16), [0, 1.23, -0.25], 3.2),
+    shade(new THREE.BoxGeometry(0.29, 0.07, 0.17), [0, 1.37, -0.252], 4.6),
+    shade(new THREE.BoxGeometry(0.06, 0.26, 0.05), [-0.11, 1.34, -0.155], 2.0),
+    shade(new THREE.BoxGeometry(0.06, 0.26, 0.05), [0.11, 1.34, -0.155], 2.0),
     (() => {
-      const g = new THREE.SphereGeometry(0.138, 10, 7, 0, Math.PI * 2, 0, Math.PI * 0.62);
-      g.scale(0.94, 1.12, 1.06);
+      const g = new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
+      g.scale(0.90, 1.08, 1.02);
       g.translate(0, 1.695, -0.012);
-      return g;
+      return shade(g, [0, 0, 0], 1);
     })(),
   ]);
   const backpack = new THREE.Mesh(
     kitGeo,
-    new THREE.MeshStandardMaterial({ color: 0x0a0e14, roughness: 0.8, metalness: 0.2 })
+    new THREE.MeshStandardMaterial({
+      color: 0x0a0e14, roughness: 0.8, metalness: 0.2, vertexColors: true,
+    })
   );
-  group.add(coat, head, visor, legL, legR, armL, armR, backpack);
+  group.add(coat, head, legL, legR, armL, armR, backpack);
   return { group, legL, legR, armL, armR };
 }
 

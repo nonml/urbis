@@ -190,7 +190,8 @@ const GRADE_SHADER = {
     void main() {
       vec3 c = texture2D(tDiffuse, vUv).rgb;
       float day = 1.0 - uNight;
-      c = (c - 0.5) * mix(1.07, 1.16, day) + 0.5 + mix(0.0, -0.012, day);
+      float pivot = mix(0.50, 0.43, day);
+      c = (c - pivot) * mix(1.07, 1.16, day) + pivot;
       float l = dot(c, LUMA);
       vec3 cool = vec3(0.90, 0.985, 1.13);
       vec3 warm = vec3(1.075, 1.005, 0.905);

@@ -344,6 +344,11 @@ function towerMaterials(texLoader, maxAniso) {
       roughness: 0.12, metalness: 0.55, envMapIntensity: 1.6,
     });
     m.userData.baseTint = m.color.clone();
+    // A tower's windows go dark at noon. A shop's do not — its lights stay on
+    // all day, and without that floor the glazing reads as a black hole punched
+    // in a sunlit wall, which is the loudest "toy" tell left at eye level.
+    m.userData.emissiveScale = 0.34;
+    m.userData.dayFloor = 0.3;
     return m;
   });
   return {
