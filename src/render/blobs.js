@@ -52,12 +52,12 @@ export function updateBlobs(mesh, street, player, heroCar) {
   const driving = player.mode === 'drive';
   // On foot the player casts and the car sits parked with its own shadow; in
   // the car the player's slot collapses to nothing and only the car casts.
-  _d.position.set(player.x, 0.16, player.z);
+  _d.position.set(player.x, player.y + 0.16, player.z);
   _d.rotation.set(0, 0, 0);
   _d.scale.set(driving ? 0 : 0.9, 1, driving ? 0 : 1.1);
   _d.updateMatrix();
   mesh.setMatrixAt(k++, _d.matrix);
-  _d.position.set(heroCar.x, 0.16, heroCar.z);
+  _d.position.set(heroCar.x, heroCar.y + 0.16, heroCar.z);
   _d.rotation.set(0, heroCar.yaw, 0);
   _d.scale.set(2.2, 1, 4.6);
   _d.updateMatrix();

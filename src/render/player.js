@@ -214,12 +214,12 @@ export function buildPlayer() {
 }
 
 export function updatePlayer(avatar, player) {
-  avatar.group.position.set(player.x, 0, player.z);
+  avatar.group.position.set(player.x, player.y, player.z);
   avatar.group.rotation.y = player.yaw;
   const swing = Math.sin(player.walkPhase) * Math.min(1, player.speed / 3) * 0.55;
   avatar.legL.rotation.x = swing;
   avatar.legR.rotation.x = -swing;
   avatar.armL.rotation.x = -swing * 0.7;
   avatar.armR.rotation.x = swing * 0.7;
-  avatar.group.position.y = Math.abs(Math.sin(player.walkPhase)) * 0.03 * Math.min(1, player.speed / 3);
+  avatar.group.position.y = player.y + Math.abs(Math.sin(player.walkPhase)) * 0.03 * Math.min(1, player.speed / 3);
 }

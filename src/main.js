@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
+import { heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
@@ -184,7 +185,7 @@ window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, 
 
 // Follow cam: lower and closer than before — towers loom, street glow fills
 // the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
-const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5 };
+const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5, ground: 0 };
 let dragging = false;
 let lastDragT = -10;
 let lastPX = 0;
@@ -224,6 +225,17 @@ if (spawnPreset === 'east') {
   player.x = 2;
   player.z = 70;
   cam.yaw = Math.PI;
+} else if (spawnPreset === 'bank') {
+  // On the west bank of the channel, a third of a metre down the slope, looking
+  // across the water. The bed itself is deeper but it is under an opaque river.
+  player.x = -36.5;
+  player.z = -60;
+  cam.yaw = Math.PI / 2;
+} else if (spawnPreset === 'mound') {
+  // The crest of the pocket park, the highest ground a person can stand on.
+  player.x = 67;
+  player.z = 17;
+  cam.yaw = -Math.PI / 2;
 } else if (spawnPreset === 'cross') {
   // Middle of the z=40 intersection, looking east down the E-W canyon
   // (cross traffic + lamps + both road axes in one frame).
@@ -301,8 +313,8 @@ window.__game = {
   hack: () => fireHack(),
   dark: () => [...DARK],
   cooldown: () => +hackCooldownLeft(street).toFixed(1),
-  player: () => ({ x: +player.x.toFixed(2), z: +player.z.toFixed(2), mode: player.mode }),
-  car: () => ({ x: +heroCar.x.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
+  player: () => ({ x: +player.x.toFixed(2), y: +player.y.toFixed(2), z: +player.z.toFixed(2), mode: player.mode }),
+  car: () => ({ x: +heroCar.x.toFixed(2), y: +heroCar.y.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
   enter: () => toggleVehicle(),
   profile: () => lastProfile,
   heat: () => wanted.heat,
@@ -472,7 +484,7 @@ function render() {
   updateBlobs(blobs, street, player, heroCar);
   const hx = driving ? heroCar.x : player.x;
   const hz = driving ? heroCar.z : player.z;
-  heroKey.position.set(hx, 2.4, hz);
+  heroKey.position.set(hx, (driving ? heroCar.y : player.y) + 2.4, hz);
   heroKey.intensity = 14 * night;
   let tx = driving ? heroCar.x : player.x;
   let tz = driving ? heroCar.z : player.z;
@@ -490,14 +502,17 @@ function render() {
 
   const ax = driving ? heroCar.x : player.x;
   const az = driving ? heroCar.z : player.z;
+  const ay = driving ? heroCar.y : player.y;
   const cp = Math.cos(cam.pitch);
   const sp = Math.sin(cam.pitch);
-  camera.position.set(
-    ax - Math.sin(cam.yaw) * cam.dist * cp,
-    sp * cam.dist + 0.6,
-    az - Math.cos(cam.yaw) * cam.dist * cp
-  );
-  lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), driving ? 1.2 : 1.7, az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
+  const cx = ax - Math.sin(cam.yaw) * cam.dist * cp;
+  const cz = az - Math.cos(cam.yaw) * cam.dist * cp;
+  // The camera rides the higher of two grounds — the one under the player and
+  // the one under itself — so a bank standing between them cannot swallow it.
+  // Eased, because a kerb is a step function and the whole frame would jump.
+  cam.ground += (Math.max(ay, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * 6);
+  camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
+  lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
   camera.lookAt(lookAt);
 
   lastProfile = driving ? null : updateProfiler(camera, acquireTarget());
