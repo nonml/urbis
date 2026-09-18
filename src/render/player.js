@@ -169,9 +169,9 @@ export function buildPlayer() {
   armGeo.translate(0, -0.26, 0);
   bakeVerticalShade(weaveUVs(armGeo), 1.40);
   const armL = new THREE.Mesh(armGeo, coatMat);
-  armL.position.set(-0.252, 1.40, 0);
+  armL.position.set(-0.278, 1.40, 0);
   const armR = new THREE.Mesh(armGeo, coatMat);
-  armR.position.set(0.252, 1.40, 0);
+  armR.position.set(0.278, 1.40, 0);
   // One dark-kit mesh: pack, its straps and lid, plus the hair cap. All one
   // material, so the back of the hero gains the only object the player stares
   // at all game without costing a draw. The shades are vertex multipliers on a

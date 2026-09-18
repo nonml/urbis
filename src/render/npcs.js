@@ -33,9 +33,12 @@ function headWithHairGeo() {
   const skull = new THREE.SphereGeometry(0.11, 10, 8);
   skull.scale(0.92, 1.12, 1.0);
   skull.translate(0, 1.68, 0);
-  const hair = new THREE.SphereGeometry(0.116, 10, 6, 0, Math.PI * 2, 0, Math.PI * 0.6);
-  hair.scale(0.95, 1.14, 1.06);
-  hair.translate(0, 1.678, -0.006);
+  // The cap has to out-tessellate the skull as well as out-scale it: a
+  // 6-segment shell sags inside a 10-segment sphere between its own vertices,
+  // and every walker was showing scalp through its own hair.
+  const hair = new THREE.SphereGeometry(0.128, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.6);
+  hair.scale(0.90, 1.08, 1.02);
+  hair.translate(0, 1.676, -0.006);
   const geo = mergeGeometries([skull, hair]);
   const n = skull.attributes.position.count;
   const shade = new Float32Array(geo.attributes.position.count * 3).fill(1);
@@ -51,7 +54,11 @@ export function buildNPCs(street) {
   const dummy = new THREE.Object3D();
   // Short rain jacket + long legs + small head: human ratio, not garden gnome.
   // Jacket hem sits at 0.70 so most of the leg reads; head is ~1/8 of height.
-  const profile = [[0.31, 0], [0.295, 0.25], [0.255, 0.55], [0.225, 0.75], [0.21, 0.85]]
+  // Hem 0.31 under a 0.21 shoulder is a cone that flares outward all the way
+  // down, which is a chess pawn from every angle — the same profile bug the
+  // hero had. The shoulder is the widest point on a person, and the hem
+  // hangs just inside it.
+  const profile = [[0.245, 0], [0.238, 0.25], [0.214, 0.55], [0.243, 0.72], [0.228, 0.85]]
     .map(([r, y]) => new THREE.Vector2(r, y));
   const coatLathe = new THREE.LatheGeometry(profile, 9);
   coatLathe.translate(0, 0.70, 0);
@@ -183,7 +190,7 @@ export function updateNPCs(rig, street) {
     dummy.updateMatrix();
     legR.setMatrixAt(i, dummy.matrix);
     // Arms hang from the shoulders, counter-swinging the legs.
-    const sx = 0.215 * (n.bulk ?? 1);
+    const sx = 0.268 * (n.bulk ?? 1);
     const sy = 1.42 * n.h + bob;
     dummy.position.set(n.x + Math.cos(yaw) * sx, sy, n.z - Math.sin(yaw) * sx);
     dummy.rotation.set(-swing * 0.7, yaw, 0, 'YXZ');
