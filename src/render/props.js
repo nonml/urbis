@@ -38,6 +38,44 @@ function clean(geo) {
   return g;
 }
 
+function centreX(geos) {
+  let lo = Infinity;
+  let hi = -Infinity;
+  for (const g of geos) {
+    g.computeBoundingBox();
+    lo = Math.min(lo, g.boundingBox.min.x);
+    hi = Math.max(hi, g.boundingBox.max.x);
+  }
+  return (lo + hi) / 2;
+}
+
+// These Poly Haven props ship as showcase pairs: a clean copy and an aged
+// copy standing side by side on the X axis. Instancing the file as one object
+// planted BOTH at every position, so the whole city had its bins and hydrants
+// in identical twos about a metre apart — a clone tell on every corner.
+//
+// Split them by which side of the model they sit on, recentre each variant on
+// its own origin, and deal the placements out between them. Same material
+// count, so the same number of draws, and now there are two bins in the city
+// instead of one bin twice.
+function splitVariants(byMat) {
+  const groups = [...byMat];
+  const mids = groups.map(([, geos]) => centreX(geos));
+  const lo = Math.min(...mids);
+  const hi = Math.max(...mids);
+  const single = hi - lo < 0.05;
+  const variantOf = mids.map((x) => (single || x >= (lo + hi) / 2 ? 0 : 1));
+  const centres = [0, 1].map((v) => {
+    const geos = groups.filter((_, i) => variantOf[i] === v).flatMap(([, g]) => g);
+    return geos.length ? centreX(geos) : 0;
+  });
+  return groups.map(([mat, geos], i) => {
+    const v = variantOf[i];
+    for (const g of geos) g.translate(-centres[v], 0, 0);
+    return { mat, geos, variant: single ? -1 : v };
+  });
+}
+
 // One InstancedMesh per source material. Original PBR materials kept as-is.
 export async function loadPropInstances(relPath, placements) {
   const gltf = await new GLTFLoader().loadAsync(relPath);
@@ -57,10 +95,11 @@ export async function loadPropInstances(relPath, placements) {
   });
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
-  for (const [mat, geos] of byMat) {
-    const merged = mergeGeometries(geos);
-    const inst = new THREE.InstancedMesh(merged, mat, placements.length);
-    placements.forEach(([x, z], i) => {
+  for (const { mat, geos, variant } of splitVariants(byMat)) {
+    const mine = placements.filter((_, i) => variant < 0 || i % 2 === variant);
+    if (!mine.length) continue;
+    const inst = new THREE.InstancedMesh(mergeGeometries(geos), mat, mine.length);
+    mine.forEach(([x, z], i) => {
       dummy.position.set(x, 0, z);
       dummy.rotation.set(0, (x * 13 + z * 7) % 6.28, 0);
       dummy.scale.set(1, 1, 1);

@@ -474,6 +474,38 @@ function pavementFurniture(out, ax, side) {
   }
 }
 
+// Only one face of each podium gets a shopfront — the one its avenue sees.
+// The other three were flat plaster slabs four metres tall, and from any
+// cross street that is a grey void where a building should be. Every face
+// gets the rhythm instead: pilasters, a corner downpipe with its hopper and
+// shoe, and a condenser where a back-of-house wall would carry one. All of
+// it merges into the podium and trim meshes that already exist.
+function podiumSkin(cx, cz, pw, pd, caps, pod) {
+  for (const sx of [-1, 1]) {
+    for (const sz of [-1, 1]) {
+      const x = cx + sx * (pw / 2 + 0.16);
+      const z = cz + sz * (pd / 2 + 0.16);
+      caps.push(box(0.19, 4.2, 0.19, x, 2.1, z));
+      caps.push(box(0.36, 0.3, 0.36, x, 4.06, z));
+      caps.push(box(0.28, 0.26, 0.28, x, 0.5, z));
+    }
+  }
+  // Pilasters on the two faces the avenue never sees, at the same 0.55 width
+  // and 4.2 height the dressed face uses, so the block reads consistent.
+  for (const sz of [-1, 1]) {
+    for (const u of [-pw / 2 + 0.5, 0, pw / 2 - 0.5]) {
+      pod.push(box(0.55, 4.2, 0.22, cx + u, 2.1, cz + sz * (pd / 2 + 0.11)));
+    }
+  }
+  for (const sx of [-1, 1]) {
+    for (const u of [-pd / 2 + 0.5, 0, pd / 2 - 0.5]) {
+      pod.push(box(0.22, 4.2, 0.55, cx + sx * (pw / 2 + 0.11), 2.1, cz + u));
+    }
+  }
+  caps.push(box(0.8, 0.62, 0.48, cx + pw / 2 + 0.34, 3.5, cz + pd * 0.28));
+  caps.push(box(0.48, 0.62, 0.8, cx - pw * 0.3, 3.5, cz - pd / 2 - 0.34));
+}
+
 // A box laid flat against a podium face. `alongZ` says the face normal points
 // down X, so the pane's width runs in Z instead.
 function faceBox(wide, tall, thick, x, y, z, alongZ) {
@@ -570,6 +602,7 @@ export function buildTowers(texLoader, maxAniso) {
     const shaft = facades[idx % facades.length][zone];
     const pod = podiums[idx % podiums.length];
     pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
+    podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, pod);
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
     // Door recess: dark inset on the street-facing podium face.
