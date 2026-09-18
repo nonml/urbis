@@ -3,9 +3,16 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial } from './materials.js';
+import { displaceToTerrain, RIVER_STRIP } from './landscape.js';
 
 const STREET_LEN = 200;
 const ROAD_HALF = 3.5;
+// The ground under and beyond the city. One mesh, one draw — subdividing it is
+// what lets it carry a Y (law 4 bans splitting it, not refining it). 4 m cells
+// resolve the lip where relief meets the flat road corridor, which blends over
+// 11 m; anything coarser turns that slope into three facets.
+const GROUND_EXTENT = 700;
+const GROUND_CELL = 4;
 
 function box(w, h, d, x, y, z) {
   const g = new THREE.BoxGeometry(w, h, d);
@@ -121,17 +128,43 @@ export function buildGround(texLoader, maxAniso) {
   clutterMesh.receiveShadow = true;
   group.add(clutterMesh);
 
-  const groundBase = new THREE.Mesh(
-    new THREE.PlaneGeometry(700, 700),
-    new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 1, metalness: 0 })
-  );
-  groundBase.rotation.x = -Math.PI / 2;
-  groundBase.position.y = -0.08;
-  groundBase.receiveShadow = true;
-  group.add(groundBase);
+  group.add(terrainBase());
   const markings = buildMarkings();
   group.add(markings.group);
   return { group, mats, markings: markings.mats };
+}
+
+// A 4 m quad cannot describe a 9 m trench — it interpolates straight over the
+// top and hides the water. Drop the quads above the river and let the 1 m bank
+// mesh own that strip; RIVER_STRIP's edges sit on this grid's own lines, so the
+// hole is square and the bank's side faces cover it.
+function cutRiverStrip(geo) {
+  const pos = geo.attributes.position;
+  const idx = geo.index.array;
+  const kept = [];
+  for (let i = 0; i < idx.length; i += 3) {
+    const a = idx[i], b = idx[i + 1], c = idx[i + 2];
+    const cx = (pos.getX(a) + pos.getX(b) + pos.getX(c)) / 3;
+    const cz = (pos.getZ(a) + pos.getZ(b) + pos.getZ(c)) / 3;
+    const over = cx > RIVER_STRIP.x0 && cx < RIVER_STRIP.x1
+      && cz > RIVER_STRIP.z0 && cz < RIVER_STRIP.z1;
+    if (!over) kept.push(a, b, c);
+  }
+  geo.setIndex(kept);
+  return geo;
+}
+
+function terrainBase() {
+  const cells = GROUND_EXTENT / GROUND_CELL;
+  const geo = new THREE.PlaneGeometry(GROUND_EXTENT, GROUND_EXTENT, cells, cells);
+  geo.rotateX(-Math.PI / 2);
+  const mesh = new THREE.Mesh(
+    cutRiverStrip(displaceToTerrain(geo)),
+    new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 1, metalness: 0 })
+  );
+  mesh.position.y = -0.08;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 function buildMarkings() {
