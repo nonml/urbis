@@ -4,9 +4,18 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
+import {
+  ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
+  isAvenue, way, wayCenter, wayLength,
+} from '../sim/world.js';
 
-const STREET_LEN = 200;
-const ROAD_HALF = 3.5;
+// Where the city is comes from sim/world.js — this file draws the road graph,
+// it does not get a second opinion about where the roads are.
+const PLAZA = way('plaza');
+const SOUTH = way('south');
+// Every avenue runs the same span today, and the markings that straddle the
+// zone boundary at z = 0 are cut against it.
+const STREET_LEN = wayLength(way('main'));
 // The ground under and beyond the city. One mesh, one draw — subdividing it is
 // what lets it carry a Y (law 4 bans splitting it, not refining it). 4 m cells
 // resolve the lip where relief meets the flat road corridor, which blends over
@@ -29,26 +38,49 @@ function worldUVs(geo, w, h, d, tile) {
   return geo;
 }
 
+// The carriageways, in the order the street was merged in: avenues north-south,
+// then the crossings east-west.
+const ROADS = [...AVENUES, ...CROSSINGS];
+
+// A way's tarmac as one quad: full width across, its own span along.
+function carriageway(w) {
+  const len = wayLength(w);
+  const geo = isAvenue(w)
+    ? new THREE.PlaneGeometry(ROAD_HALF * 2, len)
+    : new THREE.PlaneGeometry(len, ROAD_HALF * 2);
+  const c = wayCenter(w);
+  geo.rotateX(-Math.PI / 2);
+  geo.translate(c.x, 0, c.z);
+  return geo;
+}
+
+// A pair of slabs flanking a way, one per side, sitting just off the kerb face.
+function flankingSlabs(w, width, height, y) {
+  const len = wayLength(w);
+  const c = wayCenter(w);
+  const off = ROAD_HALF + width / 2;
+  return [-1, 1].map((side) => (isAvenue(w)
+    ? box(width, height, len, c.x + side * off, y, c.z)
+    : box(len, height, width, c.x, y, c.z + side * off)));
+}
+
+const WALK_RISE = 0.24;
+// The plaza's footways are narrower than the standard: they give the width back
+// to the 104 m of carriageway they flank.
+const PLAZA_WALK_WIDTH = 2.4;
+const KERB_WIDTH = 0.22;
+const KERB_RISE = 0.15;
+// The painted edge line, measured out from the centre-line like every other
+// marking. It lands on the kerb face rather than beside it — inherited, and not
+// this refactor's to move.
+const EDGE_LINE_OUT = ROAD_HALF + 0.2;
+
 export function buildGround(texLoader, maxAniso) {
   const group = new THREE.Group();
   const mats = {};
   const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
   const roadMat = standardFromMaps(asphalt, { roughness: 0.38, envMapIntensity: 1.4, color: 0x7e838d });
-  const roadMain = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
-  roadMain.rotateX(-Math.PI / 2);
-  const roadEast = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
-  roadEast.rotateX(-Math.PI / 2);
-  roadEast.translate(44, 0, 0);
-  const roadWest = new THREE.PlaneGeometry(ROAD_HALF * 2, STREET_LEN);
-  roadWest.rotateX(-Math.PI / 2);
-  roadWest.translate(-44, 0, 0);
-  const roadCross = new THREE.PlaneGeometry(104, ROAD_HALF * 2);
-  roadCross.rotateX(-Math.PI / 2);
-  roadCross.translate(0, 0, 40);
-  const roadSouth = new THREE.PlaneGeometry(58, ROAD_HALF * 2);
-  roadSouth.rotateX(-Math.PI / 2);
-  roadSouth.translate(22, 0, -64);
-  const roadMesh = new THREE.Mesh(mergeGeometries([roadMain, roadEast, roadWest, roadCross, roadSouth]), roadMat);
+  const roadMesh = new THREE.Mesh(mergeGeometries(ROADS.map(carriageway)), roadMat);
   roadMesh.receiveShadow = true;
   group.add(roadMesh);
   mats.road = roadMat;
@@ -56,17 +88,10 @@ export function buildGround(texLoader, maxAniso) {
   const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
   const walkMat = standardFromMaps(paving, { roughness: 0.6, envMapIntensity: 0.7, color: 0x9aa0ab });
   const walks = mergeGeometries([
-    box(3, 0.24, STREET_LEN, -(ROAD_HALF + 1.5), 0.0, 0),
-    box(3, 0.24, STREET_LEN, ROAD_HALF + 1.5, 0.0, 0),
-    box(3, 0.24, STREET_LEN, 44 - (ROAD_HALF + 1.5), 0.0, 0),
-    box(3, 0.24, STREET_LEN, 44 + (ROAD_HALF + 1.5), 0.0, 0),
-    box(3, 0.24, STREET_LEN, -44 - (ROAD_HALF + 1.5), 0.0, 0),
-    box(3, 0.24, STREET_LEN, -44 + (ROAD_HALF + 1.5), 0.0, 0),
-    box(104, 0.24, 2.4, 0, 0.0, 40 - (ROAD_HALF + 1.2)),
-    box(104, 0.24, 2.4, 0, 0.0, 40 + (ROAD_HALF + 1.2)),
-    box(58, 0.24, 3, 22, 0.0, -64 - (ROAD_HALF + 1.5)),
-    box(58, 0.24, 3, 22, 0.0, -64 + (ROAD_HALF + 1.5)),
-    box(22, 0.24, 9, -17, 0.0, -32),
+    ...AVENUES.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
+    ...flankingSlabs(PLAZA, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
+    ...flankingSlabs(SOUTH, WALKWAY_WIDTH, WALK_RISE, 0.0),
+    box(22, WALK_RISE, 9, -17, 0.0, -32),   // river promenade slab
   ]);
   const walkMesh = new THREE.Mesh(walks, walkMat);
   walkMesh.receiveShadow = true;
@@ -75,18 +100,12 @@ export function buildGround(texLoader, maxAniso) {
 
   const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
   const curbMat = standardFromMaps(concrete, { roughness: 0.75, envMapIntensity: 0.4, color: 0x7d828c });
+  const kerbRails = (w) => flankingSlabs(w, KERB_WIDTH, KERB_RISE, KERB_RISE / 2);
   const curbs = mergeGeometries([
-    box(0.22, 0.15, STREET_LEN, -(ROAD_HALF + 0.11), 0.075, 0),
-    box(0.22, 0.15, STREET_LEN, ROAD_HALF + 0.11, 0.075, 0),
-    box(0.22, 0.15, STREET_LEN, 44 - (ROAD_HALF + 0.11), 0.075, 0),
-    box(0.22, 0.15, STREET_LEN, 44 + (ROAD_HALF + 0.11), 0.075, 0),
-    box(0.22, 0.15, STREET_LEN, -44 - (ROAD_HALF + 0.11), 0.075, 0),
-    box(0.22, 0.15, STREET_LEN, -44 + (ROAD_HALF + 0.11), 0.075, 0),
-    box(58, 0.15, 0.22, 22, 0.075, -64 - (ROAD_HALF + 0.11)),
-    box(58, 0.15, 0.22, 22, 0.075, -64 + (ROAD_HALF + 0.11)),
-    box(104, 0.15, 0.22, 0, 0.075, 40 - (ROAD_HALF + 0.11)),
-    box(104, 0.15, 0.22, 0, 0.075, 40 + (ROAD_HALF + 0.11)),
-    box(0.35, 1.0, 9, -27.8, 0.5, -32),
+    ...AVENUES.flatMap(kerbRails),
+    ...kerbRails(SOUTH),
+    ...kerbRails(PLAZA),
+    box(0.35, 1.0, 9, -27.8, 0.5, -32),     // river promenade parapet
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
   curbMesh.receiveShadow = true;
@@ -95,7 +114,7 @@ export function buildGround(texLoader, maxAniso) {
   // Curb clutter: bollards, drain grates, utility boxes — all merged, +0 draws.
   const clutter = [];
   // Bollards at regular intervals along each avenue curb.
-  for (const ax of [0, 44, -44]) {
+  for (const ax of AVENUE_X) {
     for (let z = -80; z <= 80; z += 16) {
       for (const side of [-1, 1]) {
         const bx = ax + side * (ROAD_HALF + 0.5);
@@ -107,17 +126,23 @@ export function buildGround(texLoader, maxAniso) {
     }
   }
   // Drain grates at intersections.
-  for (const ax of [0, 44, -44]) {
-    for (const gz of [40 - ROAD_HALF - 0.5, 40 + ROAD_HALF + 0.5]) {
+  for (const ax of AVENUE_X) {
+    for (const gz of [PLAZA.z - ROAD_HALF - 0.5, PLAZA.z + ROAD_HALF + 0.5]) {
       clutter.push(box(0.8, 0.02, 0.4, ax, 0.03, gz));
     }
   }
-  // Utility boxes on the wider sidewalk sections.
-  const boxPositions = [[-6.2, -40], [6.2, -20], [-50.2, 0], [50.2, 16], [-6.2, 36], [6.2, 56]];
+  // Utility boxes on the wider sidewalk sections, out against the building line.
+  const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
+  const UTILITY_OUT = ROAD_HALF + 2.7;
+  const boxPositions = [
+    [MAIN_X - UTILITY_OUT, -40], [MAIN_X + UTILITY_OUT, -20],
+    [WEST_X - UTILITY_OUT, 0], [EAST_X + UTILITY_OUT, 16],
+    [MAIN_X - UTILITY_OUT, 36], [MAIN_X + UTILITY_OUT, 56],
+  ];
   for (const [bx, bz] of boxPositions) {
     clutter.push(box(0.6, 1.0, 0.5, bx, 0.5, bz));
   }
-  for (const ax of [0, 44, -44]) for (const side of [-1, 1]) pavementFurniture(clutter, ax, side);
+  for (const ax of AVENUE_X) for (const side of [-1, 1]) pavementFurniture(clutter, ax, side);
   const clutterMesh = new THREE.Mesh(
     mergeGeometries(clutter.map((g) => (g.attributes.color ? g : tint(g, 1)))),
     new THREE.MeshStandardMaterial({
@@ -152,66 +177,52 @@ function buildMarkings() {
   const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
   // Center dashes: 10cm wide, 3m long, 6m gap (real road standard).
   const dash = new THREE.PlaneGeometry(0.10, 3);
-  for (const ax of [0, 44, -44]) {
-    for (let z = -STREET_LEN / 2 + 3; z < STREET_LEN / 2 - 3; z += 6) {
+  for (const av of AVENUES) {
+    for (let z = av.z0 + 3; z < av.z1 - 3; z += 6) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
-      q.translate(ax, 0.02, z);
+      q.translate(av.x, 0.02, z);
       push(q, z);
     }
   }
+  // Along a crossing, stopping short of the junction mouth at either end.
   const dashX = new THREE.PlaneGeometry(2, 0.10);
-  for (let x = -4; x <= 48; x += 5) {
-    const q = dashX.clone();
-    q.rotateX(-Math.PI / 2);
-    q.translate(x, 0.02, -64);
-    push(q, -64);
+  const crossDashes = (cr, inset) => {
+    for (let x = cr.x0 + inset; x <= cr.x1 - inset; x += 5) {
+      const q = dashX.clone();
+      q.rotateX(-Math.PI / 2);
+      q.translate(x, 0.02, cr.z);
+      push(q, cr.z);
+    }
+  };
+  crossDashes(SOUTH, 3);
+  crossDashes(PLAZA, 2);
+  // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
+  // avenue, each at its own z so the three do not line up across the district.
+  for (const [id, cz] of [['main', 20], ['east', -20], ['west', 10]]) {
+    const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
+    for (let i = -3; i <= 3; i++) {
+      const q = stripe.clone();
+      q.rotateX(-Math.PI / 2);
+      q.rotateY(Math.PI / 2);
+      q.translate(way(id).x, 0.02, cz + i * 0.7);
+      push(q, cz);
+    }
   }
-  for (let x = -50; x <= 50; x += 5) {
-    const q = dashX.clone();
-    q.rotateX(-Math.PI / 2);
-    q.translate(x, 0.02, 40);
-    push(q, 40);
-  }
-  // Crosswalk stripes: 35cm wide, tight 70cm pitch.
-  const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  for (let i = -3; i <= 3; i++) {
-    const q = stripe.clone();
-    q.rotateX(-Math.PI / 2);
-    q.rotateY(Math.PI / 2);
-    q.translate(0, 0.02, 20 + i * 0.7);
-    push(q, 20);
-  }
-  const stripeE = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  for (let i = -3; i <= 3; i++) {
-    const q = stripeE.clone();
-    q.rotateX(-Math.PI / 2);
-    q.rotateY(Math.PI / 2);
-    q.translate(44, 0.02, -20 + i * 0.7);
-    push(q, -20);
-  }
-  const stripeW = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  for (let i = -3; i <= 3; i++) {
-    const q = stripeW.clone();
-    q.rotateX(-Math.PI / 2);
-    q.rotateY(Math.PI / 2);
-    q.translate(-44, 0.02, 10 + i * 0.7);
-    push(q, 10);
-  }
-  // Zebra crossings over the E-W connector (z=40) at each avenue.
+  // Zebra crossings over the plaza connector at each avenue.
   const stripeC = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  for (const ax of [-44, 0, 44]) {
+  for (const ax of [...AVENUE_X].sort((a, b) => a - b)) {
     for (let i = -3; i <= 3; i++) {
       const q = stripeC.clone();
       q.rotateX(-Math.PI / 2);
-      q.translate(ax + i * 0.7, 0.02, 40);
-      push(q, 40);
+      q.translate(ax + i * 0.7, 0.02, PLAZA.z);
+      push(q, PLAZA.z);
     }
   }
   // Edge lines split at the zone boundary — same look, two draws.
   const edge = new THREE.PlaneGeometry(0.10, STREET_LEN / 2);
-  for (const ax of [0, 44, -44]) {
-    for (const ex of [ax - 3.7, ax + 3.7]) {
+  for (const ax of AVENUE_X) {
+    for (const ex of [ax - EDGE_LINE_OUT, ax + EDGE_LINE_OUT]) {
       for (const [zc, zs] of [[-STREET_LEN / 4, 0], [STREET_LEN / 4, 1]]) {
         const q = edge.clone();
         q.rotateX(-Math.PI / 2);
@@ -230,7 +241,7 @@ function buildMarkings() {
   });
   const manholes = [];
   const mh = new THREE.CircleGeometry(0.55, 14);
-  for (const ax of [0, 44, -44]) {
+  for (const ax of AVENUE_X) {
     for (let z = -48; z <= 48; z += 24) {
       const q = mh.clone();
       q.rotateX(-Math.PI / 2);
@@ -611,7 +622,6 @@ function faceBox(wide, tall, thick, x, y, z, alongZ) {
 }
 
 export function buildTowers(texLoader, maxAniso) {
-  const avenues = [0, 44, -44];
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
   const facades = mats.kinds.map(() => [[], []]);
@@ -750,7 +760,7 @@ export function buildTowers(texLoader, maxAniso) {
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
   }
   let idx = 0;
-  for (const ax of avenues) {
+  for (const ax of AVENUE_X) {
     for (const [side, z, w, h, d] of TOWERS) {
       // The dressed face is the one the avenue sees, not an arbitrary +Z.
       emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++, [-side, 0]);

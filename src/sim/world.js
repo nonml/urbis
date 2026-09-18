@@ -301,3 +301,51 @@ export function heightAt(x, z) {
   const hills = HILL_RISE * band01(HILL_WAVES, x, z) * wildness(x, z);
   return open * (swell + hills);
 }
+
+// Whole-way lookups, added when render/block.js, render/lamps.js and
+// sim/street.js migrated onto this file.
+//
+// The graph above is nodes and edges, which is what a car following a road
+// wants. A generator that lays one down wants the other half: the uncut way,
+// by name, with its middle and its length — a carriageway is drawn as one quad
+// and its kerbs as one box, not as a chain of segments.
+// ---------------------------------------------------------------------------
+
+// The pavement flanking a carriageway, kerb face to building line. Render lays
+// the slab and the sim walks people down it, so the width belongs to the road's
+// cross-section rather than to either of them.
+export const WALKWAY_WIDTH = 3;
+
+const WAYS_BY_ID = new Map();
+for (const d of DISTRICTS) {
+  for (const w of [...d.avenues, ...d.crossings]) WAYS_BY_ID.set(w.id, w);
+}
+
+// An avenue or a crossing by name, so a call site can say 'plaza' and never 40.
+export function way(id) {
+  const found = WAYS_BY_ID.get(id);
+  if (!found) throw new Error(`world: no way named ${id}`);
+  return found;
+}
+
+// An avenue carries an x and runs in z; a crossing is the other way round.
+export function isAvenue(w) {
+  return w.x !== undefined;
+}
+
+export const AVENUES = DISTRICTS.flatMap((d) => d.avenues);
+export const CROSSINGS = DISTRICTS.flatMap((d) => d.crossings);
+// Centre-lines, in declaration order — the order the street was built in, and
+// the order anything merging geometry has to keep to stay byte-identical.
+export const AVENUE_X = AVENUES.map((a) => a.x);
+export const CROSSING_Z = CROSSINGS.map((c) => c.z);
+
+export function wayCenter(w) {
+  return isAvenue(w)
+    ? { x: w.x, z: (w.z0 + w.z1) / 2 }
+    : { x: (w.x0 + w.x1) / 2, z: w.z };
+}
+
+export function wayLength(w) {
+  return isAvenue(w) ? w.z1 - w.z0 : w.x1 - w.x0;
+}
