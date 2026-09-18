@@ -278,6 +278,38 @@ const FACADE_MAPS = [
 // Each architecture carries a per-zone twin, because a blackout has to kill one
 // zone's windows and leave the other burning. That is one draw per material and it
 // is the price of the hack reading at all.
+// What the pane emits, not what colour it is. A flat amber rectangle is a
+// lightbox; a shop is a bright ceiling, a dim floor and stock in between, and
+// at play distance that gradient plus a few dark verticals is the whole read.
+// Every pane maps this once, so the district costs one 128x64 canvas.
+function shopInteriorTexture() {
+  const c = document.createElement('canvas');
+  c.width = 128;
+  c.height = 64;
+  const g = c.getContext('2d');
+  const wash = g.createLinearGradient(0, 0, 0, 64);
+  wash.addColorStop(0, '#ffdcae');
+  wash.addColorStop(0.28, '#e8a863');
+  wash.addColorStop(0.72, '#8a5a30');
+  wash.addColorStop(1, '#241708');
+  g.fillStyle = wash;
+  g.fillRect(0, 0, 128, 64);
+  g.fillStyle = 'rgba(255,240,215,0.85)';
+  g.fillRect(0, 2, 128, 5);           // ceiling strip
+  g.fillStyle = 'rgba(20,12,6,0.72)';
+  for (const [x, w, top] of [[12, 9, 22], [31, 6, 30], [58, 11, 18], [83, 7, 27], [104, 10, 24]]) {
+    g.fillRect(x, top, w, 64 - top);  // shelving and stock
+  }
+  g.fillStyle = 'rgba(12,8,4,0.8)';
+  g.fillRect(44, 34, 5, 30);          // a figure at the counter
+  g.fillRect(43, 29, 7, 6);
+  g.fillStyle = 'rgba(10,7,4,0.9)';
+  g.fillRect(0, 58, 128, 6);          // the sill's own shadow
+  const tex = new THREE.CanvasTexture(c);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 function towerMaterials(texLoader, maxAniso) {
   const nightMaps = {};
   for (const [slot, file, srgb] of FACADE_MAPS) {
@@ -302,13 +334,33 @@ function towerMaterials(texLoader, maxAniso) {
     [loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2), 0.85, 0x54575f],
     [loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2), 0.8, 0x4e5158],
   ].map(([maps, roughness, color]) => standardFromMaps(maps, { roughness, envMapIntensity: 0.35, color }));
+  // Ground-floor glazing, one material per power zone. It has to be zoned:
+  // a shopfront still burning through a blackout is exactly the dishonesty
+  // VGA-007 was opened for. Emissive is driven from main with the lamps.
+  const interior = shopInteriorTexture();
+  const shopGlass = [0, 1].map(() => {
+    const m = new THREE.MeshStandardMaterial({
+      color: 0x11161d, emissive: 0xffffff, emissiveIntensity: 0, emissiveMap: interior,
+      roughness: 0.12, metalness: 0.55, envMapIntensity: 1.6,
+    });
+    m.userData.baseTint = m.color.clone();
+    return m;
+  });
   return {
     kinds,
     podium,
+    shopGlass,
     // Only glass crossfades day to night in-shader; concrete looks the same at noon.
     facadeMats: [...kinds[0], ...kinds[1]],
-    zoneMats: [kinds.map((twins) => twins[0]), kinds.map((twins) => twins[1])],
+    zoneMats: [[...kinds.map((twins) => twins[0]), shopGlass[0]],
+      [...kinds.map((twins) => twins[1]), shopGlass[1]]],
   };
+}
+
+// A box laid flat against a podium face. `alongZ` says the face normal points
+// down X, so the pane's width runs in Z instead.
+function faceBox(wide, tall, thick, x, y, z, alongZ) {
+  return alongZ ? box(thick, tall, wide, x, y, z) : box(wide, tall, thick, x, y, z);
 }
 
 export function buildTowers(texLoader, maxAniso) {
@@ -318,11 +370,83 @@ export function buildTowers(texLoader, maxAniso) {
   const facades = mats.kinds.map(() => [[], []]);
   const podiums = mats.podium.map(() => []);
   const caps = [];
+  const shopGeos = [[], []];
+  const shopPools = [];
   const beaconPts = [];
+  // The eye-level pass. A 4.2m plaster box with one narrow door is the single
+  // biggest reason the street reads as a model: at walking distance a wall has
+  // to have a base, a rhythm, a shopfront and something casting a shadow on it.
+  // Everything here merges into a mesh that already exists except the glazing,
+  // which needs its own material because it lights up — and its own per-zone
+  // twin, because a lit shopfront surviving a blackout is a lie.
+  const SHOP_SILL = 0.55;
+  const SHOP_HEAD = 3.15;
+  const SHOP_MARGIN = 1.5;     // solid pier each side of the glazing
+  const AWNING_OUT = 0.85;
+  const SPILL_OUT = 1.9;       // pool centre, just off the kerb side of the glass
+  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], pod) {
+    const alongZ = fx !== 0;
+    const pw = w + 1.2;
+    const pd = d + 1.2;
+    const span = alongZ ? pd : pw;
+    const dir = alongZ ? fx : fz;
+    const out = (alongZ ? pw : pd) / 2;
+    const ox = alongZ ? cx + dir * out : cx;
+    const oz = alongZ ? cz : cz + dir * out;
+    // u runs across the face, t stands off it — both in the face's own frame.
+    const at = (u, t) => (alongZ
+      ? [ox + dir * t, oz + u]
+      : [ox + u, oz + dir * t]);
+    // Plinth: a dark stone base the whole podium stands on. Without it the
+    // wall grows out of the pavement like a decal.
+    caps.push(box(pw + 0.16, 0.5, pd + 0.16, cx, 0.25, cz));
+    const run = span - SHOP_MARGIN * 2;
+    const midY = (SHOP_SILL + SHOP_HEAD) / 2;
+    const gh = SHOP_HEAD - SHOP_SILL;
+    if (run > 1.2) {
+      // Separate tenancies, not one continuous ribbon of light. A single 12m
+      // pane reads as a lightbox stuck to the wall; piers every ~3.5m make the
+      // block read as four shops that each happen to be open.
+      const bays = Math.max(1, Math.round(run / 3.6));
+      const pier = bays > 1 ? 0.5 : 0;
+      const bayW = (run - pier * (bays - 1)) / bays;
+      for (let i = 0; i < bays; i++) {
+        const u = -run / 2 + i * (bayW + pier) + bayW / 2;
+        const [gx, gz] = at(u, 0.02);
+        shopGeos[zone].push(faceBox(bayW, gh, 0.08, gx, midY, gz, alongZ));
+        // Spill on the pavement. A lit window with dark ground under it is a
+        // sticker; this rides the existing per-zone pool mesh, so it is free
+        // and it dies in a blackout with everything else.
+        const [lx, lz] = at(u, SPILL_OUT);
+        shopPools.push({ x: lx, z: lz, size: Math.min(bayW * 1.5, 7), color: '#ffb066', zone });
+        // Mullions inside a bay: the vertical rhythm that says shopfront.
+        for (const mu of [-bayW / 4, bayW / 4]) {
+          const [mx, mz] = at(u + mu, 0.09);
+          caps.push(faceBox(0.09, gh, 0.1, mx, midY, mz, alongZ));
+        }
+        if (i < bays - 1) {
+          const [px, pz] = at(u + bayW / 2 + pier / 2, 0.08);
+          pod.push(faceBox(pier, gh + 0.5, 0.18, px, midY + 0.1, pz, alongZ));
+        }
+      }
+      // Sill under the glass, awning over it: two horizontal shadow lines.
+      const [sx, sz] = at(0, 0.12);
+      caps.push(faceBox(run + 0.3, 0.14, 0.24, sx, SHOP_SILL - 0.05, sz, alongZ));
+      const [ax2, az2] = at(0, AWNING_OUT / 2);
+      caps.push(faceBox(run + 0.5, 0.12, AWNING_OUT, ax2, SHOP_HEAD + 0.18, az2, alongZ));
+    }
+    // Pilasters in podium plaster, so they self-shadow and the lamps rake them.
+    for (const u of [-span / 2 + 0.45, span / 2 - 0.45]) {
+      const [px, pz] = at(u, 0.11);
+      pod.push(faceBox(0.55, 4.2, 0.22, px, 2.1, pz, alongZ));
+    }
+  }
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
-  function emitTower(cx, cz, w, h, d, idx) {
-    const shaft = facades[idx % facades.length][cz < 0 ? 0 : 1];
-    podiums[idx % podiums.length].push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
+  function emitTower(cx, cz, w, h, d, idx, face) {
+    const zone = cz < 0 ? 0 : 1;
+    const shaft = facades[idx % facades.length][zone];
+    const pod = podiums[idx % podiums.length];
+    pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
     // Door recess: dark inset on the street-facing podium face.
@@ -332,6 +456,7 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
     // Small canopy over the door.
     caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
+    if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod);
     shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
@@ -352,17 +477,18 @@ export function buildTowers(texLoader, maxAniso) {
   let idx = 0;
   for (const ax of avenues) {
     for (const [side, z, w, h, d] of TOWERS) {
-      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++);
+      // The dressed face is the one the avenue sees, not an arbitrary +Z.
+      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++, [-side, 0]);
     }
   }
   for (const [x, w, h] of SOUTH_TOWERS) {
-    emitTower(x, -66, w, h, 10, idx++);
+    emitTower(x, -66, w, h, 10, idx++, [0, 1]);
   }
   for (const [x, z, w, h, d] of INFILL_TOWERS) {
-    emitTower(x, z, w, h, d, idx++);
+    emitTower(x, z, w, h, d, idx++, [x > 0 ? -1 : 1, 0]);
   }
   for (const [x, z, w, h, d] of TERMINUS_TOWERS) {
-    emitTower(x, z, w, h, d, idx++);
+    emitTower(x, z, w, h, d, idx++, [0, -1]);
   }
   const batches = [
     ...facades.flatMap((zoned, kind) => zoned.map((geos, zone) => [geos, mats.kinds[kind][zone]])),
@@ -391,6 +517,11 @@ export function buildTowers(texLoader, maxAniso) {
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
   group.add(capMesh);
+  // Two draws for every shopfront in the district — one per power zone.
+  shopGeos.forEach((geos, zone) => {
+    if (!geos.length) throw new Error('buildTowers: a zone has no shopfronts');
+    group.add(new THREE.Mesh(mergeGeometries(geos), mats.shopGlass[zone]));
+  });
 
   const silhouettes = [
     box(20, 60, 16, -58, 30, -30), box(24, 74, 18, 34, 37, -8),
@@ -400,7 +531,10 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  return { group, beacons: beaconPts, facadeMats: mats.facadeMats, zoneMats: mats.zoneMats, mirrorProxies };
+  return {
+    group, beacons: beaconPts, facadeMats: mats.facadeMats,
+    zoneMats: mats.zoneMats, mirrorProxies, shopPools,
+  };
 }
 
 // Horizon promise (VGA-054): lit-window ring beyond the playable blocks.

@@ -78,7 +78,7 @@ Promise.all([
 const signs = buildSigns();
 scene.add(signs.group);
 const signPoolMeshes = [0, 1].map((zone) => {
-  const m = buildPools(signs.pools.filter((q) => q.zone === zone));
+  const m = buildPools([...signs.pools, ...towers.shopPools].filter((q) => q.zone === zone));
   scene.add(m);
   return m;
 });
@@ -415,7 +415,7 @@ function render() {
     signPoolMeshes[z].material.opacity = 0.5 * nf * b;
     spots[z].intensity = 45 * nf * b;
     for (const m of towers.zoneMats[z]) {
-      m.emissiveIntensity = 0.75 * nf * b;
+      m.emissiveIntensity = 0.75 * nf * b * (m.userData.emissiveScale ?? 1);
       m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
     }
     setPuddleGlow(puddles, z, b);
