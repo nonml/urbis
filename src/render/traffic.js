@@ -319,7 +319,7 @@ export function updateCarPools(rig, cars, camera = null) {
   const { pools, dummy } = rig;
   const base = pools.count - POOL_EXTRA;
   cars.forEach((c, i) => {
-    dummy.position.set(c.x, POOL_Y, c.z);
+    dummy.position.set(c.x, (c.y ?? 0) + POOL_Y, c.z);
     dummy.rotation.set(0, c.yaw, 0);
     const fade = c.on ? poolFade(c.x, c.z, camera) : 0;
     dummy.scale.set(fade, 1, throwScale(c.speed) * fade);
@@ -368,7 +368,7 @@ export function buildPlayerCar(scene, car) {
 }
 
 export function updatePlayerCar(rig, car, braking) {
-  rig.group.position.set(car.x, 0, car.z);
+  rig.group.position.set(car.x, car.y, car.z);
   rig.group.rotation.y = car.yaw;
   rig.tailMat.color.copy(braking ? TAIL_BRAKE : TAIL_DIM);
   rig.beacon.position.set(0, 3.4, 0);
@@ -379,10 +379,13 @@ export function updatePlayerCar(rig, car, braking) {
   for (const s of rig.glows) {
     s.position.set(
       car.x + s.userData.sx * rx + 2.15 * fx,
-      0.7,
+      car.y + 0.7,
       car.z + s.userData.sx * rz + 2.15 * fz
     );
   }
-  rig.spot.position.set(car.x, 1.0, car.z);
-  rig.spot.target.position.set(car.x + fx * 18, 0, car.z + fz * 18);
+  rig.spot.position.set(car.x, car.y + 1.0, car.z);
+  // The beam stays level with the car, not with the world: no road in this city
+  // leaves the flat, so aiming it at y = 0 only matters off-road, and a beam
+  // that dips into a verge it is driving over reads as a fault, not as physics.
+  rig.spot.target.position.set(car.x + fx * 18, car.y, car.z + fz * 18);
 }
