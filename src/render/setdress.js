@@ -22,60 +22,109 @@ const SHOP_STYLES = [
   { glow: '#52ff9e', name: 'CLINIC' },
 ];
 
-function shopTexture(kind) {
+// The old version painted a whole fake shopfront — sign band plus four lit
+// window rectangles — onto a flat plane and hung it on the wall. Since the
+// podium grew real glazing with real interiors behind it, that plane was a
+// sticker of a shop stuck over an actual shop, and it cost one draw each.
+//
+// What a commercial street has and this one did not is signage with depth: a
+// fascia board over the door and a blade projecting out across the pavement,
+// so the trade reads from the far end of the block instead of only head-on.
+//
+// 256x200 atlas: three 256x64 trade bands, then an 8px black strip at the
+// bottom that every face which is not a sign face points at.
+const SIGN_BAND = 64 / 200;
+
+function paintSignCell(g, kind, oy) {
   const st = SHOP_STYLES[kind];
+  g.fillStyle = '#080b10';
+  g.fillRect(0, oy, 256, 64);
+  g.shadowColor = st.glow;
+  g.shadowBlur = 14;
+  g.strokeStyle = st.glow;
+  g.lineWidth = 3;
+  g.strokeRect(5, oy + 5, 246, 54);
+  g.fillStyle = st.glow;
+  g.font = 'bold 34px sans-serif';
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.fillText(st.name, 128, oy + 33);
+  g.shadowBlur = 0;
+}
+
+function shopSignAtlas() {
   const c = document.createElement('canvas');
   c.width = 256;
-  c.height = 160;
+  c.height = 200;
   const g = c.getContext('2d');
   g.fillStyle = '#05070c';
-  g.fillRect(0, 0, 256, 160);
-  g.shadowColor = st.glow;
-  g.shadowBlur = 16;
-  g.fillStyle = st.glow;
-  g.fillRect(0, 0, 256, 34);
-  g.shadowBlur = 0;
-  g.fillStyle = '#000';
-  g.font = 'bold 24px sans-serif';
-  g.textAlign = 'center';
-  g.fillText(st.name, 128, 25);
-  for (let i = 0; i < 4; i++) {
-    const x = 14 + i * 62;
-    const lit = (i + kind) % 3 !== 0;
-    g.fillStyle = lit ? '#ffe9c4' : '#131a24';
-    g.shadowColor = st.glow;
-    g.shadowBlur = lit ? 12 : 0;
-    g.fillRect(x, 52, 48, 88);
-    g.shadowBlur = 0;
-    g.fillStyle = 'rgba(0,0,0,0.55)';
-    g.fillRect(x, 52, 48, 12);
-  }
+  g.fillRect(0, 0, 256, 200);
+  for (let k = 0; k < SHOP_STYLES.length; k += 1) paintSignCell(g, k, k * 64);
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = false;
+  tex.minFilter = THREE.LinearFilter;
   return tex;
+}
+
+// BoxGeometry lays its faces out +X, -X, +Y, -Y, +Z, -Z, four vertices each.
+// Faces listed in `lit` read the trade band; the rest point at the black
+// strip, so one material covers the sign, its edges and its back.
+function mapSignFaces(geo, kind, lit) {
+  const uv = geo.attributes.uv;
+  const v0 = 1 - (kind + 1) * SIGN_BAND;
+  for (let f = 0; f < 6; f += 1) {
+    for (let k = 0; k < 4; k += 1) {
+      const i = f * 4 + k;
+      if (lit.includes(f)) uv.setXY(i, uv.getX(i), v0 + uv.getY(i) * SIGN_BAND);
+      else uv.setXY(i, 0.5, 0.01);
+    }
+  }
+  return geo;
+}
+
+function shopSignGeos(s, signGeos, brackets) {
+  const zone = s.z < 0 ? 0 : 1;
+  const dx = Math.sin(s.ry);
+  const dz = Math.cos(s.ry);
+  const fascia = mapSignFaces(new THREE.BoxGeometry(6.0, 0.92, 0.24), s.kind, [4]);
+  fascia.rotateY(s.ry);
+  fascia.translate(s.x + dx * 0.2, 3.62, s.z + dz * 0.2);
+  signGeos[zone].push(fascia);
+  // Both broad faces of the blade carry the name: the whole point of a
+  // projecting sign is being read side-on from down the block, where a flat
+  // fascia is edge-on and says nothing.
+  const blade = mapSignFaces(new THREE.BoxGeometry(1.9, 0.86, 0.1), s.kind, [4, 5]);
+  blade.rotateY(s.ry + Math.PI / 2);
+  blade.translate(s.x + dx * 1.2, 5.1, s.z + dz * 1.2);
+  signGeos[zone].push(blade);
+  const arm = new THREE.BoxGeometry(0.1, 0.1, 0.62);
+  arm.rotateY(s.ry);
+  arm.translate(s.x + dx * 0.42, 5.44, s.z + dz * 0.42);
+  const stay = new THREE.BoxGeometry(0.08, 0.5, 0.08);
+  stay.translate(s.x + dx * 0.68, 5.25, s.z + dz * 0.68);
+  const cap = new THREE.BoxGeometry(7.0, 0.14, 1.1);
+  cap.rotateY(s.ry);
+  cap.translate(s.x + dx * 0.5, 4.2, s.z + dz * 0.5);
+  brackets.push(arm, stay, cap);
 }
 
 export function buildShops(texLoader, maxAniso) {
   const group = new THREE.Group();
-  const texes = [shopTexture(0), shopTexture(1), shopTexture(2)];
-  const canopies = [];
-  const mats = [];
-  for (const [si, s] of SHOPS.entries()) {
-    const mat = new THREE.MeshBasicMaterial({ map: texes[s.kind] });
-    const m = new THREE.Mesh(new THREE.PlaneGeometry(6.4, 3.4), mat);
-    m.position.set(s.x, 2.0, s.z);
-    m.rotation.y = s.ry;
-    group.add(m);
-    mats.push({ mat, zone: s.z < 0 ? 0 : 1, seed: si * 1.9 + 3 });
-    const dirX = Math.sin(s.ry);
-    const dirZ = Math.cos(s.ry);
-    const cap = new THREE.BoxGeometry(7.0, 0.14, 1.1);
-    cap.translate(s.x + dirX * 0.5, 3.85, s.z + dirZ * 0.5);
-    canopies.push(cap);
-  }
+  const signTex = shopSignAtlas();
+  const signGeos = [[], []];
+  const brackets = [];
+  for (const s of SHOPS) shopSignGeos(s, signGeos, brackets);
+  // One sign mesh per power zone, so a blackout still takes a zone's trade
+  // names out with its lamps. Six materials became two.
+  const mats = signGeos.map((geos, zone) => {
+    const mat = new THREE.MeshBasicMaterial({ map: signTex });
+    group.add(new THREE.Mesh(mergeGeometries(geos), mat));
+    return { mat, zone, seed: zone * 2.6 + 3 };
+  });
   const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
   const capMat = standardFromMaps(plate, { roughness: 0.62, metalness: 0.25, envMapIntensity: 0.9, color: 0x8b949f });
-  group.add(new THREE.Mesh(mergeGeometries(canopies), capMat));
+  group.add(new THREE.Mesh(mergeGeometries(brackets), capMat));
   return { group, mats };
 }
 

@@ -128,7 +128,7 @@ before reinstating anything that was removed.
 
 ## H. Signage (excess, layered)
 
-- **VGA-044 Animated & holographic signs.** Flicker, scanlines, chase bulbs, holo koi/boards, giant facade ads, freestanding light boxes. Second sign style minimum; Jig-Jig layering on one block. Done when: night frame carries motion + depth. Draws: +2..4.
+- **VGA-044 Animated & holographic signs.** ⏳ PARTIAL (slice 033: the six setdress shopfronts were flat planes painting a fake shopfront — sign band plus four fake lit windows — hung on a wall that had since grown real glazing with real interiors behind it. A sticker of a shop stuck over an actual shop, at one draw each. Replaced with signage that has depth: a fascia board over the door, and a blade projecting across the pavement so the trade reads side-on from the far end of the block, which is the whole point of a projecting sign and the thing the street was most missing. One 256x200 atlas of three trade bands plus a black strip every non-sign face points at, merged per power zone — six materials became two, and the blackout still takes a zone's trade names out with its lamps (`slice-033-signs-blackout.png`). Evidence `slice-033-signs-night.png` + `slice-033-signs-day.png`. 156 peak to 153 on the same sweep: -3. Flicker, scanlines, chase bulbs and holograms still open.) Draws: +2..4.
 - **VGA-045 Sign water & mist behavior.** Sheeting faces, dripping arms, halos fattening in mist (needs VGA-040 storm values). Done when: downpour sign close-up. Draws: +0.
 
 ## I. Nature & valley (a place, not a rim)
