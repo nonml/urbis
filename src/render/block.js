@@ -110,9 +110,13 @@ export function buildGround(texLoader, maxAniso) {
   for (const [bx, bz] of boxPositions) {
     clutter.push(box(0.6, 1.0, 0.5, bx, 0.5, bz));
   }
-  const clutterMesh = new THREE.Mesh(mergeGeometries(clutter), new THREE.MeshStandardMaterial({
-    color: 0x2a2d33, roughness: 0.8, metalness: 0.3,
-  }));
+  for (const ax of [0, 44, -44]) for (const side of [-1, 1]) pavementFurniture(clutter, ax, side);
+  const clutterMesh = new THREE.Mesh(
+    mergeGeometries(clutter.map((g) => (g.attributes.color ? g : tint(g, 1)))),
+    new THREE.MeshStandardMaterial({
+      color: 0x2a2d33, roughness: 0.8, metalness: 0.3, vertexColors: true,
+    })
+  );
   clutterMesh.castShadow = true;
   clutterMesh.receiveShadow = true;
   group.add(clutterMesh);
@@ -408,6 +412,66 @@ function towerMaterials(texLoader, maxAniso) {
     zoneMats: [[...kinds.map((twins) => twins[0]), shopGlass[0]],
       [...kinds.map((twins) => twins[1]), shopGlass[1]]],
   };
+}
+
+// One flat colour multiplier baked into a part before it joins the shared
+// clutter mesh. Per channel, so a crate can be warm timber and a downpipe
+// cold steel out of the same material and the same draw.
+function tint(geo, r, g = r, b = r) {
+  const n = geo.attributes.position.count;
+  const col = new Float32Array(n * 3);
+  for (let i = 0; i < n; i += 1) { col[i * 3] = r; col[i * 3 + 1] = g; col[i * 3 + 2] = b; }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return geo;
+}
+
+// Everything a real pavement has and a modelled one does not: meters to walk
+// past, bikes locked to hoops, stock waiting outside a back door, and the
+// plant on the wall behind it all. Every piece merges into the clutter mesh
+// that already exists, so a street's worth of life costs no draw at all.
+function pavementFurniture(out, ax, side) {
+  const kerb = ax + side * 4.35;
+  const mid = ax + side * 6.1;
+  const wall = ax + side * 7.62;
+  for (let z = -72; z <= 72; z += 16) {
+    out.push(tint(box(0.09, 1.1, 0.09, kerb, 0.55, z + 8), 0.9));
+    out.push(tint(box(0.17, 0.3, 0.13, kerb, 1.2, z + 8), 1.0));
+    out.push(tint(box(0.12, 0.12, 0.02, kerb - side * 0.07, 1.24, z + 8), 2.6, 2.3, 1.4));
+  }
+  for (let z = -66; z <= 66; z += 22) {
+    // Downpipe with its hopper: the one thing that stops a podium wall being
+    // a painted plane, and it reads at every distance.
+    out.push(tint(box(0.17, 4.2, 0.17, wall, 2.1, z), 0.8));
+    out.push(tint(box(0.34, 0.3, 0.3, wall, 4.05, z), 0.8));
+    out.push(tint(box(0.26, 0.26, 0.26, wall, 0.5, z), 0.8));
+  }
+  for (let z = -55; z <= 60; z += 38) {
+    // Condenser on a bracket, high enough to clear a head.
+    out.push(tint(box(0.78, 0.6, 0.46, ax + side * 7.4, 3.72, z), 1.5));
+    out.push(tint(box(0.9, 0.08, 0.1, ax + side * 7.5, 3.38, z), 0.7));
+  }
+  for (let z = -48; z <= 60; z += 27) {
+    // Bike hoop: two posts and a bar, the cheapest object that says people
+    // arrive here under their own power.
+    for (const dz of [-0.36, 0.36]) out.push(tint(box(0.07, 0.78, 0.07, mid, 0.39, z + dz), 1.1));
+    out.push(tint(box(0.07, 0.07, 0.79, mid, 0.78, z), 1.1));
+  }
+  for (const z of [-34, 14, 52]) {
+    // Stock crates by a back door. Warm timber against all that cold steel.
+    out.push(tint(box(0.78, 0.5, 0.62, ax + side * 7.1, 0.25, z), 2.5, 1.95, 1.15));
+    out.push(tint(box(0.62, 0.44, 0.5, ax + side * 7.1, 0.72, z + 0.1), 2.2, 1.7, 1.0));
+  }
+  for (const z of [-24, 6, 44]) {
+    // A-board: two leaves leaning into each other. One plate is a blank
+    // panel standing in the street; two is a thing somebody put out.
+    for (const lean of [0.19, -0.19]) {
+      const a = box(0.6, 0.8, 0.05, 0, 0, 0);
+      a.rotateX(lean);
+      a.rotateY(side > 0 ? -1.35 : 1.35);
+      a.translate(mid + side * 0.35 + lean * 0.4, 0.39, z);
+      out.push(tint(a, 0.85));
+    }
+  }
 }
 
 // A box laid flat against a podium face. `alongZ` says the face normal points

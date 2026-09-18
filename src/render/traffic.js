@@ -224,7 +224,16 @@ export function buildTraffic(street) {
   const dummy = new THREE.Object3D();
   // Sized by the street, not the moving count: parked cars ride free.
   const N = street.cars.length;
-  const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.24, metalness: 0.6, envMapIntensity: 1.9 }), N);
+  // Car paint is pigment under clearcoat, not bare metal. At metalness 0.6
+  // with env 1.9 every up-facing panel became a mirror of the sky, so from a
+  // chase camera the roof and boot of each car read as one blown-out white
+  // slab with no colour left in them — the single worst object in the frame.
+  // Metalness down, env down, roughness up a touch: the paint keeps its
+  // colour, and there is still enough gloss for the neon to land on it.
+  const paintMat = new THREE.MeshStandardMaterial({
+    roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
+  });
+  const bodies = new THREE.InstancedMesh(bodyGeo, paintMat, N);
   bodies.castShadow = true;
   const wheels = new THREE.InstancedMesh(wheelGeo, wheelMaterial(), N);
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
@@ -324,7 +333,7 @@ export function updateCarPools(rig, cars, camera = null) {
 export function buildPlayerCar(scene, car) {
   const group = new THREE.Group();
   const paint = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
-    color: 0x8f4a0c, roughness: 0.22, metalness: 0.65, envMapIntensity: 2.0,
+    color: 0x8f4a0c, roughness: 0.30, metalness: 0.16, envMapIntensity: 1.1,
   }));
   paint.castShadow = true;
   const wheels = new THREE.Mesh(wheelGeo, wheelMaterial());
