@@ -6,6 +6,7 @@ import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
 import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { getGlowTex } from './signs.js';
 
@@ -155,6 +156,54 @@ export function updateDaylight(env, scene, bloom, n, renderer) {
   renderer.toneMappingExposure = 0.75 + 0.35 * day;
 }
 
+// Film grade (VGA-080). Runs after OutputPass, so it works on display-referred
+// pixels the way a colourist does, not on linear HDR where lift/gamma/gain are
+// meaningless. Four things, each earning its place in the frame:
+//   contrast   — the untouched day frame was grey soup, every value crowded
+//                around 0.5 with nothing anchoring black
+//   split tone — cool shadows against warm highlights, the pressure that makes
+//                a neon street read as photographed rather than rendered
+//   vignette   — quiet, just enough to stop the corners competing with the
+//                middle; heavier at night when the middle is the only lit part
+//   grain      — the single cheapest thing that stops a frame looking like CG,
+//                because nothing in the real world is noise-free
+const GRADE_SHADER = {
+  uniforms: {
+    tDiffuse: { value: null },
+    uNight: { value: 1 },
+    uTime: { value: 0 },
+    uRes: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }`,
+  fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform float uNight;
+    uniform float uTime;
+    uniform vec2 uRes;
+    varying vec2 vUv;
+    const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+    void main() {
+      vec3 c = texture2D(tDiffuse, vUv).rgb;
+      float day = 1.0 - uNight;
+      c = (c - 0.5) * mix(1.07, 1.16, day) + 0.5 + mix(0.0, -0.012, day);
+      float l = dot(c, LUMA);
+      vec3 cool = vec3(0.90, 0.985, 1.13);
+      vec3 warm = vec3(1.075, 1.005, 0.905);
+      c *= mix(cool, warm, smoothstep(0.12, 0.72, l));
+      c = mix(vec3(l), c, mix(1.10, 1.20, day));
+      vec2 d = vUv - 0.5;
+      c *= 1.0 - dot(d, d) * mix(0.62, 0.40, day);
+      float g = fract(sin(dot(vUv * uRes + fract(uTime) * 91.7, vec2(12.9898, 78.233))) * 43758.5453);
+      c += (g - 0.5) * mix(0.032, 0.020, day);
+      gl_FragColor = vec4(clamp(c, 0.0, 1.0), 1.0);
+    }`,
+};
+
 export function createComposer(renderer, scene, camera) {
   const size = new THREE.Vector2(window.innerWidth, window.innerHeight);
   const composer = new EffectComposer(renderer);
@@ -162,7 +211,10 @@ export function createComposer(renderer, scene, camera) {
   const bloom = new UnrealBloomPass(size, 0.45, 0.55, 0.85);
   composer.addPass(bloom);
   composer.addPass(new OutputPass());
-  return { composer, bloom };
+  const grade = new ShaderPass(GRADE_SHADER);
+  grade.uniforms.uRes.value.copy(size);
+  composer.addPass(grade);
+  return { composer, bloom, grade };
 }
 
 export function fitRenderer(renderer, composer, camera) {

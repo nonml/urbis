@@ -16,7 +16,7 @@ export const bodyGeo = mergeGeometries([
   // visible window — the whole fleet read as moulded plastic. Body keeps only
   // the belt, the roof and four pillars; the glass fills the openings between.
   (() => { const g = new THREE.BoxGeometry(1.58, 0.10, 2.06); g.translate(0, 0.925, -0.15); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.56, 0.09, 1.92); g.translate(0, 1.335, -0.22); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.56, 0.09, 1.62); g.translate(0, 1.335, -0.02); return g; })(),
 ]);
 // Everything a real car wears in black rubber and plastic — bumpers, mirrors,
 // pillars, rocker sills, wheel arches. Painting these body colour is what made
@@ -24,8 +24,8 @@ export const bodyGeo = mergeGeometries([
 export const trimGeo = mergeGeometries([
   (() => { const g = new THREE.BoxGeometry(0.10, 0.40, 0.12); g.rotateX(-0.35); g.translate(-0.71, 1.12, 0.90); return g; })(),
   (() => { const g = new THREE.BoxGeometry(0.10, 0.40, 0.12); g.rotateX(-0.35); g.translate(0.71, 1.12, 0.90); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.11, 0.42, 0.13); g.translate(-0.72, 1.13, -1.09); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.11, 0.42, 0.13); g.translate(0.72, 1.13, -1.09); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(0.10, 0.42, 0.13); g.rotateX(0.42); g.translate(-0.70, 1.13, -0.98); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(0.10, 0.42, 0.13); g.rotateX(0.42); g.translate(0.70, 1.13, -0.98); return g; })(),
   (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, 2.1); return g; })(),
   (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, -2.1); return g; })(),
   (() => { const g = new THREE.BoxGeometry(0.12, 0.1, 0.2); g.translate(-0.95, 1.05, 0.5); return g; })(),
@@ -40,21 +40,42 @@ export const trimGeo = mergeGeometries([
     return g;
   }),
 ]);
+// Tyre and rim in one mesh, told apart by a vertex-colour multiplier rather
+// than by a second material. They used to be two meshes whose hub cylinders
+// were exactly coincident — identical radius, length and centre — so they
+// z-fought, and the rim cost a draw per fleet on top. One mesh, no fight,
+// and every car on the map gets its rims back for free.
+const TYRE_SHADE = 0.05;
+const RIM_SHADE = 0.62;
+export const WHEEL_HUBS = [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]];
 export const wheelGeo = (() => {
   const parts = [];
-  for (const [x, z] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
-    const g = new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12);
-    g.rotateZ(Math.PI / 2);
-    g.translate(x, 0.35, z);
-    parts.push(g);
-    // Hubs merged into the same mesh: tires stop reading as oil drums.
-    const hub = new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10);
-    hub.rotateZ(Math.PI / 2);
-    hub.translate(x, 0.35, z);
-    parts.push(hub);
+  const shades = [];
+  for (const [x, z] of WHEEL_HUBS) {
+    for (const [geo, shade] of [
+      [new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12), TYRE_SHADE],
+      [new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10), RIM_SHADE],
+    ]) {
+      geo.rotateZ(Math.PI / 2);
+      geo.translate(x, 0.35, z);
+      parts.push(geo);
+      shades.push([geo.attributes.position.count, shade]);
+    }
   }
-  return mergeGeometries(parts);
+  const merged = mergeGeometries(parts);
+  const color = new Float32Array(merged.attributes.position.count * 3);
+  let at = 0;
+  for (const [count, shade] of shades) {
+    for (let i = 0; i < count; i++, at++) color[at * 3] = color[at * 3 + 1] = color[at * 3 + 2] = shade;
+  }
+  merged.setAttribute('color', new THREE.BufferAttribute(color, 3));
+  return merged;
 })();
+export function wheelMaterial() {
+  return new THREE.MeshStandardMaterial({
+    color: 0xd6dbe2, roughness: 0.72, metalness: 0.4, vertexColors: true,
+  });
+}
 export const beamGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(-0.55, 0.7, 2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(0.55, 0.7, 2.11); return g; })(),
@@ -66,21 +87,17 @@ export const tailGeo = mergeGeometries([
 // Cabin + raked windshield in one glass shell, sized to fill the body frame
 // above with a hair of overlap at belt and roof so no seam of sky shows through.
 const canopyGeo = mergeGeometries([
-  (() => { const g = new THREE.BoxGeometry(1.50, 0.46, 1.90); g.translate(0, 1.13, -0.18); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.50, 0.46, 1.66); g.translate(0, 1.13, -0.06); return g; })(),
   (() => { const g = new THREE.BoxGeometry(1.44, 0.36, 0.44); g.rotateX(-0.35); g.translate(0, 1.11, 0.92); return g; })(),
+  (() => { const g = new THREE.BoxGeometry(1.44, 0.38, 0.52); g.rotateX(0.42); g.translate(0, 1.11, -0.99); return g; })(),
 ]);
-export const hubGeo = (() => {
-  const parts = [];
-  for (const [x, z] of [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]]) {
-    const g = new THREE.CylinderGeometry(0.17, 0.17, 0.27, 10);
-    g.rotateZ(Math.PI / 2);
-    g.translate(x, 0.35, z);
-    parts.push(g);
-  }
-  return mergeGeometries(parts);
-})();
 const glassMat = new THREE.MeshStandardMaterial({
-  color: 0x0a121c, metalness: 0.9, roughness: 0.06, envMapIntensity: 2.2,
+  // envMapIntensity is the whole story here. scene.environment is a PMREM of
+  // RoomEnvironment, which is a lit studio and far brighter than 1.0; at 2.2 the
+  // cabin mirrored it into a white slab and the chase camera — the view the
+  // player holds for the whole game — stared at a blank block. Bisected against
+  // envMapIntensity 0: 0.22 keeps a tinted sheen without saturating.
+  color: 0x0b1119, metalness: 0.55, roughness: 0.12, envMapIntensity: 0.22,
 });
 // Shared by every car on the map, so trim costs one draw for the whole fleet.
 const trimMat = new THREE.MeshStandardMaterial({
@@ -191,11 +208,10 @@ export function buildTraffic(street) {
   const N = street.cars.length;
   const bodies = new THREE.InstancedMesh(bodyGeo, new THREE.MeshStandardMaterial({ roughness: 0.24, metalness: 0.6, envMapIntensity: 1.9 }), N);
   bodies.castShadow = true;
-  const wheels = new THREE.InstancedMesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }), N);
+  const wheels = new THREE.InstancedMesh(wheelGeo, wheelMaterial(), N);
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), N);
   const glass = new THREE.InstancedMesh(canopyGeo, glassMat, N);
-  const hubs = new THREE.InstancedMesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }), N);
   const trim = new THREE.InstancedMesh(trimGeo, trimMat, N);
   const poolMat = new THREE.MeshBasicMaterial({
     map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
@@ -216,20 +232,19 @@ export function buildTraffic(street) {
     bodies.setColorAt(i, new THREE.Color(c.paint));
   });
   bodies.instanceColor.needsUpdate = true;
-  group.add(bodies, wheels, beams, tails, glass, hubs, trim, pools);
-  const rig = { bodies, wheels, beams, tails, glass, hubs, trim, pools, glows, dummy };
+  group.add(bodies, wheels, beams, tails, glass, trim, pools);
+  const rig = { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy };
   updateCarPools(rig, [0, 0, 0].map(() => ({ x: 0, z: 0, yaw: 0, speed: 0, on: false })));
   updateTraffic(rig, street);
   return { group, rig };
 }
 
 export function updateTraffic(rig, street, camera = null) {
-  const { bodies, wheels, beams, tails, glass, hubs, trim, pools, glows, dummy } = rig;
+  const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy } = rig;
   street.cars.forEach((c, i) => {
     const m = placeOnCar(dummy, c, 0);
     bodies.setMatrixAt(i, m);
     wheels.setMatrixAt(i, m);
-    hubs.setMatrixAt(i, m);
     glass.setMatrixAt(i, m);
     trim.setMatrixAt(i, m);
     if (c.parked) {
@@ -264,7 +279,6 @@ export function updateTraffic(rig, street, camera = null) {
   });
   bodies.instanceMatrix.needsUpdate = true;
   wheels.instanceMatrix.needsUpdate = true;
-  hubs.instanceMatrix.needsUpdate = true;
   beams.instanceMatrix.needsUpdate = true;
   tails.instanceMatrix.needsUpdate = true;
   glass.instanceMatrix.needsUpdate = true;
@@ -295,12 +309,11 @@ export function buildPlayerCar(scene, car) {
     color: 0x8f4a0c, roughness: 0.22, metalness: 0.65, envMapIntensity: 2.0,
   }));
   paint.castShadow = true;
-  const wheels = new THREE.Mesh(wheelGeo, new THREE.MeshStandardMaterial({ color: 0x0a0a0c, roughness: 0.9 }));
+  const wheels = new THREE.Mesh(wheelGeo, wheelMaterial());
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4ff }));
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_DIM.clone() });
   const tails = new THREE.Mesh(tailGeo, tailMat);
   const canopy = new THREE.Mesh(canopyGeo, glassMat);
-  const hubs = new THREE.Mesh(hubGeo, new THREE.MeshStandardMaterial({ color: 0x8a9099, metalness: 0.9, roughness: 0.3 }));
   const glows = [];
   for (const sx of [-0.55, 0.55]) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
@@ -321,27 +334,8 @@ export function buildPlayerCar(scene, car) {
   }));
   beacon.scale.set(1.6, 3.2, 1);
   group.add(beacon);
-  group.add(paint, wheels, beams, tails, canopy, hubs, carTrimMesh());
-  // Contact shadow under the hero car.
-  const carBlobC = document.createElement('canvas');
-  carBlobC.width = carBlobC.height = 64;
-  const carBlobG = carBlobC.getContext('2d');
-  const carBlobGrad = carBlobG.createRadialGradient(32, 32, 0, 32, 32, 32);
-  carBlobGrad.addColorStop(0, 'rgba(0,0,0,0.6)');
-  carBlobGrad.addColorStop(0.6, 'rgba(0,0,0,0.2)');
-  carBlobGrad.addColorStop(1, 'rgba(0,0,0,0)');
-  carBlobG.fillStyle = carBlobGrad;
-  carBlobG.fillRect(0, 0, 64, 64);
-  const carBlobTex = new THREE.CanvasTexture(carBlobC);
-  carBlobTex.colorSpace = THREE.SRGBColorSpace;
-  const carBlobMat = new THREE.MeshBasicMaterial({
-    map: carBlobTex, transparent: true, depthWrite: false, fog: false,
-  });
-  const carBlob = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 5.0), carBlobMat);
-  carBlob.rotation.x = -Math.PI / 2;
-  carBlob.position.y = 0.01;
-  group.add(carBlob);
-  const rig = { group, paint, wheels, beams, tails, tailMat, glows, spot, beacon, carBlob };
+  group.add(paint, wheels, beams, tails, canopy, carTrimMesh());
+  const rig = { group, paint, wheels, beams, tails, tailMat, glows, spot, beacon };
   updatePlayerCar(rig, car, false);
   return rig;
 }

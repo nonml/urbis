@@ -179,8 +179,8 @@ const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
 heroKey.layers.enable(1);
 scene.add(heroKey);
 
-const { composer, bloom } = createComposer(renderer, scene, camera);
-window.addEventListener('resize', () => fitRenderer(renderer, composer, camera));
+const { composer, bloom, grade } = createComposer(renderer, scene, camera);
+window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, grade));
 
 // Follow cam: lower and closer than before — towers loom, street glow fills
 // the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
@@ -441,6 +441,8 @@ function render() {
   tickRiver(river, dt);
   const night = clock.nightFactor;
   updateDaylight(env, scene, bloom, night, renderer);
+  grade.uniforms.uNight.value = night;
+  grade.uniforms.uTime.value = clock.elapsed;
   for (const m of towers.facadeMats) {
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);

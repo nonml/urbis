@@ -3,21 +3,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
-function blobShadowTexture() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 64;
-  const g = c.getContext('2d');
-  const grad = g.createRadialGradient(32, 32, 0, 32, 32, 32);
-  grad.addColorStop(0, 'rgba(0,0,0,0.55)');
-  grad.addColorStop(0.6, 'rgba(0,0,0,0.2)');
-  grad.addColorStop(1, 'rgba(0,0,0,0)');
-  g.fillStyle = grad;
-  g.fillRect(0, 0, 64, 64);
-  const tex = new THREE.CanvasTexture(c);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
-}
-
 function heroFaceTexture() {
   const c = document.createElement('canvas');
   c.width = 64;
@@ -99,14 +84,7 @@ export function buildPlayer() {
     new THREE.MeshStandardMaterial({ color: 0x0a0e14, roughness: 0.8, metalness: 0.2 })
   );
   group.add(coat, head, visor, legL, legR, armL, armR, backpack);
-  const blobMat = new THREE.MeshBasicMaterial({
-    map: blobShadowTexture(), transparent: true, depthWrite: false, fog: false,
-  });
-  const blob = new THREE.Mesh(new THREE.PlaneGeometry(1.2, 1.2), blobMat);
-  blob.rotation.x = -Math.PI / 2;
-  blob.position.y = 0.01;
-  group.add(blob);
-  return { group, legL, legR, armL, armR, blob };
+  return { group, legL, legR, armL, armR };
 }
 
 export function updatePlayer(avatar, player) {

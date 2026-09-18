@@ -22,7 +22,10 @@ export function buildBlobs(street) {
   const mat = new THREE.MeshBasicMaterial({
     map: blobTexture(), transparent: true, opacity: 0.65, depthWrite: false,
   });
-  const mesh = new THREE.InstancedMesh(geo, mat, street.npcs.length + street.cars.length + 1);
+  // +2: the player and the hero car each hold a slot permanently. They used to
+  // own private blob planes as well, which double-darkened the ground under a
+  // parked car and cost two draws for a shadow this mesh was already drawing.
+  const mesh = new THREE.InstancedMesh(geo, mat, street.npcs.length + street.cars.length + 2);
   mesh.renderOrder = 1;
   return mesh;
 }
@@ -47,10 +50,16 @@ export function updateBlobs(mesh, street, player, heroCar) {
     mesh.setMatrixAt(k++, _d.matrix);
   }
   const driving = player.mode === 'drive';
-  _d.position.set(driving ? heroCar.x : player.x, 0.16,
-    driving ? heroCar.z : player.z);
+  // On foot the player casts and the car sits parked with its own shadow; in
+  // the car the player's slot collapses to nothing and only the car casts.
+  _d.position.set(player.x, 0.16, player.z);
   _d.rotation.set(0, 0, 0);
-  _d.scale.set(driving ? 2.2 : 0.9, 1, driving ? 4.6 : 1.1);
+  _d.scale.set(driving ? 0 : 0.9, 1, driving ? 0 : 1.1);
+  _d.updateMatrix();
+  mesh.setMatrixAt(k++, _d.matrix);
+  _d.position.set(heroCar.x, 0.16, heroCar.z);
+  _d.rotation.set(0, heroCar.yaw, 0);
+  _d.scale.set(2.2, 1, 4.6);
   _d.updateMatrix();
   mesh.setMatrixAt(k++, _d.matrix);
   mesh.instanceMatrix.needsUpdate = true;
