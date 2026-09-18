@@ -3,6 +3,7 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
+import { heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
@@ -25,7 +26,9 @@ import { buildBlobs, updateBlobs } from './render/blobs.js';
 import { buildRain, tickRain } from './render/rain.js';
 import { captureFrame } from './render/capture.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
-import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
+import { buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
+import { createChunkManager } from './render/chunks.js';
+import { buildOutskirts } from './render/outskirts.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -56,11 +59,19 @@ const skyline = buildSkyline(texLoader, maxAniso);
 scene.add(skyline.mesh);
 const stars = buildStars();
 scene.add(stars);
-const river = buildRiver(texLoader, maxAniso);
-scene.add(river.mesh);
 scene.add(buildGrassGround());
 scene.add(buildGrassTufts());
 scene.add(buildMountains());
+// Streamed world. The outskirts own their meshes for the whole game — a tile
+// borrows instance slots in them, so residency changes cost zero draws — and
+// the manager only decides which tiles have claimed any. Two tiles a frame and
+// 1.5 ms is the whole build allowance; boot warms the spawn's ring up front so
+// frame one is not a half-built world.
+const outskirts = buildOutskirts();
+for (const m of outskirts.meshes) scene.add(m);
+const chunks = createChunkManager({ scene, budgetTiles: 2, budgetMs: 1.5 });
+chunks.register('outskirts', outskirts.build);
+let streamOrigin = null;
 const beacons = buildBeacons(towers.beacons);
 scene.add(beacons.mesh);
 scene.add(buildTrees());
@@ -184,7 +195,7 @@ window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, 
 
 // Follow cam: lower and closer than before — towers loom, street glow fills
 // the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
-const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5 };
+const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5, ground: 0 };
 let dragging = false;
 let lastDragT = -10;
 let lastPX = 0;
@@ -212,7 +223,7 @@ if (spawnPreset === 'east') {
 } else if (spawnPreset === 'shop') {
   player.x = 3.5;
   player.z = 7;
-} else if (spawnPreset === 'river') {
+} else if (spawnPreset === 'promenade') {
   player.x = -6;
   player.z = -32;
   cam.yaw = -Math.PI / 2;
@@ -224,12 +235,40 @@ if (spawnPreset === 'east') {
   player.x = 2;
   player.z = 70;
   cam.yaw = Math.PI;
+} else if (spawnPreset === 'westflank') {
+  // The ground the river channel used to cut, looking across it: verge swell
+  // now, no trench, nothing to fall into.
+  player.x = -36.5;
+  player.z = -60;
+  cam.yaw = Math.PI / 2;
+} else if (spawnPreset === 'mound') {
+  // The crest of the pocket park, the highest ground a person can stand on.
+  player.x = 67;
+  player.z = 17;
+  cam.yaw = -Math.PI / 2;
 } else if (spawnPreset === 'cross') {
   // Middle of the z=40 intersection, looking east down the E-W canyon
   // (cross traffic + lamps + both road axes in one frame).
   player.x = 0;
   player.z = 40;
   cam.yaw = Math.PI / 2;
+} else if (spawnPreset === 'edge') {
+  // The two corners of the walk box that look out of town: the south-east
+  // limit facing east, and the south edge of the connector facing south. Both
+  // are ordinary play positions with the ordinary follow cam — the outskirts
+  // have to survive being looked at from where the player can actually stand,
+  // not from a staged lab angle (AGENTS.md step 5).
+  player.x = 70;
+  player.z = -66;
+  cam.yaw = Math.PI / 2;
+  cam.pitch = 0.32;
+  cam.dist = 8;
+} else if (spawnPreset === 'edge-s') {
+  player.x = -20;
+  player.z = -66;
+  cam.yaw = Math.PI;
+  cam.pitch = 0.32;
+  cam.dist = 8;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -301,8 +340,8 @@ window.__game = {
   hack: () => fireHack(),
   dark: () => [...DARK],
   cooldown: () => +hackCooldownLeft(street).toFixed(1),
-  player: () => ({ x: +player.x.toFixed(2), z: +player.z.toFixed(2), mode: player.mode }),
-  car: () => ({ x: +heroCar.x.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
+  player: () => ({ x: +player.x.toFixed(2), y: +player.y.toFixed(2), z: +player.z.toFixed(2), mode: player.mode }),
+  car: () => ({ x: +heroCar.x.toFixed(2), y: +heroCar.y.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
   enter: () => toggleVehicle(),
   profile: () => lastProfile,
   heat: () => wanted.heat,
@@ -314,6 +353,32 @@ window.__game = {
     return captureFrame(renderer);
   },
 };
+
+// Capture-only streaming probe, bound behind ?capture=1 and nowhere else. It
+// moves the position the STREAMER reads, not the player and not the camera —
+// DRIVE_BOUNDS is untouched and the game plays identically with it bound. It
+// exists because the road graph does not reach the outskirts yet, so proving a
+// tile builds and disposes out there cannot be done by driving to it.
+if (CAPTURE) {
+  window.__game.chunks = {
+    stats: () => ({ ...chunks.stats(), ms: chunks.cost(), pools: outskirts.stats() }),
+    cost: () => chunks.cost(),
+    resident: () => chunks.resident(),
+    origin: (x, z) => { streamOrigin = x === null ? null : { x, z }; },
+    budget: (tiles, ms) => chunks.budget(tiles, ms),
+    visible: (on) => { for (const m of outskirts.meshes) m.visible = on; },
+  };
+  // Stand the player somewhere inside the walk box it could have walked to, and
+  // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
+  // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
+  window.__game.pose = (x, z, yaw) => {
+    player.x = Math.max(-52, Math.min(70, x));
+    player.z = Math.max(-68, Math.min(100, z));
+    cam.yaw = yaw;
+  };
+}
+
+chunks.warm(player.x, player.z);
 
 let last = performance.now();
 let fpsAcc = 0;
@@ -388,6 +453,11 @@ function render() {
   const driving = player.mode === 'drive';
   tickClock(clock, dt);
   tickStreet(street, dt);
+  // Stream against the camera, because the camera is what the frustum belongs
+  // to. It is last frame's position; at a 160 m build radius one frame of lag
+  // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
+  const eye = streamOrigin ?? camera.position;
+  chunks.update(eye.x, eye.z);
   if (driving) {
     const res = tickPlayerCar(heroCar, driveInput(), dt);
     braking = res.braking;
@@ -443,7 +513,6 @@ function render() {
   tickRain(rain, clock.elapsed);
   tickSteam(steam, clock.elapsed, dt);
   tickHackFx(fx, dt);
-  tickRiver(river, dt);
   const night = clock.nightFactor;
   updateDaylight(env, scene, bloom, night, renderer);
   grade.uniforms.uNight.value = night;
@@ -472,7 +541,7 @@ function render() {
   updateBlobs(blobs, street, player, heroCar);
   const hx = driving ? heroCar.x : player.x;
   const hz = driving ? heroCar.z : player.z;
-  heroKey.position.set(hx, 2.4, hz);
+  heroKey.position.set(hx, (driving ? heroCar.y : player.y) + 2.4, hz);
   heroKey.intensity = 14 * night;
   let tx = driving ? heroCar.x : player.x;
   let tz = driving ? heroCar.z : player.z;
@@ -490,14 +559,17 @@ function render() {
 
   const ax = driving ? heroCar.x : player.x;
   const az = driving ? heroCar.z : player.z;
+  const ay = driving ? heroCar.y : player.y;
   const cp = Math.cos(cam.pitch);
   const sp = Math.sin(cam.pitch);
-  camera.position.set(
-    ax - Math.sin(cam.yaw) * cam.dist * cp,
-    sp * cam.dist + 0.6,
-    az - Math.cos(cam.yaw) * cam.dist * cp
-  );
-  lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), driving ? 1.2 : 1.7, az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
+  const cx = ax - Math.sin(cam.yaw) * cam.dist * cp;
+  const cz = az - Math.cos(cam.yaw) * cam.dist * cp;
+  // The camera rides the higher of two grounds — the one under the player and
+  // the one under itself — so a bank standing between them cannot swallow it.
+  // Eased, because a kerb is a step function and the whole frame would jump.
+  cam.ground += (Math.max(ay, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * 6);
+  camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
+  lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
   camera.lookAt(lookAt);
 
   lastProfile = driving ? null : updateProfiler(camera, acquireTarget());

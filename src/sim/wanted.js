@@ -1,6 +1,6 @@
 // Wanted: heat 0-3, pursuit cars that seek the player, busted on catch.
 // Crimes: blackouts (+1). Speeding holds heat. Darkness + distance shed it.
-import { DRIVE_BOUNDS, clampToBounds } from './world.js';
+import { DRIVE_BOUNDS, clampToBounds, heightAt } from './world.js';
 
 export const MAX_HEAT = 3;
 export const PURSUIT_SPEED = 10;
@@ -19,8 +19,8 @@ export function createWanted() {
     bustedUntil: 0,
     bustedFlashUntil: 0,
     pursuit: [
-      { active: false, x: 0, z: -55, yaw: 0, speed: 0 },
-      { active: false, x: 0, z: 55, yaw: Math.PI, speed: 0 },
+      { active: false, x: 0, y: heightAt(0, -55), z: -55, yaw: 0, speed: 0 },
+      { active: false, x: 0, y: heightAt(0, 55), z: 55, yaw: Math.PI, speed: 0 },
     ],
   };
 }
@@ -66,6 +66,7 @@ function stepPursuit(p, tx, tz, dt) {
   );
   p.x = inside.x;
   p.z = inside.z;
+  p.y = heightAt(p.x, p.z);
   return d;
 }
 

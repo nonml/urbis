@@ -1,6 +1,6 @@
 // Player vehicle: arcade handling, pure data. No collision yet —
 // road-clamped only (cutover polish will add poles, cars, facades).
-import { DRIVE_BOUNDS, clampToBounds } from './world.js';
+import { DRIVE_BOUNDS, clampToBounds, heightAt } from './world.js';
 
 export const CAR_TOP = 12;
 export const CAR_REVERSE = 4;
@@ -10,7 +10,7 @@ const TURN = 1.9;
 
 export function createPlayerCar() {
   // Curb-parked beside the player spawn (2.5, 26) — the F prompt greets you.
-  return { x: 3.0, z: 23.5, yaw: Math.PI, speed: 0 };
+  return { x: 3.0, y: heightAt(3.0, 23.5), z: 23.5, yaw: Math.PI, speed: 0 };
 }
 
 // input: {throttle -1..1, steer -1..1}. Returns {braking} for taillights.
@@ -38,5 +38,10 @@ export function tickPlayerCar(car, input, dt) {
     car.z = inside.z;
     car.speed = 0;
   }
+  // The wheels are on the ground, always. No slope limit, because there is
+  // nothing to limit: with the river channel gone the steepest gradient inside
+  // DRIVE_BOUNDS is 4 degrees, measured over the whole box at 0.25 m. A car
+  // cannot reach anything it could not drive up.
+  car.y = heightAt(car.x, car.z);
   return { braking };
 }

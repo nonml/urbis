@@ -252,3 +252,85 @@ finished `world.js`):
   in wave 1; relief lives off the carriageway.
 - **Scope honesty**: planks 1-3 are engine-level and will not complete in one wave.
   Wave 1 proves the approach and funds it. It does not deliver a drivable Chicago.
+
+---
+
+## Wave 2 — the authority inversion
+
+The river was stopped after four independent faults were found in one feature:
+buried under the opaque ground plane, routed through a row of ten towers,
+painted darker than its own banks, and sited where no light reaches it. The
+first hid the other three for the whole of this project's history. Evidence:
+`docs/shots/river-along-day.png`, `docs/shots/river-along-night.png`.
+
+The four are not four bugs. They are one bug seen four times.
+
+**Terrain is currently downstream of building placement.** The ground is
+carved, and then patched back up wherever someone has already put a tower —
+that is precisely what `CHANNEL_ABUTMENTS` is, a table of ten hand-copied
+footprints whose only job is to hold the ground up under buildings that were
+placed over water. Every fault above follows from that ordering.
+
+**Wave 2 inverts it: terrain and water are authored first, and placement asks
+them.** One predicate in the generator — *does this footprint overlap water or
+exceed this gradient?* — removes the entire class permanently, and the abutment
+table disappears as a consequence rather than needing to be maintained. The
+same applies to `FLAT_RECTS` and `RIVER_STRIP`: both are hand-copied road and
+bank geometry that `sim/world.js` should own.
+
+Three placement constraints, each one a fault we actually hit:
+
+1. Nothing may be placed over water.
+2. At least two avenues must keep a clear sightline to it. Today only avenue
+   −44 has one, southward, because the south tower row blocks x −8…52.
+3. It must be lit. This is a siting constraint, not a material one — water
+   reads as water because something moves in its reflection.
+
+### Siting the river
+
+**Run it east–west, not north–south.** A N–S river parallels the three avenues
+and competes with them for the same corridor, which is exactly how this one
+ended up 1 m wide with towers in it. An E–W river *crosses* all three avenues,
+which buys three bridges, a reason for them to exist, and the river appearing
+across every sightline down every avenue instead of edge-on down one.
+
+Measured fallback on today's map, if a corridor is ever wanted without new
+ground: **z −91.5 … −73.5** is the only band clear across every x. It is bounded
+by the connector verge slab at z −73.5, `SOUTH_TOWERS` at z −71…−61, and the
+silhouette box at (22, 24, −100) with the skyline ring at (−30, −102) and
+(58, −100). That gives 18.5 m of corridor — 12 m of water with 3 m banks, twice
+what was built. The avenues already span z −100…100, so all three already cross
+it and the existing causeway mechanism in `heightAt` would produce three
+crossings with no new code. It needs `WALK_BOUNDS.minZ` moved from −68 to about
+−95, or it is scenery again.
+
+Generated map, which is the real answer: **reserve a 60 m corridor, water in the
+middle ~30 m**. These are targets, not measurements:
+
+| | target | why |
+|---|---|---|
+| water width | ~30 m | the single biggest lever on whether it reads; at a grazing view the near bank occludes the first several metres, and 6 m gave 4–24% of frame |
+| bank run | ~7 m each side | 2.5 m for a 1.1 m drop is a 24° bank, steep for a river; a deeper channel wants a shallower angle |
+| building setback | ~8 m each side | the number whose absence caused everything else |
+
+### What carries forward from the terrain branch
+
+- `heightAt` / `displaceToTerrain` — sound. The field moves to `sim/world.js`.
+- The flat-corridor blend — roads stay exactly flat, relief ramps off the
+  carriageway. Survived four rebuilds without breaking the street. Reuse as-is.
+- The channel profile and causeway behaviour — the causeway *is* the bridge site.
+- The water material — a correct starting point (dielectric, albedo bounded
+  between the ground plane at 0.0085 and the grass banks at 0.0247, not leaning
+  on a constant environment term). Do not re-tune it before the river is
+  somewhere with light and something worth reflecting; every number will move.
+- **The non-negative invariant becomes a placement rule, not a terrain rule.**
+  The field was made non-negative so relief could never undercut a hand-placed
+  base. Once placement queries terrain, that constraint is unnecessary — and
+  dropping it is what allows a valley you descend into, and the subway, which is
+  the same feature at negative Y.
+
+One lighting fact that constrains all of the above: the only dynamic lights in
+the scene are two spotlights at x = 0, z = ±9 throwing a ~3.8 m pool, plus the
+hero car's headlights. The lamps are emissive geometry, not lights. Anything
+that needs to look lit at night must either be sited against a lit street or
+come with lights of its own, and lights cost frame time against a 175 budget.

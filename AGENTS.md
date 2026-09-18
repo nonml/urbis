@@ -307,6 +307,35 @@ If the gate fails, fix the real cause. Two retries, then revert and say so.
 up, the gate fails across unrelated tasks (that's infrastructure, not your code), or a
 task would break one of the six laws.
 
+### Working in a parallel worktree
+
+Several agents on `git worktree` copies of this repo share more state than they look like
+they do. Both of the first two below have already produced confident, wrong measurements
+here.
+
+**The gate can test a build you did not make.** `playwright.config.js` used to set
+`reuseExistingServer` on a fixed port, so a gate run would adopt whatever server another
+worktree left listening, load that bundle, and pass green on code it never executed. It
+now refuses to reuse a server it did not start, and fails loudly on a busy port instead of
+letting vite slide to the next one. Set `GATE_PORT` per worktree; do not remove
+`--strictPort`.
+
+**Prove the bundle under test is yours. Freshness is not identity.** Assert the hash the
+page actually executed, and assert a string that exists only in your change — a positive
+identity test, not just a new mtime. A build four minutes stale once had a river feature
+diagnosed across four screenshots of a frame that could not have contained it.
+
+**`git stash` is one stack shared by every worktree.** A bare `git stash pop` pops
+whatever is on top, which may be another agent's uncommitted work. Use
+`git checkout <ref> -- <paths>` instead. Note too that `git stash push <paths>` stashes
+*nothing* when those paths are already committed — which silently turns a "baseline"
+build into a second copy of the build you were trying to compare it against.
+
+**Check your instrument against itself before you trust a diff from it.** Run it twice on
+unchanged code and confirm the two outputs match. `scripts/dump_geometry.mjs` exists for
+this and its header leads with the rule. A pixel-diff method was abandoned here after the
+control — same build, same pose, twice — differed *more* than the two builds under test.
+
 ### Never do these
 
 - Claim something works without running it. Evidence before assertions, always.

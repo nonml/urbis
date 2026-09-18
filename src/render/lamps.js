@@ -4,24 +4,41 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
+import { AVENUE_X, way } from '../sim/world.js';
+
+// Which street a fixture belongs to comes from sim/world.js; how it stands on
+// that street is this file's business.
+const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
+const PLAZA_Z = way('plaza').z;
+const SOUTH_Z = way('south').z;
 
 // Explicit per-lamp placement: pole base (x,z), head offset toward the road,
 // instance yaw, blackout zone. Main + east avenues share the z rhythm.
 const POLE_X = 5.4;
+const ARM = 1.8;
+// A crossing's footway is narrower, so its poles stand closer to the kerb. The
+// arm is the same length; both offsets are measured off the way's centre-line.
+const CROSS_POLE_OUT = 4.2;
+const CROSS_HEAD_OUT = 2.4;
 const LAMPS = [
   ...[-45, -27, -9, 9, 27, 45].flatMap((z, i) => {
     const side = i % 2 === 0 ? -1 : 1;
-    return [0, 44].map((ax) => ({
+    return [MAIN_X, EAST_X].map((ax) => ({
       x: ax + side * POLE_X,
       z,
-      hx: ax + side * (POLE_X - 1.8),
+      hx: ax + side * (POLE_X - ARM),
       hz: z,
       rotY: side > 0 ? 0 : Math.PI,
       zone: z < 0 ? 0 : 1,
     }));
   }),
   ...[-2, 12, 26, 40].map((x) => ({
-    x, z: -68.2, hx: x, hz: -66.4, rotY: Math.PI / 2, zone: 0,
+    x,
+    z: SOUTH_Z - CROSS_POLE_OUT,
+    hx: x,
+    hz: SOUTH_Z - CROSS_HEAD_OUT,
+    rotY: Math.PI / 2,
+    zone: 0,
   })),
   { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
   { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
@@ -29,16 +46,31 @@ const LAMPS = [
   ...[-27, -9, 9, 27].flatMap((z, i) => {
     const side = i % 2 === 0 ? -1 : 1;
     return [{
-      x: -44 + side * POLE_X, z,
-      hx: -44 + side * (POLE_X - 1.8), hz: z,
+      x: WEST_X + side * POLE_X, z,
+      hx: WEST_X + side * (POLE_X - ARM), hz: z,
       rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
     }];
   }),
-  // North extension + cross street
-  { x: 5.4, z: 63, hx: 3.6, hz: 63, rotY: 0, zone: 1 },
-  { x: -5.4, z: 81, hx: -3.6, hz: 81, rotY: Math.PI, zone: 1 },
-  { x: -20, z: 35.8, hx: -20, hz: 37.6, rotY: Math.PI / 2, zone: 1 },
-  { x: 20, z: 44.2, hx: 20, hz: 42.4, rotY: -Math.PI / 2, zone: 1 },
+  // North extension + cross street. The two on main keep their written head
+  // offset rather than POLE_X - ARM, which is the same 3.6 m one ulp away.
+  { x: MAIN_X + POLE_X, z: 63, hx: MAIN_X + 3.6, hz: 63, rotY: 0, zone: 1 },
+  { x: MAIN_X - POLE_X, z: 81, hx: MAIN_X - 3.6, hz: 81, rotY: Math.PI, zone: 1 },
+  {
+    x: -20,
+    z: PLAZA_Z - CROSS_POLE_OUT,
+    hx: -20,
+    hz: PLAZA_Z - CROSS_HEAD_OUT,
+    rotY: Math.PI / 2,
+    zone: 1,
+  },
+  {
+    x: 20,
+    z: PLAZA_Z + CROSS_POLE_OUT,
+    hx: 20,
+    hz: PLAZA_Z + CROSS_HEAD_OUT,
+    rotY: -Math.PI / 2,
+    zone: 1,
+  },
 ];
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);

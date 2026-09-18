@@ -56,7 +56,7 @@ export function buildPursuitCar() {
 export function updatePursuit(rig, state, elapsed) {
   rig.group.visible = state.active;
   if (!state.active) return;
-  rig.group.position.set(state.x, 0, state.z);
+  rig.group.position.set(state.x, state.y, state.z);
   rig.group.rotation.y = state.yaw;
   const flip = Math.floor(elapsed * 4) % 2 === 0;
   rig.redMat.color.copy(flip ? RED_HOT : RED_DIM);

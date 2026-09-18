@@ -1,5 +1,5 @@
 // On-foot player state. Pure data — render reads, main ticks.
-import { WALK_BOUNDS, clampToBounds } from './world.js';
+import { WALK_BOUNDS, clampToBounds, heightAt } from './world.js';
 
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
@@ -7,6 +7,7 @@ export const HURRY_SPEED = 6.0;
 export function createPlayer() {
   return {
     x: 2.5,
+    y: heightAt(2.5, 26),
     z: 26,
     yaw: Math.PI, // facing -z, into the street
     speed: 0,
@@ -39,4 +40,8 @@ export function tickPlayer(player, input, dt) {
     }
     player.walkPhase += dt * player.speed * 2.6;
   }
+  // Every tick, not only the moving ones: a spawn preset moves x and z behind
+  // this function's back, and standing still on a bank is exactly the case
+  // where floating shows.
+  player.y = heightAt(player.x, player.z);
 }

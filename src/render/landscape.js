@@ -1,43 +1,49 @@
-// Valley landscape: river west, mountain ring, grass banks + park, grass tufts.
-// Static merges. Water normal scrolls; everything else sleeps.
+// Valley landscape: mountain ring, grass verges + park, grass tufts.
+// Static merges — built once, then they sleep.
+//
+// The heightfield itself lives in sim/world.js — a mover has to ask how high the
+// ground is, and it must not reach into the renderer to do it (law 5). This file
+// owns only the part that needs a BufferGeometry: displacing a mesh onto it.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from '../sim/rng.js';
+import { heightAt } from '../sim/world.js';
 
-export function buildRiver(texLoader, maxAniso) {
-  const normal = texLoader.load('assets/asphalt/normal.jpg');
-  normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
-  normal.repeat.set(3, 40);
-  normal.anisotropy = maxAniso;
-  const mat = new THREE.MeshStandardMaterial({
-    color: 0x10222f, metalness: 0.85, roughness: 0.14,
-    normalMap: normal, normalScale: new THREE.Vector2(0.6, 0.6),
-    envMapIntensity: 1.6,
-  });
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(9, 280), mat);
-  mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(-34, -0.5, -5);
-  return { mesh, normal };
+// Lift every vertex of an already-positioned geometry onto the field. A slab's
+// top and bottom move together, so its thickness and its vertical sides survive
+// and no face cracks open.
+export function displaceToTerrain(geo) {
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setY(i, pos.getY(i) + heightAt(pos.getX(i), pos.getZ(i)));
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
 }
 
-export function tickRiver(river, dt) {
-  river.normal.offset.y -= dt * 0.03;
-}
+// One vertex every GRASS_CELL metres, the same cadence as the ground plane, so
+// the two surfaces bend together and the plane cannot poke up through a verge.
+const GRASS_CELL = 4;
 
 export function buildGrassGround() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1.0, envMapIntensity: 0.2 });
   const geos = [];
   const slab = (w, d, x, z) => {
-    const g = new THREE.BoxGeometry(w, 0.3, d);
+    const cells = (m) => Math.max(1, Math.round(m / GRASS_CELL));
+    const g = new THREE.BoxGeometry(w, 0.3, d, cells(w), 1, cells(d));
     g.translate(x, -0.1, z);
     geos.push(g);
   };
   slab(2.5, 280, -50.75, -5); // far-west verge (west of the avenue)
-  slab(11, 280, -32.5, -5); // river bank (avenue runs clear between them)
+  // West green strip. It used to be the river bank, cut at 1 m cells to resolve
+  // a trench; with the channel gone it is ordinary verge on the ordinary 4 m
+  // grid, and it stays because without it the west flank is bare ground plane.
+  slab(12, 284, -32, -4);
   slab(15, 32, 61, 5); // pocket park east
   slab(60, 4, 22, -71.5); // connector verge south
   slab(60, 4, 22, -56.5); // connector verge north
-  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos)), mat);
   mesh.receiveShadow = true;
   return mesh;
 }
@@ -69,7 +75,7 @@ function bladeTexture() {
 
 const TUFT_RECTS = [
   { x0: -52, x1: -50, z0: -60, z1: 55 }, // far-west verge (west of the avenue)
-  { x0: -38, x1: -29, z0: -60, z1: 55 }, // river bank (east of the avenue)
+  { x0: -37, x1: -28, z0: -60, z1: 55 }, // west green strip (east of the avenue)
   { x0: 54, x1: 68, z0: -10, z1: 20 }, // park
   { x0: -7, x1: 51, z0: -73, z1: -70 }, // connector verges
 ];
@@ -92,9 +98,8 @@ export function buildGrassTufts() {
     const r = TUFT_RECTS[Math.floor(rand() * TUFT_RECTS.length)];
     const x = r.x0 + rand() * (r.x1 - r.x0);
     const z = r.z0 + rand() * (r.z1 - r.z0);
-    if (x > -38.5 && x < -29.5) continue; // open water
     const s = 0.7 + rand() * 0.9;
-    dummy.position.set(x, 0.02, z);
+    dummy.position.set(x, heightAt(x, z) + 0.02, z);
     dummy.rotation.set(0, rand() * Math.PI, 0);
     dummy.scale.set(s, s, s);
     dummy.updateMatrix();
