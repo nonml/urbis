@@ -153,7 +153,7 @@ test('tiles build on approach, dispose behind, and free their geometries', () =>
     expect(scene.getObjectByName('chunk 0,0')).toBeUndefined();
 
     manager.disposeAll();
-    expect(manager.stats()).toEqual({ resident: 0, tracked: 0, builders: 1 });
+    expect(manager.stats()).toEqual({ resident: 0, pending: 0, tracked: 0, builders: 1 });
     expect(scene.children.length).toBe(0);
     // Everything every tile ever made is now released — no leak left behind.
     expect(parts.disposed.length).toBe(parts.calls() * 3);
@@ -213,6 +213,141 @@ test('a tile that comes back comes back the same', () => {
     expect(parts.made.get('0,0').seed).toBe(first);
     expect(tileSeed(0, 0)).toBe(first);
     expect(tileSeed(0, 0)).not.toBe(tileSeed(1, 0));
+});
+
+// A builder that borrows slots in a pool the whole world shares — the shape
+// render/outskirts.js actually has, and the reason draws stay flat as residency
+// grows. Nothing here is per-tile, so nothing here may be disposed per tile.
+function poolFixture() {
+  const geometry = new THREE.BoxGeometry(1, 1, 1);
+  const material = new THREE.MeshStandardMaterial({ color: 0x334455 });
+  const disposed = [];
+  watched(geometry, disposed);
+  watched(material, disposed);
+  const held = new Map();
+  // The handle carries the pool's geometry and material on purpose: if the
+  // manager ever went looking for resources on a claim it would take down the
+  // whole world's pool, and this is the test that would catch it.
+  const build = (bounds) => {
+    held.set(bounds.key, 4);
+    return { release: () => held.delete(bounds.key), geometry, material };
+  };
+  return { build, disposed, held };
+}
+
+test('a builder that borrows shared slots hands them back on dispose, and frees nothing', () => {
+    const scene = new THREE.Scene();
+    const pool = poolFixture();
+    const manager = createChunkManager({ ...GRID, scene });
+    manager.register('pool', pool.build);
+
+    manager.update(5, 5);
+    expect(pool.held.size).toBe(manager.stats().resident);
+    // The claim is not an Object3D, so nothing of it lands in the scene graph.
+    expect(scene.children.length).toBe(0);
+    expect(manager.stats().tracked).toBe(0);
+
+    manager.update(500, 5);
+    expect(pool.held.has('0,0')).toBe(false);
+    expect(pool.held.size).toBe(manager.stats().resident);
+
+    manager.disposeAll();
+    expect(pool.held.size).toBe(0);
+    expect(pool.disposed).toEqual([]);   // the pool outlives every tile that used it
+});
+
+test('a builder may return null for a tile it has nothing in, and that tile is still resident', () => {
+    // Once the world is big this is the common answer, and a manager that treated
+    // it as a failed build would re-plan the same empty tile every single frame.
+    const seen = [];
+    const manager = createChunkManager(GRID);
+    manager.register('sparse', (bounds) => {
+      seen.push(bounds.key);
+      return bounds.tx === 0 ? new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1)) : null;
+    });
+
+    const first = manager.update(5, 5);
+    expect(manager.resident()).toContain('1,0');
+    expect(manager.objectAt('1,0')).toBe(null);
+    const built = seen.length;
+    const again = manager.update(5, 5);
+    expect(again).toMatchObject({ built: 0, dropped: 0, pending: 0, resident: first.resident });
+    expect(seen.length).toBe(built);      // nothing rebuilt
+});
+
+test('the build budget spreads a residency fill over frames instead of spending one on all of it', () => {
+    const parts = fixture();
+    const manager = createChunkManager({ ...GRID, budgetTiles: 2 });
+    manager.register('fixture', parts.build);
+
+    const wanted = residency([], 5, 5, GRID).build.length;
+    expect(wanted).toBeGreaterThan(4);
+
+    const first = manager.update(5, 5);
+    expect(first.built).toBe(2);
+    expect(first.pending).toBe(wanted - 2);
+    expect(parts.calls()).toBe(2);
+
+    let frames = 1;
+    while (manager.stats().pending) {
+      expect(manager.update(5, 5).built).toBeLessThanOrEqual(2);
+      frames++;
+    }
+    expect(frames).toBe(Math.ceil(wanted / 2));
+    expect(manager.stats().resident).toBe(wanted);
+});
+
+test('the queue is drained nearest first, so the tile ahead is never behind the tile in the fog', () => {
+    const order = [];
+    const manager = createChunkManager({ ...GRID, budgetTiles: 1 });
+    manager.register('order', (bounds) => {
+      order.push(bounds.key);
+      return null;
+    });
+
+    manager.update(5, 5);
+    while (manager.stats().pending) manager.update(5, 5);
+    const distances = order.map((key) => {
+      const [tx, tz] = key.split(',').map(Number);
+      return tileDistance(tx, tz, 5, 5, GRID.tileSize);
+    });
+    expect(distances).toEqual([...distances].sort((a, b) => a - b));
+    expect(order[0]).toBe('0,0');
+});
+
+test('a queued tile the player leaves before it is built is never built at all', () => {
+    const parts = fixture();
+    const manager = createChunkManager({ ...GRID, budgetTiles: 1 });
+    manager.register('fixture', parts.build);
+
+    manager.update(5, 5);
+    expect(manager.stats().pending).toBeGreaterThan(0);
+    const builtNear = parts.calls();
+
+    // Gone, before the queue ever got its turn. The work is dropped, not done.
+    const away = manager.update(500, 5);
+    expect(manager.pending().some((key) => key.startsWith('0,'))).toBe(false);
+    expect(parts.calls()).toBe(builtNear + away.built);
+    expect([...parts.made.keys()].length).toBe(parts.calls());
+});
+
+test('the ms budget stops starting builds, but always lets one through so streaming cannot stall', () => {
+    // A fake clock: every now() reads 10 ms later, so the budget is spent the
+    // moment the first build finishes.
+    let clock = 0;
+    const parts = fixture();
+    const manager = createChunkManager({
+      ...GRID, budgetTiles: 8, budgetMs: 1, now: () => (clock += 10),
+    });
+    manager.register('fixture', parts.build);
+
+    expect(manager.update(5, 5).built).toBe(1);
+    expect(manager.update(5, 5).built).toBe(1);
+
+    // warm() ignores the budget outright — boot wants the world, not a trickle.
+    manager.warm(5, 5);
+    expect(manager.stats().pending).toBe(0);
+    expect(manager.stats().resident).toBe(residency([], 5, 5, GRID).build.length);
 });
 
 test('the shipped radii have a whole tile of hysteresis, and a manager without it refuses to exist', () => {
