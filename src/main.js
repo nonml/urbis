@@ -26,6 +26,8 @@ import { buildRain, tickRain } from './render/rain.js';
 import { captureFrame } from './render/capture.js';
 import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
 import { buildRiver, tickRiver, buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
+import { createChunkManager } from './render/chunks.js';
+import { buildOutskirts } from './render/outskirts.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -61,6 +63,16 @@ scene.add(river.mesh);
 scene.add(buildGrassGround());
 scene.add(buildGrassTufts());
 scene.add(buildMountains());
+// Streamed world. The outskirts own their meshes for the whole game — a tile
+// borrows instance slots in them, so residency changes cost zero draws — and
+// the manager only decides which tiles have claimed any. Two tiles a frame and
+// 1.5 ms is the whole build allowance; boot warms the spawn's ring up front so
+// frame one is not a half-built world.
+const outskirts = buildOutskirts();
+for (const m of outskirts.meshes) scene.add(m);
+const chunks = createChunkManager({ scene, budgetTiles: 2, budgetMs: 1.5 });
+chunks.register('outskirts', outskirts.build);
+let streamOrigin = null;
 const beacons = buildBeacons(towers.beacons);
 scene.add(beacons.mesh);
 scene.add(buildTrees());
@@ -230,6 +242,23 @@ if (spawnPreset === 'east') {
   player.x = 0;
   player.z = 40;
   cam.yaw = Math.PI / 2;
+} else if (spawnPreset === 'edge') {
+  // The two corners of the walk box that look out of town: the south-east
+  // limit facing east, and the south edge of the connector facing south. Both
+  // are ordinary play positions with the ordinary follow cam — the outskirts
+  // have to survive being looked at from where the player can actually stand,
+  // not from a staged lab angle (AGENTS.md step 5).
+  player.x = 70;
+  player.z = -66;
+  cam.yaw = Math.PI / 2;
+  cam.pitch = 0.32;
+  cam.dist = 8;
+} else if (spawnPreset === 'edge-s') {
+  player.x = -20;
+  player.z = -66;
+  cam.yaw = Math.PI;
+  cam.pitch = 0.32;
+  cam.dist = 8;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -315,6 +344,32 @@ window.__game = {
   },
 };
 
+// Capture-only streaming probe, bound behind ?capture=1 and nowhere else. It
+// moves the position the STREAMER reads, not the player and not the camera —
+// DRIVE_BOUNDS is untouched and the game plays identically with it bound. It
+// exists because the road graph does not reach the outskirts yet, so proving a
+// tile builds and disposes out there cannot be done by driving to it.
+if (CAPTURE) {
+  window.__game.chunks = {
+    stats: () => ({ ...chunks.stats(), ms: chunks.cost(), pools: outskirts.stats() }),
+    cost: () => chunks.cost(),
+    resident: () => chunks.resident(),
+    origin: (x, z) => { streamOrigin = x === null ? null : { x, z }; },
+    budget: (tiles, ms) => chunks.budget(tiles, ms),
+    visible: (on) => { for (const m of outskirts.meshes) m.visible = on; },
+  };
+  // Stand the player somewhere inside the walk box it could have walked to, and
+  // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
+  // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
+  window.__game.pose = (x, z, yaw) => {
+    player.x = Math.max(-52, Math.min(70, x));
+    player.z = Math.max(-68, Math.min(100, z));
+    cam.yaw = yaw;
+  };
+}
+
+chunks.warm(player.x, player.z);
+
 let last = performance.now();
 let fpsAcc = 0;
 let fpsN = 0;
@@ -388,6 +443,11 @@ function render() {
   const driving = player.mode === 'drive';
   tickClock(clock, dt);
   tickStreet(street, dt);
+  // Stream against the camera, because the camera is what the frustum belongs
+  // to. It is last frame's position; at a 160 m build radius one frame of lag
+  // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
+  const eye = streamOrigin ?? camera.position;
+  chunks.update(eye.x, eye.z);
   if (driving) {
     const res = tickPlayerCar(heroCar, driveInput(), dt);
     braking = res.braking;

@@ -1,12 +1,11 @@
 // Chunk streaming: the world cut into tiles, built on approach, disposed behind.
 //
-// UNWIRED SPIKE. Nothing calls this yet — plank 3 of
-// docs/superpowers/specs/2026-09-19-world-scale-design.md lands it unattached so the
-// lifecycle can be reviewed before it touches the frame loop.
+// Driven from the frame loop in main.js against the camera position.
 //
-// Two halves, deliberately separated:
+// Three halves, deliberately separated:
 //   1. residency — which tiles should exist. Pure, zero three, zero state.
 //   2. the manager — build/dispose and the GPU resource accounting that goes with it.
+//   3. the budget — how much of that work one frame is allowed to do.
 import * as THREE from 'three';
 
 // One superblock. The avenues sit 44 m apart (render/block.js), so a 64 m tile holds
@@ -167,6 +166,16 @@ function createRegistry() {
   };
 }
 
+// The build budget. Unlimited by default, because "make residency true" is what
+// update() means and a test or a boot warm-up wants exactly that. A frame loop
+// says how much of it one frame may pay for, and everything else waits in the
+// queue — a frame that builds four tiles at once is a visible hitch, which is
+// the whole reason law 1 asks for a trace and not an assertion.
+//
+// budgetTiles is the hard stop; budgetMs stops *starting* another build once the
+// frame has already spent its slice. One build per frame is always allowed even
+// over the ms budget, or a slow frame stalls streaming forever and the world
+// never arrives.
 function chunkConfig(options) {
   const config = {
     scene: options.scene ?? null,
@@ -174,6 +183,9 @@ function chunkConfig(options) {
     buildRadius: options.buildRadius ?? BUILD_RADIUS,
     disposeRadius: options.disposeRadius ?? DISPOSE_RADIUS,
     seed: options.seed ?? WORLD_SEED,
+    budgetTiles: options.budgetTiles ?? Infinity,
+    budgetMs: options.budgetMs ?? Infinity,
+    now: options.now ?? (() => performance.now()),
   };
   if (!(config.disposeRadius > config.buildRadius)) {
     throw new Error('chunks: disposeRadius must exceed buildRadius, or tiles thrash on the boundary');
@@ -182,27 +194,42 @@ function chunkConfig(options) {
 }
 
 // A tile does not know what is inside it. Callers register builders; each builder is
-// handed tileBounds() and returns an Object3D to show, or null for "nothing of mine
-// lives here" — which is the common answer once the world is big.
+// handed tileBounds() and returns one of three things:
+//
+//   an Object3D     — the tile owns it. Added to the scene, and at dispose time every
+//                     geometry, material and texture under it is refcounted back out.
+//   a claim handle  — anything with release(). The builder owns shared GPU resources
+//                     that outlive the tile (render/outskirts.js holds one InstancedMesh
+//                     per prop kind for the whole world) and the tile only borrowed
+//                     slots in them. Nothing is added, nothing is disposed; release()
+//                     hands the slots back. This is the shape that keeps draws flat as
+//                     residency grows, so it is the shape most builders should have.
+//   null            — nothing of mine lives here, the common answer once the world is big.
 export function createChunkManager(options = {}) {
-  const { scene, tileSize, buildRadius, disposeRadius, seed } = chunkConfig(options);
+  const { scene, tileSize, buildRadius, disposeRadius, seed, now, ...budget } =
+    chunkConfig(options);
   const builders = [];
   const tiles = new Map();
+  const queued = new Map();
   const registry = createRegistry();
+  let lastMs = 0;
   markShared(...(options.shared ?? []));
 
   function buildTile(bounds) {
     const group = new THREE.Group();
     group.name = `chunk ${bounds.key}`;
+    const claims = [];
     for (const builder of builders) {
-      const object = builder.build(bounds);
-      if (object) group.add(object);
+      const made = builder.build(bounds);
+      if (!made) continue;
+      if (made.isObject3D) group.add(made);
+      else claims.push(made);
     }
     const object = group.children.length ? group : null;
     const resources = object ? tileResources(object) : [];
     for (const resource of resources) registry.acquire(resource);
     if (object && scene) scene.add(object);
-    tiles.set(bounds.key, { bounds, object, resources });
+    tiles.set(bounds.key, { bounds, object, resources, claims });
   }
 
   function dropTile(key) {
@@ -214,29 +241,105 @@ export function createChunkManager(options = {}) {
       tile.object.clear();
     }
     for (const resource of tile.resources) registry.release(resource);
+    for (const claim of tile.claims) claim.release();
+  }
+
+  // Nearest first. The tile the player is about to drive into is worth more than
+  // the one behind the fog, and a queue drained in plan order does not know that.
+  function nextQueued(x, z) {
+    let best = null;
+    let bestD = Infinity;
+    for (const bounds of queued.values()) {
+      const d = tileDistance(bounds.tx, bounds.tz, x, z, tileSize);
+      if (d < bestD) {
+        bestD = d;
+        best = bounds;
+      }
+    }
+    return best;
+  }
+
+  function drain(x, z) {
+    const started = now();
+    let built = 0;
+    while (queued.size && built < budget.budgetTiles) {
+      if (built > 0 && now() - started >= budget.budgetMs) break;
+      const bounds = nextQueued(x, z);
+      queued.delete(bounds.key);
+      buildTile(bounds);
+      built++;
+    }
+    return built;
+  }
+
+  // Drop first, then build: the peak resource count is the larger residency set,
+  // never the union of the two. A queued tile counts as resident for planning, so it
+  // is never queued twice, and it is dropped from the queue — not built and then
+  // thrown away — if the player leaves before its turn comes.
+  function update(x, z) {
+    const started = now();
+    const have = new Set([...tiles.keys(), ...queued.keys()]);
+    const plan = residency(have, x, z, { tileSize, buildRadius, disposeRadius, seed });
+    let dropped = 0;
+    for (const key of plan.drop) {
+      if (queued.delete(key)) continue;
+      dropTile(key);
+      dropped++;
+    }
+    for (const bounds of plan.build) queued.set(bounds.key, bounds);
+    const built = drain(x, z);
+    // What the budget is actually capping, in the units the budget is written
+    // in. Two performance.now() calls a frame, so that the cost of streaming is
+    // a measured number and not a story about one (law 2).
+    lastMs = now() - started;
+    return { built, dropped, resident: tiles.size, pending: queued.size, ms: lastMs };
+  }
+
+  // Everything residency asks for, now, budget ignored. Boot wants the world around
+  // the spawn present on frame one rather than trickling in over the first half
+  // second; the budget exists for the frames after that.
+  function warm(x, z) {
+    let guard = 0;
+    let built = update(x, z).built;
+    while (queued.size && guard++ < 1e4) {
+      const bounds = nextQueued(x, z);
+      queued.delete(bounds.key);
+      buildTile(bounds);
+      built++;
+    }
+    return built;
   }
 
   return {
     // Every builder must be in before the first update, or early tiles are missing
     // whatever registered late and nothing ever notices.
     register(name, build) {
-      if (tiles.size) throw new Error('chunks: register every builder before the first update()');
+      if (tiles.size || queued.size) {
+        throw new Error('chunks: register every builder before the first update()');
+      }
       builders.push({ name, build });
     },
-    // Drop first, then build: the peak resource count is the larger residency set,
-    // never the union of the two.
-    update(x, z) {
-      const plan = residency(tiles.keys(), x, z, { tileSize, buildRadius, disposeRadius, seed });
-      for (const key of plan.drop) dropTile(key);
-      for (const bounds of plan.build) buildTile(bounds);
-      return { built: plan.build.length, dropped: plan.drop.length, resident: tiles.size };
+    update,
+    warm,
+    // Runtime knob, so the cost of having a budget at all can be measured
+    // against not having one on the same running frame loop.
+    budget(budgetTiles, budgetMs) {
+      budget.budgetTiles = budgetTiles;
+      budget.budgetMs = budgetMs;
     },
     disposeAll() {
+      queued.clear();
       for (const key of [...tiles.keys()]) dropTile(key);
     },
     resident: () => [...tiles.keys()],
+    pending: () => [...queued.keys()],
     objectAt: (key) => tiles.get(key)?.object ?? null,
     holds: (resource) => registry.count(resource),
-    stats: () => ({ resident: tiles.size, tracked: registry.size(), builders: builders.length }),
+    // What the last update() spent, in the units the budget is written in.
+    cost: () => lastMs,
+    stats: () => ({
+      resident: tiles.size, pending: queued.size,
+      tracked: registry.size(), builders: builders.length,
+    }),
   };
 }
