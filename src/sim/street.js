@@ -21,6 +21,11 @@ export const STREET_HALF = 100;
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
 export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];
 const CAR_PAINTS = [0x7a1020, 0x10233d, 0x3d3d42, 0x0f3d2e, 0x4d4d10, 0x222222];
+// How many body silhouettes the render layer knows how to build. A street
+// where every car is the same shape is a toy car park, and the shape has to
+// live here with the paint so a car keeps it for life instead of changing
+// body every time its render slot is reused.
+const SHAPE_COUNT = 5;
 const FIRST = ['Mara', 'Kaito', 'Iris', 'Dario', 'Yuki', 'Petra', 'Sol', 'Nadia', 'Rook', 'Esen', 'Milo', 'Aya', 'Corv', 'Lena', 'Juno', 'Theo'];
 const LAST = ['Vane', 'Kuro', 'Dax', 'Mori', 'Lark', 'Voss', 'Quill', 'Reyes', 'Hale', 'Ito', 'Fenn', 'Okafor', 'Rill', 'Sable', 'Thorn', 'Vale'];
 const JOBS = [
@@ -98,6 +103,7 @@ function makeNSCar(rng, i) {
     z: -STREET_HALF + ((i * 37) % 12) / 12 * STREET_HALF * 2,
     speed: 7 + rng.sim() * 3,
     paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
+    shape: (i * 3 + 1) % SHAPE_COUNT,
   };
 }
 
@@ -115,6 +121,7 @@ function makeEWCar(rng, i) {
     dir,
     speed: 7 + rng.sim() * 3,
     paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
+    shape: (i * 3 + 2) % SHAPE_COUNT,
     xMin,
     xMax,
   };
@@ -144,6 +151,7 @@ export function createStreet(seed) {
       speed: 0,
       parked: true,
       paint: CAR_PAINTS[(k * 5 + 3) % CAR_PAINTS.length],
+      shape: (k * 3) % SHAPE_COUNT,
     });
   });
   return {

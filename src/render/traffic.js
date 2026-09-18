@@ -191,12 +191,30 @@ const poolGeo = mergeGeometries([lensGeo(-POOL_LENS_X), lensGeo(POOL_LENS_X)]);
 const TAIL_DIM = new THREE.Color(0x7a140e);
 const TAIL_BRAKE = new THREE.Color(0xff2a20);
 
-function placeOnCar(dummy, car, yOff) {
+// Five bodies out of one. A second vehicle mesh would cost four draws — a
+// paint pass, a glass pass, a trim pass, a wheel pass — and the street does
+// not need four more models, it needs to stop being one model repeated.
+// Stretching the shared body per instance gives a van, a compact, a long
+// wagon and a low coupe for nothing, because the greenhouse and the glass
+// ride the same numbers and the roofline changes with them.
+// Index matches SHAPE_COUNT in sim/street.js.
+const CAR_SHAPES = [
+  [1.00, 1.00, 1.00],  // saloon
+  [1.05, 1.24, 1.14],  // van
+  [0.93, 0.95, 0.84],  // compact
+  [1.02, 1.05, 1.21],  // wagon
+  [1.07, 0.87, 1.03],  // coupe
+];
+
+function placeOnCar(dummy, car, yOff, roundWheels = false) {
+  const [sx, sy, sz] = CAR_SHAPES[car.shape ?? 0];
   dummy.position.set(car.x ?? car.lane, yOff, car.z);
   if (car.yaw !== undefined) dummy.rotation.set(0, car.yaw, 0);
   else if (car.axis === 'x') dummy.rotation.set(0, car.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
   else dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
-  dummy.scale.set(1, 1, 1);
+  // Wheels widen their track with the body but never squash: an ellipse
+  // where a tyre should be is worse than no variety at all.
+  dummy.scale.set(sx, roundWheels ? 1 : sy, sz);
   dummy.updateMatrix();
   return dummy.matrix;
 }
@@ -244,9 +262,9 @@ export function updateTraffic(rig, street, camera = null) {
   street.cars.forEach((c, i) => {
     const m = placeOnCar(dummy, c, 0);
     bodies.setMatrixAt(i, m);
-    wheels.setMatrixAt(i, m);
     glass.setMatrixAt(i, m);
     trim.setMatrixAt(i, m);
+    wheels.setMatrixAt(i, placeOnCar(dummy, c, 0, true));
     if (c.parked) {
       // Dark and quiet: parked cars wear no headlight glow.
       dummy.scale.set(0, 0, 0);
