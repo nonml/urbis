@@ -3,7 +3,7 @@
 // the walker freezes. Hats/visors hide via zero-scale for wearers without.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { bakeVerticalShade } from './player.js';
+import { bakeVerticalShade, coatFabric } from './player.js';
 import { NPC_COUNT, SKIN_TONES, isDark, zoneAt } from '../sim/street.js';
 
 const HAT_COLORS = [0x14161c, 0x3a2a1a, 0x1a3a4a, 0x5c1f2e];
@@ -73,6 +73,7 @@ export function buildNPCs(street) {
   bakeVerticalShade(armGeo, 1.42);
   const coatMat = new THREE.MeshStandardMaterial({
     roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, vertexColors: true,
+    ...coatFabric(0.5),
   });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
   bodies.castShadow = true;

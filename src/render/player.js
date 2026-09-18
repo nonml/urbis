@@ -2,6 +2,7 @@
 // Matches NPC fidelity — same silhouette language, hero-specific details.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { mulberry32 } from '../sim/rng.js';
 
 function heroFaceTexture() {
   const c = document.createElement('canvas');
@@ -19,6 +20,54 @@ function heroFaceTexture() {
   const tex = new THREE.CanvasTexture(c);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
+}
+
+// Every surface in this city carries a normal map except the one the player
+// looks at for the whole game. The hero's coat and the crowd's coats were
+// flat colour next to PBR pavement and PBR walls, and that mismatch reads as
+// "the character is from a different, cheaper game" long before any shape
+// problem does. A woven height field, differenced into normals: 128x128,
+// built once, shared by the hero and all 72 walkers.
+let _fabric = null;
+
+function fabricNormalMap() {
+  if (_fabric) return _fabric;
+  const S = 128;
+  const rnd = mulberry32(0x5eed);
+  const h = new Float32Array(S * S);
+  for (let y = 0; y < S; y += 1) {
+    for (let x = 0; x < S; x += 1) {
+      h[y * S + x] = Math.sin(x * 1.55) * 0.3 + Math.sin(y * 1.55) * 0.3 + rnd() * 0.4;
+    }
+  }
+  const c = document.createElement('canvas');
+  c.width = S;
+  c.height = S;
+  const g = c.getContext('2d');
+  const img = g.createImageData(S, S);
+  const at = (x, y) => h[((y + S) % S) * S + ((x + S) % S)];
+  for (let y = 0; y < S; y += 1) {
+    for (let x = 0; x < S; x += 1) {
+      const nx = (at(x - 1, y) - at(x + 1, y)) * 1.4;
+      const ny = (at(x, y - 1) - at(x, y + 1)) * 1.4;
+      const len = Math.hypot(nx, ny, 1);
+      const i = (y * S + x) * 4;
+      img.data[i] = (nx / len * 0.5 + 0.5) * 255;
+      img.data[i + 1] = (ny / len * 0.5 + 0.5) * 255;
+      img.data[i + 2] = (1 / len * 0.5 + 0.5) * 255;
+      img.data[i + 3] = 255;
+    }
+  }
+  g.putImageData(img, 0, 0);
+  _fabric = new THREE.CanvasTexture(c);
+  _fabric.wrapS = THREE.RepeatWrapping;
+  _fabric.wrapT = THREE.RepeatWrapping;
+  _fabric.repeat.set(4, 4);
+  return _fabric;
+}
+
+export function coatFabric(scale) {
+  return { normalMap: fabricNormalMap(), normalScale: new THREE.Vector2(scale, scale) };
 }
 
 // Cloth is never one value. A coat catches sky on the shoulders, goes dark in
@@ -79,6 +128,7 @@ export function buildPlayer() {
   bakeVerticalShade(coatGeo, 0);
   const coatMat = new THREE.MeshStandardMaterial({
     color: 0x112b32, roughness: 0.6, metalness: 0.1, envMapIntensity: 0.9, vertexColors: true,
+    ...coatFabric(0.62),
   });
   const coat = new THREE.Mesh(coatGeo, coatMat);
   coat.castShadow = true;
