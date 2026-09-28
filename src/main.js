@@ -44,6 +44,9 @@ import { buildCityView } from './render/cityview.js';
 import { bindCityView } from './ui/cityview.js';
 import { buildInteriors, updateInteriors } from './render/interior.js';
 import { buildDoorHud, updateDoorHud, fadeThroughDoor } from './render/doorhud.js';
+import { ARC, createArc, tickArc, arcChoose, arcTarget, arcSigns, arcSnapshot, arcSkipStep } from './sim/arc.js';
+import { buildArcMarker, updateArcMarker } from './render/arc.js';
+import { buildArcUI, updateArcUI, toggleJournal } from './render/arcui.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -137,6 +140,10 @@ const player = createPlayer();
 player.mode = 'foot';
 const heroCar = createPlayerCar();
 const mission = createMission();
+const arc = createArc();
+const arcMarker = buildArcMarker(ARC.signs);
+scene.add(arcMarker.mesh);
+const arcUI = buildArcUI();
 const wanted = createWanted();
 let lastWantedStatus = 'clean';
 const npcRig = buildNPCs(street);
@@ -399,6 +406,8 @@ window.addEventListener('keydown', (e) => {
   // door is used at street scale, never from the overview.
   if (interior.space === STREET) cityKey(cityView, k, cam.yaw);
   if (k === 'e' && cityView.mode === 'street') enterDoor();
+  if (k === 'j') toggleJournal(arcUI);
+  if (k === '1' || k === '2') arcChoose(arc, Number(k), street.time);
 });
 
 const clock = createClock();
@@ -423,6 +432,11 @@ window.__game = {
   space: () => interior.space,
   door: () => interior.near?.label ?? null,
   useDoor: () => enterDoor(),
+  arc: () => {
+    const at = player.mode === 'drive' ? heroCar : player;
+    return arcSnapshot(arc, city.parcels, at.x, at.z);
+  },
+  choose: (key) => arcChoose(arc, key, street.time),
   city: () => ({
     time: +city.time.toFixed(2),
     demand: { ...city.demand },
@@ -517,6 +531,7 @@ if (CAPTURE) {
     cam.pitch = Math.max(0.08, Math.min(1.2, pitch));
     cam.dist = Math.max(3, Math.min(14, dist));
   };
+  window.__game.arcSkip = () => arcSkipStep(arc);
 }
 
 chunks.warm(player.x, player.z);
@@ -721,6 +736,12 @@ function render() {
     missionNote(mission, 'BUSTED — contract reset', street.time, 3);
   }
   wanted.pursuit.forEach((p, i) => updatePursuit(pursuitRigs[i], p, clock.elapsed));
+  mission.balance += tickArc(arc, {
+    x: hx, z: hz, inCar: driving, dark: DARK, heat: wanted.heat, profile: lastProfile?.name ?? null,
+    parcels: city.parcels, busted: lastWantedStatus === 'busted',
+  }, street.time);
+  updateArcMarker(arcMarker, arcTarget(arc, city.parcels, hx, hz), arcSigns(arc), clock.elapsed, night, glows);
+  updateArcUI(arcUI, arc, hx, hz, street.time);
 
   const ax = driving ? heroCar.x : player.x;
   const az = driving ? heroCar.z : player.z;

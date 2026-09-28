@@ -1,0 +1,250 @@
+{
+  "start": "live_wire",
+  "contacts": {
+    "ruf": { "name": "RUF TAMM", "role": "lineman, district grid", "color": "#d9a441", "attitude": "neutral" },
+    "celeste": { "name": "CELESTE MARROW", "role": "acquisitions, Arden Holdings", "color": "#9db4c9", "attitude": "neutral" },
+    "nell": { "name": "NELL ADEYEMI", "role": "West Ave Books, tenants' committee", "color": "#d98f6a", "attitude": "neutral" }
+  },
+  "places": {
+    "substation_s": { "name": "the south substation", "x": 6.8, "z": -30, "r": 6 },
+    "hotel_main": { "name": "the Hotel on Main", "x": 5.4, "z": -6, "r": 4 },
+    "plaza_lot": { "name": "the plaza lot", "x": -5, "z": 53, "r": 4 },
+    "west_ave": { "name": "West Avenue", "x": -44, "z": 10, "r": 40 },
+    "bookshop": { "name": "West Ave Books", "x": -39.5, "z": 25, "r": 4 },
+    "plaza": { "name": "the plaza", "x": 0, "z": 40, "r": 8 },
+    "tavern": { "name": "the Tavern on Main", "x": -5.4, "z": 6, "r": 4 }
+  },
+  "signs": [
+    {
+      "id": "bookshop_holdout", "if": "warned_nell", "kind": "banner",
+      "text": "NOT FOR SALE", "sub": "WEST AVE TENANTS' COMMITTEE", "color": "#efe6d2", "ink": "#9b2a22",
+      "x": -37.8, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
+    },
+    {
+      "id": "bookshop_closing", "if": "sold_names", "kind": "banner",
+      "text": "CLOSING SALE", "sub": "LEASE NOT RENEWED · ALL STOCK", "color": "#e3be3f", "ink": "#1c1814",
+      "x": -37.8, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
+    },
+    {
+      "id": "lot_arden", "if": "ledger_arden", "kind": "board",
+      "text": "PLAZA TOWER", "sub": "ARDEN HOLDINGS · NOW LEASING", "color": "#1f3a5f", "ink": "#d8b863",
+      "x": -6.85, "z": 59.5, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
+    },
+    {
+      "id": "lot_trust", "if": "ledger_nell", "kind": "board",
+      "text": "LAND TRUST", "sub": "40 HOMES · WEST AVE", "color": "#24553a", "ink": "#efe6d2",
+      "x": -6.85, "z": 59.5, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
+    }
+  ],
+  "missions": [
+    {
+      "id": "live_wire", "title": "LIVE WIRE", "contact": "ruf", "payout": 400,
+      "brief": [
+        { "who": "ruf", "text": "You're the one with the rig. Good. Every light on this district runs down a wire, and I'm the man they call when the wire goes." },
+        { "who": "ruf", "text": "Here's the audition. Take the car, get down to the south substation, put the south block in the dark. Then get clean." }
+      ],
+      "steps": [
+        { "verb": "enter_car", "label": "Get in the car (F)" },
+        { "verb": "go_to", "place": "substation_s", "label": "Drive to the south substation" },
+        { "verb": "blackout_zone", "zone": 0, "label": "Put the south block in the dark (H)" },
+        { "verb": "lose_heat", "label": "Lose the heat" }
+      ],
+      "debrief": [
+        { "who": "ruf", "text": "Eight seconds of dark and nobody saw your face. That's the whole trade." },
+        { "who": "ruf", "text": "Somebody at Arden Holdings pays well for that kind of quiet. Celeste Marrow. She'll call." }
+      ],
+      "next": "site_visit"
+    },
+    {
+      "id": "site_visit", "title": "SITE VISIT", "contact": "celeste", "payout": 200,
+      "brief": [
+        { "who": "celeste", "text": "Ruf says you're discreet. I'm at the Hotel on Main. Come down to the door — I don't do business on the phone." }
+      ],
+      "steps": [
+        {
+          "verb": "go_to", "place": "hotel_main", "label": "Meet Celeste at the Hotel on Main",
+          "say": [
+            { "who": "celeste", "text": "Arden Holdings owns most of the empty land on this district. Every lot you've watched go up, we bought when it was mud." },
+            { "who": "celeste", "text": "Walk with me to the plaza. There's one I want you to see." }
+          ]
+        },
+        {
+          "verb": "read_lot", "place": "plaza_lot", "label": "Walk the plaza lot with Celeste",
+          "say": [
+            { "who": "celeste", "if": "lot:EMPTY", "text": "Mud and a fence. By next year, forty storeys — if the neighbours stop filing objections." },
+            { "who": "celeste", "if": "lot:SITE", "text": "Ground's broken. Every week that crane waits on a permit costs us more than you'll earn this year." },
+            { "who": "celeste", "if": ["lot:LOW", "lot:MID"], "text": "Watch it climb. That's what money looks like before it's finished." },
+            { "who": "celeste", "if": "lot:HIGH", "text": "Topped out and let before the glass went in. That's how it's supposed to go. It rarely does." },
+            { "who": "celeste", "text": "The objections all come from one block on West Avenue. I need names — who still lives there, who's organising. Go and look." }
+          ]
+        },
+        { "verb": "profile_count", "n": 3, "place": "west_ave", "label": "Put names to 3 people on West Avenue" },
+        {
+          "verb": "choose", "who": "nell", "label": "Nell has noticed you — answer her",
+          "say": [
+            { "who": "nell", "text": "You've been reading my neighbours off that little screen for ten minutes. I run the bookshop. I notice people who read." },
+            { "who": "nell", "text": "You're Arden's, aren't you. So: do those names go to Celeste Marrow, or do you tell me what she's planning?" }
+          ],
+          "options": [
+            {
+              "key": 1, "text": "It's a job. The names go to Arden.",
+              "set": "sold_names", "money": 800, "trust": { "nell": -3, "celeste": 1 },
+              "note": "You gave Arden the names on West Avenue.",
+              "reply": [
+                { "who": "nell", "text": "Then get off my street. Arden will have this shop by spring, and you can tell people you helped." }
+              ]
+            },
+            {
+              "key": 2, "text": "She wants the whole block. Here's what I know.",
+              "set": "warned_nell", "trust": { "nell": 2, "celeste": -2 },
+              "note": "You told Nell what Arden is planning.",
+              "reply": [
+                { "who": "nell", "text": "The whole block. Of course she does. Right — you're going to help me make that very expensive." }
+              ]
+            }
+          ]
+        }
+      ],
+      "debrief": [
+        { "who": "celeste", "if": "sold_names", "text": "Twelve names by morning. Arden appreciates people who finish things." },
+        { "who": "celeste", "if": "warned_nell", "text": "No names? Then you're paid for the walk and nothing else. Think harder next time." }
+      ],
+      "next": { "sold_names": "quiet_title", "warned_nell": "stop_work" }
+    },
+    {
+      "id": "stop_work", "title": "STOP WORK", "contact": "nell", "payout": 300,
+      "brief": [
+        { "who": "nell", "text": "Arden's permit on the south lots lapses if the site sits idle for a working week. The inspector drives past every afternoon." },
+        { "who": "nell", "text": "So the crane doesn't turn while he's looking. Go south, find Arden's crane, and kill the power while it's working." }
+      ],
+      "steps": [
+        { "verb": "stall_site", "zone": 0, "label": "Stop Arden's crane: black out the south block while it works" },
+        { "verb": "lose_heat", "label": "Lose the heat" }
+      ],
+      "debrief": [
+        { "who": "nell", "text": "The inspector wrote 'no activity on site'. One more day on Arden's clock." },
+        { "who": "nell", "text": "Come by the shop some time. First book's free. The second one, I'll judge you by." }
+      ],
+      "next": "dead_air"
+    },
+    {
+      "id": "quiet_title", "title": "QUIET TITLE", "contact": "celeste", "payout": 900,
+      "brief": [
+        { "who": "celeste", "text": "The West Avenue tenants meet at the bookshop tonight. Their lawyer keeps the paperwork on a machine in the back." },
+        { "who": "celeste", "text": "My people need four minutes inside with the lights off. Be at the bookshop, and kill the north block when you get there." }
+      ],
+      "steps": [
+        { "verb": "go_to", "place": "bookshop", "label": "Go to West Ave Books" },
+        { "verb": "blackout_zone", "zone": 1, "label": "Kill the north block (H)" },
+        { "verb": "lose_heat", "label": "Lose the heat" }
+      ],
+      "debrief": [
+        { "who": "celeste", "text": "The files are gone. Without paper, the tenants are just people who are upset. That passes." }
+      ],
+      "next": "dead_air"
+    },
+    {
+      "id": "dead_air", "title": "DEAD AIR", "contact": "ruf", "payout": 800,
+      "brief": [
+        { "who": "ruf", "text": "The plaza lot goes to auction Friday. Arden's bidding. The tenants have a land trust and a counter-bid. Both get filed at the registry." },
+        { "who": "ruf", "if": "warned_nell", "text": "Kill the north block, then the south while the north still burns, and the registry's backup goes too. No filings for a week. Nell gets her week." },
+        { "who": "ruf", "if": "sold_names", "text": "Kill the north block, then the south while the north still burns, and the registry's backup goes too. The trust misses its deadline. Arden won't." }
+      ],
+      "steps": [
+        { "verb": "enter_car", "label": "Get in the car (F)" },
+        { "verb": "go_to", "place": "plaza", "label": "Drive to the plaza" },
+        { "verb": "blackout_chain", "zones": [1, 0], "label": "Black out the north block, then the south while it burns" },
+        { "verb": "lose_heat", "label": "Lose the heat" }
+      ],
+      "debrief": [
+        { "who": "ruf", "text": "Registry's dark, backup's dark. Whatever happens Friday happens because of us. Go home. I'll call." }
+      ],
+      "next": "crossed_wires"
+    },
+    {
+      "id": "crossed_wires", "title": "CROSSED WIRES", "contact": "ruf", "payout": 0,
+      "brief": [
+        { "who": "nell", "if": "warned_nell", "text": "Ruf wasn't buying me a week. While the registry was dark he walked in with a key card and filed Arden's bid by hand." },
+        { "who": "nell", "if": "warned_nell", "text": "He drinks at the tavern on Main. Go and ask him what he's worth." },
+        { "who": "celeste", "if": "sold_names", "text": "Ruf filed our bid, as agreed. He also kept a ledger of every payment Arden ever made him, and he's selling it tonight." },
+        { "who": "celeste", "if": "sold_names", "text": "He drinks at the tavern on Main. Go and remind him who he works for." }
+      ],
+      "steps": [
+        {
+          "verb": "go_to", "place": "tavern", "label": "Find Ruf at the Tavern on Main",
+          "say": [
+            { "who": "ruf", "text": "Sit down. You look like you've been talking to people." }
+          ]
+        },
+        {
+          "verb": "choose", "who": "ruf", "label": "Decide what happens to Ruf's ledger",
+          "say": [
+            { "who": "ruf", "text": "Arden pays for everything on this district. The cranes, the inspectors, the patrols. Me. It's all in here." },
+            { "who": "ruf", "text": "Arden would pay a fortune to watch it burn. The tenants would use it to void every permit Arden holds. Your call. I'm tired." }
+          ],
+          "options": [
+            {
+              "key": 1, "text": "Sell the ledger back to Arden.",
+              "set": "ledger_arden", "money": 1500, "trust": { "ruf": 1, "celeste": 1, "nell": -3 },
+              "note": "You sold Ruf's ledger back to Arden. The plaza lot is theirs.",
+              "reply": [
+                { "who": "ruf", "text": "Smart. Celeste will send a car. Nobody on West Avenue will ever know it existed." }
+              ]
+            },
+            {
+              "key": 2, "text": "Give the ledger to Nell.",
+              "set": "ledger_nell", "trust": { "ruf": -3, "celeste": -3, "nell": 2 },
+              "note": "You gave Ruf's ledger to Nell. Arden's bid on the plaza lot is void.",
+              "reply": [
+                { "who": "ruf", "text": "Then I'd get off this district before Arden reads the papers. I know I will." }
+              ]
+            }
+          ]
+        }
+      ],
+      "debrief": [],
+      "next": { "ledger_arden": "topping_out", "ledger_nell": "common_ground" }
+    },
+    {
+      "id": "common_ground", "title": "COMMON GROUND", "contact": "nell", "payout": 500,
+      "brief": [
+        { "who": "nell", "if": "warned_nell", "text": "The ledger's with the city attorney. Arden's bid is void and the plaza lot goes to the land trust. Come and see it." },
+        { "who": "nell", "if": "sold_names", "text": "You sold my neighbours' names, then brought me the thing that saves them. I don't know what you are. Come to the plaza lot." }
+      ],
+      "steps": [
+        {
+          "verb": "read_lot", "place": "plaza_lot", "label": "Meet Nell at the plaza lot",
+          "say": [
+            { "who": "nell", "if": "lot:EMPTY", "text": "Mud, still. Forty homes one day, and nobody's rent tied to somebody else's spreadsheet." },
+            { "who": "nell", "if": ["lot:SITE", "lot:LOW", "lot:MID"], "text": "Arden's crane, our building. We're keeping the crane driver. He was the only one who ever waved." },
+            { "who": "nell", "if": "lot:HIGH", "text": "Arden finished it for us and hasn't worked that out yet. Forty homes." },
+            { "who": "nell", "if": "warned_nell", "text": "The shop stays open. Come by. First book's still free." },
+            { "who": "nell", "if": "sold_names", "text": "We're square now. Don't come to West Avenue again." }
+          ]
+        }
+      ],
+      "debrief": [],
+      "next": null
+    },
+    {
+      "id": "topping_out", "title": "TOPPING OUT", "contact": "celeste", "payout": 1200,
+      "brief": [
+        { "who": "celeste", "text": "The ledger's ash and the plaza lot is ours. Come and see what you bought. You paid for it too." }
+      ],
+      "steps": [
+        {
+          "verb": "read_lot", "place": "plaza_lot", "label": "Meet Celeste at the plaza lot",
+          "say": [
+            { "who": "celeste", "if": "lot:EMPTY", "text": "Mud today. Next year, forty storeys and a doorman. Nobody will remember what the block looked like." },
+            { "who": "celeste", "if": ["lot:SITE", "lot:LOW", "lot:MID"], "text": "Every floor that crane lifts is a floor West Avenue can't afford. That isn't cruelty. It's arithmetic." },
+            { "who": "celeste", "if": "lot:HIGH", "text": "Topped out, and let before the glass went in." },
+            { "who": "celeste", "if": "warned_nell", "text": "You started on the wrong side and finished on the right one. Arden remembers both." },
+            { "who": "celeste", "if": "sold_names", "text": "Arden owns more lots than this one. I'll call." }
+          ]
+        }
+      ],
+      "debrief": [],
+      "next": null
+    }
+  ]
+}
