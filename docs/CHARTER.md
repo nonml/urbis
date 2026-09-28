@@ -104,7 +104,7 @@ consumed by it. The three features were never built — they are listed below by
 
 Two tracks. The feature slices below are the **structural** work and come first.
 `docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
-waits behind them — except VGA-083.
+waits behind them — except VGA-083 and VGA-084.
 
 Next free slice number: **053**. Wave 2 (slices 047–052) and the unmerged `wave2/wanted` branch are recorded in `docs/handoff/WAVE2.md`; the merged gate pose measures **123** on a GPU (118 on the container's SwiftShader). The worst case with every wave 2 feature on at once is **149**, city view by day in a blackout (`docs/DRAWS.md`).
 
@@ -112,6 +112,18 @@ Next free slice number: **053**. Wave 2 (slices 047–052) and the unmerged `wav
 in order → the rest of the visual queue. This replaces the earlier "visual queue closes
 first" redirect, which would have buried the building half of the game behind 80 polish
 items — many of which touch buildings that zoning is about to change anyway.
+
+**VGA-084 strip the toy (placed 2026-09-29).** The operator called the whole frame
+"lego", not only the buildings, and asked where the fix belongs. It goes **next, before
+Wanted**:
+- Four of the five feature slices have shipped, so it no longer buries the building half
+  of the game.
+- Wanted's open work is its visuals: cruisers that "read as beige boxes" and a helicopter
+  body. Those would be built on the box cars VGA-084 replaces.
+- Its first sub-slice fixes a bug in the tower tables: 48 buildings intersect, and the
+  zoning lots are read off those tables.
+
+Order from here: VGA-084 → Wanted → the rest of the visual queue.
 
 ### Feature slices, in order
 

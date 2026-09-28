@@ -39,6 +39,11 @@ backlit letters in real brand colours. **No neon.** No magenta/cyan palette, no
 holograms, no "neon-noir", no cyberpunk styling. If a change pushes the frame toward
 neon, it does not land. The shipped neon was stripped under **VGA-083** (slice 045).
 
+**Not a toy either.** The bar is Watch Dogs and GTA, not a Lego set. Buildings, cars,
+people, trees and mountains built from raw boxes, cones and spheres read as toys however
+well they are lit. Two buildings that pass through each other are a bug. Polishing a
+primitive does not fix this; replacing it does. Tracked as **VGA-084**.
+
 ### Six pillars — every task must serve at least one
 
 | Pillar | What it means | Test |
@@ -310,13 +315,17 @@ one line, and go.
 
 1. ~~**VGA-083 — strip the neon**~~ — done, slice 045. Everything built after it
    inherits the palette.
-2. **The feature slices in `docs/CHARTER.md`, in the order listed** — zoning + growth
-   first (`docs/ZONING.md`). Building the city is half the game; it goes before polish.
-3. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner
+2. **VGA-084 — strip the toy.** The whole frame reads as Lego: buildings that overlap,
+   and boxes for buildings, cars, people and props. Its sub-slices run in the order the
+   item lists, starting with the no-overlap test.
+3. **The feature slices in `docs/CHARTER.md`, in the order listed** — only Wanted is
+   left, on the `wave2/wanted` branch.
+4. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner
    only when a visual item blocks the slice in hand.
 
 The operator can redirect by naming a VGA id or a feature slice. This order was set by
-the operator on 2026-09-28 and is recorded in `docs/CHARTER.md`.
+the operator on 2026-09-28, with VGA-084 placed on 2026-09-29, and is recorded in
+`docs/CHARTER.md`.
 
 1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
    Structural work on the city itself has its own plan in `docs/ZONING.md`.

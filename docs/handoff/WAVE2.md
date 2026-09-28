@@ -54,4 +54,5 @@ Start with `docs/handoff/wave2-wanted.md` on that branch. Merge
   `wave2-reclaim-night-before.png`, shot on `69ff023`, shows it too.
 - At its widest reach, city view shows pale spiked mountains down one side and the
   nearest towers as black slabs (`wave2-merged-cityview-day.png`). The track's own
-  `wave2-cityview-zone.png` shows the same.
+  `wave2-cityview-zone.png` shows the same. Both are now in **VGA-084**, along with the
+  48 intersecting buildings the operator spotted after this wave.

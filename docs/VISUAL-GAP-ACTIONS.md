@@ -42,7 +42,8 @@ review — including this one.
 
 - **Featureless walls at eye level.** The biggest real finding. Tracks to **VGA-043**.
 - **Fidelity mismatch** — flat-shaded trees against PBR cobblestone against box cars.
-  Real, and an art-direction decision, not a shader fix. No single VGA item owns it.
+  Real, and an art-direction decision, not a shader fix. Unowned until 2026-09-29, when
+  the operator called the whole frame "lego": now **VGA-084**.
 - **No contact shadow under the car or the player.** Genuinely absent, genuinely cheap
   as a blob decal on the existing instanced path. Not currently a VGA item.
 - **Street drains and grates.** Manholes exist; drains do not.
@@ -118,6 +119,81 @@ remaining neon element is now a defect, and this item goes before every other op
   the play camera show no magenta/cyan/electric-green light anywhere; the blackout
   sequence still reads. Evidence `slice-NNN-grounded-night.png` +
   `slice-NNN-grounded-day.png` + `slice-NNN-grounded-blackout.png`. Draws: +0.
+
+- **VGA-084 Strip the toy.** Opened 2026-09-29 by the operator. After wave 2 they said
+  the city "looks like a lego game more than Watch Dogs or GTA", that this means
+  **pretty much everything, not only the buildings**, and that the buildings overlap
+  each other. The September external review had already named the cause as "flat-shaded
+  trees against PBR cobblestone against box cars", filed it as an art-direction decision,
+  and left it with no item. This is that item. Like VGA-083 it is a direction change:
+  everything built after it inherits whatever the frame is made of. So it goes before
+  every open item except the fixes it depends on.
+
+  **What the frame is made of** (measured 2026-09-29 on `3bd688a`):
+  - **Buildings overlap: 48 intersecting pairs among 88 buildings.** 33 are tower
+    against tower, 9 silhouette against tower, 5 skyline against tower and 1 silhouette
+    against skyline. The 10 zoning lots are clear. There are three causes, all in
+    `src/render/block.js`:
+    - `INFILL_TOWERS` at x = ±22 and ±66 were added to fill dark gaps, and were placed
+      inside the strip both flanking avenue rows already occupy.
+    - The avenue rows are set back by `8.5 + d / 2`, but `box(w, h, d)` puts `w` along
+      x. A tower wider than it is deep reaches 1.5–2 m further into the block than the
+      setback assumes.
+    - The seven `silhouettes` are unlit, flat-black boxes 48–74 m tall, and five of them
+      stand *inside* the district. The skyline `RING` was placed without checking the
+      towers either. From city view the silhouettes are the black slabs
+      (`wave2-merged-cityview-day.png`).
+  - **Every building is a box.** A tower is one box shaft, with a second box at 72% on
+    top of every other tower 30 m or taller. Its windows are a flat texture with no
+    reveal, and its caps are more boxes. Footprints are 10–14 m and heights 22–52 m, on
+    7 m roads. Only 57–58% of each avenue row's frontage is built; the rest is gaps, so
+    the blocks read as pieces set on a board, not a street wall.
+  - **Cars are boxes.** `traffic.js` builds the body from `BoxGeometry` parts, and
+    VGA-019 stretches that one saloon into five shapes.
+  - **People are primitives.** A sphere head, a lathe coat, cylinder limbs and box shoes
+    (`npcs.js`, `player.js`). Slices 027–041 polished them, but they are still the same
+    primitives.
+  - **The landscape is geometric.** The mountains are six-sided, flat-shaded cones with
+    white cone caps (`landscape.js`): the pale spikes in city view. Trees are icosahedron
+    clumps (`props.js`, and `outskirts.js` at detail 0).
+  - **Interiors are boxes.** `interiorsets.js` builds the noodle bar and the roof from
+    68 box calls.
+  - **Only two real models are in the game:** the hydrant and the trash can.
+    `street_lamp_01` is harvested but unused (`docs/ASSETS.md`). Everything else on the
+    pavement is `box()`.
+  - **Nothing has an edge.** No bevels, no edge wear, no contact darkening. Every seam is
+    a sharp CG edge on a clean material, and that is the plastic-brick read. SSAO is
+    *not* the answer: it was removed in `56f1462` for cause (see the triage above). Use
+    baked or vertex AO and bevelled geometry.
+
+  **Order inside the item:** one slice each, each with its own play-camera evidence.
+  1. **No overlap.** A headless test that fails if any two building footprints
+     intersect, wired into the gate. Then fit the infill into real gaps, correct the
+     setback axis, and move the silhouettes and ring out of the district. Moving tower
+     tables touches what is placed against them: the zoning `LOTS`, sign positions in
+     `signs.json`, and the noodle bar door. Re-check every one.
+  2. **Buildings.** Continuous street walls at believable proportions, facade relief
+     (window reveals, cornices, setbacks), material variety (brick, stone, concrete,
+     glass) and rooftops with parapets and plant. This sets the bar for the remaining
+     work in VGA-038, VGA-039, VGA-041 and VGA-042. Keep it merged or instanced
+     (law 4); `docs/ZONING.md` explains why the towers are static tables.
+  3. **Cars.** Real body silhouettes from a model, not boxes (VGA-019/020/021/024). The
+     unmerged `wave2/wanted` cruisers "read as beige boxes": do not build police livery
+     on the box body this replaces.
+  4. **People.** `docs/ASSETS.md` rule 2 bans generated NPCs, so this needs a sourced,
+     rigged CC0 body. **Operator's call** which one (VGA-011/067).
+  5. **Landscape.** Mountains (VGA-048), trees (VGA-046) and the seams between them
+     (VGA-050).
+  6. **Street kit and interiors.** Real props before `box()`; `street_lamp_01` first.
+
+  Done when: the gate has the overlap test and it passes; no building, car, person,
+  mountain or tree in the play frame is a raw primitive; and night, day and blackout
+  frames at the play camera read as a real street. Hold each frame beside a Watch Dogs
+  or GTA frame at the same framing, as a reference only: nothing from those games ships.
+  Evidence `slice-NNN-real-night.png` + `slice-NNN-real-day.png` +
+  `slice-NNN-real-blackout.png`, plus one per sub-slice. Draws: the frame has 26 of
+  headroom at the measured worst case (149, `docs/DRAWS.md`). Every sub-slice declares
+  its measured delta, and one real model per repeated thing stays instanced.
 
 ---
 
