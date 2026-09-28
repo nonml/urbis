@@ -145,6 +145,20 @@ Day was not measured: the `T` glide takes over a minute of wall clock on a softw
 rasteriser, longer than the shared browser lock allowed. Nothing in the marker reads the
 time of day except its sign tint, which is a colour write, not a draw.
 
+## Evidence
+
+All at the normal play camera, 1280×720, night, SwiftShader (`?capture=1`), staged with
+the capture probe (steps skipped, every choice answered with `choose()`):
+
+| File | What it proves |
+|---|---|
+| `docs/shots/wave2-arc-choice.png` | Nell's question on West Avenue, both answers on screen, the hero clear of the panel |
+| `docs/shots/wave2-arc-marker.png` | LIVE WIRE, in the car at the spawn: the amber column over the south substation 48 m down Main, the objective line counting it down |
+| `docs/shots/wave2-arc-lot-arden-night.png` | Choice 2 answered "sell the ledger back to Arden": the navy PLAZA TOWER board on the plaza lot, the marker over the lot beyond it |
+| `docs/shots/wave2-arc-lot-trust-night.png` | The other answer, the other street: the green LAND TRUST board on the same lot |
+| `docs/shots/wave2-arc-ending-arden.png` | The last mission done on the lot: Celeste's closing lines, read off the lot's stage and choice 1, over the board |
+| `docs/shots/wave2-arc-journal.png` | `J` at the end of a playthrough: six missions and what they paid, both choices in the words of what they did, the three people and where they ended |
+
 ## Adding to the arc
 
 A mission is an entry in `arc.json → missions`:
