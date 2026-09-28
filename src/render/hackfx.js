@@ -16,10 +16,12 @@ export const SUBSTATIONS = [
 export function buildHackFx() {
   const group = new THREE.Group();
 
-  // Origin pulse: expanding flat ring, hidden unless firing.
+  // Origin pulse: expanding flat ring, hidden unless firing. The camera is always
+  // above it, so it shows one face: one additive pass, not the two a transparent
+  // double-sided material costs by default.
   const pulseMat = new THREE.MeshBasicMaterial({
     color: 0xe6ecef, transparent: true, opacity: 0,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true,
   });
   const pulse = new THREE.Mesh(new THREE.RingGeometry(0.92, 1.0, 48), pulseMat);
   pulse.rotation.x = -Math.PI / 2;

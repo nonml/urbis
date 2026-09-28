@@ -41,8 +41,9 @@ Draw budget: **155 / 175** as of slice 023. This design must fit in the remainin
 and it is expected to spend about 6. **Measured at slice 046: +9.** That is 143 → 152
 by day and by night, and 151 → 160 in a blackout (165 on the frames that re-shoot a
 mirror face). The estimate missed that every shell mesh casts a shadow, so each costs
-two draws. There are four shell meshes (glass and concrete, times two power zones),
-plus the site kit.
+two draws. There were four shell meshes (glass and concrete, times two power zones),
+plus the site kit; wave 2's reclaim track made that two, one per architecture, each
+lighting both zones from a per-instance zone (`docs/DRAWS.md`).
 
 ## The model
 
@@ -95,9 +96,11 @@ costs a matrix write and nothing else. Reuse the tower materials from
 `towerMaterials()` in `block.js` — a grown building must be made of the same city as
 the ones around it, and reusing the material keeps the group inside its draw budget.
 
-Growable shells go in `zoneMats[parcel.powerZone]` like every other facade, or they
+Every growable shell carries its parcel's power zone, like every other facade, or it
 will stay lit through a blackout and regress **VGA-007**, which is ✅ DONE and must
-stay that way.
+stay that way. Since wave 2 the tower materials light both zones from a per-vertex (or
+per-instance) `zone` attribute (`zoneLit` in `materials.js`), so a shell's zone is one
+float in the instanced `zone` attribute, not a choice of mesh.
 
 ### Where the land is
 

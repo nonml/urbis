@@ -31,11 +31,13 @@ import { buildGrassGround, buildGrassTufts, buildMountains } from './render/land
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
+import { drawLedger } from './render/ledger.js';
+import { hideFaded } from './render/faded.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
 // spawn needs to land in the same frame without the probe pushing it over.
-const MIRROR_FACE_DRAWS = 5;
+const MIRROR_FACE_DRAWS = 4;
 const MIRROR_MARGIN = 10;
 let lastDraws = 0;
 const bootStart = performance.now();
@@ -109,6 +111,8 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
   scene.add(m);
   return m;
 });
+// Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
+const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
 
 const street = createStreet(20260916);
 const city = createCity(20260916);
@@ -289,6 +293,8 @@ window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
 const DARK = [false, false];
+// The zone light the city mirror was last shot under, 1 lit or 0 dead.
+const MIRRORED = [1, 1];
 
 function fireHack() {
   const driving = player.mode === 'drive';
@@ -391,6 +397,11 @@ if (CAPTURE) {
     budget: (tiles, ms) => chunks.budget(tiles, ms),
     visible: (on) => { for (const m of outskirts.meshes) m.visible = on; },
   };
+  // What each draw was spent on, per frame: docs/DRAWS.md is built from it.
+  window.__game.ledger = drawLedger(renderer);
+  // The end of the day/night glide, reached at once: a probe measuring the day
+  // frame should not have to render 140 frames of dusk to get there.
+  window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; };
   // Stand the player somewhere inside the walk box it could have walked to, and
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
@@ -499,8 +510,16 @@ function render() {
     const dark = isDark(street, z);
     if (DARK[z] !== dark) {
       DARK[z] = dark;
-      requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
       missionOnBlackout(mission, DARK, street.time);
+    }
+    // Re-shoot the mirror once a zone has settled, dead or lit, not the instant
+    // the hack lands: the collapse and the relight both flicker, and a face shot
+    // mid-flicker holds a half-lit street in the water until the next re-shoot.
+    // The frame used to be too full for the probe to fire during the collapse
+    // anyway (VGA-010's dead water was shot in the dark by accident); now it is not.
+    if ((glows[z] === 0 || glows[z] === 1) && glows[z] !== MIRRORED[z]) {
+      MIRRORED[z] = glows[z];
+      requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
     }
     const b = glows[z] >= 1 ? 1 : glows[z] <= 0 ? 0 : blink(street.time, z * 3.7);
     lamps.setZoneLight(z, glows[z]);
@@ -610,6 +629,7 @@ function render() {
     prompt.style.display = 'none';
   }
 
+  hideFaded(fadedDraws);
   renderer.info.reset();
   // The city mirror re-shoots one cube face per frame, and only when it has gone
   // stale: five frames of one extra pass after a blackout, a day/night flip, or a

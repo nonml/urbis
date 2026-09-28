@@ -115,6 +115,9 @@ export function buildAtmosphere(scene, renderer) {
   sun.shadow.camera.far = 300;
   sun.shadow.bias = -0.0005;
   sun.shadow.normalBias = 0.8;
+  // Drawn once at boot even if the city wakes at night, so the map the shaders
+  // sample is never one nothing has written to. updateDaylight owns it after.
+  sun.shadow.needsUpdate = true;
   scene.add(sun, sun.target);
   const spots = [];
   for (const z of [-9, 9]) {
@@ -131,7 +134,7 @@ export function buildAtmosphere(scene, renderer) {
   moonGlow.position.set(45, 60, -90);
   moonGlow.scale.set(40, 40, 1);
   scene.add(moonGlow);
-  return { spots, skyMat: sky.mat, skyMesh: sky.mesh, sun, moon, bounce, hemi, moonGlowMat: moonGlow.material };
+  return { spots, skyMat: sky.mat, skyMesh: sky.mesh, sun, moon, bounce, hemi, moonGlow, moonGlowMat: moonGlow.material };
 }
 
 const _fog = new THREE.Color();
@@ -140,6 +143,11 @@ export function updateDaylight(env, scene, bloom, n, renderer) {
   const day = 1 - n;
   env.skyMat.uniforms.uNight.value = n;
   env.sun.intensity = 2.3 * day;
+  // The sun is the only light that casts, and at full night it is at zero, so
+  // the shadow it would draw multiplies nothing: re-rendering the map is every
+  // caster's second draw for no pixel. It holds still instead, and redraws on
+  // the first frame the sun is back, before anything samples it lit.
+  env.sun.shadow.autoUpdate = day > 0;
   env.moon.intensity = 0.25 * n;
   env.bounce.intensity = 0.5 * day;
   env.hemi.intensity = 0.25 + 0.5 * day;

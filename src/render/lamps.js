@@ -84,10 +84,13 @@ const GLOW_OPACITY = 0.38;
 // instance's depth exactly like the sprite it replaces. Per-lamp brightness rides on
 // instanceColor — additive blending makes scaling the colour and scaling the alpha
 // the same multiplication, so blackout dimming reads identically.
+// A transparent double-sided material draws twice, back faces then front, unless it
+// is forced into one pass. A view-space billboard only ever shows its front, and
+// additive light does not care which face lands first: one pass, same pixels.
 function glowMaterial() {
   const mat = new THREE.MeshBasicMaterial({
     map: getGlowTex(), color: GLOW_COLOR, transparent: true, opacity: 1,
-    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, forceSinglePass: true,
   });
   mat.onBeforeCompile = (sh) => {
     sh.vertexShader = sh.vertexShader.replace('#include <project_vertex>', [
@@ -134,6 +137,7 @@ export function buildLamps() {
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xffc98a, transparent: true, opacity: 0.05, alphaMap: shaftTex,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
+    forceSinglePass: true,     // both faces of the shaft add light, in either order: see glowMaterial
   });
   const cones = new THREE.InstancedMesh(coneGeo, coneMat, LAMPS.length);
   const glowMat = glowMaterial();
@@ -208,5 +212,5 @@ export function buildLamps() {
   }
 
   const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
-  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions };
+  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions, cones };
 }

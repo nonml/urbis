@@ -3,10 +3,11 @@
 // is a unit box instanced at any size, so a stage change is a matrix write and
 // the whole programme costs a fixed handful of draws, whatever it is doing:
 //
-//   shells    one InstancedMesh per architecture per power zone, wearing the
-//             shipped tower materials — a grown building is made of the same
-//             city as its neighbours, and it goes dark in a blackout with them
-//             (VGA-007). Four meshes; a mesh with nothing standing costs zero.
+//   shells    one InstancedMesh per architecture, wearing the shipped tower
+//             materials — a grown building is made of the same city as its
+//             neighbours, and it goes dark in a blackout with them (VGA-007):
+//             each instance carries its lot's power zone. Two meshes; a mesh
+//             with nothing standing costs zero.
 //   site kit  one InstancedMesh with per-instance colour: hoarding, crane,
 //             netting, plinth, parapet, plant.
 import * as THREE from 'three';
@@ -138,10 +139,11 @@ function dressParcel(rig, p, i) {
   if (p.stage === STAGE.EMPTY || p.building) fenceLot(rig, p);
   if (p.stage === STAGE.EMPTY) kitBox(rig, PAINT.skip, p.x + p.w / 4, 0, p.z, 3, 1.3, 1.7, 0.2);
   if (h > 0.05) {
-    const shells = rig.shells[ARCHITECTURE[p.use]][p.powerZone];
+    const shells = rig.shells[ARCHITECTURE[p.use]];
     pos.set(p.x, 0, p.z);
     scale.set(sw, h, sd);
     shells.setMatrixAt(shells.count, matrix.compose(pos, quat.identity(), scale));
+    shells.geometry.attributes.zone.setX(shells.count, p.powerZone);
     shells.setColorAt(shells.count++, paint.setRGB(...TINT[p.use]));
     kitBox(rig, PAINT.plinth, p.x, 0, p.z, sw + 0.16, PAD_RISE + 0.12, sd + 0.16);
     kitBox(rig, PAINT.parapet, p.x, h, p.z, sw + 0.4, 0.5, sd + 0.4);
@@ -160,15 +162,16 @@ export function buildZoning(city, kinds, footprints) {
   const n = city.parcels.length;
   const shells = {};
   for (const kind of new Set(Object.values(ARCHITECTURE))) {
-    shells[kind] = kinds[kind].map((mat) => {
-      const m = new THREE.InstancedMesh(geo, mat, n);
-      // Colour from the first frame, or the program compiles without it.
-      m.setColorAt(0, paint.setRGB(1, 1, 1));
-      m.castShadow = true;
-      m.receiveShadow = true;
-      group.add(m);
-      return m;
-    });
+    // Its own box, because the zone rides on the geometry, one per instance.
+    const shellGeo = unitBox();
+    shellGeo.setAttribute('zone', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
+    const m = new THREE.InstancedMesh(shellGeo, kinds[kind], n);
+    // Colour from the first frame, or the program compiles without it.
+    m.setColorAt(0, paint.setRGB(1, 1, 1));
+    m.castShadow = true;
+    m.receiveShadow = true;
+    group.add(m);
+    shells[kind] = m;
   }
   const kit = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: 0.82, metalness: 0.12, envMapIntensity: 0.5,
@@ -179,7 +182,7 @@ export function buildZoning(city, kinds, footprints) {
   const rects = [...footprints, ...city.parcels];
   const slew = city.parcels.map((p) => slewZone(p, rects));
   const rig = { shells, kit, kitCount: 0, slew };
-  const meshes = [kit, ...Object.values(shells).flat()];
+  const meshes = [kit, ...Object.values(shells)];
   // Rewritten every frame: the sim moves a parcel a little every tick, and a
   // few dozen matrices cost less than tracking which of them changed.
   function update() {
@@ -190,6 +193,7 @@ export function buildZoning(city, kinds, footprints) {
     for (const m of meshes) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      if (m.geometry.attributes.zone) m.geometry.attributes.zone.needsUpdate = true;
       // The bounds grow with the buildings; stale ones cull a tower that is there.
       m.computeBoundingSphere();
     }

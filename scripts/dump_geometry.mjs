@@ -8,7 +8,8 @@
 // Answers one question: did the shipped street move? It walks buildGround(),
 // buildTowers(), buildSkyline() and buildLamps() and writes, for every mesh in
 // each: object position, rotation, scale, shadow flags, the full position,
-// normal, uv and color attributes, the whole index array, the bounding box,
+// normal, uv and color attributes (and the power-zone stamp, where a mesh
+// lights both zones), the whole index array, the bounding box,
 // and for instanced meshes every instance matrix and instance colour. Then it
 // does the same for sim/street.js — createStreet() serialised, a blackout fired
 // and 600 ticks run, serialised again. A refactor that claims to move nothing
@@ -90,6 +91,8 @@ function dumpGeometry(geo) {
   dumpAttr('  normal', geo.attributes.normal);
   dumpAttr('  uv', geo.attributes.uv);
   dumpAttr('  color', geo.attributes.color);
+  // Only where it exists, so every mesh without one dumps as it always has.
+  if (geo.attributes.zone) dumpAttr('  zone', geo.attributes.zone);
   if (geo.index) {
     w(`  index: len=${geo.index.array.length}`);
     w(Array.from(geo.index.array).join(' '));
