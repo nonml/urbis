@@ -80,14 +80,17 @@ test('a blacked-out site stops dead, and starts again when the power returns', (
 test('a slump takes buildings back down, a little at a time', () => {
     const world = boot();
     run(world, 150);
-    // Hold every market at the bottom of its swell: one wave, frozen at its trough.
-    for (const use of USES) world.city.waves[use] = [{ amp: 0.5, period: 1e9, phase: -Math.PI / 2 }];
+    // Hold every market at the bottom: whatever the district economy would say,
+    // each tick starts from no demand for anything, in either district.
+    const slump = () => world.city.economy.districts.forEach((d) => USES.forEach((use) => { d.demand[use] = 0; }));
+    slump();
     const standing = world.city.parcels.filter((p) => p.stage > STAGE.EMPTY);
     const before = standing.map(builtHeight);
     const stages = standing.map((p) => p.stage);
     const heights = standing.map(builtHeight);
     let worstStep = 0;
     run(world, 60, () => {
+        slump();
         standing.forEach((p, i) => {
             worstStep = Math.max(worstStep, Math.abs(builtHeight(p) - heights[i]));
             heights[i] = builtHeight(p);
