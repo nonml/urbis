@@ -14,8 +14,11 @@ same 16:9 aspect). Base is `69ff023`; "now" is the tip of `wave2/reclaim`.
 |---|---|---|---|
 | Night | 152 | 122 | −30 |
 | Day | 152 | 131 | −21 |
-| Night blackout, peak | 168 | PEAK_NIGHT | PEAK_NIGHT_D |
-| Day blackout, peak | 168 | PEAK_DAY | PEAK_DAY_D |
+| Night blackout, peak | 168 | not recorded | — |
+| Day blackout, peak | 168 | not recorded | — |
+
+The reclaim track left its own blackout peaks unrecorded. The merged build's, read on
+every frame of a whole blackout, are under "Worst case on the merged build" below.
 
 A blackout frame is the ordinary frame plus a pursuit car (7 meshes, and its shadow by
 day), the hack pulse, the spark burst and, on the frames that re-shoot the city mirror,
@@ -122,7 +125,35 @@ only when the last frame plus a face plus a 10-draw margin fits the budget. It f
 when a zone settles dead or lit, when the camera travels 20 m, and every 6 s of game
 time regardless, so an ordinary night or day frame also peaks at +4.
 
-PEAKS_DETAIL
+### Worst case on the merged build
+
+Measured 2026-09-29 on the merged wave 2 build (`9f846cd`, bundle `index-CfqULxPY.js`),
+Chrome on a real GPU (ANGLE/D3D11), 1280x720. Every frame from the hack to the zone
+lit again was read, about 2,250 frames at 180 fps. Everything wave 2 added was on at
+once:
+
+- the arc's marker was up (the player has taken the car);
+- shops were pinned to a collapsed market and homes to a booming one for 14 s of sim,
+  so TO LET boards, dark floors and cranes were all showing;
+- in city view, a clearing was ordered with X at the widest reach.
+
+On the same machine the gate pose reads 123. The container read 118 for the same build
+on SwiftShader.
+
+| Where | Night, lit | Night, blackout peak | Day, lit | Day, blackout peak |
+|---|---|---|---|---|
+| Street, gate pose | 125 | 136 | 134 | 147 |
+| Driving, W held | 118 | 127 | 126 | 139 |
+| City view, widest reach, a lot clearing | 127 | 138 | 136 | **149** |
+| Inside the noodle bar | 111 | 120 | 121 | 131 |
+| Roof | 115 | 119 | 124 | 130 |
+
+**Worst frame: 149 / 175**, city view by day in a blackout. That is main 111, shadow
+19, one mirror face 4 and post 15. Every peak but one includes a mirror face. The
+outdoor day peaks land in the first second after the hack. The other peaks land 8.4 to
+9.5 s after it, around the end of the blackout at 8.9 s. The exception is the night drive, which peaks
+on the first frame after the hack, before the car pulls away, and has no mirror face.
+Evidence: `wave2-merged-*.png`.
 
 ## What is still on the table
 

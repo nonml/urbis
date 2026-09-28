@@ -19,17 +19,20 @@ One is on its own branch.
 1 failed, and that failure is the known environment one below. Draws: 118 / 175 at the
 gate pose, 109 inside the shop, 110 on the roof.
 
-## Not done at wrap-up (the operator stopped the wave)
+## Closed out on a GPU (2026-09-29)
 
-- **No combined worst-case sweep on the merged build.** No run has measured blackout,
-  city view, inside the shop and the marker together, every rAF. Each track measured
-  its own worst case on its branch, and none came near 175. The merged gate pose is
-  118. Measure before trusting the headroom.
-- **No new play-camera shots of the merged build.** The evidence above was shot on each
-  branch.
-- **Known environment failure:** `the world changes while the player stands still`
-  times out on SwiftShader. `dt` is clamped at 50 ms and the frame rate is a few fps,
-  so the city's clock runs slower than wall time. It should pass on a GPU; verify there.
+The operator stopped the wave before three checks were done. All three were then run
+locally on the merged build (`9f846cd`), in Chrome on a real GPU.
+
+- **Gate: 76 of 76 pass**, including `the world changes while the player stands
+  still`. Its SwiftShader timeout was the container, not the code. Draws: 123 at the
+  gate pose, 109 in the shop, 110 on the roof.
+- **Combined worst-case sweep: 149 / 175.** The worst frame is city view by day in a
+  blackout, with the marker, decline, growth and an ordered clearing all on, read on
+  every frame. The full table is in `docs/DRAWS.md`, "Worst case on the merged build".
+- **Play-camera shots of the merged build:** `wave2-merged-*.png`, covering the
+  street by night, by day and in a blackout, the drive, city view, the shop lit and
+  dark, and the roof.
 
 ## Unfinished: `wave2/wanted` (police tiers, feature slice 4)
 
@@ -46,3 +49,9 @@ Start with `docs/handoff/wave2-wanted.md` on that branch. Merge
   `describe()` doesn't know about demolitions the player ordered.
 - The hint line is long enough to wrap at 1280 px.
 - `__game.cooldown()` throws (it calls `hackCooldownLeft` without a zone). Pre-existing.
+- In the foreground of the gate pose, the puddle mirror renders as a jagged white and
+  blue shape (bottom left of `wave2-merged-street-*.png`). This is pre-existing:
+  `wave2-reclaim-night-before.png`, shot on `69ff023`, shows it too.
+- At its widest reach, city view shows pale spiked mountains down one side and the
+  nearest towers as black slabs (`wave2-merged-cityview-day.png`). The track's own
+  `wave2-cityview-zone.png` shows the same.

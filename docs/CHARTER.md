@@ -106,7 +106,7 @@ Two tracks. The feature slices below are the **structural** work and come first.
 `docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
 waits behind them — except VGA-083.
 
-Next free slice number: **053**. Wave 2 (slices 047–052) and the unmerged `wave2/wanted` branch are recorded in `docs/handoff/WAVE2.md`; the merged gate pose measures **118**.
+Next free slice number: **053**. Wave 2 (slices 047–052) and the unmerged `wave2/wanted` branch are recorded in `docs/handoff/WAVE2.md`; the merged gate pose measures **123** on a GPU (118 on the container's SwiftShader). The worst case with every wave 2 feature on at once is **149**, city view by day in a blackout (`docs/DRAWS.md`).
 
 **Work order (operator, 2026-09-28):** VGA-083 strip the neon (done, slice 045) → the feature slices below,
 in order → the rest of the visual queue. This replaces the earlier "visual queue closes
