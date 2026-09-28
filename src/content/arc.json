@@ -8,9 +8,9 @@
   "places": {
     "substation_s": { "name": "the south substation", "x": 6.8, "z": -30, "r": 6 },
     "hotel_main": { "name": "the Hotel on Main", "x": 5.4, "z": -6, "r": 4 },
-    "plaza_lot": { "name": "the plaza lot", "x": -6, "z": 56, "r": 5 },
+    "plaza_lot": { "name": "the plaza lot", "x": -5, "z": 53, "r": 4 },
     "west_ave": { "name": "West Avenue", "x": -44, "z": 10, "r": 40 },
-    "bookshop": { "name": "West Ave Books", "x": -38.6, "z": 30, "r": 4 },
+    "bookshop": { "name": "West Ave Books", "x": -39.5, "z": 25, "r": 4 },
     "plaza": { "name": "the plaza", "x": 0, "z": 40, "r": 8 },
     "tavern": { "name": "the Tavern on Main", "x": -5.4, "z": 6, "r": 4 }
   },
@@ -18,22 +18,22 @@
     {
       "id": "bookshop_holdout", "if": "warned_nell", "kind": "banner",
       "text": "NOT FOR SALE", "sub": "WEST AVE TENANTS' COMMITTEE", "color": "#efe6d2", "ink": "#9b2a22",
-      "x": -37.45, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
+      "x": -37.8, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
     },
     {
       "id": "bookshop_closing", "if": "sold_names", "kind": "banner",
       "text": "CLOSING SALE", "sub": "LEASE NOT RENEWED · ALL STOCK", "color": "#e3be3f", "ink": "#1c1814",
-      "x": -37.45, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
+      "x": -37.8, "z": 30, "y": 3.1, "w": 4.4, "h": 1.1, "face": [-1, 0]
     },
     {
       "id": "lot_arden", "if": "ledger_arden", "kind": "board",
       "text": "PLAZA TOWER", "sub": "ARDEN HOLDINGS · NOW LEASING", "color": "#1f3a5f", "ink": "#d8b863",
-      "x": -6.85, "z": 56, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
+      "x": -6.85, "z": 59.5, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
     },
     {
       "id": "lot_trust", "if": "ledger_nell", "kind": "board",
       "text": "LAND TRUST", "sub": "40 HOMES · WEST AVE", "color": "#24553a", "ink": "#efe6d2",
-      "x": -6.85, "z": 56, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
+      "x": -6.85, "z": 59.5, "y": 1.8, "w": 3.2, "h": 3.6, "face": [1, 0]
     }
   ],
   "missions": [
