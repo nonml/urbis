@@ -157,6 +157,25 @@ first slice is bigger than it wants to be, and it carries its own proof.
   building that shrinks with no explanation is a bug to the player, whatever the sim
   thinks. Decline logic itself lands in 024, per the model above; this slice is about
   making it legible.
+  - **Built on `wave2/decline`.** A lot now reports a `trend` (growing, steady,
+    stalled, declining) and a `why`, a cause code (`demand-strong`, `demand-thin`,
+    `demand-low`, `no-power`), set in `tickParcel` where the decision is made. The
+    district economy adds its own causes as new codes plus a line each in `REASONS`
+    (`src/sim/decline.js`); a code with no line yet reads as the plain market reason.
+  - **A building empties before it loses a floor.** Below the decline floor a lot
+    with finished floors first gains `vacancy`, 0 to 1 over 20 s, and only an empty
+    building sheds height. A site has nobody in it, so it is empty at once. Vacancy
+    falls only when the market is healthy again, and holds between the bands, so
+    nothing hung on the building flickers when demand wobbles across a threshold.
+  - **What the street shows.** The shell's windows go dark from the top, a window
+    row at a time, as it empties (a patch on the shipped tower materials, +0 draws,
+    still zoned for the blackout). Painted TO LET boards go up on every face at 15%,
+    roller shutters over the ground floor at 50%, and DANGER DEMOLITION notices on
+    the hoarding once it comes down: one instanced mesh on one canvas atlas, unlit,
+    1 draw. A stalled site hangs none of it; its crane just stops.
+  - **What the player reads.** One line, low left, for the changing lot the player
+    stands beside or looks at: "Flats at Main & South emptying — housing demand
+    collapsed", "Workshop site at Main & South stopped — no power".
 - **026 — demand stops being a sine wave.** Feature slice 5, the district economy,
   replaces the placeholder oscillation. At that point growth has a cause the player can
   reach, and pillar 3 has something real to cascade into.

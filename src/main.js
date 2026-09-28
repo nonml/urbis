@@ -35,6 +35,9 @@ import { buildZoning } from './render/zoning.js';
 import { drawLedger } from './render/ledger.js';
 import { hideFaded } from './render/faded.js';
 import { buildEconomyPanel, updateEconomyPanel } from './render/economy.js';
+import { buildDecline } from './render/decline.js';
+import { buildLotNote, showLotNote } from './render/lotnote.js';
+import { focusParcel, pinDemand } from './sim/decline.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -121,6 +124,9 @@ const city = createCity(20260916);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
 const economyPanel = buildEconomyPanel();
+const decline = buildDecline(city, maxAniso);
+scene.add(decline.mesh);
+const lotNote = buildLotNote();
 const player = createPlayer();
 player.mode = 'foot';
 const heroCar = createPlayerCar();
@@ -378,6 +384,7 @@ window.__game = {
     parcels: city.parcels.map((p) => ({
       x: p.x, z: p.z, use: p.use, zone: p.powerZone, stage: STAGES[p.stage],
       progress: +p.progress.toFixed(4), height: +builtHeight(p).toFixed(2), building: p.building,
+      trend: p.trend, why: p.why, vacancy: +p.vacancy.toFixed(3),
     })),
   }),
   economy: () => districtReport(city),
@@ -422,6 +429,23 @@ if (CAPTURE) {
     player.x = Math.max(-52, Math.min(70, x));
     player.z = Math.max(-68, Math.min(100, z));
     cam.yaw = yaw;
+  };
+  // Decline on demand: hold a market where it is needed and run the world on
+  // ahead — clock, street and city, in the frame loop's longest step, so it is
+  // the same sim — instead of waiting minutes for the swell to slump. Software
+  // rendering runs a frame a second, and a blackout is nine seconds of sim.
+  window.__game.zoning = {
+    pin: (use, level) => pinDemand(city, use, level),
+    skip: (secs) => {
+      for (let t = 0; t < secs; t += 0.05) {
+        tickClock(clock, 0.05);
+        tickStreet(street, 0.05);
+        tickZoning(city, 0.05, street);
+      }
+    },
+    note: () => lotNote.textContent,
+    // A/B for the draw count: the same frame with and without the boards.
+    dressing: (on) => { decline.mesh.visible = on; },
   };
 }
 
@@ -587,6 +611,7 @@ function render() {
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   growth.update();
   updateEconomyPanel(economyPanel, city);
+  decline.update();
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street, camera);
   // Hero and pursuit throws ride the traffic pool set (VGA-004): three more
@@ -631,6 +656,7 @@ function render() {
   camera.lookAt(lookAt);
 
   lastProfile = driving ? null : updateProfiler(camera, acquireTarget());
+  showLotNote(lotNote, focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)));
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   if (driving && lockedNpc) lockedNpc = null;
   if (driving) {
