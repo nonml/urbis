@@ -61,13 +61,15 @@ function beamMaterial() {
 // light mesh, so the ring costs no draw of its own.
 const RING_DASHES = 40;
 const RING_FILL = 0.6;
-const RING_WIDTH = 0.32;
+// Wide enough to read from a chase camera a couple of metres off the ground,
+// which sees a flat ring almost edge-on.
+const RING_WIDTH = 0.7;
 const RING_THICK = 0.02;
 const RING_LIFT = 0.06;
 const RING_ROTATE = 0.12;
 const RING_SWEEP = 1.3;
 const RING_FADE_IN = 0.6;
-const RING_BASE = [1.0, 0.55, 0.18];
+const RING_BASE = [1.2, 0.62, 0.18];
 const _dash = new THREE.Color();
 
 function pushRing(search, fade, t, push) {
@@ -112,7 +114,8 @@ const STROBE = { at: [0, 1.15, -5.6, 0.12, 0.12, 0.12], color: new THREE.Color()
 const LENS_LAMP = { at: [...LENS, 0.3, 0.3, 0.1], color: new THREE.Color().setRGB(10, 9.6, 8.8) };
 const STROBE_PERIOD = 1.1;
 const STROBE_ON = 0.08;
-const SEARCHLIGHT = 450;
+// A glossy roof straight under it must not blow out to white.
+const SEARCHLIGHT = 220;
 const NIGHT = 0.5;
 
 const _lens = new THREE.Vector3();

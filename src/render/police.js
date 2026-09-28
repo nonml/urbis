@@ -27,13 +27,14 @@ const HEAD = [[-0.55, 0.7, 2.12, 0.34, 0.16, 0.03], [0.55, 0.7, 2.12, 0.34, 0.16
 const TAIL = [[-0.55, 0.75, -2.12, 0.3, 0.12, 0.03], [0.55, 0.75, -2.12, 0.3, 0.12, 0.03]];
 const BAR = [[-0.3, 1.55, -0.2, 0.5, 0.13, 0.26], [0.3, 1.55, -0.2, 0.5, 0.13, 0.26]];
 
-// Linear HDR: the bar and the barricade lamps sit above the bloom threshold,
-// so they flare the way a real LED bar does; the rest stay under it.
+// Linear, a little over 1 so the lamps read as sources. Not much over: ACES
+// bleaches a saturated colour toward white as it climbs, and a light bar that
+// renders white has stopped saying police.
 const rgb = (r, g, b) => new THREE.Color().setRGB(r, g, b);
 const LAMP = {
   head: rgb(1.5, 1.65, 1.8), tail: rgb(0.9, 0.06, 0.04),
-  redOn: rgb(9, 0.35, 0.2), blueOn: rgb(0.25, 0.7, 11), barOff: rgb(0.12, 0.03, 0.03),
-  amberOn: rgb(7, 3, 0.45), amberOff: rgb(0.25, 0.1, 0.02), reflector: rgb(0.55, 0.28, 0.05),
+  redOn: rgb(3, 0.05, 0.04), blueOn: rgb(0.06, 0.25, 4.5), barOff: rgb(0.12, 0.03, 0.03),
+  amberOn: rgb(3.2, 1.3, 0.12), amberOff: rgb(0.25, 0.1, 0.02), reflector: rgb(0.55, 0.28, 0.05),
 };
 // Red half, then blue half, each broken by one short blink — a real bar's
 // wig-wag. Long on-times, because a bar that is dark most of the time reads

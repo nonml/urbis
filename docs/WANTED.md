@@ -121,7 +121,14 @@ recompiles every lit material in the frame. The flat-tyre sparks reuse the hack
 spark cloud. The two per-car pursuit meshes this replaced cost 8 draws a
 cruiser — 16 at ★★.
 
-Measured numbers are in the commit that landed this.
+Measured every `requestAnimationFrame` on SwiftShader (draw counts are a CPU-side
+counter and valid there; nothing here is a timing), same page, same pose:
+
+| Frame | Base `69ff023` | Wanted |
+|---|---|---|
+| Clean, night, spawn pose | 152 | 152 (+0) |
+| Blackout at spawn (the hack also raises ★) | 160 median, 165 peak — its one ★ car cost 8 | 154 |
+| Worst pursuit: ★★★, roadblock in view, helicopter up, search ring, flats sparking, night, blackout | — | 143 peak against 139 for the same pose clean: **+4** |
 
 ## Capture probe
 
