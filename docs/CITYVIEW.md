@@ -139,26 +139,36 @@ with the lift instead of popping in.
 ## Draw budget
 
 Measured with one instrument throughout: `renderer.info.render.calls` read on **every
-`requestAnimationFrame`** (never a sampler), SwiftShader, default spawn (the gate pose),
-the untouched build (`69ff023`) loaded twice and this build once in the same browser
-session. The two baseline loads agree exactly.
+`requestAnimationFrame`** (never a sampler), SwiftShader. Night rows: default spawn (the
+gate pose), the untouched build (`69ff023`) loaded twice and this build once in the
+same browser session; the two baseline loads agree exactly. Day and blackout rows: a
+second session, the player posed on the east avenue at (48, −30).
 
 | Frame | `69ff023` | city view |
 |---|---|---|
 | street, night, lit | 147 steady, 152 on mirror frames | 147 / 152 — **+0** |
 | street, blackout | 168 peak | — |
-| rise and descent (night) | — | 152–160 |
+| rise, night | — | 152–160 |
 | overview, night, 200 m, eight headings | — | 155 steady, 160 on mirror frames |
+| rise, day | — | 134–160 |
+| overview, day, 200 m, zoning a lot | — | 155 |
+| overview, day, widest (220 m, tilt 0.9), four headings | — | 155–160 |
+| overview, day, panned | — | 155–160 |
+| overview, blackout (seen from above) | — | 160–168 |
+| descent, day, blackout ending | — | 130–164 |
+
+**Worst city-view frame: 168**, a blackout seen from the overview — the same as the
+untouched build's street blackout peak. The overview never reaches 175.
 
 The street frame is untouched because nothing city view draws exists at lift 0: the
 kerbs are hidden and the camera code returns before touching anything. The overview
 costs +8 over the street's steady 147: +1 for the kerbs (one instanced mesh, no shadow)
-and +7 for instanced groups the street camera culls and the overview cannot. Any
+and +7 for instanced groups the street camera culls and the overview cannot. A
+blackout adds what it adds at street level (the pursuit car and the hack effects). Any
 frame over 160 cannot also re-shoot a mirror face: `main.js` only lets a face in when
-the previous frame left room for it.
-
-Still to be swept at this commit: the overview by day, at its widest reach and lowest
-tilt, panned, and during a blackout seen from above.
+the previous frame left room for it, which is why the blackout overview tops out at
+168 and not 173. Day and night draw the same meshes; the day rows were swept while
+`T` was still gliding the clock (night factor 0.76 → 0).
 
 ## Files
 
