@@ -1,0 +1,392 @@
+// Places a person can stand that are not the pavement: the floor of a shop, the
+// top of a tower. One world, no loading screen — a space is a volume inside the
+// city's own buildings, and a door is two spots that swap the player between
+// spaces. Pure data and pure maths (law 5): render reads SPACES to build what it
+// draws, main ticks the state and asks where the camera may go.
+//
+// The pattern every later interior copies is docs/INTERIORS.md.
+import { zoneAt } from './street.js';
+
+export const STREET = 'street';
+
+// A person is a circle this wide when it comes to walls.
+export const BODY_RADIUS = 0.28;
+// How far from a door's spot E still opens it.
+export const DOOR_REACH = 1.2;
+// The camera keeps this far off every wall, ceiling and shelf, so the near plane
+// (0.1) never slices through one.
+const CAMERA_MARGIN = 0.2;
+// Closer to the head than this and the camera gives up on the follow line and
+// looks down over the shoulder from this pitch instead.
+const CAMERA_SQUEEZE = 1.0;
+const STEEP_PITCH = 1.2;
+
+// A space is authored in a facade frame, not in world coordinates, so the same
+// template can be hung on any face of any building. `a` runs across the face —
+// to the right of someone walking in — and `d` runs into the building from the
+// face line. `out` is the face's outward normal, and the city is axis-aligned,
+// so it is always one of the four cardinals.
+function toWorld(fr, a, d) {
+  const [fx, fz] = fr.out;
+  return { x: fr.x + a * fz - d * fx, z: fr.z - a * fx - d * fz };
+}
+
+function rectToWorld(fr, [a0, a1], [d0, d1]) {
+  const p = toWorld(fr, a0, d0);
+  const q = toWorld(fr, a1, d1);
+  return {
+    minX: Math.min(p.x, q.x), maxX: Math.max(p.x, q.x),
+    minZ: Math.min(p.z, q.z), maxZ: Math.max(p.z, q.z),
+  };
+}
+
+// Headings in the frame, as the yaw tickPlayer and the follow cam use:
+// forward is (sin yaw, cos yaw).
+const HEADINGS = { in: 0, right: -Math.PI / 2, out: Math.PI, left: Math.PI / 2 };
+
+export function frameYaw(fr) {
+  const [fx, fz] = fr.out;
+  return Math.atan2(fx, fz);
+}
+
+function yawIn(fr, heading) {
+  return frameYaw(fr) + Math.PI + HEADINGS[heading];
+}
+
+// ---------------------------------------------------------------------------
+// The spaces.
+//
+// RAMEN is the noodle bar behind the RAMEN fascia on the main avenue: the
+// 44 m tower on the west side at z = -14 (block.js TOWERS[1] on the main avenue).
+// Its podium face is x = -6.4 and the noodle-bar bay of its glazing is centred
+// on z = -10.77; the door is hung in that bay. The room stops 0.65 m short of
+// the face on purpose — that is where the tower's shaft begins, and a camera
+// inside the shaft sees none of the city's single-sided boxes from behind.
+//
+// ROOF is the crown of the neighbouring tower to the south (TOWERS[0], 34 m
+// with a setback crown to 44.2 m). It is the roof on this side of the avenue
+// with a clear line to the growth lots: the south-west pair below it, the one
+// in the gap in the east row across the avenue, the two past the east avenue.
+// Its walking surface is the crown's lip plate, 12.9 x 10.9 m at y 44.475.
+
+const RAMEN_FRAME = { x: -6.4, z: -10.77, out: [1, 0] };
+const ROOF_FRAME = { x: -7.05, z: -48, out: [1, 0] };
+
+// Everything in a space is a footprint in the frame plus a top above the floor.
+// `solid: false` is dressing a person can walk through (it stands inside a
+// solid already, or it is on a wall). The render builds each kind; the sim only
+// needs the solids.
+const RAMEN_ITEMS = [
+  { kind: 'kitchen', a: [-2.1, -0.4], d: [2.2, 8.0], top: 1.28 },
+  { kind: 'keeper', a: [-1.45, -1.0], d: [4.35, 4.85], top: 1.72, solid: false },
+  { kind: 'diner', a: [-0.35, 0.25], d: [5.0, 5.4], top: 1.4, solid: false },
+  ...[2.8, 3.6, 4.4, 5.2, 6.0].map((d) => ({ kind: 'stool', a: [-0.18, 0.18], d: [d - 0.18, d + 0.18], top: 0.72 })),
+  { kind: 'ticket', a: [-2.05, -1.35], d: [0.7, 1.3], top: 1.75 },
+  { kind: 'cooler', a: [-1.2, -0.84], d: [0.72, 1.06], top: 1.15 },
+  { kind: 'ledge', a: [1.9, 4.6], d: [0.65, 1.05], top: 1.02 },
+  ...[2.45, 3.25, 4.05].map((a) => ({ kind: 'highstool', a: [a - 0.17, a + 0.17], d: [1.28, 1.62], top: 0.8 })),
+  { kind: 'shelf', a: [4.18, 4.6], d: [2.9, 6.2], top: 2.15 },
+  { kind: 'fridge', a: [3.85, 4.6], d: [6.9, 7.95], top: 1.95 },
+  { kind: 'crates', a: [2.7, 3.55], d: [7.35, 7.95], top: 0.92 },
+];
+
+const ROOF_ITEMS = [
+  // Already on the crown (block.js emitTower): two plant boxes and the beacon.
+  { kind: 'existing', a: [-0.9, 0.9], d: [7.99, 10.19], top: 1.43 },
+  { kind: 'existing', a: [-0.6, 0.6], d: [2.75, 4.15], top: 1.03 },
+  { kind: 'beacon', a: [-0.3, 0.3], d: [6.15, 6.75], top: 0.8 },
+  { kind: 'bulkhead', a: [-5.2, -2.7], d: [4.9, 7.9], top: 2.7 },
+  { kind: 'tank', a: [2.2, 4.4], d: [7.6, 9.8], top: 3.3 },
+  { kind: 'condenser', a: [4.35, 5.2], d: [2.0, 2.95], top: 0.95 },
+  { kind: 'condenser', a: [4.35, 5.2], d: [3.35, 4.3], top: 0.95 },
+  { kind: 'vent', a: [4.7, 5.1], d: [10.6, 11.0], top: 1.5 },
+  { kind: 'vent', a: [-5.1, -4.7], d: [10.9, 11.3], top: 1.2 },
+  { kind: 'dish', a: [-5.2, -4.2], d: [8.6, 9.6], top: 1.5 },
+  { kind: 'smokers', a: [-5.0, -3.4], d: [0.45, 1.6], top: 0.9 },
+];
+
+export const SPACES = [
+  {
+    id: 'ramen',
+    name: 'RAMEN',
+    indoor: true,
+    frame: RAMEN_FRAME,
+    // Floor datum, the way heightAt() is the street's: the render lays the
+    // boards a pavement-slab's rise above it. It clears the podium's plinth
+    // (a solid block to 0.5 m whose top would otherwise show through the floor)
+    // and it is the shopfront's sill height, so the door opens onto it.
+    floor: 0.56,
+    height: 2.95,
+    room: { a: [-2.1, 4.6], d: [0.65, 8.0] },
+    items: RAMEN_ITEMS,
+    // Closer and higher than the street rig: a room is small, so the camera
+    // sits over the shoulder and looks down into it.
+    rig: { dist: 2.7, pitch: 0.5 },
+  },
+  {
+    id: 'roof',
+    name: 'ROOF',
+    indoor: false,
+    frame: ROOF_FRAME,
+    floor: 44.375,
+    height: Infinity,
+    // Inside the parapet, which stands on the lip plate's edge.
+    room: { a: [-5.23, 5.23], d: [0.22, 12.68] },
+    items: ROOF_ITEMS,
+    rig: { dist: 6, pitch: 0.5 },
+  },
+];
+
+// Each end of a door: which space it is in, the spot E works from, and where
+// someone coming through it arrives and which way they face. Arrival is a step
+// clear of the door, not on it, so the camera has room behind them and a
+// second press of E does not bounce them straight back.
+//
+// A street end names the face its door is hung on — the render hangs the door
+// there — and its spot is a step out from that face onto the pavement.
+const DOOR_STEP = 1.0;
+export const DOORS = [
+  {
+    id: 'ramen-front',
+    ends: [
+      { space: STREET, face: RAMEN_FRAME, arrive: { x: -5.3, z: -9.0, yaw: 0 }, label: 'ENTER RAMEN' },
+      { space: 'ramen', at: [0, 1.25], arrive: { at: [0.6, 2.7], heading: 'in' }, label: 'LEAVE' },
+    ],
+  },
+  {
+    // The neighbouring tower's own door on its north face (block.js puts a
+    // door recess on every tower's +Z face), off the promenade.
+    id: 'roof-stair',
+    ends: [
+      {
+        space: STREET, face: { x: -13.5, z: -42.4, out: [0, 1] },
+        arrive: { x: -12.0, z: -40.9, yaw: Math.PI / 2 }, label: 'STAIRS TO ROOF',
+      },
+      { space: 'roof', at: [-2.0, 6.4], arrive: { at: [-0.9, 5.2], heading: 'out' }, label: 'STAIRS DOWN' },
+    ],
+  },
+];
+
+// ---------------------------------------------------------------------------
+// Derived, once: every footprint in world coordinates.
+
+function worldSpace(s) {
+  const solids = s.items.filter((it) => it.solid !== false).map((it) => ({
+    ...rectToWorld(s.frame, it.a, it.d), top: s.floor + it.top,
+  }));
+  return {
+    ...s,
+    zone: zoneAt(s.frame.z),
+    bounds: rectToWorld(s.frame, s.room.a, s.room.d),
+    solids,
+    ceiling: s.floor + s.height,
+  };
+}
+
+const PLACES = new Map(SPACES.map((s) => [s.id, worldSpace(s)]));
+
+function endToWorld(end) {
+  if (end.space === STREET) {
+    const [fx, fz] = end.face.out;
+    return { ...end, x: end.face.x + fx * DOOR_STEP, z: end.face.z + fz * DOOR_STEP };
+  }
+  const s = PLACES.get(end.space);
+  const spot = toWorld(s.frame, ...end.at);
+  const arrive = toWorld(s.frame, ...end.arrive.at);
+  return {
+    ...end, x: spot.x, z: spot.z,
+    arrive: { x: arrive.x, z: arrive.z, yaw: yawIn(s.frame, end.arrive.heading) },
+  };
+}
+
+const LINKS = DOORS.map((door) => ({ id: door.id, ends: door.ends.map(endToWorld) }));
+
+export function placeOf(id) {
+  return PLACES.get(id) ?? null;
+}
+
+// Every door end in world coordinates, for the render to hang things on.
+export function doorEnds() {
+  return LINKS.flatMap((link) => link.ends.map((end) => ({ door: link.id, ...end })));
+}
+
+// ---------------------------------------------------------------------------
+// State.
+
+export function createInterior() {
+  return { space: STREET, near: null, lastX: null, lastZ: null };
+}
+
+export function isIndoors(state) {
+  return PLACES.get(state.space)?.indoor ?? false;
+}
+
+export function currentPlace(state) {
+  return PLACES.get(state.space) ?? null;
+}
+
+// The door end this spot can use, and the end it leads to.
+export function doorAt(state, x, z) {
+  for (const link of LINKS) {
+    const [p, q] = link.ends;
+    for (const [from, to] of [[p, q], [q, p]]) {
+      if (from.space !== state.space) continue;
+      if (Math.hypot(x - from.x, z - from.z) <= DOOR_REACH) return { id: link.id, from, to, label: from.label };
+    }
+  }
+  return null;
+}
+
+// Per tick, after tickPlayer: keep the player inside the space they are in and
+// note which door, if any, they can reach.
+export function tickInterior(state, player) {
+  settle(state, player);
+  state.near = doorAt(state, player.x, player.z);
+}
+
+// Walk through the reachable door. Returns what was used, or null.
+export function useDoor(state, player) {
+  const door = doorAt(state, player.x, player.z);
+  if (!door) return null;
+  state.space = door.to.space;
+  player.x = door.to.arrive.x;
+  player.z = door.to.arrive.z;
+  player.yaw = door.to.arrive.yaw;
+  player.speed = 0;
+  const place = PLACES.get(state.space);
+  if (place) player.y = place.floor;
+  state.lastX = player.x;
+  state.lastZ = player.z;
+  state.near = doorAt(state, player.x, player.z);
+  return door;
+}
+
+// ---------------------------------------------------------------------------
+// Collision. A space is a rectangle with solid rectangles in it, and a person is
+// a circle. tickPlayer has already moved them; this keeps what it can of that
+// move. Sliding along a wall is the point — revert only the axis that hit.
+
+function hitsSolid(place, x, z) {
+  for (const s of place.solids) {
+    const dx = Math.max(s.minX - x, 0, x - s.maxX);
+    const dz = Math.max(s.minZ - z, 0, z - s.maxZ);
+    if (dx * dx + dz * dz < BODY_RADIUS * BODY_RADIUS) return true;
+  }
+  return false;
+}
+
+function insideRoom(place, x, z) {
+  const b = place.bounds;
+  return x >= b.minX + BODY_RADIUS && x <= b.maxX - BODY_RADIUS
+    && z >= b.minZ + BODY_RADIUS && z <= b.maxZ - BODY_RADIUS;
+}
+
+export function standable(place, x, z) {
+  return insideRoom(place, x, z) && !hitsSolid(place, x, z);
+}
+
+function clampToRoom(place, x, z) {
+  const b = place.bounds;
+  return {
+    x: Math.max(b.minX + BODY_RADIUS, Math.min(b.maxX - BODY_RADIUS, x)),
+    z: Math.max(b.minZ + BODY_RADIUS, Math.min(b.maxZ - BODY_RADIUS, z)),
+  };
+}
+
+function settle(state, player) {
+  const place = PLACES.get(state.space);
+  if (!place) {
+    state.lastX = player.x;
+    state.lastZ = player.z;
+    return;
+  }
+  const fromX = state.lastX ?? player.x;
+  const fromZ = state.lastZ ?? player.z;
+  const want = clampToRoom(place, player.x, player.z);
+  let x = want.x;
+  let z = want.z;
+  if (hitsSolid(place, x, z)) {
+    if (!hitsSolid(place, x, fromZ)) z = fromZ;
+    else if (!hitsSolid(place, fromX, z)) x = fromX;
+    else { x = fromX; z = fromZ; }
+  }
+  player.x = x;
+  player.z = z;
+  player.y = place.floor;
+  state.lastX = x;
+  state.lastZ = z;
+}
+
+// ---------------------------------------------------------------------------
+// The camera. The follow cam asks for an eye; in a space it gets the nearest
+// point on the line from the player's head to that eye that is inside the
+// room, under the ceiling and outside every solid. On the roof only the floor
+// and the solids bind — the camera may hang out past the parapet over the
+// street, which is exactly where a person would look from.
+
+// Where along pivot + t * dir the ray leaves the box [lo, hi] (the pivot is
+// inside it). Infinity when it never does.
+function exitT(p, dir, lo, hi) {
+  let t = Infinity;
+  for (let k = 0; k < 3; k++) {
+    if (dir[k] > 0) t = Math.min(t, (hi[k] - p[k]) / dir[k]);
+    else if (dir[k] < 0) t = Math.min(t, (lo[k] - p[k]) / dir[k]);
+  }
+  return t;
+}
+
+// Where the ray first enters the box, or Infinity when it misses.
+function enterT(p, dir, lo, hi) {
+  let near = 0;
+  let far = Infinity;
+  for (let k = 0; k < 3; k++) {
+    if (dir[k] === 0) {
+      if (p[k] < lo[k] || p[k] > hi[k]) return Infinity;
+      continue;
+    }
+    const t0 = (lo[k] - p[k]) / dir[k];
+    const t1 = (hi[k] - p[k]) / dir[k];
+    near = Math.max(near, Math.min(t0, t1));
+    far = Math.min(far, Math.max(t0, t1));
+  }
+  return near <= far ? near : Infinity;
+}
+
+function cameraBox(place) {
+  const m = CAMERA_MARGIN;
+  if (!place.indoor) return { lo: [-Infinity, place.floor + m * 2, -Infinity], hi: [Infinity, Infinity, Infinity] };
+  const b = place.bounds;
+  return { lo: [b.minX + m, place.floor + m, b.minZ + m], hi: [b.maxX - m, place.ceiling - m, b.maxZ - m] };
+}
+
+function clipRay(place, p, dir) {
+  const box = cameraBox(place);
+  let t = Math.min(1, exitT(p, dir, box.lo, box.hi));
+  const m = CAMERA_MARGIN;
+  for (const s of place.solids) {
+    t = Math.min(t, enterT(p, dir, [s.minX - m, place.floor - 1, s.minZ - m], [s.maxX + m, s.top + m, s.maxZ + m]));
+  }
+  return Math.max(0, t);
+}
+
+function along(p, dir, t) {
+  return { x: p[0] + dir[0] * t, y: p[1] + dir[1] * t, z: p[2] + dir[2] * t };
+}
+
+export function frameCamera(state, pivot, eye) {
+  const place = PLACES.get(state.space);
+  if (!place) return eye;
+  const p = [pivot.x, pivot.y, pivot.z];
+  const dir = [eye.x - pivot.x, eye.y - pivot.y, eye.z - pivot.z];
+  const len = Math.hypot(...dir);
+  if (len < 1e-6) return eye;
+  const t = clipRay(place, p, dir);
+  if (t * len >= CAMERA_SQUEEZE || !place.indoor) return along(p, dir, t);
+  // Backed into a wall: look down over the shoulder rather than into the back
+  // of the player's skull. Same heading, steeper, and whichever has more room.
+  const flat = Math.hypot(dir[0], dir[2]) || 1;
+  const reach = Math.cos(STEEP_PITCH) * len / flat;
+  const steep = [dir[0] * reach, Math.sin(STEEP_PITCH) * len, dir[2] * reach];
+  const t2 = clipRay(place, p, steep);
+  return t2 > t ? along(p, steep, t2) : along(p, dir, t);
+}
