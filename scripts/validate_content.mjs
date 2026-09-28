@@ -3,6 +3,7 @@
 // Usage: node scripts/validate_content.mjs [--quiet]
 // Exit non-zero on any violation — wire into gate before build.
 import { readFileSync } from 'fs';
+import { AVENUES, CROSSINGS } from '../src/sim/world.js';
 
 const QUIET = process.argv.includes('--quiet');
 const log = (...a) => { if (!QUIET) console.log(...a); };
@@ -63,11 +64,58 @@ function checkMissions(data) {
   });
 }
 
+// Every call the wanted sim can make (src/sim/wanted.js, src/sim/response.js).
+// A new event means a line here and wording in dispatch.json; keep them in step.
+const CALLS = [
+  'tier_up_1', 'tier_up_2', 'tier_up_3', 'tier_down_2', 'tier_down_1', 'clear', 'spotted', 'lost',
+  'spikes_down', 'spikes_hit', 'roadblock_up', 'rammed', 'heli_on_night', 'heli_on_day', 'heli_off', 'busted',
+];
+const SPEAKERS = ['dispatch', 'unit', 'block', 'air'];
+const BLANKS = ['street', 'heading', 'mode', 'cause'];
+// A subtitle, read in the half-second a player can spare mid-chase.
+const LINE_MAX = 72;
+
+function checkWordMap(where, map, keys) {
+  if (!map || typeof map !== 'object') return bad(where, 'missing');
+  for (const k of keys) if (typeof map[k] !== 'string' || !map[k]) bad(where, `needs a string for ${k}`);
+}
+
+function checkDispatch(data) {
+  if (!data) return;
+  const w = 'dispatch.json';
+  checkWordMap(`${w}.speakers`, data.speakers, SPEAKERS);
+  checkWordMap(`${w}.streets`, data.streets, [...AVENUES, ...CROSSINGS].map((way) => way.id));
+  checkWordMap(`${w}.headings`, data.headings, ['n', 's', 'e', 'w']);
+  checkWordMap(`${w}.modes`, data.modes, ['car', 'foot']);
+  checkWordMap(`${w}.causes`, data.causes, ['blackout', 'speeding', 'evading']);
+  for (const call of CALLS) {
+    const lines = data.lines?.[call];
+    if (!Array.isArray(lines) || lines.length === 0) {
+      bad(`${w}.lines`, `needs at least one line for ${call}`);
+      continue;
+    }
+    lines.forEach((l, i) => {
+      const lw = `${w}.lines.${call}[${i}]`;
+      if (!SPEAKERS.includes(l.by)) bad(lw, `by must be one of ${SPEAKERS.join(', ')}`);
+      if (typeof l.say !== 'string' || l.say.length === 0 || l.say.length > LINE_MAX) {
+        bad(lw, `say must be 1–${LINE_MAX} chars`);
+      }
+      for (const [, blank] of (l.say || '').matchAll(/\{(\w+)\}/g)) {
+        if (!BLANKS.includes(blank)) bad(lw, `unknown blank {${blank}}`);
+      }
+    });
+  }
+  for (const call of Object.keys(data.lines || {})) {
+    if (!CALLS.includes(call)) bad(`${w}.lines`, `${call} is never called`);
+  }
+}
+
 checkSigns(load('signs.json'));
 checkMissions(load('missions.json'));
+checkDispatch(load('dispatch.json'));
 
 if (fails.length) {
   console.error(`validate FAILED (${fails.length}):\n- ${fails.join('\n- ')}`);
   process.exit(1);
 }
-log('validate OK — signs + missions schemas pass');
+log('validate OK — signs + missions + dispatch schemas pass');

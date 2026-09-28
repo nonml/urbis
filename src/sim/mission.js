@@ -1,7 +1,7 @@
 // Data-driven contracts board (re-011). Mission defs live in
 // src/re/content/missions.json; this module is the runner — pure state,
 // no rendering. Render reads id/phases/done/balance via main.
-import MISSION_DEFS from '../content/missions.json';
+import MISSION_DEFS from '../content/missions.json' with { type: 'json' };
 
 export { MISSION_DEFS };
 

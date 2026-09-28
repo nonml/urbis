@@ -1,0 +1,83 @@
+{
+  "speakers": {
+    "dispatch": "DISPATCH",
+    "unit": "UNIT 12",
+    "block": "UNIT 40",
+    "air": "AIR 1"
+  },
+  "streets": {
+    "west": "1st Avenue",
+    "main": "Main Street",
+    "east": "3rd Avenue",
+    "plaza": "Plaza Street",
+    "south": "Dock Street"
+  },
+  "headings": { "n": "northbound", "s": "southbound", "e": "eastbound", "w": "westbound" },
+  "modes": { "car": "in a vehicle", "foot": "on foot" },
+  "causes": {
+    "blackout": "power tampering",
+    "speeding": "a speeder",
+    "evading": "a vehicle failing to stop"
+  },
+  "lines": {
+    "tier_up_1": [
+      { "by": "dispatch", "say": "Any unit near {street}, {cause}. One car respond." },
+      { "by": "dispatch", "say": "Report of {cause} on {street}. Nearest unit take it." }
+    ],
+    "tier_up_2": [
+      { "by": "dispatch", "say": "Second car rolling. Stingers authorised on {street}." },
+      { "by": "dispatch", "say": "Upgrading to two units. Strip them if they run." }
+    ],
+    "tier_up_3": [
+      { "by": "dispatch", "say": "All units, felony pursuit. Air One up, block the road ahead." },
+      { "by": "dispatch", "say": "Priority, all units. Air support and a roadblock, {street}." }
+    ],
+    "spotted": [
+      { "by": "unit", "say": "Eyes on the suspect, {mode}, {heading} on {street}." },
+      { "by": "unit", "say": "Got them, {heading} on {street}." }
+    ],
+    "lost": [
+      { "by": "unit", "say": "Lost visual near {street}. Searching the area." },
+      { "by": "unit", "say": "No sign. Last seen {heading} on {street}." }
+    ],
+    "spikes_down": [
+      { "by": "unit", "say": "Strip's down ahead of them on {street}." },
+      { "by": "unit", "say": "Stinger's out on {street}, their lane." }
+    ],
+    "spikes_hit": [
+      { "by": "unit", "say": "Tyres are gone! They're on the rims." },
+      { "by": "unit", "say": "They hit the strip. Won't get far on that." }
+    ],
+    "roadblock_up": [
+      { "by": "block", "say": "Roadblock's up on {street}. Two cars across it." },
+      { "by": "block", "say": "We're across {street}, lights on, strip in the gap." }
+    ],
+    "rammed": [
+      { "by": "block", "say": "They hit the block!" }
+    ],
+    "heli_on_night": [
+      { "by": "air", "say": "Air One on scene. Light's on." },
+      { "by": "air", "say": "Air One overhead, lighting up {street}." }
+    ],
+    "heli_on_day": [
+      { "by": "air", "say": "Air One overhead, eyes on {street}." }
+    ],
+    "heli_off": [
+      { "by": "air", "say": "Air One breaking off." }
+    ],
+    "tier_down_2": [
+      { "by": "dispatch", "say": "Air One released, block's down. Two cars stay on {street}." }
+    ],
+    "tier_down_1": [
+      { "by": "dispatch", "say": "Scaling back. One unit keep looking near {street}." }
+    ],
+    "clear": [
+      { "by": "dispatch", "say": "Suspect's gone. All units, code 4, resume patrol." },
+      { "by": "dispatch", "say": "Nothing. Stand down, back to patrol." }
+    ],
+    "busted": [
+      { "by": "unit", "say": "Suspect in custody." },
+      { "by": "unit", "say": "Got them. One in custody." }
+    ]
+  }
+}
