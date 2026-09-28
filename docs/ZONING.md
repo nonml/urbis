@@ -122,7 +122,7 @@ system that is not visible in a screenshot. An unwired `src/sim/zoning.js` with 
 unit test is exactly the dead tech law 6 exists to stop, however well tested. So the
 first slice is bigger than it wants to be, and it carries its own proof.
 
-- **024 — the city builds something.** ✅ Shipped as **slice 046**. Evidence:
+- **024 — the city builds something.** ✅ Shipped as **slice 046** (`db0d972`). Evidence:
   `slice-046-grow-early/-late.png` and `slice-046-site-lit/-blackout.png`. What
   landed differs from this plan in three ways:
   - **Ten parcels, not twelve to sixteen.** Every void in the tower tables was

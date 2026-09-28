@@ -85,7 +85,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 025 | Headlight throw — heading-aligned, speed-stretched, instanced (VGA-004) | **156** (−1, 172 peak) | `slice-025-avenue/-cross/-dark.png` |
 | 026–044 | VGA items and the wave-1 world planks — recorded per item in `docs/VISUAL-GAP-ACTIONS.md` and in the git log, not back-filled here | — | `slice-026…044-*.png` |
 | 045 | Grounded — the neon stripped: lit-box signs, real trades, Urbis (VGA-083, `5f8c9ed`) | **143** (+0, 154 blackout) | `slice-045-grounded-night/-day/-blackout.png` |
-| 046 | The city builds something — ten lots grow and decline on their own; a blackout stops the crane (zoning 1/3) | **152** (+9, 165 blackout peak) | `slice-046-grow-early/-late.png`, `slice-046-site-lit/-blackout.png` |
+| 046 | The city builds something — ten lots grow and decline on their own; a blackout stops the crane (zoning 1/3, `db0d972`) | **152** (+9, 165 blackout peak) | `slice-046-grow-early/-late.png`, `slice-046-site-lit/-blackout.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
