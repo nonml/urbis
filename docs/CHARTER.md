@@ -86,6 +86,12 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 026–044 | VGA items and the wave-1 world planks — recorded per item in `docs/VISUAL-GAP-ACTIONS.md` and in the git log, not back-filled here | — | `slice-026…044-*.png` |
 | 045 | Grounded — the neon stripped: lit-box signs, real trades, Urbis (VGA-083, `5f8c9ed`) | **143** (+0, 154 blackout) | `slice-045-grounded-night/-day/-blackout.png` |
 | 046 | The city builds something — ten lots grow and decline on their own; a blackout stops the crane (zoning 1/3, `db0d972`) | **152** (+9, 165 blackout peak) | `slice-046-grow-early/-late.png`, `slice-046-site-lit/-blackout.png` |
+| 047 | The frame spends 30 fewer draws on the same picture: draw ledger, night shadow pass off, one material for both zones (wave 2 reclaim, `9b5f131`) | **117** gate pose (−30) | `wave2-reclaim-*.png`, `docs/DRAWS.md` |
+| 048 | Demand comes from a district economy, not a sine wave (zoning 3/3, `04305a6`) | +0 | `wave2-economy-*.png` |
+| 049 | A declining building reads as failing, and says why (zoning 2/3, `bd1b0c1`) | +1 while a failing lot is in view | `wave2-decline-*.png` |
+| 050 | The player zones the city: Z overview, R C I X (`ad67e3b`) | +0 street; overview ≤ 168 before reclaim | `wave2-cityview-*.png` |
+| 051 | Walk into the city: a noodle bar and a roof (verticality v1, VGA-078, `6837f5a`) | +1 at the door | `wave2-interiors-*.png` |
+| 052 | Six missions, three people, two choices the district remembers; radio deferred, no audio yet (`58ba12a`) | +1 with the marker up | `wave2-arc-*.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
@@ -100,7 +106,7 @@ Two tracks. The feature slices below are the **structural** work and come first.
 `docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
 waits behind them — except VGA-083.
 
-Next free slice number: **047**.
+Next free slice number: **053**. Wave 2 (slices 047–052) and the unmerged `wave2/wanted` branch are recorded in `docs/handoff/WAVE2.md`; the merged gate pose measures **118**.
 
 **Work order (operator, 2026-09-28):** VGA-083 strip the neon (done, slice 045) → the feature slices below,
 in order → the rest of the visual queue. This replaces the earlier "visual queue closes
