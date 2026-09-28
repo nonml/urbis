@@ -1,4 +1,4 @@
-// Neon street block geometry. Everything repeated is instanced or merged —
+// Street block geometry. Everything repeated is instanced or merged —
 // per-object draws for repeated things are banned (charter law #4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -318,7 +318,7 @@ const SHOP_KINDS = [
   { wash: ['#eef6ff', '#d4e3f4', '#9db2c8', '#3c4a5a'], spill: '#dbe8ff' },  // grocery
   { wash: ['#ffe0b0', '#efad70', '#9a663a', '#4a301a'], spill: '#ffb066' },  // noodle bar
   { wash: ['#dff6ff', '#a8dcef', '#5d8b9e', '#2c424c'], spill: '#bfe4f5' },  // laundromat
-  { wash: ['#ffd9ec', '#e894c1', '#95496d', '#452032'], spill: '#ffa8d0' },  // boutique
+  { wash: ['#fff2e6', '#f2d6c4', '#a4806c', '#4c362c'], spill: '#ffdcc4' },  // boutique
 ];
 
 function paintShopCell(g, kind, ox, oy) {

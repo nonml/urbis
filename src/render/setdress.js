@@ -16,10 +16,12 @@ const SHOPS = [
   { x: 10, z: -60.9, ry: Math.PI, kind: 2 },
 ];
 
+// A signwriter's colours: a painted board and the letters on it. Lacquer red
+// under lantern orange, navy under old gold, white on medical blue.
 const SHOP_STYLES = [
-  { glow: '#ff9a3c', name: 'RAMEN' },
-  { glow: '#35e0ff', name: 'PAWN' },
-  { glow: '#52ff9e', name: 'CLINIC' },
+  { board: '#4a1610', letters: '#ff9a3c', name: 'RAMEN' },
+  { board: '#161d2c', letters: '#c9a24a', name: 'PAWN' },
+  { board: '#1d5c9e', letters: '#f2f5f7', name: 'CLINIC' },
 ];
 
 // The old version painted a whole fake shopfront — sign band plus four lit
@@ -35,21 +37,20 @@ const SHOP_STYLES = [
 // bottom that every face which is not a sign face points at.
 const SIGN_BAND = 64 / 200;
 
+// Crisp edges, no blur: a halo round glowing letters on a black board reads as
+// bent glass tubing, and a shop fascia is paint with the lettering lit.
 function paintSignCell(g, kind, oy) {
   const st = SHOP_STYLES[kind];
-  g.fillStyle = '#080b10';
+  g.fillStyle = st.board;
   g.fillRect(0, oy, 256, 64);
-  g.shadowColor = st.glow;
-  g.shadowBlur = 14;
-  g.strokeStyle = st.glow;
-  g.lineWidth = 3;
+  g.strokeStyle = st.letters;
+  g.lineWidth = 2;
   g.strokeRect(5, oy + 5, 246, 54);
-  g.fillStyle = st.glow;
+  g.fillStyle = st.letters;
   g.font = 'bold 34px sans-serif';
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(st.name, 128, oy + 33);
-  g.shadowBlur = 0;
 }
 
 function shopSignAtlas() {

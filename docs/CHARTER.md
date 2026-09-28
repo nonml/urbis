@@ -25,7 +25,8 @@ pushes the frame toward neon, it does not land.
 the game was still being pitched as a cyberpunk street game. That was never the
 operator's concept: the Cyberpunk reference is about *depth*, not *look*, and the core
 of the game is building a city and living in it. The neon palette, the "NEON" signs and
-the Neon City name were all downstream of that mistake. **VGA-083** strips what shipped.
+the Neon City name were all downstream of that mistake. **VGA-083** stripped what shipped
+(slice 045).
 The lighting craft itself — wet-road reflections, lamp pools, the blackout cascade,
 lit windows — stays; it just stops being tinted magenta and cyan.
 
@@ -82,6 +83,8 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 023 | Poly Haven ARM loader; concrete towers as a second architecture | **155** (+4) | `slice-023-day/-night/-blackout.png` |
 | 024 | Puddle mirrors — baked city cube, per-zone water (VGA-002) | **156** (+1, 173 peak) | `slice-024-night/-day/-blackout.png` |
 | 025 | Headlight throw — heading-aligned, speed-stretched, instanced (VGA-004) | **156** (−1, 172 peak) | `slice-025-avenue/-cross/-dark.png` |
+| 026–044 | VGA items and the wave-1 world planks — recorded per item in `docs/VISUAL-GAP-ACTIONS.md` and in the git log, not back-filled here | — | `slice-026…044-*.png` |
+| 045 | Grounded — the neon stripped: lit-box signs, real trades, Urbis (VGA-083) | **143** (+0, 154 blackout) | `slice-045-grounded-night/-day/-blackout.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
@@ -96,9 +99,9 @@ Two tracks. The feature slices below are the **structural** work and come first.
 `docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
 waits behind them — except VGA-083.
 
-Next free slice number: **026**.
+Next free slice number: **046**.
 
-**Work order (operator, 2026-09-28):** VGA-083 strip the neon → the feature slices below,
+**Work order (operator, 2026-09-28):** VGA-083 strip the neon (done, slice 045) → the feature slices below,
 in order → the rest of the visual queue. This replaces the earlier "visual queue closes
 first" redirect, which would have buried the building half of the game behind 80 polish
 items — many of which touch buildings that zoning is about to change anyway.

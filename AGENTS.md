@@ -35,7 +35,7 @@ A believable contemporary city. Day and night carry equal weight; weather is var
 not a signature. Signage is real storefront lighting — lit boxes, painted fascias,
 backlit letters in real brand colours. **No neon.** No magenta/cyan palette, no
 holograms, no "neon-noir", no cyberpunk styling. If a change pushes the frame toward
-neon, it does not land. Remaining neon is being stripped under **VGA-083**.
+neon, it does not land. The shipped neon was stripped under **VGA-083** (slice 045).
 
 ### Six pillars — every task must serve at least one
 
@@ -306,8 +306,8 @@ Three rules, each learned the expensive way:
 and run the seven steps below. Do not ask which one — pick it, say which you picked in
 one line, and go.
 
-1. **VGA-083 — strip the neon** (`docs/VISUAL-GAP-ACTIONS.md`). Small, +0 draws, and
-   everything built after it inherits the palette.
+1. ~~**VGA-083 — strip the neon**~~ — done, slice 045. Everything built after it
+   inherits the palette.
 2. **The feature slices in `docs/CHARTER.md`, in the order listed** — zoning + growth
    first (`docs/ZONING.md`). Building the city is half the game; it goes before polish.
 3. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner

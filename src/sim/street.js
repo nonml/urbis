@@ -83,7 +83,7 @@ function makeBody(rng, i) {
   // (Coats resample across the widened palette — color only, no logic reads it.)
   body.bulk = 0.85 + rng.sim() * 0.5;
   body.hat = rng.sim() < 0.42 ? 1 + Math.floor(rng.sim() * 3) : 0;
-  body.cyber = rng.sim() < 0.25;
+  body.glasses = rng.sim() < 0.25;
   body.skin = Math.floor(rng.sim() * SKIN_TONES.length);
   return body;
 }

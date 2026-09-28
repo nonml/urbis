@@ -229,7 +229,7 @@ export function buildTraffic(street) {
   // chase camera the roof and boot of each car read as one blown-out white
   // slab with no colour left in them — the single worst object in the frame.
   // Metalness down, env down, roughness up a touch: the paint keeps its
-  // colour, and there is still enough gloss for the neon to land on it.
+  // colour, and there is still enough gloss for shop and street light to land on it.
   const paintMat = new THREE.MeshStandardMaterial({
     roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
   });
@@ -354,9 +354,11 @@ export function buildPlayerCar(scene, car) {
   }
   const spot = new THREE.SpotLight(0xcfe2ff, 140, 42, 0.52, 0.45, 2);
   scene.add(spot, spot.target);
-  // Finder beacon: faint cyan pillar so the car is findable on foot.
+  // Finder beacon: faint pillar so the car is findable on foot. Warm white, not
+  // a hue — a coloured column reads as a hologram — at the luminance the old
+  // tinted one had, so it stands out no more than it did.
   const beacon = new THREE.Sprite(new THREE.SpriteMaterial({
-    map: getGlowTex(), color: 0x54f0ff, transparent: true, opacity: 0.3,
+    map: getGlowTex(), color: 0xe8dcc6, transparent: true, opacity: 0.3,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }));
   beacon.scale.set(1.6, 3.2, 1);

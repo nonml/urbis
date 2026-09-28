@@ -16,6 +16,10 @@ when it is proven, not when a month arrives.
 
 ## Debt — pay this first
 
+### Resolved 2026-09-28
+- **HUD title "NEON BLOCK 009"**, frozen at slice 009. Now reads "URBIS" — part of
+  VGA-083 stripping the neon.
+
 ### Resolved 2026-09-17
 - **SSAO + volumetric fog + SSR** (`cf988a1`) landed unscreenshotted and broke the game:
   291 draws against 175, and every pixel black. Removed in `56f1462` after measuring
@@ -41,7 +45,6 @@ its own sake.
 
 ### Smaller
 - 26 lint warnings, all lines over 120 chars (`src/render/traffic.js`, `src/sim/street.js`).
-- The HUD still reads "NEON BLOCK 009" — a title frozen at slice 009.
 - No audio of any kind exists yet. See `docs/ASSETS.md` for where it comes from.
 
 ---

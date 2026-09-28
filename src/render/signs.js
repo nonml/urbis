@@ -1,4 +1,4 @@
-// Neon signage, alley glow, and merged ground light-pools.
+// Blade signs, alley glow, and merged ground light-pools.
 import * as THREE from 'three';
 import { blink } from '../sim/street.js';
 
@@ -21,34 +21,68 @@ const ATLAS_COLS = 4;
 const ATLAS_ROWS = Math.max(1, Math.ceil(SIGNS.length / ATLAS_COLS));
 const QUAD_VERTS = 4;
 
-function paintSignCell(g, main, sub, color, ox, oy) {
-  g.save();
-  // Every sign used to own a 128x384 canvas, so a 26px shadowBlur was clipped
-  // by the canvas edge. On a shared atlas it would spill into the neighbour.
-  g.beginPath();
-  g.rect(ox, oy, CELL_W, CELL_H);
-  g.clip();
-  g.fillStyle = '#000';
+// A sign is a lit box: a painted face in the shop's own colour, backlit, in a
+// dark metal cabinet. The old cells were glowing tube outlines with white-hot
+// letters, a look this city retired (VGA-083).
+const CABINET = '#15171a';
+const FRAME = 9;
+const INK_ON_DARK = '#f4ecdc';
+const INK_ON_PALE = '#1c1814';
+const PALE_FACE_LUMA = 0.55;       // a face brighter than this takes dark letters
+const EDGE_FALLOFF = 'rgba(0,0,0,0.3)';
+const NAME_TOP = 30;
+const NAME_BOTTOM = 290;           // leaves room for the rule and the sub line
+const NAME_STEP_MAX = 68;
+const NAME_FONT_FILL = 0.9;
+const RULE_Y = 302;
+const RULE_W = 76;
+const RULE_H = 3;
+const SUB_Y = 336;
+const SUB_PAD = 4;                 // keeps a long sub line off the frame
+const SUB_FONT = 'bold 26px sans-serif';
+// A vertical column of Japanese sets the long-vowel mark vertical too; the
+// horizontal dash reads as a stray hyphen between the kana.
+const VERTICAL_FORMS = { 'ー': '｜' };
+
+function inkFor(hex) {
+  const n = parseInt(hex.slice(1), 16);
+  const luma = (0.2126 * (n >> 16) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return luma > PALE_FACE_LUMA ? INK_ON_PALE : INK_ON_DARK;
+}
+
+// The tubes run down the middle of the box, so the face is brightest there
+// and falls off toward the frame. That falloff is what makes it read as lit
+// from behind rather than painted flat.
+function paintLitFace(g, color, ox, oy) {
+  g.fillStyle = CABINET;
   g.fillRect(ox, oy, CELL_W, CELL_H);
-  g.strokeStyle = color;
-  g.lineWidth = 6;
-  g.shadowColor = color;
-  g.shadowBlur = 18;
-  g.strokeRect(ox + 10, oy + 10, 108, 364);
-  g.textAlign = 'center';
-  g.shadowBlur = 26;
+  const [x, y, w, h] = [ox + FRAME, oy + FRAME, CELL_W - 2 * FRAME, CELL_H - 2 * FRAME];
   g.fillStyle = color;
-  g.font = 'bold 64px sans-serif';
-  const chars = [...main];
-  chars.forEach((ch, i) => g.fillText(ch, ox + 64, oy + 120 + i * 68));
-  g.shadowBlur = 20;
-  g.font = 'bold 30px sans-serif';
-  g.fillText(sub, ox + 64, oy + 330);
-  g.shadowBlur = 0;
-  g.fillStyle = '#fff';
-  g.font = 'bold 64px sans-serif';
-  chars.forEach((ch, i) => g.fillText(ch, ox + 64, oy + 120 + i * 68));
-  g.restore();
+  g.fillRect(x, y, w, h);
+  const falloff = g.createLinearGradient(x, 0, x + w, 0);
+  falloff.addColorStop(0, EDGE_FALLOFF);
+  falloff.addColorStop(0.5, 'rgba(0,0,0,0)');
+  falloff.addColorStop(1, EDGE_FALLOFF);
+  g.fillStyle = falloff;
+  g.fillRect(x, y, w, h);
+}
+
+// Letters step down the column and shrink to fit, so a five-letter HOTEL no
+// longer runs off the bottom of its face and over its own sub line.
+function paintSignCell(g, main, sub, color, ox, oy) {
+  paintLitFace(g, color, ox, oy);
+  const cx = ox + CELL_W / 2;
+  const chars = [...main].map((ch) => VERTICAL_FORMS[ch] ?? ch);
+  const step = Math.min(NAME_STEP_MAX, (NAME_BOTTOM - NAME_TOP) / chars.length);
+  const top = NAME_TOP + (NAME_BOTTOM - NAME_TOP - step * chars.length) / 2;
+  g.fillStyle = inkFor(color);
+  g.textAlign = 'center';
+  g.textBaseline = 'middle';
+  g.font = `bold ${Math.round(step * NAME_FONT_FILL)}px sans-serif`;
+  chars.forEach((ch, i) => g.fillText(ch, cx, oy + top + step * (i + 0.5)));
+  g.fillRect(cx - RULE_W / 2, oy + RULE_Y, RULE_W, RULE_H);
+  g.font = SUB_FONT;
+  g.fillText(sub, cx, oy + SUB_Y, CELL_W - 2 * (FRAME + SUB_PAD));
 }
 
 // One texture for every sign is what lets ten faces merge into one draw.
@@ -111,7 +145,9 @@ export function getGlowTex() {
 
 const GLOW_W = 7;
 const GLOW_H = 9;
-const GLOW_OPACITY = 0.32;
+// A diffused lit box throws a soft wash on wet air, not a tube's halo; at the
+// old 0.32 it dyed the whole tower behind each sign in the sign's colour.
+const GLOW_OPACITY = 0.2;
 
 // A Sprite billboards and an InstancedMesh does not, so the quad is built in
 // view space instead: same face-the-camera result, one draw for all of them.
@@ -229,8 +265,8 @@ function makeTick(faceAttr, alleyAttr, glows) {
 }
 
 const ALLEYS = [
-  { x: -13, z: -41, color: '#1e4d6b' },
-  { x: 13, z: 21, color: '#5b1e4d' },
+  { x: -13, z: -41, color: '#4d4032' },
+  { x: 13, z: 21, color: '#52402c' },
 ];
 
 function buildAlleyGlows(zoneMats) {

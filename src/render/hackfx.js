@@ -18,7 +18,7 @@ export function buildHackFx() {
 
   // Origin pulse: expanding flat ring, hidden unless firing.
   const pulseMat = new THREE.MeshBasicMaterial({
-    color: 0x54f0ff, transparent: true, opacity: 0,
+    color: 0xe6ecef, transparent: true, opacity: 0,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide,
   });
   const pulse = new THREE.Mesh(new THREE.RingGeometry(0.92, 1.0, 48), pulseMat);

@@ -1,12 +1,12 @@
 [
-  { "text": "ラーメン", "sub": "RAMEN", "color": "#ff3b5c", "side": -1, "z": -22, "y": 8.5 },
-  { "text": "HOTEL", "sub": "★★★", "color": "#35e0ff", "side": 1, "z": -6, "y": 11 },
-  { "text": "BAR", "sub": "NEON", "color": "#ff4df0", "side": -1, "z": 6, "y": 7 },
-  { "text": "24H", "sub": "OPEN", "color": "#ffb14e", "side": 1, "z": 24, "y": 6.5 },
-  { "text": "酒場", "sub": "CAFE", "color": "#52ff9e", "side": -1, "z": 36, "y": 9 },
-  { "text": "HOTEL", "sub": "EAST", "color": "#35e0ff", "side": 1, "z": -14, "y": 10, "ax": 44 },
-  { "text": "麺", "sub": "NOODLE", "color": "#ff4df0", "side": -1, "z": 20, "y": 7.5, "ax": 44 },
-  { "text": "PARK", "sub": "24H", "color": "#ffb14e", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" },
-  { "text": "HOTEL", "sub": "WEST", "color": "#35e0ff", "side": -1, "z": -10, "y": 10, "ax": -44 },
-  { "text": "BAR", "sub": "NEON", "color": "#ff4df0", "side": 1, "z": 30, "y": 7, "ax": -44 }
+  { "text": "ラーメン", "sub": "RAMEN", "color": "#a8322d", "side": -1, "z": -22, "y": 6.5 },
+  { "text": "HOTEL", "sub": "★★★", "color": "#1f3a5f", "side": 1, "z": -6, "y": 8.5 },
+  { "text": "BAR", "sub": "TAVERN", "color": "#24553a", "side": -1, "z": 6, "y": 6.5 },
+  { "text": "24H", "sub": "OPEN", "color": "#e8a33d", "side": 1, "z": 24, "y": 6.5 },
+  { "text": "CAFE", "sub": "BAKERY", "color": "#7a5230", "side": -1, "z": 36, "y": 6.5 },
+  { "text": "HOTEL", "sub": "EAST", "color": "#6e2430", "side": 1, "z": -14, "y": 8.5, "ax": 44 },
+  { "text": "DELI", "sub": "& SUBS", "color": "#efe6d2", "side": -1, "z": 20, "y": 6.5, "ax": 44 },
+  { "text": "PARK", "sub": "24H", "color": "#1d4f91", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" },
+  { "text": "HOTEL", "sub": "WEST", "color": "#2b2f36", "side": -1, "z": -10, "y": 8.5, "ax": -44 },
+  { "text": "BOOKS", "sub": "USED", "color": "#c9a227", "side": 1, "z": 30, "y": 6.5, "ax": -44 }
 ]

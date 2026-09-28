@@ -1,7 +1,7 @@
-// Wet-road reflection streaks (VGA-001): vertical neon smears under every
-// light source. Static sources merge per zone (2 draws, die with blackouts);
-// hero + pursuit streaks are one instanced mesh (1 draw) with a strobing
-// pursuit tint. Render-only; main drives opacity per frame.
+// Wet-road reflection streaks (VGA-001): vertical smears under every sign and
+// lamp, in the source's own colour. Static sources merge per zone (2 draws,
+// die with blackouts); hero + pursuit streaks are one instanced mesh (1 draw)
+// with a strobing pursuit tint. Render-only; main drives opacity per frame.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 

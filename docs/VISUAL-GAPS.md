@@ -5,10 +5,12 @@ Date: 2026-09-16. Grounded in current evidence: `slice-008-beauty.png`,
 Visual items only — no mechanics, no AI, no mission design.
 
 > **Historical — read with the 2026-09-28 direction change in mind.** This audit was
-> written against the retired "neon-noir rain" target. Every gap that asks for *more*
-> neon, holograms, underglow or cyberpunk excess (most of section 3) is void: the game
-> is now Urbis, a grounded modern city, and Cyberpunk is a reference for depth only.
-> See `AGENTS.md` and VGA-083 in `docs/VISUAL-GAP-ACTIONS.md`.
+> written against the "neon-noir rain" target, retired on 2026-09-28: the game is now
+> Urbis, a grounded modern city, and Cyberpunk is a reference for depth only. A gap
+> phrased as neon is read as sign and street-light craft. A gap that only asks for the
+> look — holograms, underglow, cyberware, a sky of flying traffic — is void; the
+> coverage footer in `docs/VISUAL-GAP-ACTIONS.md` says which. See VGA-083 there and
+> `docs/CHARTER.md`.
 
 ---
 

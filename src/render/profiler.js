@@ -12,10 +12,10 @@ export function buildProfiler() {
     'position:fixed', 'display:none', 'pointer-events:none', 'z-index:5',
     'transform:translate(-50%,-100%)', 'min-width:190px',
     'font:11px/1.65 ui-monospace,Menlo,monospace', 'letter-spacing:0.05em',
-    'color:#a8ecff', 'background:rgba(3,10,18,0.82)',
-    'border:1px solid rgba(84,240,255,0.45)', 'border-left:3px solid #54f0ff',
+    'color:#e4e1da', 'background:rgba(3,10,18,0.82)',
+    'border:1px solid rgba(255,255,255,0.16)', 'border-left:3px solid #d8c7a8',
     'padding:7px 10px', 'border-radius:4px',
-    'text-shadow:0 0 6px rgba(84,240,255,0.5)',
+    'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
   ].join(';');
   document.body.appendChild(panel);
   return panel;
@@ -41,7 +41,7 @@ export function updateProfiler(camera, target) {
     `<b style="color:#fff">${p.name}</b> · ${p.age}<br>` +
     `${p.job} · ${p.income}<br>` +
     (near
-      ? `<span style="color:#ff7aa8">◆ ${p.secret}</span><br>`
+      ? `<span style="color:#ffb14e">◆ ${p.secret}</span><br>`
       : `<span style="opacity:0.55">◆ signal weak — move closer</span><br>`) +
     `<span style="opacity:0.6">${dist.toFixed(1)}m</span>`;
   panel.style.display = 'block';

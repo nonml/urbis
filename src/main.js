@@ -617,7 +617,7 @@ function render() {
     const stars = '★'.repeat(wanted.heat) + '☆'.repeat(3 - wanted.heat);
     const busted = isBusted(wanted, street.time);
     hud.innerHTML =
-      `<b>NEON BLOCK 009</b> · ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
+      `<b>URBIS</b> · ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]${speedLine}<br>` +

@@ -1,7 +1,7 @@
 {
-  "name": "neon-city",
+  "name": "urbis",
   "version": "0.1.0",
-  "description": "A living neon-noir city you can walk, drive, and hack.",
+  "description": "Build a modern city, then live in it — walk, drive and hack its streets.",
   "type": "module",
   "main": "electron.cjs",
   "scripts": {
@@ -20,8 +20,8 @@
     "electron:pack": "electron-builder --dir"
   },
   "build": {
-    "appId": "com.nonta.neon-city",
-    "productName": "Neon City",
+    "appId": "com.nonta.urbis",
+    "productName": "Urbis",
     "directories": {
       "buildResources": "public",
       "output": "dist-electron"
@@ -51,7 +51,8 @@
   "keywords": [
     "game",
     "three.js",
-    "cyberpunk"
+    "city-builder",
+    "open-world"
   ],
   "license": "MIT",
   "dependencies": {

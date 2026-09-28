@@ -152,7 +152,8 @@ export function updateDaylight(env, scene, bloom, n, renderer) {
   env.moonGlowMat.opacity = 0.5 * n;
   bloom.threshold = 0.92 + 0.05 * day;
   bloom.strength = 0.45 - 0.1 * day;
-  // Animate exposure: brighter at night (neon blooms), dimmer at day.
+  // Exposure sits lower at night so the street stays dark and its signs,
+  // windows and lamps carry the frame; day opens it back up.
   renderer.toneMappingExposure = 0.75 + 0.35 * day;
 }
 
@@ -162,7 +163,7 @@ export function updateDaylight(env, scene, bloom, n, renderer) {
 //   contrast   — the untouched day frame was grey soup, every value crowded
 //                around 0.5 with nothing anchoring black
 //   split tone — cool shadows against warm highlights, the pressure that makes
-//                a neon street read as photographed rather than rendered
+//                a lit street read as photographed rather than rendered
 //   vignette   — quiet, just enough to stop the corners competing with the
 //                middle; heavier at night when the middle is the only lit part
 //   grain      — the single cheapest thing that stops a frame looking like CG,

@@ -1,13 +1,15 @@
 // Pedestrians: flared raincoats, faces, skin tones, swinging arms + legs,
-// hats, cyber visors — all instanced. Matrices from sim; swing freezes when
-// the walker freezes. Hats/visors hide via zero-scale for wearers without.
+// hats, glasses — all instanced. Matrices from sim; swing freezes when
+// the walker freezes. Hats/glasses hide via zero-scale for wearers without.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { bakeVerticalShade, coatFabric, weaveUVs } from './player.js';
 import { NPC_COUNT, SKIN_TONES, isDark, zoneAt } from '../sim/street.js';
 
 const HAT_COLORS = [0x14161c, 0x3a2a1a, 0x1a3a4a, 0x5c1f2e];
-const VISOR_COLORS = [0x35e0ff, 0xff4df0, 0xffb14e];
+// Black, tortoiseshell, gunmetal. Lit, not basic: an unlit lens ignores the
+// street's light and reads as a glowing slit in every dark doorway.
+const GLASSES_COLORS = [0x111214, 0x3b2618, 0x2e3136];
 
 function faceTexture() {
   const c = document.createElement('canvas');
@@ -105,23 +107,23 @@ export function buildNPCs(street) {
   const faces = new THREE.InstancedMesh(faceGeo, new THREE.MeshStandardMaterial({
     map: faceTexture(), alphaTest: 0.4, roughness: 0.6,
   }), NPC_COUNT);
-  const visorGeo = new THREE.PlaneGeometry(0.15, 0.04);
-  const visors = new THREE.InstancedMesh(visorGeo, new THREE.MeshBasicMaterial({}), NPC_COUNT);
+  const glassesGeo = new THREE.PlaneGeometry(0.15, 0.04);
+  const glasses = new THREE.InstancedMesh(glassesGeo, new THREE.MeshStandardMaterial({ roughness: 0.2 }), NPC_COUNT);
   const skin = new THREE.Color();
   street.npcs.forEach((n, i) => {
     bodies.setColorAt(i, new THREE.Color(n.coat));
     heads.setColorAt(i, skin.set(SKIN_TONES[n.skin] ?? SKIN_TONES[0]));
     hats.setColorAt(i, new THREE.Color(HAT_COLORS[n.hat % HAT_COLORS.length]));
-    visors.setColorAt(i, new THREE.Color(VISOR_COLORS[i % VISOR_COLORS.length]));
+    glasses.setColorAt(i, new THREE.Color(GLASSES_COLORS[i % GLASSES_COLORS.length]));
     // Arms read coat color so they vanish into the silhouette.
     armL.setColorAt(i, new THREE.Color(n.coat));
     armR.setColorAt(i, new THREE.Color(n.coat));
   });
-  for (const m of [bodies, heads, hats, visors, armL, armR]) {
+  for (const m of [bodies, heads, hats, glasses, armL, armR]) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
-  group.add(bodies, heads, legL, legR, armL, armR, hats, faces, visors);
-  const rig = { bodies, heads, legL, legR, armL, armR, hats, faces, visors, dummy };
+  group.add(bodies, heads, legL, legR, armL, armR, hats, faces, glasses);
+  const rig = { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy };
   updateNPCs(rig, street);
   return { group, ...rig };
 }
@@ -161,7 +163,7 @@ function mergeHat() {
 const _fwd = new THREE.Vector3();
 
 export function updateNPCs(rig, street) {
-  const { bodies, heads, legL, legR, armL, armR, hats, faces, visors, dummy } = rig;
+  const { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy } = rig;
   street.npcs.forEach((n, i) => {
     const yaw = n.axis === 'x' ? (n.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (n.dir > 0 ? 0 : Math.PI);
     const moving = !isDark(street, zoneAt(n.z));
@@ -201,7 +203,7 @@ export function updateNPCs(rig, street) {
     dummy.rotation.set(swing * 0.7, yaw, 0, 'YXZ');
     dummy.updateMatrix();
     armR.setMatrixAt(i, dummy.matrix);
-    // Hat sits on the head; face + visor ride the forward vector.
+    // Hat sits on the head; face + glasses ride the forward vector.
     const hy = 1.68 * n.h + bob;
     if (n.hat) {
       dummy.position.set(n.x, hy - 0.04, n.z);
@@ -218,7 +220,7 @@ export function updateNPCs(rig, street) {
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     faces.setMatrixAt(i, dummy.matrix);
-    if (n.cyber) {
+    if (n.glasses) {
       dummy.position.set(n.x + _fwd.x * 0.115, hy + 0.025, n.z + _fwd.z * 0.115);
       dummy.rotation.set(0, yaw, 0);
       dummy.scale.set(1, 1, 1);
@@ -226,9 +228,9 @@ export function updateNPCs(rig, street) {
       dummy.scale.set(0, 0, 0);
     }
     dummy.updateMatrix();
-    visors.setMatrixAt(i, dummy.matrix);
+    glasses.setMatrixAt(i, dummy.matrix);
   });
-  for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, visors]) {
+  for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) {
     m.instanceMatrix.needsUpdate = true;
   }
 }
