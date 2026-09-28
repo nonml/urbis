@@ -302,13 +302,19 @@ Three rules, each learned the expensive way:
 
 ## How to work
 
-**If the operator just says "start" or "next":** take the first open item in
-`docs/VISUAL-GAP-ACTIONS.md` and run the seven steps below. That queue closes first, by
-the operator's own call, recorded in `docs/CHARTER.md`. Do not ask which one — pick it,
-say which you picked in one line, and go. The operator can redirect with "start zoning"
-(slice 024 in `docs/ZONING.md`) or by naming a VGA id. **VGA-083 (strip the neon) sits at
-the top of that queue and goes first** — until it is ticked, every other visual item is
-being built on a palette that is about to change.
+**If the operator just says "start" or "next":** take the first open item in this order
+and run the seven steps below. Do not ask which one — pick it, say which you picked in
+one line, and go.
+
+1. **VGA-083 — strip the neon** (`docs/VISUAL-GAP-ACTIONS.md`). Small, +0 draws, and
+   everything built after it inherits the palette.
+2. **The feature slices in `docs/CHARTER.md`, in the order listed** — zoning + growth
+   first (`docs/ZONING.md`). Building the city is half the game; it goes before polish.
+3. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner
+   only when a visual item blocks the slice in hand.
+
+The operator can redirect by naming a VGA id or a feature slice. This order was set by
+the operator on 2026-09-28 and is recorded in `docs/CHARTER.md`.
 
 1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
    Structural work on the city itself has its own plan in `docs/ZONING.md`.

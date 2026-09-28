@@ -92,14 +92,16 @@ consumed by it. The three features were never built — they are listed below by
 
 ## Next
 
-Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queue**
-(82 items, most still open) and closes first per operator redirect. The feature slices
-below are the **structural** work.
+Two tracks. The feature slices below are the **structural** work and come first.
+`docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
+waits behind them — except VGA-083.
 
 Next free slice number: **026**.
 
-**First, before any other visual item: VGA-083 — strip the neon.** See the visual target
-above.
+**Work order (operator, 2026-09-28):** VGA-083 strip the neon → the feature slices below,
+in order → the rest of the visual queue. This replaces the earlier "visual queue closes
+first" redirect, which would have buried the building half of the game behind 80 polish
+items — many of which touch buildings that zoning is about to change anyway.
 
 ### Feature slices, in order
 
