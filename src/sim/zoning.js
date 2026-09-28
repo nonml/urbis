@@ -4,6 +4,7 @@
 // towers is docs/ZONING.md.
 import { createStreams } from './rng.js';
 import { isDark, zoneAt } from './street.js';
+import { TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
 
 export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
 export const STAGE = Object.fromEntries(STAGES.map((name, i) => [name, i]));
@@ -80,6 +81,10 @@ function makeParcel(rand, [x, z, w, d]) {
     // it is climbing toward the low block.
     heights: [0, 0, LOW_HEIGHT, LOW_HEIGHT + (top - LOW_HEIGHT) * MID_SHARE, top],
     building: false,
+    // What the lot is doing and why, and how empty it stands (sim/decline.js).
+    trend: TREND.STEADY,
+    why: null,
+    vacancy: 0,
   };
 }
 
@@ -118,17 +123,25 @@ function growthRate(p, demand) {
 
 // Progress is work toward the next stage, so both directions stay continuous: a
 // stage completes at 1 and carries the overshoot; a slump below 0 drops a stage
-// and lands at the top of the one beneath, the same height it just left.
-function tickParcel(p, demand, dt) {
+// and lands at the top of the one beneath, the same height it just left. A
+// building empties before it sheds anything (vacate).
+function tickParcel(p, demand, dt, powered) {
   const bar = p.stage === STAGE.EMPTY ? BREAK_GROUND_AT : GROW_AT;
   const grows = p.stage < STAGE.HIGH && demand >= bar;
+  const lets = demand >= GROW_AT && p.vacancy > 0;
+  const slumps = !grows && demand < DECLINE_AT;
+  judge(p, { gaining: grows || (lets && hasFloors(p)), losing: slumps && p.stage > STAGE.EMPTY, powered });
+  // The cascade hook: a site without power does no work. It does not decline
+  // either — a blackout stops the crane, it does not dismantle it.
+  if (!powered) return;
+  if (lets) reoccupy(p, dt);
   if (grows) {
     p.progress += dt * growthRate(p, demand);
     if (p.progress >= 1) {
       p.stage += 1;
       p.progress = p.stage === STAGE.HIGH ? 0 : p.progress - 1;
     }
-  } else if (demand < DECLINE_AT) {
+  } else if (slumps && vacate(p, dt)) {
     p.progress -= dt / DECLINE_SECS;
     if (p.progress < 0 && p.stage > STAGE.EMPTY) {
       p.stage -= 1;
@@ -143,10 +156,7 @@ export function tickZoning(city, dt, street) {
   city.time += dt;
   updateDemand(city);
   for (const p of city.parcels) {
-    // The cascade hook: a site without power does no work. It does not decline
-    // either — a blackout stops the crane, it does not dismantle it.
-    if (isDark(street, p.powerZone)) continue;
-    tickParcel(p, city.demand[p.use], dt);
+    tickParcel(p, city.demand[p.use], dt, !isDark(street, p.powerZone));
   }
 }
 
