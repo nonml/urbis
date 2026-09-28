@@ -69,7 +69,7 @@ city, then live in it**, with a **grounded modern city** look (see `AGENTS.md` a
 `docs/CHARTER.md`). Cyberpunk is a reference for *depth*, never for *look*. Every
 remaining neon element is now a defect, and this item goes before every other open one.
 
-- **VGA-083 Strip the neon.** ✅ DONE (slice 045: a sign is now a lit box — a painted
+- **VGA-083 Strip the neon.** ✅ DONE (5f8c9ed, slice 045: a sign is now a lit box — a painted
   face in a real fascia colour, backlit, in a dark cabinet, no tube halo — and the ten
   signs are real trades at believable heights: blades at 6.5 m and hotels at 8.5 m, clear
   of the 4.2 m awning line. The sign wash dropped 0.32 → 0.2, because at 0.32 it dyed
