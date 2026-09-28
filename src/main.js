@@ -8,6 +8,7 @@ import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
+import { districtReport } from './sim/economy.js';
 import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
@@ -33,6 +34,7 @@ import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
 import { drawLedger } from './render/ledger.js';
 import { hideFaded } from './render/faded.js';
+import { buildEconomyPanel, updateEconomyPanel } from './render/economy.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -118,6 +120,7 @@ const street = createStreet(20260916);
 const city = createCity(20260916);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
+const economyPanel = buildEconomyPanel();
 const player = createPlayer();
 player.mode = 'foot';
 const heroCar = createPlayerCar();
@@ -377,6 +380,7 @@ window.__game = {
       progress: +p.progress.toFixed(4), height: +builtHeight(p).toFixed(2), building: p.building,
     })),
   }),
+  economy: () => districtReport(city),
   shot: () => {
     composer.render();
     return captureFrame(renderer);
@@ -402,6 +406,15 @@ if (CAPTURE) {
   // The end of the day/night glide, reached at once: a probe measuring the day
   // frame should not have to render 140 frames of dusk to get there.
   window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; };
+  // Runs the street and the city ahead by `secs` of game time in the frame loop's
+  // own 50 ms steps, so evidence of a minutes-long economic swing does not need
+  // minutes of a software rasteriser. Nothing else is ticked; nothing is skipped.
+  window.__game.advance = (secs) => {
+    for (let t = 0; t < secs; t += 0.05) {
+      tickStreet(street, 0.05);
+      tickZoning(city, 0.05, street);
+    }
+  };
   // Stand the player somewhere inside the walk box it could have walked to, and
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
@@ -573,6 +586,7 @@ function render() {
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
   growth.update();
+  updateEconomyPanel(economyPanel, city);
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street, camera);
   // Hero and pursuit throws ride the traffic pool set (VGA-004): three more

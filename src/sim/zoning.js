@@ -4,6 +4,7 @@
 // towers is docs/ZONING.md.
 import { createStreams } from './rng.js';
 import { isDark, zoneAt } from './street.js';
+import { cityDemand, createEconomy, demandFor, tickEconomy } from './economy.js';
 
 export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
 export const STAGE = Object.fromEntries(STAGES.map((name, i) => [name, i]));
@@ -56,15 +57,6 @@ const MID_SHARE = 0.45;
 const START_STAGES = [STAGE.EMPTY, STAGE.EMPTY, STAGE.EMPTY, STAGE.SITE, STAGE.SITE, STAGE.LOW, STAGE.LOW, STAGE.MID];
 const START_PROGRESS = 0.8;
 
-// Until the district economy lands (feature slice 2), demand per use is a slow
-// swell: two sines at unrelated periods, so no use repeats on a beat a player
-// could learn. Seeded from the sim stream, because it is behaviour, not layout.
-const DEMAND_MEAN = 0.56;
-const DEMAND_WAVES = [
-  { amp: 0.26, minSecs: 150, maxSecs: 260 },
-  { amp: 0.14, minSecs: 55, maxSecs: 95 },
-];
-
 function makeParcel(rand, [x, z, w, d]) {
   const stage = START_STAGES[Math.floor(rand() * START_STAGES.length)];
   const fit = Math.min(TOP_MAX, Math.max(TOP_MIN, Math.min(w, d) * SLENDERNESS));
@@ -83,32 +75,19 @@ function makeParcel(rand, [x, z, w, d]) {
   };
 }
 
-function makeWaves(rand) {
-  return DEMAND_WAVES.map((w) => ({
-    amp: w.amp,
-    period: w.minSecs + rand() * (w.maxSecs - w.minSecs),
-    phase: rand() * Math.PI * 2,
-  }));
-}
-
-function updateDemand(city) {
-  for (const use of USES) {
-    let v = DEMAND_MEAN;
-    for (const w of city.waves[use]) v += w.amp * Math.sin((city.time / w.period) * Math.PI * 2 + w.phase);
-    city.demand[use] = Math.max(0, Math.min(1, v));
-  }
+// Demand is the district economy's (sim/economy.js): what stands on the lots and
+// what happens in each district move it. A parcel reads its own district's
+// market through demandFor(); `demand` is the whole city's mean, for a glance.
+function updateDemand(city, dt, street) {
+  tickEconomy(city.economy, city.parcels, builtHeight, street, dt);
+  city.demand = cityDemand(city.economy);
 }
 
 export function createCity(seed) {
   const rng = createStreams(seed);
-  const city = {
-    time: 0,
-    parcels: LOTS.map((lot) => makeParcel(rng.world, lot)),
-    waves: Object.fromEntries(USES.map((use) => [use, makeWaves(rng.sim)])),
-    demand: {},
-  };
-  updateDemand(city);
-  return city;
+  const parcels = LOTS.map((lot) => makeParcel(rng.world, lot));
+  const economy = createEconomy(parcels, builtHeight, rng.sim);
+  return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
 
 function growthRate(p, demand) {
@@ -141,12 +120,12 @@ function tickParcel(p, demand, dt) {
 
 export function tickZoning(city, dt, street) {
   city.time += dt;
-  updateDemand(city);
+  updateDemand(city, dt, street);
   for (const p of city.parcels) {
     // The cascade hook: a site without power does no work. It does not decline
     // either — a blackout stops the crane, it does not dismantle it.
     if (isDark(street, p.powerZone)) continue;
-    tickParcel(p, city.demand[p.use], dt);
+    tickParcel(p, demandFor(city, p), dt);
   }
 }
 
