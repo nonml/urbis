@@ -8,6 +8,7 @@ import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
+import { STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera } from './sim/interior.js';
 import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
@@ -31,6 +32,8 @@ import { buildGrassGround, buildGrassTufts, buildMountains } from './render/land
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
+import { buildInteriors, updateInteriors } from './render/interior.js';
+import { buildDoorHud, updateDoorHud, fadeThroughDoor } from './render/doorhud.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -132,6 +135,11 @@ const avatar = buildPlayer();
 scene.add(avatar.group);
 const shops = buildShops(texLoader, maxAniso);
 scene.add(shops.group);
+// Verticality: the noodle bar behind the RAMEN board and the roof next door.
+const interior = createInterior();
+const interiors = buildInteriors();
+scene.add(interiors.group);
+const doorHud = buildDoorHud();
 const puddles = buildPuddles();
 scene.add(puddles.group);
 const mirror = buildCityMirror();
@@ -315,7 +323,28 @@ function fireHack() {
 // Per-frame zone power driver: DARK follows sim truth; every light answers.
 
 function nearHero() {
-  return Math.hypot(heroCar.x - player.x, heroCar.z - player.z) < 3.4;
+  return interior.space === STREET && Math.hypot(heroCar.x - player.x, heroCar.z - player.z) < 3.4;
+}
+
+// The follow cam's street framing, put back when the player comes out.
+const STREET_RIG = { dist: 4.5, pitch: 0.18 };
+// Where the camera pivots in a space: the player's head.
+const CAM_PIVOT = 1.6;
+// How far the rain box reaches below a player up on a roof.
+const ROOF_RAIN_BELOW = 12;
+
+// E: through the door in reach, if there is one. The cut is immediate; the
+// camera snaps to the new space's rig behind the player and a short fade
+// covers the jump.
+function enterDoor() {
+  if (player.mode !== 'foot' || !useDoor(interior, player)) return;
+  const rig = currentPlace(interior)?.rig ?? STREET_RIG;
+  cam.yaw = player.yaw;
+  cam.dist = rig.dist;
+  cam.pitch = rig.pitch;
+  cam.ground = player.y;
+  lockedNpc = null;
+  fadeThroughDoor(doorHud);
 }
 
 function toggleVehicle() {
@@ -342,6 +371,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'h') fireHack();
   if (k === 'f') toggleVehicle();
   if (k === 't') toggleDay(clock);
+  if (k === 'e') enterDoor();
 });
 
 const clock = createClock();
@@ -363,6 +393,9 @@ window.__game = {
   tod: () => +clock.nightFactor.toFixed(3),
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
+  space: () => interior.space,
+  door: () => interior.near?.label ?? null,
+  useDoor: () => enterDoor(),
   city: () => ({
     time: +city.time.toFixed(2),
     demand: { ...city.demand },
@@ -398,6 +431,12 @@ if (CAPTURE) {
     player.x = Math.max(-52, Math.min(70, x));
     player.z = Math.max(-68, Math.min(100, z));
     cam.yaw = yaw;
+  };
+  // The mouse's drag and wheel as numbers, clamped to the ranges the mouse has:
+  // a framing any player can reach by hand, not a lab angle.
+  window.__game.look = (pitch, dist = cam.dist) => {
+    cam.pitch = Math.max(0.08, Math.min(1.2, pitch));
+    cam.dist = Math.max(3, Math.min(14, dist));
   };
 }
 
@@ -491,6 +530,7 @@ function render() {
     }
   } else {
     tickPlayer(player, footInput(), dt);
+    tickInterior(interior, player);
     updatePlayer(avatar, player);
   }
   const glows = [zoneGlow(street, 0), zoneGlow(street, 1)];
@@ -532,6 +572,10 @@ function render() {
     const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(street.time, e.seed);
     e.mat.color.setScalar((0.3 + 0.7 * nf) * (0.06 + 0.94 * b));
   }
+  updateInteriors(interiors, interior, { glows, night: nf, time: street.time, elapsed: clock.elapsed });
+  rain.visible = !isIndoors(interior);
+  // Up on a roof it rains on the roof: the rain box rides up with the player.
+  rain.position.y = interior.space === STREET ? 0 : player.y - ROOF_RAIN_BELOW;
   lamps.tick(street.time);
   missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
@@ -568,6 +612,7 @@ function render() {
   const hz = driving ? heroCar.z : player.z;
   heroKey.position.set(hx, (driving ? heroCar.y : player.y) + 2.4, hz);
   heroKey.intensity = 14 * night;
+  if (isIndoors(interior)) heroKey.intensity = interiors.key;
   let tx = driving ? heroCar.x : player.x;
   let tz = driving ? heroCar.z : player.z;
   // Threat pull: a fresh hack drags pursuit toward the dead zone (re-012).
@@ -594,10 +639,11 @@ function render() {
   // Eased, because a kerb is a step function and the whole frame would jump.
   cam.ground += (Math.max(ay, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * 6);
   camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
+  if (!driving) camera.position.copy(frameCamera(interior, { x: ax, y: ay + CAM_PIVOT, z: az }, camera.position));
   lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
   camera.lookAt(lookAt);
 
-  lastProfile = driving ? null : updateProfiler(camera, acquireTarget());
+  lastProfile = driving ? null : updateProfiler(camera, interior.space === STREET ? acquireTarget() : null);
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   if (driving && lockedNpc) lockedNpc = null;
   if (driving) {
@@ -609,6 +655,7 @@ function render() {
   } else {
     prompt.style.display = 'none';
   }
+  updateDoorHud(doorHud, driving ? null : interior.near);
 
   renderer.info.reset();
   // The city mirror re-shoots one cube face per frame, and only when it has gone
