@@ -62,7 +62,50 @@ before reinstating anything that was removed.
 
 ---
 
-## A. Street reflection & wetness (the founding image)
+## 0. Direction change — do this first
+
+On 2026-09-28 the operator retired the neon-noir target. The game is **Urbis — build a
+city, then live in it**, with a **grounded modern city** look (see `AGENTS.md` and
+`docs/CHARTER.md`). Cyberpunk is a reference for *depth*, never for *look*. Every
+remaining neon element is now a defect, and this item goes before every other open one.
+
+- **VGA-083 Strip the neon.** Remove every trace of the neon/cyberpunk look from the
+  running game and the project metadata, without losing the lighting craft underneath.
+  Found by grep on 2026-09-28 — re-grep `neon|cyberpunk|magenta|cyan` and the four hex
+  values below before you start, the list may have grown:
+  - `src/content/signs.json` — magenta `#ff4df0`, cyan `#35e0ff`, electric green
+    `#52ff9e`, hot pink `#ff3b5c`, and the literal `"sub": "NEON"`. Replace with real
+    storefront trades and fascia colours; lower hotel/bar signs to believable heights.
+  - `src/render/setdress.js` — PAWN / CLINIC glows in the same cyan and green.
+  - `src/render/npcs.js` — `VISOR_COLORS` (cyan/magenta visors are pure cyberpunk
+    costume). Ordinary clothing accents instead.
+  - `src/render/traffic.js` — the cyan finder beacon. Keep a finder, pick a neutral cue.
+  - `src/main.js` — HUD title `NEON BLOCK 009` (also in `docs/BACKLOG.md`). Becomes
+    Urbis, or a district name.
+  - `src/render/signs.js`, `streaks.js`, `block.js`, `atmosphere.js` — "neon" in
+    comments and naming. Rename to signage/storefront language.
+  - `index.html` `<title>`, and `package.json` `name`, `description`, `productName`,
+    `keywords` (`cyberpunk`). **`appId` (`com.nonta.neon-city`) — ask the operator
+    before changing:** it is tied to the Electron/Steam build.
+  - Re-scope what the old target wrote into this queue: VGA-001 "magenta/cyan smears"
+    → smears in the sign's own real colour; VGA-021 "Paint that answers neon" → paint
+    that answers sign and street light; VGA-044 "holographic" and VGA-056 "neon sparkle"
+    are dropped from their done-when; the coverage footer's "Cyberpunk (19)" group is
+    audited for anything that is look rather than depth.
+  - **Keep:** wet-road reflections, lamp pools, lit windows, the blackout cascade, rain
+    as one weather among several. These are lighting craft, not neon.
+  - **Do not** rebalance the grade toward teal-orange "cinema" either — grounded means
+    the frame looks like a real street, day or night.
+
+  Done when: grep for `neon|cyberpunk` in `src/`, `index.html` and `package.json`
+  returns nothing (appId excepted if the operator says so); a night and a day frame at
+  the play camera show no magenta/cyan/electric-green light anywhere; the blackout
+  sequence still reads. Evidence `slice-NNN-grounded-night.png` +
+  `slice-NNN-grounded-day.png` + `slice-NNN-grounded-blackout.png`. Draws: +0.
+
+---
+
+## A. Street reflection & wetness (weather craft)
 
 - **VGA-001 Neon-to-asphalt reflections.** ✅ DONE (VGA batch 1: static merged smears per zone for all signs + lamp heads, dynamic instanced streaks for hero + strobing pursuit, die per zone, day-subtle. Evidence `slice-013-streaks.png` + `slice-013-paintdark.png`.) Signs, lamps, and headlights smear on wet road (planar probe / SSR-lite / stretched sprite decals — implementer's choice, fixed cost). Touches: `src/render/*` + road material. Done when: night frame shows magenta/cyan smears under signs; re-shot angle matches `slice-011-market`. Draws: +2..4.
 - **VGA-002 Puddle mirrors.** ✅ DONE (ac8d9f7, slice 024: the water is a real mirror. A basic material samples a city cube the street re-shoots only when the light changes, so puddles carry tower windows and sign wash at the play camera, go pale-sky by day, and die per zone in a blackout. Evidence `slice-024-night.png` + `slice-024-zoom-night.png` + `slice-024-day.png` + `slice-024-blackout.png`. Measured 156 draws steady (+1), 173 peak on the five re-shoot frames. Known limits: one cube for the whole city, so a distant puddle reflects a plausible block rather than its own; drying rings and the formation lifecycle stay with VGA-051.) Draws: +1.
@@ -71,7 +114,7 @@ before reinstating anything that was removed.
 - **VGA-005 Wetness response materials.** ✅ DONE (VGA batch 2: wet-grade scalar pass — road/paving/curb/podium/metal/paint roughness down + env up, road darkened. Zero draws. Evidence `slice-014-puddle.png`. Per-material animated wetness values wait on VGA-051.) Per-material 0–1 wetness driving darkening/gloss on asphalt, paving, concrete, metal, car bodies, awnings, cans. Touches: materials lib + all maps. Done when: dry/wet split frame shows the ramp. Draws: +0.
 - **VGA-006 Oil-rainbow & joint water.** ⏳ PARTIAL (thin-film iridescence proven in lab `slice-014-rainbow.png`; play-angle audit 2026-09-17: fringe invisible at play distance. Slice 024 then traded the physical puddle material for a basic mirror, so the iridescence term is gone outright — the rainbow has to come back as texture or shader work on the mirror, not as a material flag. Reopen until it reads in the play frame. Full per-slab water simulation waits on VGA-051.) Rainbow sheen in old puddles under neon; pooled water darkening paving joints. Touches: puddle shader, paving. Done when: close-up night frame. Draws: +0..1.
 
-## B. Blackout theater (the signature hack)
+## B. Blackout theater (one hack among several)
 
 - **VGA-007 Blackout honesty.** ✅ DONE (`b406d64`, slice 012; play-angle audit 2026-09-17 `slice-016-audit-dark.png` holds: shop awning 94→15, road 77→37, facade band 57→20, zebra 99→11 — the zone actually dies in the play frame). Fixes: windows blazing, BAR glowing, zebra shining, stray cones. Touches: `street.js` zones, facade/sign/pool materials. Draws: +0.
 - **VGA-008 Death & rebirth cascade.** ✅ DONE (`b406d64`, slice 012). Flicker-and-die rolling down the block, staggered per-fixture; relight staggers back. Lamp pop/buzz visual (flash scale + sprite kick). Touches: lamp/sign update fns. Done when: 3-frame sequence (lit → dying → dark). Draws: +0.
@@ -126,7 +169,7 @@ before reinstating anything that was removed.
 - **VGA-042 Rooftop furniture.** Water towers, AC farms, antennas, billboards, parapets with craft, gardens. Done when: looking-up frame ends in interest. Draws: +2.
 - **VGA-043 Shopfronts that live.** ⏳ PARTIAL (slice 028: the external review's biggest surviving finding. Ground-floor glazing now runs every dressed podium face, split into ~3.6m tenancies with solid piers between and mullions inside each bay, so the block reads as four shops rather than one ribbon of light. Each pane carries a baked interior — bright ceiling strip, graded wash, dark shelving verticals, a figure at the counter — so it is a room, not a lightbox. Warm spill lands on the pavement in front of every bay, riding the existing per-zone pool mesh for +0. The glazing is zoned, so a blackout kills the shops and their spill together: `slice-028-blackout.png`. Evidence `slice-028-shopfront-night.png` + `slice-028-shopfront-day.png` + `slice-028-street-night.png`. Measured 160 draws steady, 166 peak — +2, one glazing mesh per power zone. Moving silhouettes and real interior depth still open. Slice 030 gave the glazing a daylight floor: a tower's windows go dark at noon but a shop's do not, and without it every dressed ground floor read as a black hole punched in a sunlit wall. Still zoned, so a daytime blackout kills it honestly. Slice 031: the giveaway was never one pane, it was twenty identical amber panes in a row — one canvas, one colour temperature, the whole district lit by a single bulb. The interior is now a 256x128 four-cell atlas (grocery, noodle bar, laundromat, boutique), each with its own wash, its own stock — gondola aisles, a counter with a cook and pendant stems, washer drums, mannequins — and its own pavement spill colour. Bays pick a cell by `(blockIndex * 3 + bayIndex) % 4`, so no two neighbours match and no block repeats the one before it. Pure UV offsets into one texture: +0 draws, no new material. Pane floors lifted off black, and the shared trim material went 0x0b0d12 to 0x1b1f27 because an awning at that value is a hole in the frame, not a thing. Evidence `slice-031-shopfront-night.png` + `slice-031-shopfront-day.png` + `slice-031-street-night.png`. 156 peak, unchanged. Slice 036 answered the other half: only the avenue-facing podium face was ever dressed, so from any cross street a building was a four-metre flat plaster slab — a grey void where a frontage should be. Every face now carries the rhythm: three pilasters at the same width and height the dressed face uses, a downpipe with hopper and shoe on each of the four corners, and a bracketed condenser on the back-of-house walls. All merged into the podium and trim meshes that already existed, +0 draws. Slice 040: the awning was a plate floating off a wall, which is most of why it read as a black void rather than as a canopy. It now hangs a valance off its outer edge and stands on raked brackets every ~3.2m, all merged into the trim mesh. Evidence `slice-040-awning-day.png` + `slice-040-awning-night.png`. 154 peak, +0.) Draws: +2.
 
-## H. Signage (excess, layered)
+## H. Signage (real storefronts, layered)
 
 - **VGA-044 Animated & holographic signs.** ⏳ PARTIAL (slice 033: the six setdress shopfronts were flat planes painting a fake shopfront — sign band plus four fake lit windows — hung on a wall that had since grown real glazing with real interiors behind it. A sticker of a shop stuck over an actual shop, at one draw each. Replaced with signage that has depth: a fascia board over the door, and a blade projecting across the pavement so the trade reads side-on from the far end of the block, which is the whole point of a projecting sign and the thing the street was most missing. One 256x200 atlas of three trade bands plus a black strip every non-sign face points at, merged per power zone — six materials became two, and the blackout still takes a zone's trade names out with its lamps (`slice-033-signs-blackout.png`). Evidence `slice-033-signs-night.png` + `slice-033-signs-day.png`. 156 peak to 153 on the same sweep: -3. Flicker, scanlines, chase bulbs and holograms still open.) Draws: +2..4.
 - **VGA-045 Sign water & mist behavior.** Sheeting faces, dripping arms, halos fattening in mist (needs VGA-040 storm values). Done when: downpour sign close-up. Draws: +0.

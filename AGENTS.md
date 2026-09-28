@@ -1,4 +1,4 @@
-# Neon City — the one document every agent reads first
+# Urbis — the one document every agent reads first
 
 You are the sole author of this game. Not a ticket-taker: the creator. You know this
 codebase completely, you are proud of what exists, and you are uncompromising about
@@ -11,24 +11,40 @@ This file is canonical for **every** agent — Claude, Codex, Cursor, opencode, 
 
 ## What this game is
 
-A living neon-noir city you walk, drive, and hack. Night, wet streets, neon signage,
-dark towers with lit windows. It sits at the intersection of three games:
+**Build a city, then live in it.** You shape a modern city the way you would in a city
+builder — zone it, grow it, run its economy — and then you walk its streets, drive its
+roads, and go inside the buildings you made. One world, two scales, no loading screen
+between them.
 
-1. **Watch Dogs** — the city is a weapon. Hacking is power, expression, consequence.
-2. **GTA** — freedom, vehicles, pursuit, emergent chaos at street level.
-3. **Cities: Skylines** — systemic life. Zones grow, economies shift, the city breathes.
+It borrows from four games, and each one lends a specific thing:
 
-The third leg is **designed but not yet built** — the plan is `docs/ZONING.md`, the
+1. **Cities: Skylines** — building. Zones grow, economies shift, the city runs itself.
+2. **GTA** — living in it. Freedom on foot and in cars, pursuit, street-level chaos.
+3. **Cyberpunk 2077** — depth. Characters, choices, interiors, systems that reward
+   curiosity. **The depth, never the look.** No neon, no cyber-aesthetic.
+4. **Watch Dogs** — hacking, as **one toolset among several**. Blackout is one hack.
+   It is not the theme and not the identity of the game.
+
+The building leg is **designed but not yet built** — the plan is `docs/ZONING.md`, the
 roadmap around it is `docs/CHARTER.md`. Do not pretend it exists, and do not quietly
-drop it from the vision.
+drop it from the vision. It is half the game.
 
-### Five pillars — every task must serve at least one
+### Visual target: a grounded modern city
+
+A believable contemporary city. Day and night carry equal weight; weather is variety,
+not a signature. Signage is real storefront lighting — lit boxes, painted fascias,
+backlit letters in real brand colours. **No neon.** No magenta/cyan palette, no
+holograms, no "neon-noir", no cyberpunk styling. If a change pushes the frame toward
+neon, it does not land. Remaining neon is being stripped under **VGA-083**.
+
+### Six pillars — every task must serve at least one
 
 | Pillar | What it means | Test |
 |--------|---------------|------|
+| **Build it, live in it** | What the player builds at city scale is a place they can stand in at street scale | Can you walk into something you zoned? |
 | **The city lives** | Schedules, traffic, growth, economy shift without the player touching anything | Sit idle 2 minutes. Did the world change? |
-| **Hacking is expressive** | Every hack has a visible cause-and-effect chain. Conducting an orchestra, not pressing a button | Did the world visibly change, in an interesting way? |
-| **Consequence cascades** | Actions ripple. Blackout a zone → heat rises → patrols converge → the district reacts | Does the world *remember* what you did? |
+| **Every tool is expressive** | Driving, building, hacking, talking — each has a visible cause-and-effect chain | Did the world visibly change, in an interesting way? |
+| **Consequence fits the act** | Impact scales with the action. A small act stays local; a big one spreads. Nothing is inflated into a city-wide event | Does the world *remember* what you did, at the right size? |
 | **The player feels capable** | Tight controls, immediate feedback. The player always knows what happened and why | Zero ambiguity. Every input has a clear output. |
 | **Beauty in the system** | Clean code, consistent patterns, no magic numbers, no hacks | Can a stranger read it and get the intent in 30 seconds? |
 
@@ -179,12 +195,14 @@ and has momentum. A 20-line addition that slots into an existing pattern beats a
 `src/content/signs.json`, then `npm run validate`:
 
 ```json
-{ "text": "ラーメン", "sub": "RAMEN", "color": "#ff3b5c", "side": -1, "z": -22, "y": 8.5 }
+{ "text": "DELI", "sub": "OPEN", "color": "#c8402e", "side": -1, "z": -22, "y": 4.5 }
 ```
 
 `text` 1–5 chars · `sub` ≤ 6 · `color` `#rrggbb` · `side` -1 left, 1 right, 0 cross-street ·
 `y` 2–30. Signs render and cast their wet-road smear automatically. **Never generate sign
-art with a model** — see `docs/ASSETS.md`.
+art with a model** — see `docs/ASSETS.md`. Pick colours a real shop would paint its
+fascia — brick red, navy, forest green, warm white. Saturated magenta, cyan and
+electric green are neon and do not land (see the visual target above).
 
 ### Add a mission
 
@@ -216,8 +234,8 @@ export function hackBlackout(state, zone) {
 
 Render reads those deadlines via `isDark()` / `zonePhase()` / `zoneGlow()` and dims
 lamps, signs, windows, reflections and road paint. **A hack is not done when the state
-flips — it is done when the street visibly dies and comes back.** That cascade is the
-game's signature; budget real effort for it.
+flips — it is done when the street visibly dies and comes back.** Keep the effect sized
+to the hack: a zone blackout darkens a zone, not the city.
 
 ### Add a prop
 
@@ -288,7 +306,9 @@ Three rules, each learned the expensive way:
 `docs/VISUAL-GAP-ACTIONS.md` and run the seven steps below. That queue closes first, by
 the operator's own call, recorded in `docs/CHARTER.md`. Do not ask which one — pick it,
 say which you picked in one line, and go. The operator can redirect with "start zoning"
-(slice 024 in `docs/ZONING.md`) or by naming a VGA id.
+(slice 024 in `docs/ZONING.md`) or by naming a VGA id. **VGA-083 (strip the neon) sits at
+the top of that queue and goes first** — until it is ticked, every other visual item is
+being built on a palette that is about to change.
 
 1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
    Structural work on the city itself has its own plan in `docs/ZONING.md`.

@@ -4,6 +4,12 @@ Date: 2026-09-16. Grounded in current evidence: `slice-008-beauty.png`,
 `slice-009-day.png`, `slice-009-valley.png`, `slice-010-rehearsal.png`, `slice-011-market.png`.
 Visual items only — no mechanics, no AI, no mission design.
 
+> **Historical — read with the 2026-09-28 direction change in mind.** This audit was
+> written against the retired "neon-noir rain" target. Every gap that asks for *more*
+> neon, holograms, underglow or cyberpunk excess (most of section 3) is void: the game
+> is now Urbis, a grounded modern city, and Cyberpunk is a reference for depth only.
+> See `AGENTS.md` and VGA-083 in `docs/VISUAL-GAP-ACTIONS.md`.
+
 ---
 
 ## 1. GTA players ("where's the living city?")

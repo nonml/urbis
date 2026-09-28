@@ -1,11 +1,42 @@
-# Neon City
+# Urbis
 
-A living neon-noir city you can walk, drive, and hack. Night, wet streets, neon signage,
-dark towers with lit windows — built in Three.js, running in a browser.
+**Build a city, then live in it.**
 
-Blackout a city zone and watch the street die in a cascade: lamps flicker out down the
-block, sign reflections drain off the wet asphalt, windows go dark, and the police start
-looking for whoever did it.
+Urbis is one world at two scales. At city scale you shape a modern city the way you
+would in a city builder — zone it, grow it, run its economy. At street scale you walk
+its pavements, drive its roads, and go inside the buildings you made. No loading screen
+between the two.
+
+Built in Three.js, running in a browser.
+
+## What it's reaching for
+
+| From | It takes |
+|---|---|
+| **Cities: Skylines** | Building — zones grow, the economy shifts, the city runs itself |
+| **GTA** | Living in it — freedom on foot and in cars, pursuit, street-level chaos |
+| **Cyberpunk 2077** | Depth — characters, choices, interiors, systems that reward curiosity |
+| **Watch Dogs** | Hacking — one toolset among several |
+
+The look is a **grounded modern city**: believable streets and towers, day and night,
+real weather, real storefronts.
+
+Consequences are sized to what you did. A small act stays on its block; a big one
+spreads further. The city remembers either way.
+
+## What's in it today
+
+This is an early build. Honestly, today:
+
+- **One district** you can walk and drive — blocks, avenues, cross traffic, a river valley
+- **A day/night cycle** and rain, with wet-road reflections and lit windows
+- **Traffic and pedestrians**, parked cars, street furniture
+- **Pursuit and heat** — police respond, chase, and can bust you
+- **Hacking** — one hack so far: black out a power zone and watch its lights die
+- **Missions** — data-driven, from a small verb set
+
+**Not built yet:** the city-building half (zoning, growth, economy — planned in
+`docs/ZONING.md`), enterable interiors, and the narrative arc. See `docs/CHARTER.md`.
 
 ## Run it
 
@@ -56,9 +87,10 @@ Evidence lives in `docs/shots/`, one set per slice.
 
 | File | What's in it |
 |---|---|
-| `AGENTS.md` | **Start here.** The laws, the architecture, the patterns, how to work |
-| `docs/CHARTER.md` | Visual target, what shipped, what's next |
-| `docs/VISUAL-GAP-ACTIONS.md` | The live work queue — 82 tracked visual items |
+| `AGENTS.md` | **Start here.** The concept, the laws, the architecture, how to work |
+| `docs/CHARTER.md` | The game, the visual target, what shipped, what's next |
+| `docs/ZONING.md` | The city-building half — the plan |
+| `docs/VISUAL-GAP-ACTIONS.md` | The live visual work queue |
 | `docs/BACKLOG.md` | Long-horizon engineering and content work |
 | `docs/ASSETS.md` | Where art, audio and models come from |
 

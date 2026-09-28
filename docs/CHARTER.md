@@ -5,15 +5,29 @@ in what order, and what's already proven.**
 
 ---
 
+## The game (locked until vetoed)
+
+**Urbis — build a city, then live in it.** City-builder scale (zoning, growth, economy)
+and street scale (on foot, in cars, inside buildings) in one world. GTA's freedom,
+Cyberpunk 2077's depth, Watch Dogs' hacking as one toolset among several. The full
+statement and the pillars are in `AGENTS.md`.
+
 ## Visual target (locked until vetoed)
 
-**Neon-noir rain.** Night, wet streets, neon signage, dark towers with lit windows.
+**A grounded modern city.** Believable contemporary streets and towers. Day and night
+carry equal weight; weather is variety. Signage is real storefront lighting — painted
+fascias, lit boxes, backlit letters in real brand colours.
 
-It serves the cyberpunk fantasy at street level, it flatters low-poly geometry with
-light instead of punishing it, and every element of it is cheap: emissive + bloom +
-env reflections + fog. **If a feature doesn't serve neon-noir rain, it waits.**
+**No neon.** No magenta/cyan palette, no holograms, no cyberpunk styling. If a feature
+pushes the frame toward neon, it does not land.
 
-Day exists and must hold up (slice 009), but night is the founding image.
+**Why this changed (2026-09-28).** The original target was "neon-noir rain", chosen when
+the game was still being pitched as a cyberpunk street game. That was never the
+operator's concept: the Cyberpunk reference is about *depth*, not *look*, and the core
+of the game is building a city and living in it. The neon palette, the "NEON" signs and
+the Neon City name were all downstream of that mistake. **VGA-083** strips what shipped.
+The lighting craft itself — wet-road reflections, lamp pools, the blackout cascade,
+lit windows — stays; it just stops being tinted magenta and cyan.
 
 ---
 
@@ -83,6 +97,9 @@ Two tracks run in parallel. `docs/VISUAL-GAP-ACTIONS.md` is the **near-term queu
 below are the **structural** work.
 
 Next free slice number: **026**.
+
+**First, before any other visual item: VGA-083 — strip the neon.** See the visual target
+above.
 
 ### Feature slices, in order
 
