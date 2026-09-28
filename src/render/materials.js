@@ -4,6 +4,8 @@
 import * as THREE from 'three';
 
 const BASE = 'assets/';
+// Metres of facade one repeat of a window map covers, on every tower in the city.
+export const FACADE_TILE = 11;
 
 function load(texLoader, maxAniso, path, srgb, rx, ry) {
   const tex = texLoader.load(BASE + path);
@@ -39,6 +41,28 @@ export function loadPolyHavenMaps(texLoader, maxAniso, dir, rx, ry) {
   };
 }
 
+// A shell grown on a lot (render/zoning.js) is one unit box instanced at any size,
+// so its UVs run 0..1 across a face however big the building is. Rescale them by
+// the instance's own size so it tiles the same FACADE_TILE window grid the merged
+// towers bake in with worldUVs(). Redefining `uv` for the length of the stock
+// chunk reaches every map's UV at once. Behind USE_INSTANCING: the merged towers
+// compile without it and never run a line of it.
+function instancedFacadeUVs(sh, name) {
+  sh.vertexShader = sh.vertexShader.replace('#include <uv_vertex>', `
+#ifdef USE_INSTANCING
+  vec3 shellSize = vec3( length( instanceMatrix[ 0 ].xyz ), length( instanceMatrix[ 1 ].xyz ),
+    length( instanceMatrix[ 2 ].xyz ) );
+  vec2 faceSize = abs( normal.x ) > 0.5 ? shellSize.zy : abs( normal.y ) > 0.5 ? shellSize.xz : shellSize.xy;
+  vec2 shellUv = uv * faceSize / ${FACADE_TILE.toFixed(1)};
+  #define uv shellUv
+#endif
+#include <uv_vertex>
+#ifdef USE_INSTANCING
+  #undef uv
+#endif`);
+  if (!sh.vertexShader.includes('shellUv')) console.error(`[${name}] instanced UV patch missed`);
+}
+
 // Day/night facade: one material, two albedos mixed in-shader by uNight.
 // The emissive windows fade separately via emissiveIntensity (0 by day).
 // Same merged geometry, same draw count, no pop — the whole wall crossfades.
@@ -71,6 +95,7 @@ export function facadeMaterial(nightMaps, dayColorTex, tint) {
         'vec4 dayTexel = texture2D( dayMap, vMapUv );\nvec4 nightTexel = texture2D( map, vMapUv );\ndiffuseColor *= mix( dayTexel, nightTexel, uNight );'
       );
     if (!sh.fragmentShader.includes('dayTexel')) console.error('[facade] patch missed');
+    instancedFacadeUVs(sh, 'facade');
   };
   mat.customProgramCacheKey = () => 'daynight-facade';
   return mat;
@@ -100,6 +125,7 @@ export function concreteFacadeMaterial(maps, windowMap, tint) {
         'diffuseColor.rgb *= 1.0 - 0.85 * windowMask;\n#include <emissivemap_fragment>'
       );
     if (!sh.fragmentShader.includes('windowMask')) console.error('[concrete] patch missed');
+    instancedFacadeUVs(sh, 'concrete');
   };
   mat.customProgramCacheKey = () => 'concrete-facade';
   return mat;

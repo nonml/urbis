@@ -21,7 +21,7 @@ test('boots and exposes the debug API', async ({ page }) => {
     await boot(page);
 
     const api = await page.evaluate(() => Object.keys(window.__game));
-    expect(api).toEqual(expect.arrayContaining(['draws', 'hack', 'dark', 'player', 'heat', 'mission']));
+    expect(api).toEqual(expect.arrayContaining(['draws', 'hack', 'dark', 'player', 'heat', 'mission', 'city']));
     expect(errors).toEqual([]);
 });
 
@@ -50,14 +50,20 @@ test('blackout hack darkens a zone and the world shows it', async ({ page }) => 
     expect(await page.evaluate(() => window.__game.dark())).toContain(true);
 });
 
-// Pillar 1's own test: sit idle, does the world change? Compared as pixels because
-// that is the claim — traffic and pedestrians must visibly move on their own.
+// Pillar 1's own test: sit idle, does the world change? Not as pixels any more —
+// traffic and pedestrians pass that on their own, and they are not the city. The
+// claim is that the district itself moves: a lot breaks ground, a floor goes on,
+// a building comes down, while nobody touches anything. The sim half of this,
+// ticked for two full minutes, is tests/zoning.spec.js.
 test('the world changes while the player stands still', async ({ page }) => {
     await boot(page);
 
-    const before = await page.evaluate(() => window.__game.shot());
-    await page.waitForTimeout(2500);
-    const after = await page.evaluate(() => window.__game.shot());
-
-    expect(after).not.toBe(before);
+    const stood = await page.evaluate(() => window.__game.player());
+    const before = await page.evaluate(() => window.__game.city().parcels.map((p) => p.stage));
+    await page.waitForFunction(
+        (stages) => window.__game.city().parcels.some((p, i) => p.stage !== stages[i]),
+        before,
+        { timeout: 30000 },
+    );
+    expect(await page.evaluate(() => window.__game.player())).toEqual(stood);
 });

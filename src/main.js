@@ -7,6 +7,7 @@ import { heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
+import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
@@ -29,6 +30,7 @@ import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRen
 import { buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
+import { buildZoning } from './render/zoning.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -109,6 +111,9 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
 });
 
 const street = createStreet(20260916);
+const city = createCity(20260916);
+const growth = buildZoning(city, towers.kinds, towers.footprints);
+scene.add(growth.group);
 const player = createPlayer();
 player.mode = 'foot';
 const heroCar = createPlayerCar();
@@ -269,6 +274,16 @@ if (spawnPreset === 'east') {
   cam.yaw = Math.PI;
   cam.pitch = 0.32;
   cam.dist = 8;
+} else if (spawnPreset === 'site') {
+  // The west edge of the walk box, looking east across the flank verge at the
+  // two south-west growth lots: the one long open view onto a site, so the crane
+  // and the building it raises fit in one frame. Wheeled all the way out and
+  // looking level, the way a player stops to watch something go up.
+  player.x = -52;
+  player.z = -60;
+  cam.yaw = Math.PI / 2;
+  cam.pitch = 0.08;
+  cam.dist = 14;
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
@@ -348,6 +363,14 @@ window.__game = {
   tod: () => +clock.nightFactor.toFixed(3),
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
+  city: () => ({
+    time: +city.time.toFixed(2),
+    demand: { ...city.demand },
+    parcels: city.parcels.map((p) => ({
+      x: p.x, z: p.z, use: p.use, zone: p.powerZone, stage: STAGES[p.stage],
+      progress: +p.progress.toFixed(4), height: +builtHeight(p).toFixed(2), building: p.building,
+    })),
+  }),
   shot: () => {
     composer.render();
     return captureFrame(renderer);
@@ -453,6 +476,7 @@ function render() {
   const driving = player.mode === 'drive';
   tickClock(clock, dt);
   tickStreet(street, dt);
+  tickZoning(city, dt, street);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
   // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
@@ -529,6 +553,7 @@ function render() {
   for (const s of env.spots) s.intensity = 45 * night;
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
+  growth.update();
   updateNPCs(npcRig, street);
   updateTraffic(traffic.rig, street, camera);
   // Hero and pursuit throws ride the traffic pool set (VGA-004): three more

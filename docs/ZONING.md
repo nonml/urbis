@@ -11,8 +11,8 @@ Motion is not life. Until the skyline changes because the city decided to change
 the Cities:Skylines leg of the three-game pitch is a claim, not a feature.
 
 The gate already has a test named `the world changes while the player stands still`.
-It currently passes on pixel churn from traffic and rain. When this lands, it should
-pass on a building that was not there when the player arrived.
+It used to pass on pixel churn from traffic and rain. Since slice 046 it passes only
+when a parcel changes stage while the player stands still.
 
 ## The constraint that shapes the whole design
 
@@ -38,7 +38,11 @@ Two consequences:
    existing skyline is the backdrop; the growable lots are the living part.
 
 Draw budget: **155 / 175** as of slice 023. This design must fit in the remaining 20,
-and it is expected to spend about 6.
+and it is expected to spend about 6. **Measured at slice 046: +9.** That is 143 → 152
+by day and by night, and 151 → 160 in a blackout (165 on the frames that re-shoot a
+mirror face). The estimate missed that every shell mesh casts a shadow, so each costs
+two draws. There are four shell meshes (glass and concrete, times two power zones),
+plus the site kit.
 
 ## The model
 
@@ -118,7 +122,22 @@ system that is not visible in a screenshot. An unwired `src/sim/zoning.js` with 
 unit test is exactly the dead tech law 6 exists to stop, however well tested. So the
 first slice is bigger than it wants to be, and it carries its own proof.
 
-- **024 — the city builds something.** `src/sim/zoning.js`, `src/render/zoning.js`,
+- **024 — the city builds something.** ✅ Shipped as **slice 046**. Evidence:
+  `slice-046-grow-early/-late.png` and `slice-046-site-lit/-blackout.png`. What
+  landed differs from this plan in three ways:
+  - **Ten parcels, not twelve to sixteen.** Every void in the tower tables was
+    checked from the street. Only ten held a lot that clears every carriageway,
+    footway, podium, tree trunk and grass strip, and they split five per power zone.
+    The candidates under *Where the land is* were the starting point; the measured
+    list is `LOTS` in `src/sim/zoning.js`.
+  - **The crane is zoned.** It stands a storey or two above the working floor, so a
+    player can read it from the pavement. That puts it below its neighbours, so it
+    slews only through the widest arc where the boom clears every tower. The slew
+    follows progress, so a blackout freezes it along with the work.
+  - **Demand comes from the `sim` stream and layout from `world`.** No `city`
+    stream was needed.
+
+  The original brief: `src/sim/zoning.js`, `src/render/zoning.js`,
   wired in `main.js`, growth running. The one slice that cannot be subdivided without
   breaking a law. Ships with:
   - a headless gate test that ticks 120 simulated seconds and asserts stages advanced

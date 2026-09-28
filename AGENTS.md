@@ -25,9 +25,11 @@ It borrows from four games, and each one lends a specific thing:
 4. **Watch Dogs** — hacking, as **one toolset among several**. Blackout is one hack.
    It is not the theme and not the identity of the game.
 
-The building leg is **designed but not yet built** — the plan is `docs/ZONING.md`, the
-roadmap around it is `docs/CHARTER.md`. Do not pretend it exists, and do not quietly
-drop it from the vision. It is half the game.
+The building leg has **started, not finished**. Since slice 046, ten lots grow and
+decline on their own, and a blackout stops their cranes. But the player cannot zone
+anything yet, and demand is a placeholder wave. The plan is `docs/ZONING.md`; the
+roadmap around it is `docs/CHARTER.md`. Do not pretend the rest exists, and do not
+quietly drop it from the vision. It is half the game.
 
 ### Visual target: a grounded modern city
 

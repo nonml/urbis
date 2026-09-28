@@ -85,6 +85,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 025 | Headlight throw — heading-aligned, speed-stretched, instanced (VGA-004) | **156** (−1, 172 peak) | `slice-025-avenue/-cross/-dark.png` |
 | 026–044 | VGA items and the wave-1 world planks — recorded per item in `docs/VISUAL-GAP-ACTIONS.md` and in the git log, not back-filled here | — | `slice-026…044-*.png` |
 | 045 | Grounded — the neon stripped: lit-box signs, real trades, Urbis (VGA-083, `5f8c9ed`) | **143** (+0, 154 blackout) | `slice-045-grounded-night/-day/-blackout.png` |
+| 046 | The city builds something — ten lots grow and decline on their own; a blackout stops the crane (zoning 1/3) | **152** (+9, 165 blackout peak) | `slice-046-grow-early/-late.png`, `slice-046-site-lit/-blackout.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
@@ -99,7 +100,7 @@ Two tracks. The feature slices below are the **structural** work and come first.
 `docs/VISUAL-GAP-ACTIONS.md` is the **polish queue** (80+ items, most still open) and
 waits behind them — except VGA-083.
 
-Next free slice number: **046**.
+Next free slice number: **047**.
 
 **Work order (operator, 2026-09-28):** VGA-083 strip the neon (done, slice 045) → the feature slices below,
 in order → the rest of the visual queue. This replaces the earlier "visual queue closes
@@ -108,10 +109,11 @@ items — many of which touch buildings that zoning is about to change anyway.
 
 ### Feature slices, in order
 
-1. **Zoning + growth** — the building half of the game, currently missing. Zones grow
-   through a staged pipeline; the skyline changes because the city decided it, not
-   because an artist placed a tower. **Planned in `docs/ZONING.md`**, which also records
-   why the existing 68 towers stay merged and static. (Its internal slice numbers
+1. **Zoning + growth** — the building half of the game. Zones grow through a staged
+   pipeline; the skyline changes because the city decided it, not because an artist
+   placed a tower. **Planned in `docs/ZONING.md`**, which also records why the
+   existing 68 towers stay merged and static. Growth and decline shipped in slice 046.
+   Next: making decline legible (ZONING's second slice). (Its internal slice numbers
    predate this reorder — number by what ships, per the bookkeeping note above.)
 2. **District economy** — jobs, wealth and demand per district, feeding growth and
    giving consequences something real to move (VGA-077 faction paint reads it).

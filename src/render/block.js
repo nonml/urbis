@@ -2,7 +2,9 @@
 // per-object draws for repeated things are banned (charter law #4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial } from './materials.js';
+import {
+  FACADE_TILE, loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial,
+} from './materials.js';
 import { displaceToTerrain } from './landscape.js';
 import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
@@ -621,6 +623,13 @@ function faceBox(wide, tall, thick, x, y, z, alongZ) {
   return alongZ ? box(thick, tall, wide, x, y, z) : box(wide, tall, thick, x, y, z);
 }
 
+// The ground a merged box covers, as a centre and a size.
+function footprintOf(geometry) {
+  geometry.computeBoundingBox();
+  const { min, max } = geometry.boundingBox;
+  return { x: (min.x + max.x) / 2, z: (min.z + max.z) / 2, w: max.x - min.x, d: max.z - min.z };
+}
+
 export function buildTowers(texLoader, maxAniso) {
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
@@ -631,6 +640,9 @@ export function buildTowers(texLoader, maxAniso) {
   const shopPools = [];
   const beaconPts = [];
   const posters = [];
+  // Where every tower stands, podium included: a crane on a growth lot zones
+  // its jib around these (render/zoning.js).
+  const footprints = [];
   // The eye-level pass. A 4.2m plaster box with one narrow door is the single
   // biggest reason the street reads as a model: at walking distance a wall has
   // to have a base, a rhythm, a shopfront and something casting a shadow on it.
@@ -742,13 +754,13 @@ export function buildTowers(texLoader, maxAniso) {
     // Small canopy over the door.
     caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
     if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
-    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, 11));
+    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * 0.72;
       const uh = h * 0.3;
       const ud = d * 0.72;
-      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, 11));
+      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, FACADE_TILE));
       topY = h + uh;
     }
     caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
@@ -758,6 +770,7 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
     caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
+    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2 });
   }
   let idx = 0;
   for (const ax of AVENUE_X) {
@@ -823,9 +836,10 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
+  footprints.push(...silhouettes.map(footprintOf));
   return {
     group, beacons: beaconPts, facadeMats: mats.facadeMats,
-    zoneMats: mats.zoneMats, mirrorProxies, shopPools,
+    zoneMats: mats.zoneMats, kinds: mats.kinds, mirrorProxies, shopPools, footprints,
   };
 }
 
