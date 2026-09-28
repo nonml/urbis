@@ -180,8 +180,8 @@ remaining neon element is now a defect, and this item goes before every other op
   3. **Cars.** Real body silhouettes from a model, not boxes (VGA-019/020/021/024). The
      unmerged `wave2/wanted` cruisers "read as beige boxes": do not build police livery
      on the box body this replaces.
-  4. **People.** `docs/ASSETS.md` rule 2 bans generated NPCs, so this needs a sourced,
-     rigged CC0 body. **Operator's call** which one (VGA-011/067).
+  4. **People.** A real rigged body in place of the primitives, sourced from a CC0
+     library or generated (`docs/ASSETS.md`) (VGA-011/067).
   5. **Landscape.** Mountains (VGA-048), trees (VGA-046) and the seams between them
      (VGA-050).
   6. **Street kit and interiors.** Real props before `box()`; `street_lamp_01` first.

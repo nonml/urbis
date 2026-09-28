@@ -111,24 +111,22 @@ These are not suggestions. A generated asset that breaks one does not land.
 1. **Never generate signage or lettering.** The models cannot spell — you get garbled
    glyphs. Signs are data (`src/content/signs.json`) rendered as text. This is also why
    sign content stays editable and localisable.
-2. **Never generate NPCs or the hero.** Generated meshes have decimated topology, no rig
-   and no animation-friendly edge flow. The body system (VGA-011) is hand-built.
-3. **One object, plain background.** The matting step fails on scenes, pairs, or objects
+2. **One object, plain background.** The matting step fails on scenes, pairs, or objects
    sitting on a base plate.
-4. **Instanceable or it doesn't ship.** Single material where possible, so
+3. **Instanceable or it doesn't ship.** Single material where possible, so
    `loadPropInstances()` gives **one draw per material at any count**. A prop that costs
    a draw per instance breaks law 3 and will be rejected.
-5. **Budget the triangles, but know it's not the constraint.** Draws are. A 6k-triangle
+4. **Budget the triangles, but know it's not the constraint.** Draws are. A 6k-triangle
    prop instanced 40 times is fine; 40 separate meshes are not.
-6. **Metres, Y-up, origin at the base.** Matches the existing GLB props.
-7. **Credit it.** Even self-generated assets get a `CREDITS.md` line naming the model and
+5. **Metres, Y-up, origin at the base.** Matches the existing GLB props.
+6. **Credit it.** Even self-generated assets get a `CREDITS.md` line naming the model and
    its licence, because the *model's* licence flows through to the output.
-8. **It still has to survive a screenshot.** Law 1 does not exempt generated content.
+7. **It still has to survive a screenshot.** Law 1 does not exempt generated content.
    An asset that looks wrong at the play camera is not done, however cheap it was to make.
 
 The real risk of bulk generation is not quality per asset — it is **coherence**. Eighty
-props from a generator can read as eighty different games. Our look is carried by light,
-not by prop detail, which helps; but every batch needs a play-camera frame before it lands.
+props from a generator can read as eighty different games, so every batch needs a
+play-camera frame before it lands.
 
 ---
 
