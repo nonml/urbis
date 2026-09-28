@@ -293,6 +293,8 @@ window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
 const DARK = [false, false];
+// The zone light the city mirror was last shot under, 1 lit or 0 dead.
+const MIRRORED = [1, 1];
 
 function fireHack() {
   const driving = player.mode === 'drive';
@@ -508,8 +510,16 @@ function render() {
     const dark = isDark(street, z);
     if (DARK[z] !== dark) {
       DARK[z] = dark;
-      requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
       missionOnBlackout(mission, DARK, street.time);
+    }
+    // Re-shoot the mirror once a zone has settled, dead or lit, not the instant
+    // the hack lands: the collapse and the relight both flicker, and a face shot
+    // mid-flicker holds a half-lit street in the water until the next re-shoot.
+    // The frame used to be too full for the probe to fire during the collapse
+    // anyway (VGA-010's dead water was shot in the dark by accident); now it is not.
+    if ((glows[z] === 0 || glows[z] === 1) && glows[z] !== MIRRORED[z]) {
+      MIRRORED[z] = glows[z];
+      requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
     }
     const b = glows[z] >= 1 ? 1 : glows[z] <= 0 ? 0 : blink(street.time, z * 3.7);
     lamps.setZoneLight(z, glows[z]);
