@@ -31,6 +31,9 @@ import { buildGrassGround, buildGrassTufts, buildMountains } from './render/land
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
+import { createCityView, cityKey, tickCityView } from './sim/cityview.js';
+import { buildCityView } from './render/cityview.js';
+import { bindCityView } from './ui/cityview.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -219,6 +222,12 @@ canvas.addEventListener('wheel', (e) => {
   cam.dist = Math.max(3, Math.min(14, cam.dist * (1 + e.deltaY * 0.001)));
 }, { passive: true });
 
+// City view (Z): the same world from above, where the player zones the lots.
+const cityView = createCityView(city);
+const cityRig = buildCityView(city, cityView);
+scene.add(cityRig.mesh);
+const cityUi = bindCityView({ canvas, cam, camera, city, street, view: cityView, rig: cityRig });
+
 const keys = new Set();
 // Dev spawn presets for scripted verification (?spawn=east).
 const spawnPreset = new URLSearchParams(location.search).get('spawn');
@@ -342,6 +351,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'h') fireHack();
   if (k === 'f') toggleVehicle();
   if (k === 't') toggleDay(clock);
+  cityKey(cityView, k, cam.yaw);
 });
 
 const clock = createClock();
@@ -376,6 +386,25 @@ window.__game = {
     return captureFrame(renderer);
   },
 };
+window.__game.cityview = {
+  state: () => ({ ...cityView, level: undefined, trend: [...cityView.trend] }),
+  lots: () => city.parcels.map((p) => ({ use: p.use, zoned: p.zoned, stage: STAGES[p.stage], building: p.building })),
+  screen: (i) => cityRig.screenOf(camera, i),
+  pick: (x, y) => cityRig.pick(camera, x, y),
+};
+if (CAPTURE) {
+  // Capture-only: run the district's sim ahead by `secs`, in the frame loop's own
+  // steps and functions, without drawing them. SwiftShader draws about a frame a
+  // second, so the half-minute a zoned lot takes to break ground is ten minutes
+  // of frames; this lets evidence show "later" without the wait.
+  window.__game.cityview.advance = (secs) => {
+    for (let t = 0; t < secs; t += 0.05) {
+      tickStreet(street, 0.05);
+      tickZoning(city, 0.05, street);
+      tickCityView(cityView, city, 0.05, new Set());
+    }
+  };
+}
 
 // Capture-only streaming probe, bound behind ?capture=1 and nowhere else. It
 // moves the position the STREAMER reads, not the player and not the camera —
@@ -413,7 +442,11 @@ let bootMs = 0;
 let braking = false;
 const lookAt = new THREE.Vector3();
 
+const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
+const HELD_CAR = { throttle: 0, steer: 0 };
+
 function footInput() {
+  if (cityView.mode === 'city') return HELD_FOOT;
   const lx = Math.sin(cam.yaw);
   const lz = Math.cos(cam.yaw);
   const rx = -lz;
@@ -429,6 +462,7 @@ function footInput() {
 }
 
 function driveInput() {
+  if (cityView.mode === 'city') return HELD_CAR;
   return {
     throttle: (keys.has('w') ? 1 : 0) + (keys.has('s') ? -1 : 0),
     steer: (keys.has('a') ? -1 : 0) + (keys.has('d') ? 1 : 0),
@@ -477,6 +511,7 @@ function render() {
   tickClock(clock, dt);
   tickStreet(street, dt);
   tickZoning(city, dt, street);
+  tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
   // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
@@ -609,6 +644,8 @@ function render() {
   } else {
     prompt.style.display = 'none';
   }
+  cityRig.frame(camera, lookAt, scene);
+  cityUi.update();
 
   renderer.info.reset();
   // The city mirror re-shoots one cube face per frame, and only when it has gone

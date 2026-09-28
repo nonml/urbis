@@ -69,9 +69,15 @@ function makeParcel(rand, [x, z, w, d]) {
   const stage = START_STAGES[Math.floor(rand() * START_STAGES.length)];
   const fit = Math.min(TOP_MAX, Math.max(TOP_MIN, Math.min(w, d) * SLENDERNESS));
   const top = fit * (0.85 + rand() * 0.25);
+  const use = USES[Math.floor(rand() * USES.length)];
   return {
     x, z, w, d,
-    use: USES[Math.floor(rand() * USES.length)],
+    // `use` is what stands on the lot, or what it is breaking ground as; `zoned`
+    // is what the lot is zoned for (null: unzoned). The district arrives zoned
+    // for what it is already building, so an untouched city grows exactly as
+    // it did before the player could zone. The player repaints it in city view.
+    use,
+    zoned: use,
     stage,
     progress: rand() * START_PROGRESS,
     powerZone: zoneAt(z),
@@ -139,6 +145,38 @@ function tickParcel(p, demand, dt) {
   p.building = p.stage >= STAGE.SITE && p.stage < STAGE.HIGH && (grows || p.progress > 0);
 }
 
+// A lot whose building no longer fits its zoning clears first: it comes down a
+// stage at a time, as continuously as it went up, and only the empty lot takes
+// the new use and breaks ground as it — a building never changes use standing.
+// An unzoned lot clears and stays clear. Faster than a slump, because it is a
+// demolition the player ordered, not a market giving up (docs/CITYVIEW.md).
+// A stage comes down in CLEAR_SECS: a tower is cleared in a minute.
+const CLEAR_SECS = 15;
+function clearLot(p, dt) {
+  if (p.stage === STAGE.EMPTY) {
+    p.use = p.zoned;
+    p.progress = 0;
+    p.building = false;
+    return;
+  }
+  p.progress -= dt / CLEAR_SECS;
+  if (p.progress < 0) {
+    p.stage -= 1;
+    p.progress += 1;
+  }
+  p.building = p.stage > STAGE.EMPTY;
+}
+
+// The player's hand on the city (city view, sim/cityview.js): zone lot `index`
+// for a use, or unzone it with null. Nothing moves here; the lot answers over
+// the ticks that follow. Returns whether the zoning changed.
+export function zoneParcel(city, index, use) {
+  const p = city.parcels[index];
+  if (!p || (use !== null && !USES.includes(use)) || p.zoned === use) return false;
+  p.zoned = use;
+  return true;
+}
+
 export function tickZoning(city, dt, street) {
   city.time += dt;
   updateDemand(city);
@@ -146,7 +184,8 @@ export function tickZoning(city, dt, street) {
     // The cascade hook: a site without power does no work. It does not decline
     // either — a blackout stops the crane, it does not dismantle it.
     if (isDark(street, p.powerZone)) continue;
-    tickParcel(p, city.demand[p.use], dt);
+    if (p.zoned !== null && p.use === p.zoned) tickParcel(p, city.demand[p.use], dt);
+    else clearLot(p, dt);
   }
 }
 
