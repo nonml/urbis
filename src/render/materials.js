@@ -97,8 +97,7 @@ export function facadeMaterial(nightMaps, dayColorTex, tint) {
     if (!sh.fragmentShader.includes('dayTexel')) console.error('[facade] patch missed');
     instancedFacadeUVs(sh, 'facade');
   };
-  mat.customProgramCacheKey = () => 'daynight-facade';
-  return mat;
+  return zoneLit(mat, 'daynight-facade');
 }
 
 // Concrete tower: the same window map the glass towers glow with, read as geometry
@@ -127,8 +126,71 @@ export function concreteFacadeMaterial(maps, windowMap, tint) {
     if (!sh.fragmentShader.includes('windowMask')) console.error('[concrete] patch missed');
     instancedFacadeUVs(sh, 'concrete');
   };
-  mat.customProgramCacheKey = () => 'concrete-facade';
+  return zoneLit(mat, 'concrete-facade');
+}
+
+// One material lights both power zones. A blackout kills one zone's windows and
+// leaves the other's burning, which used to take a twin of every lit material,
+// one per zone, and a draw for each twin. Now each vertex (or instance) carries
+// its zone in a `zone` attribute, and the colour and emissive strength main.js
+// writes per zone arrive as two-element uniforms the shader picks between.
+// Emissive intensity moves wholly into the per-zone value, so the stock
+// `emissive` uniform is the plain emissive colour and the product is unchanged.
+//
+// A mesh wearing one of these must carry the attribute (withZone, or an
+// InstancedBufferAttribute for instances): without it WebGL reads 0, and the
+// whole mesh quietly follows zone 0 through every blackout.
+export function zoneLit(mat, key) {
+  const own = mat.onBeforeCompile;
+  mat.userData.zoneDiffuse = { value: [mat.color.clone(), mat.color.clone()] };
+  mat.userData.zoneEmissive = { value: [mat.emissiveIntensity, mat.emissiveIntensity] };
+  mat.emissiveIntensity = 1;
+  mat.onBeforeCompile = (sh, renderer) => {
+    own.call(mat, sh, renderer);
+    sh.uniforms.zoneDiffuse = mat.userData.zoneDiffuse;
+    sh.uniforms.zoneEmissive = mat.userData.zoneEmissive;
+    sh.vertexShader = sh.vertexShader
+      .replace('#include <common>', '#include <common>\nattribute float zone;\nvarying float vZone;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvZone = zone;');
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <common>',
+        '#include <common>\nuniform vec3 zoneDiffuse[ 2 ];\nuniform float zoneEmissive[ 2 ];\nvarying float vZone;'
+      )
+      .replace(
+        'vec4 diffuseColor = vec4( diffuse, opacity );',
+        'vec4 diffuseColor = vec4( vZone < 0.5 ? zoneDiffuse[ 0 ] : zoneDiffuse[ 1 ], opacity );'
+      )
+      .replace(
+        'vec3 totalEmissiveRadiance = emissive;',
+        'vec3 totalEmissiveRadiance = emissive * ( vZone < 0.5 ? zoneEmissive[ 0 ] : zoneEmissive[ 1 ] );'
+      );
+    const patched = sh.vertexShader.includes('vZone = zone;')
+      && sh.fragmentShader.includes('zoneDiffuse[ 1 ], opacity')
+      && sh.fragmentShader.includes('zoneEmissive[ 1 ] );');
+    if (!patched) console.error(`[${key}] zone patch missed`);
+  };
+  mat.customProgramCacheKey = () => `${key}-zoned`;
   return mat;
+}
+
+// What main.js drives per zone, shaped like the twin material it replaces: it
+// writes `emissiveIntensity` and `color` and reads `userData`, and each write
+// lands in that zone's slot of the shared material's uniforms.
+export function zoneView(mat, zone) {
+  const { zoneDiffuse, zoneEmissive } = mat.userData;
+  return {
+    userData: mat.userData,
+    color: zoneDiffuse.value[zone],
+    set emissiveIntensity(v) { zoneEmissive.value[zone] = v; },
+  };
+}
+
+// Stamp a merged part with the power zone it belongs to.
+export function withZone(geo, zone) {
+  const n = geo.attributes.position.count;
+  geo.setAttribute('zone', new THREE.BufferAttribute(new Float32Array(n).fill(zone), 1));
+  return geo;
 }
 
 export function standardFromMaps(maps, opts) {

@@ -37,7 +37,7 @@ import { hideFaded } from './render/faded.js';
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
 // spawn needs to land in the same frame without the probe pushing it over.
-const MIRROR_FACE_DRAWS = 5;
+const MIRROR_FACE_DRAWS = 4;
 const MIRROR_MARGIN = 10;
 let lastDraws = 0;
 const bootStart = performance.now();

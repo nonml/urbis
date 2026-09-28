@@ -4,6 +4,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import {
   FACADE_TILE, loadPBRMaps, loadPolyHavenMaps, standardFromMaps, facadeMaterial, concreteFacadeMaterial,
+  zoneLit, zoneView, withZone,
 } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
 import {
@@ -305,9 +306,9 @@ const FACADE_MAPS = [
 
 // Three facade architectures so the skyline is not one tower repeated: lit curtain
 // glass in two tints, and poured concrete with the same windows punched through it.
-// Each architecture carries a per-zone twin, because a blackout has to kill one
-// zone's windows and leave the other burning. That is one draw per material and it
-// is the price of the hack reading at all.
+// A blackout has to kill one zone's windows and leave the other burning; each
+// material lights both zones from a per-vertex zone (zoneLit), so that costs no
+// draw of its own.
 // What the pane emits, not what colour it is. A flat amber rectangle is a
 // lightbox; a shop is a bright ceiling, a dim floor and stock in between, and
 // at play distance that gradient plus a few dark verticals is the whole read.
@@ -403,40 +404,36 @@ function towerMaterials(texLoader, maxAniso) {
   dayColor.anisotropy = maxAniso;
   const concrete = loadPolyHavenMaps(texLoader, maxAniso, 'concrete_wall_008', 1, 1);
   const kinds = [
-    () => facadeMaterial(nightMaps, dayColor, 0x9aa2ae),
-    () => facadeMaterial(nightMaps, dayColor, 0x8a94a8),
-    () => concreteFacadeMaterial(concrete, nightMaps.emission, 0x767a83),
-  ].map((make) => [make(), make()]);
-  for (const zoned of kinds) for (const m of zoned) m.userData.baseTint = m.color.clone();
+    facadeMaterial(nightMaps, dayColor, 0x9aa2ae),
+    facadeMaterial(nightMaps, dayColor, 0x8a94a8),
+    concreteFacadeMaterial(concrete, nightMaps.emission, 0x767a83),
+  ];
+  for (const m of kinds) m.userData.baseTint = m.color.clone();
   const podium = [
     [loadPBRMaps(texLoader, maxAniso, 'plaster_rough', 'color', 3, 2), 0.85, 0x54575f],
     [loadPBRMaps(texLoader, maxAniso, 'plaster_painted', 'color', 3, 2), 0.8, 0x4e5158],
   ].map(([maps, roughness, color]) => standardFromMaps(maps, { roughness, envMapIntensity: 0.35, color }));
-  // Ground-floor glazing, one material per power zone. It has to be zoned:
-  // a shopfront still burning through a blackout is exactly the dishonesty
-  // VGA-007 was opened for. Emissive is driven from main with the lamps.
+  // Ground-floor glazing, lit per power zone. It has to be zoned: a shopfront
+  // still burning through a blackout is exactly the dishonesty VGA-007 was
+  // opened for. Emissive is driven from main with the lamps.
   const interior = shopInteriorAtlas();
-  const shopGlass = [0, 1].map(() => {
-    const m = new THREE.MeshStandardMaterial({
-      color: 0x11161d, emissive: 0xffffff, emissiveIntensity: 0, emissiveMap: interior,
-      roughness: 0.12, metalness: 0.55, envMapIntensity: 1.6,
-    });
-    m.userData.baseTint = m.color.clone();
-    // A tower's windows go dark at noon. A shop's do not — its lights stay on
-    // all day, and without that floor the glazing reads as a black hole punched
-    // in a sunlit wall, which is the loudest "toy" tell left at eye level.
-    m.userData.emissiveScale = 0.34;
-    m.userData.dayFloor = 0.3;
-    return m;
-  });
+  const shopGlass = zoneLit(new THREE.MeshStandardMaterial({
+    color: 0x11161d, emissive: 0xffffff, emissiveIntensity: 0, emissiveMap: interior,
+    roughness: 0.12, metalness: 0.55, envMapIntensity: 1.6,
+  }), 'shop-glass');
+  shopGlass.userData.baseTint = shopGlass.color.clone();
+  // A tower's windows go dark at noon. A shop's do not — its lights stay on
+  // all day, and without that floor the glazing reads as a black hole punched
+  // in a sunlit wall, which is the loudest "toy" tell left at eye level.
+  shopGlass.userData.emissiveScale = 0.34;
+  shopGlass.userData.dayFloor = 0.3;
   return {
     kinds,
     podium,
     shopGlass,
     // Only glass crossfades day to night in-shader; concrete looks the same at noon.
-    facadeMats: [...kinds[0], ...kinds[1]],
-    zoneMats: [[...kinds.map((twins) => twins[0]), shopGlass[0]],
-      [...kinds.map((twins) => twins[1]), shopGlass[1]]],
+    facadeMats: [kinds[0], kinds[1]],
+    zoneMats: [0, 1].map((zone) => [...kinds, shopGlass].map((m) => zoneView(m, zone))),
   };
 }
 
@@ -788,8 +785,11 @@ export function buildTowers(texLoader, maxAniso) {
   for (const [x, z, w, h, d] of TERMINUS_TOWERS) {
     emitTower(x, z, w, h, d, idx++, [0, -1]);
   }
+  // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
+  // architecture lights both halves of the district.
+  for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
   const batches = [
-    ...facades.flatMap((zoned, kind) => zoned.map((geos, zone) => [geos, mats.kinds[kind][zone]])),
+    ...facades.map((zoned, kind) => [zoned.flat(), mats.kinds[kind]]),
     ...podiums.map((geos, i) => [geos, mats.podium[i]]),
   ];
   for (const [geos, mat] of batches) {
@@ -799,18 +799,18 @@ export function buildTowers(texLoader, maxAniso) {
     m.receiveShadow = true;
     group.add(m);
   }
-  // Mirror proxy (VGA-002): one merged copy of every facade per power zone, so
-  // the reflection probe redraws the city in two passes instead of six. Water
-  // cannot tell glass from concrete at reflection scale, so all three
-  // architectures borrow the glass material — and each zone still dies with
-  // its own lights.
-  const mirrorProxies = facades[0].map((_, zone) => {
-    const geos = facades.flatMap((zoned) => zoned[zone]);
-    const m = new THREE.Mesh(mergeGeometries(geos), mats.kinds[0][zone]);
-    m.castShadow = false;
-    m.receiveShadow = false;
-    return m;
-  });
+  // Mirror proxy (VGA-002): one merged copy of every facade, so the reflection
+  // probe redraws the city in one pass instead of six. Water cannot tell glass
+  // from concrete at reflection scale, so all three architectures borrow the
+  // glass material — and each zone still dies with its own lights, because the
+  // proxy carries the same zone stamp.
+  const mirrorProxy = new THREE.Mesh(
+    mergeGeometries([0, 1].flatMap((zone) => facades.flatMap((zoned) => zoned[zone]))),
+    mats.kinds[0],
+  );
+  mirrorProxy.castShadow = false;
+  mirrorProxy.receiveShadow = false;
+  const mirrorProxies = [mirrorProxy];
   const capMat = new THREE.MeshStandardMaterial({
     color: 0x1b1f27, roughness: 0.78, metalness: 0.15, envMapIntensity: 0.7,
   });
@@ -822,11 +822,12 @@ export function buildTowers(texLoader, maxAniso) {
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
   group.add(capMesh);
-  // Two draws for every shopfront in the district — one per power zone.
+  // One draw for every shopfront in the district, both power zones.
   shopGeos.forEach((geos, zone) => {
     if (!geos.length) throw new Error('buildTowers: a zone has no shopfronts');
-    group.add(new THREE.Mesh(mergeGeometries(geos), mats.shopGlass[zone]));
+    for (const g of geos) withZone(g, zone);
   });
+  group.add(new THREE.Mesh(mergeGeometries(shopGeos.flat()), mats.shopGlass));
 
   const silhouettes = [
     box(20, 60, 16, -58, 30, -30), box(24, 74, 18, 34, 37, -8),
