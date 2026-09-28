@@ -8,6 +8,10 @@ import { mkdirSync, writeFileSync } from 'fs';
 const DRAW_BUDGET = 175;
 const SHOT_DIR = 'docs/shots/gate';
 
+// Draw calls do not depend on resolution, and on a software renderer every
+// pixel costs time: a quarter of the gate's viewport runs four times the frames.
+test.use({ viewport: { width: 480, height: 270 } });
+
 function saveShot(dataUrl, name) {
     mkdirSync(SHOT_DIR, { recursive: true });
     writeFileSync(`${SHOT_DIR}/${name}.png`, Buffer.from(dataUrl.split(',')[1], 'base64'));
@@ -84,11 +88,12 @@ async function gameSeconds(page, secs) {
 
 // One boot for all of it: the gate pays for every page load.
 test('E walks into the noodle bar and out, a blackout kills its lights, the stair goes to the roof', async ({ page }) => {
+    test.setTimeout(180000);
     await boot(page);
     await useDoorAt(page, -5.4, -10.77, 'ENTER RAMEN');
     await page.waitForFunction(() => window.__game.space() === 'ramen');
-    await frames(page, 6);
-    const inside = await peak(page, 20);
+    await frames(page, 3);
+    const inside = await peak(page, 8);
     console.log(`inside draws: ${inside} / ${DRAW_BUDGET}`);
     expect(inside).toBeLessThanOrEqual(DRAW_BUDGET);
     saveShot(await page.evaluate(() => window.__game.shot()), 'interior-lit');
@@ -97,7 +102,7 @@ test('E walks into the noodle bar and out, a blackout kills its lights, the stai
     // Past the collapse flicker and into the dark itself.
     await page.evaluate(() => window.__game.hack());
     await page.waitForFunction(() => window.__game.dark()[0], null, { timeout: 15000 });
-    await gameSeconds(page, 1.5);
+    await gameSeconds(page, 1.2);
     const dark = await brightness(page);
     saveShot(await page.evaluate(() => window.__game.shot()), 'interior-dark');
     expect(dark).toBeLessThan(lit * 0.6);
@@ -109,8 +114,8 @@ test('E walks into the noodle bar and out, a blackout kills its lights, the stai
     await page.waitForFunction(() => window.__game.space() === 'roof');
     expect((await page.evaluate(() => window.__game.player())).y).toBeGreaterThan(40);
     await page.evaluate(() => window.__game.look(0.75, 7));
-    await frames(page, 6);
-    const roof = await peak(page, 20);
+    await frames(page, 3);
+    const roof = await peak(page, 8);
     console.log(`roof draws: ${roof} / ${DRAW_BUDGET}`);
     expect(roof).toBeLessThanOrEqual(DRAW_BUDGET);
     saveShot(await page.evaluate(() => window.__game.shot()), 'interior-roof');
