@@ -1,6 +1,6 @@
 # Zoning + growth — the plan
 
-Feature slice 4 in `docs/CHARTER.md`. Read `AGENTS.md` first; this document assumes it.
+Feature slice 1 (first) in `docs/CHARTER.md`. Read `AGENTS.md` first; this document assumes it.
 
 ## Why this exists
 

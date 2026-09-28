@@ -103,23 +103,26 @@ above.
 
 ### Feature slices, in order
 
-1. **Wanted** — police tiers: roadblocks, helicopter, spike strips, dispatch chatter.
+1. **Zoning + growth** — the building half of the game, currently missing. Zones grow
+   through a staged pipeline; the skyline changes because the city decided it, not
+   because an artist placed a tower. **Planned in `docs/ZONING.md`**, which also records
+   why the existing 68 towers stay merged and static. (Its internal slice numbers
+   predate this reorder — number by what ships, per the bookkeeping note above.)
+2. **District economy** — jobs, wealth and demand per district, feeding growth and
+   giving consequences something real to move (VGA-077 faction paint reads it).
+3. **Verticality** — interiors (shop, safehouse, homes) and accessible rooftops. This is
+   where the two halves meet: you walk into what you zoned. Pairs with VGA-078.
+   Salvages old Q3/Q13.
+4. **Wanted** — police tiers: roadblocks, helicopter, spike strips, dispatch chatter.
    Pairs with VGA-068/069. Salvages the old Q4 design.
-2. **Arc + radio** — 6-mission narrative skeleton, 3-channel radio structure.
+5. **Arc + radio** — 6-mission narrative skeleton, 3-channel radio structure.
    Salvages old Q7. Radio audio comes from the local pipeline in `docs/ASSETS.md`.
-3. **Verticality** — interiors (shop, safehouse) and accessible rooftops.
-   Pairs with VGA-078. Salvages old Q3/Q13.
-4. **Zoning + growth** — the Cities:Skylines leg, currently missing. Zones grow through
-   a staged pipeline; the skyline changes because the city decided it, not because
-   an artist placed a tower. **Planned in `docs/ZONING.md`** (slices 024–027), which
-   also records why the existing 68 towers stay merged and static.
-5. **District economy** — jobs, wealth and demand per district, feeding growth and
-   giving consequence cascades something real to move (VGA-077 faction paint reads it).
 
-**Why 4 and 5 matter:** pillar 1, "the city lives", currently rests on traffic, NPCs
-and a day/night clock. That is motion, not life. Until zones grow and an economy shifts,
-the third leg of the three-game pitch is a claim rather than a feature. Building them
-is a deliberate commitment made 2026-09-17, not a someday-maybe.
+**Why this order (reordered 2026-09-28 by the operator).** The game is *build a city,
+then live in it* — building is half of it, and it was scheduled fourth. So: build it
+(1–2), then make what you built a place you can enter (3), then layer street pressure
+and story on top (4–5). Police and narrative on a city that can't grow would be polish
+on a claim.
 
 Longer-horizon engineering and content work — streaming, KTX2/meshopt, zero-alloc loops,
 sewers, skybridges, accessibility, launch readiness — is in `docs/BACKLOG.md`.
