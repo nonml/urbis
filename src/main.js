@@ -32,6 +32,7 @@ import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
 import { drawLedger } from './render/ledger.js';
+import { hideFaded } from './render/faded.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -110,6 +111,8 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
   scene.add(m);
   return m;
 });
+// Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
+const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
 
 const street = createStreet(20260916);
 const city = createCity(20260916);
@@ -616,6 +619,7 @@ function render() {
     prompt.style.display = 'none';
   }
 
+  hideFaded(fadedDraws);
   renderer.info.reset();
   // The city mirror re-shoots one cube face per frame, and only when it has gone
   // stale: five frames of one extra pass after a blackout, a day/night flip, or a

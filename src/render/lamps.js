@@ -208,5 +208,5 @@ export function buildLamps() {
   }
 
   const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
-  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions };
+  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions, cones };
 }
