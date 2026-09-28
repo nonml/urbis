@@ -31,6 +31,7 @@ import { buildGrassGround, buildGrassTufts, buildMountains } from './render/land
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
+import { drawLedger } from './render/ledger.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -391,6 +392,11 @@ if (CAPTURE) {
     budget: (tiles, ms) => chunks.budget(tiles, ms),
     visible: (on) => { for (const m of outskirts.meshes) m.visible = on; },
   };
+  // What each draw was spent on, per frame: docs/DRAWS.md is built from it.
+  window.__game.ledger = drawLedger(renderer);
+  // The end of the day/night glide, reached at once: a probe measuring the day
+  // frame should not have to render 140 frames of dusk to get there.
+  window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; };
   // Stand the player somewhere inside the walk box it could have walked to, and
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
