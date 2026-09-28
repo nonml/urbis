@@ -7,10 +7,12 @@
 //             shipped tower materials — a grown building is made of the same
 //             city as its neighbours, and it goes dark in a blackout with them
 //             (VGA-007). Four meshes; a mesh with nothing standing costs zero.
+//             An emptying shell goes dark from the top (render/vacancy.js).
 //   site kit  one InstancedMesh with per-instance colour: hoarding, crane,
 //             netting, plinth, parapet, plant.
 import * as THREE from 'three';
 import { STAGE, builtHeight } from '../sim/zoning.js';
+import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
 // Offices go up in glass; homes and workshops in concrete.
@@ -22,10 +24,10 @@ const ARCHITECTURE = { com: GLASS, res: CONCRETE, ind: CONCRETE };
 const TINT = { com: [1, 1, 1], res: [1.16, 1.02, 0.86], ind: [0.86, 0.9, 0.96] };
 
 // The shell stands this far inside the hoarding line on every side.
-const SETBACK = 1.2;
+export const SETBACK = 1.2;
 const HOARDING_HEIGHT = 2.4;
-const HOARDING_THICK = 0.12;
-const PAD_RISE = 0.5;          // gravel over the lot, above the verge swell (<= 0.45)
+export const HOARDING_THICK = 0.12;
+export const PAD_RISE = 0.5;   // gravel over the lot, above the verge swell (<= 0.45)
 const NETTING_BAND = 4.5;      // the working floors wrapped while a shell climbs
 
 // A tower crane climbs inside the core, its jib a storey or two above the
@@ -142,6 +144,7 @@ function dressParcel(rig, p, i) {
     pos.set(p.x, 0, p.z);
     scale.set(sw, h, sd);
     shells.setMatrixAt(shells.count, matrix.compose(pos, quat.identity(), scale));
+    shells.geometry.attributes.litTop.setX(shells.count, litTop(p, h));
     shells.setColorAt(shells.count++, paint.setRGB(...TINT[p.use]));
     kitBox(rig, PAINT.plinth, p.x, 0, p.z, sw + 0.16, PAD_RISE + 0.12, sd + 0.16);
     kitBox(rig, PAINT.parapet, p.x, h, p.z, sw + 0.4, 0.5, sd + 0.4);
@@ -161,7 +164,7 @@ export function buildZoning(city, kinds, footprints) {
   const shells = {};
   for (const kind of new Set(Object.values(ARCHITECTURE))) {
     shells[kind] = kinds[kind].map((mat) => {
-      const m = new THREE.InstancedMesh(geo, mat, n);
+      const m = new THREE.InstancedMesh(withLitTop(geo.clone(), n), emptyFloorsGoDark(mat), n);
       // Colour from the first frame, or the program compiles without it.
       m.setColorAt(0, paint.setRGB(1, 1, 1));
       m.castShadow = true;
@@ -190,6 +193,7 @@ export function buildZoning(city, kinds, footprints) {
     for (const m of meshes) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      if (m.geometry.attributes.litTop) m.geometry.attributes.litTop.needsUpdate = true;
       // The bounds grow with the buildings; stale ones cull a tower that is there.
       m.computeBoundingSphere();
     }
