@@ -1,12 +1,14 @@
 import { defineConfig } from '@playwright/test';
 
-// Locally: real GPU via ANGLE/D3D11.
+// Locally: real GPU via ANGLE — D3D11 on Windows, Metal on macOS (D3D11 does
+// not exist there, and asking for it silently drops Chrome to a fallback).
 // In CI there is no GPU, so we fall back to SwiftShader — valid ONLY because
 // renderer.info.render.calls is a CPU-side counter and is backend-independent.
 // Never read an fps number from a CI run; the charter bans SwiftShader for timing.
+const ANGLE_BACKEND = process.platform === 'darwin' ? 'metal' : 'd3d11';
 const GPU_ARGS = process.env.CI
     ? ['--enable-unsafe-swiftshader']
-    : ['--use-angle=d3d11', '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'];
+    : [`--use-angle=${ANGLE_BACKEND}`, '--use-gl=angle', '--ignore-gpu-blocklist', '--enable-gpu-rasterization'];
 
 // The gate must test THIS working tree's build and no other. That is not
 // automatic: with a fixed port and reuseExistingServer, a gate run in one
@@ -33,9 +35,10 @@ export default defineConfig({
         baseURL: `http://localhost:${PORT}`,
         viewport: { width: 960, height: 540 },
         trace: 'on-first-retry',
-        // Locally use installed Chrome — real GPU, and no 150 MB download.
+        // Windows uses installed Chrome — real GPU, and the chromium download
+        // stalls there. macOS has no such stall, so it uses bundled chromium.
         // CI installs bundled chromium, where headless_shell is fine for draw counts.
-        channel: process.env.CI ? 'chromium' : 'chrome',
+        channel: process.env.CI || process.platform === 'darwin' ? 'chromium' : 'chrome',
         launchOptions: { args: GPU_ARGS },
     },
     webServer: {

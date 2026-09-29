@@ -124,9 +124,10 @@ Things that will waste an hour if you learn them by discovery:
   `preserveDrawingBuffer` behind that flag, so normal play pays nothing for it. Without
   it every capture is pure black and you will misdiagnose it as a render bug. It has
   happened in this repo.
-- **Use `channel: 'chrome'` locally, bundled chromium in CI.** Playwright's chromium
-  download stalls on the operator's machine. `playwright.config.js` already branches on
-  `process.env.CI`; don't "fix" it.
+- **Installed Chrome on Windows, bundled chromium on macOS and in CI.** Playwright's
+  chromium download stalls on the operator's Windows machine; on the Mac it does not.
+  The ANGLE backend follows the platform too — D3D11 on Windows, Metal on macOS.
+  `playwright.config.js` already branches on both; don't "fix" it.
 - **`dark()` returns `[bool, bool]`**, one per power zone — not a list of dark zone ids.
 - **`tod()` is not a clock.** `nightFactor` is static until `T` is pressed. It cannot be
   used to prove the world is advancing on its own.
