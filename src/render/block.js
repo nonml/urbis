@@ -734,7 +734,8 @@ export function buildTowers(texLoader, maxAniso) {
     }
   }
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
-  function emitTower(cx, cz, w, h, d, idx, face) {
+  // `name` says which table row this is, so the overlap check can point at it.
+  function emitTower(cx, cz, w, h, d, idx, face, name) {
     const zone = cz < 0 ? 0 : 1;
     const shaft = facades[idx % facades.length][zone];
     const pod = podiums[idx % podiums.length];
@@ -767,24 +768,24 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
     caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
-    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2 });
+    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, name });
   }
   let idx = 0;
   for (const ax of AVENUE_X) {
-    for (const [side, z, w, h, d] of TOWERS) {
+    TOWERS.forEach(([side, z, w, h, d], i) => {
       // The dressed face is the one the avenue sees, not an arbitrary +Z.
-      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++, [-side, 0]);
-    }
+      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++, [-side, 0], `TOWERS[${i}] avenue x=${ax}`);
+    });
   }
-  for (const [x, w, h] of SOUTH_TOWERS) {
-    emitTower(x, -66, w, h, 10, idx++, [0, 1]);
-  }
-  for (const [x, z, w, h, d] of INFILL_TOWERS) {
-    emitTower(x, z, w, h, d, idx++, [x > 0 ? -1 : 1, 0]);
-  }
-  for (const [x, z, w, h, d] of TERMINUS_TOWERS) {
-    emitTower(x, z, w, h, d, idx++, [0, -1]);
-  }
+  SOUTH_TOWERS.forEach(([x, w, h], i) => {
+    emitTower(x, -66, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
+  });
+  INFILL_TOWERS.forEach(([x, z, w, h, d], i) => {
+    emitTower(x, z, w, h, d, idx++, [x > 0 ? -1 : 1, 0], `INFILL_TOWERS[${i}]`);
+  });
+  TERMINUS_TOWERS.forEach(([x, z, w, h, d], i) => {
+    emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
+  });
   // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
   // architecture lights both halves of the district.
   for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
@@ -837,7 +838,7 @@ export function buildTowers(texLoader, maxAniso) {
   ];
   const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
   group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  footprints.push(...silhouettes.map(footprintOf));
+  footprints.push(...silhouettes.map((g, i) => ({ ...footprintOf(g), name: `silhouettes[${i}]` })));
   return {
     group, beacons: beaconPts, facadeMats: mats.facadeMats,
     zoneMats: mats.zoneMats, kinds: mats.kinds, mirrorProxies, shopPools, footprints,
@@ -861,7 +862,8 @@ export function buildSkyline(texLoader, maxAniso) {
   ];
   const geos = RING.map(([x, z, w, h, d]) => worldUVs(box(w, h, d, x, h / 2, z), w, h, d, 9));
   const mat = new THREE.MeshBasicMaterial({ map: emission });
+  const footprints = geos.map((g, i) => ({ ...footprintOf(g), name: `RING[${i}]` }));
   const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
   mesh.frustumCulled = false;
-  return { mesh, mat };
+  return { mesh, mat, footprints };
 }

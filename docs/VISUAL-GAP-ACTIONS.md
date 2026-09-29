@@ -167,7 +167,9 @@ remaining neon element is now a defect, and this item goes before every other op
     baked or vertex AO and bevelled geometry.
 
   **Order inside the item:** one slice each, each with its own play-camera evidence.
-  1. **No overlap.** A headless test that fails if any two building footprints
+  1. **No overlap.** ⏳ Checker in the gate (`npm run check:overlap`, 57 pairs at the
+     podium, ratchet); fixes briefed step by step in `docs/handoff/VGA-084-1.md`.
+     A headless test that fails if any two building footprints
      intersect, wired into the gate. Then fit the infill into real gaps, correct the
      setback axis, and move the silhouettes and ring out of the district. Moving tower
      tables touches what is placed against them: the zoning `LOTS`, sign positions in

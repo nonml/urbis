@@ -95,6 +95,7 @@ npm run gate         # everything below, in order — must be green before you c
 | `npm run lint` | style + line length; errors fail, warnings don't |
 | `npm run check:rng` | no `Math.random()` anywhere in `src/` |
 | `npm run check:boundary` | no three.js or DOM in `src/sim/` (law 5) |
+| `npm run check:overlap` | no two building footprints intersect; a ratchet down to 0 (VGA-084) |
 | `npm run validate` | `src/content/*.json` schemas |
 | `npm run build` | **mandatory** — lint and tests do not parse the bundle. Syntax and import errors surface only here |
 | `npm test` | boots the built game in GPU headless, asserts **draws ≤ 175**, proves the hack cascade, writes evidence to `docs/shots/gate/` |
@@ -318,7 +319,8 @@ one line, and go.
    inherits the palette.
 2. **VGA-084 — strip the toy.** The whole frame reads as Lego: buildings that overlap,
    and boxes for buildings, cars, people and props. Its sub-slices run in the order the
-   item lists, starting with the no-overlap test.
+   item lists, starting with the no-overlap test. **That first sub-slice has a
+   step-by-step brief: `docs/handoff/VGA-084-1.md`. Follow it exactly.**
 3. **The feature slices in `docs/CHARTER.md`, in the order listed** — only Wanted is
    left, on the `wave2/wanted` branch.
 4. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner
@@ -335,7 +337,8 @@ the operator on 2026-09-28, with VGA-084 placed on 2026-09-29, and is recorded i
 4. `npm run gate`. Green, all of it.
 5. **Screenshot it at the normal play camera.** A close-up or top-down lab angle proves
    nothing — that rule exists because an audit caught lab-only proofs passing as done.
-   Save to `docs/shots/`.
+   Save to `docs/shots/`. `node scripts/shot.mjs` does it on Windows or macOS and
+   prints the per-frame draw peak; usage is in its header.
 6. Commit: `<type>(<area>): <title>`, plus `Why:` and the measured draw cost.
 7. Tick the item with its commit hash and evidence filename.
 
