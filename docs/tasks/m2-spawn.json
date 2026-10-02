@@ -1,0 +1,23 @@
+{
+  "milestone": "2e: a generated world starts on its own main avenue",
+  "tasks": [
+    {
+      "id": "m2-spawn-place",
+      "lane": "spawn",
+      "goal": "Fill in spawnFor in src/sim/spawn.js: a generated world's start spot on its main avenue, the hero car at the east kerb on a plain stretch, the player just ahead of it.",
+      "files": ["src/sim/spawn.js"],
+      "test": "tests/spawn-place.spec.js",
+      "commit": "feat(spawn): a generated world starts on its main avenue, off the junctions",
+      "notes": "The comment above spawnFor is the exact rule and the constants are final. Remove the void line. const a = district.avenues[0]; const meets = district.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1); fits(z) is true when every crossing in meets has Math.abs(z - c.z) >= SPAWN_CLEAR and district.walk.minZ + SPAWN_CLEAR <= z <= district.walk.maxZ - SPAWN_CLEAR. Search outward: for k = 0, 1, 2, ... try z = SPAWN_Z - k * SPAWN_STEP first, then z = SPAWN_Z + k * SPAWN_STEP, and return the first that fits as { player: { x: a.x + PLAYER_OUT, z: z + PLAYER_AHEAD, yaw: Math.PI }, car: { x: a.x + CAR_OUT, z, yaw: Math.PI } }. Stop the loop at k = 200 and return HAND_SPAWN if nothing fits. Leave HAND_SPAWN and the SPAWN line as they are."
+    },
+    {
+      "id": "m2-spawn-wire",
+      "lane": "spawn",
+      "goal": "Start a new game at SPAWN: createPlayer and createPlayerCar read it, and main.js keeps the player inside this world's walk box when getting out of the car or posing a shot.",
+      "files": ["src/sim/player.js", "src/sim/vehicle.js", "src/main.js"],
+      "test": "tests/spawn-wire.spec.js",
+      "commit": "feat(spawn): a new game on a generated world starts at its own spawn",
+      "notes": "player.js: import { SPAWN } from './spawn.js'; createPlayer does const { x, z, yaw } = SPAWN.player; and returns { x, y: heightAt(x, z), z, yaw, speed: 0, walkPhase: 0 }. vehicle.js: import { SPAWN } from './spawn.js'; createPlayerCar does const { x, z, yaw } = SPAWN.car; return { x, y: heightAt(x, z), z, yaw, speed: 0 }; and update its comment to say the car is parked beside the player's spawn. main.js line 7 becomes import { WALK_BOUNDS, clampToBounds, heightAt } from './sim/world.js'; in toggleVehicle the two Math.max(-52 / Math.max(-68 lines become ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z)); and in window.__game.pose the two lines become ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, x, z)); The hand preset must start exactly where it does today: SPAWN equals HAND_SPAWN there. tests/spawn-place.spec.js and tests/save.spec.js must stay green."
+    }
+  ]
+}
