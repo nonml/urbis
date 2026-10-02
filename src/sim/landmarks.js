@@ -32,11 +32,42 @@ export const PIN_BAND = ROAD_HALF_WIDTH + WALKWAY_WIDTH;
 // (c.z +- PIN_BAND), of the avenue's z0 and z1, and of every tower already
 // placed; otherwise it takes the nearest z on the half-metre grid that does,
 // trying hand z - 0.5, hand z + 0.5, hand z - 1, ... in that order.
-// Milestone 2 skeleton: a stub with its test in tests/pinned-place.todo.js.
+// A tower at z clears the span z0..z1 (already widened by whatever gap the
+// caller owes) when its footprint sits entirely outside it.
+function clearOf(t, z, z0, z1) {
+  return z + t.d / 2 <= z0 || z - t.d / 2 >= z1;
+}
+
+function isFree(t, z, placed, avenue, crossings) {
+  if (z - t.d / 2 < avenue.z0 + PIN_GAP) return false;
+  if (z + t.d / 2 > avenue.z1 - PIN_GAP) return false;
+  for (const c of crossings) {
+    if (!clearOf(t, z, c.z - PIN_BAND - PIN_GAP, c.z + PIN_BAND + PIN_GAP)) return false;
+  }
+  for (const u of placed) {
+    if (!clearOf(t, z, u.z - u.d / 2 - PIN_GAP, u.z + u.d / 2 + PIN_GAP)) return false;
+  }
+  return true;
+}
+
+// hand z first, then hand z - 0.5, hand z + 0.5, hand z - 1, ... — nearest first.
+function nearestFreeZ(t, placed, avenue, crossings) {
+  if (isFree(t, t.z, placed, avenue, crossings)) return t.z;
+  const span = avenue.z1 - avenue.z0;
+  for (let n = 1; n <= span * 2; n++) {
+    const step = Math.ceil(n / 2) * 0.5;
+    const z = t.z + (n % 2 === 1 ? -step : step);
+    if (isFree(t, z, placed, avenue, crossings)) return z;
+  }
+  throw new Error(`landmarks: no free z for ${t.id}`);
+}
+
 export function placePinned(hand, avenue, crossings) {
-  void avenue;
-  void crossings;
-  return hand.map((t) => ({ ...t }));
+  const placed = [];
+  for (const t of hand) {
+    placed.push({ ...t, z: nearestFreeZ(t, placed, avenue, crossings) });
+  }
+  return placed;
 }
 
 export const PINNED_TOWERS = worldSeed().generate ? placePinned(HAND_PINNED, AVENUES[0], CROSSINGS) : HAND_PINNED;
