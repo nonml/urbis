@@ -13,13 +13,14 @@
 import { createClock } from './clock.js';
 import { createInterior, currentPlace, placeOf, STREET } from './interior.js';
 import { createMission, missionRestore } from './mission.js';
+import { createPeople } from './people.js';
 import { createPlayer } from './player.js';
 import { createStreet } from './street.js';
 import { createPlayerCar } from './vehicle.js';
 import { heightAt } from './world.js';
 import { createCity, STAGE, USES } from './zoning.js';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 // ---------------------------------------------------------------------------
 // serialize: live state in, plain object out.
@@ -75,6 +76,14 @@ function snapshotMission(m) {
   };
 }
 
+function snapshotPeople(people) {
+  return {
+    list: people.list.map((q) => ({ id: q.id, name: q.name, age: q.age, home: q.home, job: q.job })),
+    nextId: people.nextId,
+    rand: people.rand.dump(),
+  };
+}
+
 export function serialize(game) {
   return {
     version: SAVE_VERSION,
@@ -86,6 +95,7 @@ export function serialize(game) {
     car: { x: game.car.x, z: game.car.z, yaw: game.car.yaw, speed: game.car.speed },
     interior: { space: game.interior.space, lastX: game.interior.lastX, lastZ: game.interior.lastZ },
     mission: snapshotMission(game.mission),
+    people: snapshotPeople(game.people),
   };
 }
 
@@ -98,7 +108,7 @@ function isSnapshot(s) {
   return isPlain(s)
     && s.version === SAVE_VERSION
     && Number.isInteger(s.seed) && s.seed > 0 && s.seed < 2 ** 31
-    && [s.clock, s.street, s.city, s.player, s.car, s.interior, s.mission].every(isPlain)
+    && [s.clock, s.street, s.city, s.player, s.car, s.interior, s.mission, s.people].every(isPlain)
     && Array.isArray(s.street.zones)
     && Array.isArray(s.city.parcels)
     && isPlain(s.city.economy) && Array.isArray(s.city.economy.districts);
@@ -120,6 +130,9 @@ const maybe = (fn) => (v) => (v === null ? null : fn(v));
 
 function applyClock(clock, s) {
   clock.elapsed = num(s.elapsed);
+  clock.hour = num(s.hour);
+  clock.day = num(s.day);
+  clock.rate = num(s.rate);
   clock.nightFactor = num(s.nightFactor);
   clock.nightTarget = num(s.nightTarget);
   clock.rainFactor = num(s.rainFactor);
@@ -212,6 +225,23 @@ function applyCar(car, s) {
   return car;
 }
 
+function applyPeople(people, s, city) {
+  if (!Array.isArray(s.list)) throw new Error('save: people list');
+  const parcel = (v) => Number.isInteger(v) && v >= 0 && v < city.parcels.length;
+  people.list = s.list.map((q) => {
+    if (!Number.isInteger(q.id)) throw new Error('save: bad person id');
+    if (typeof q.name !== 'string') throw new Error('save: bad person name');
+    if (!Number.isInteger(q.age)) throw new Error('save: bad person age');
+    if (!parcel(q.home)) throw new Error('save: bad person home');
+    if (q.job !== null && !parcel(q.job)) throw new Error('save: bad person job');
+    return { id: q.id, name: q.name, age: q.age, home: q.home, job: q.job };
+  });
+  if (!Number.isInteger(s.nextId)) throw new Error('save: bad person next id');
+  people.nextId = s.nextId;
+  people.rand.load(num(s.rand));
+  return people;
+}
+
 function rebuild(saved) {
   const street = createStreet(saved.seed);
   const city = createCity(saved.seed);
@@ -226,6 +256,7 @@ function rebuild(saved) {
     car: applyCar(createPlayerCar(), saved.car),
     interior,
     mission: missionRestore(createMission(), saved.mission),
+    people: applyPeople(createPeople(saved.seed), saved.people, city),
   };
 }
 
