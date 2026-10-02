@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
 import { AVENUE_X, CROSSINGS } from '../sim/world.js';
+import { WORLD_FURNITURE } from '../sim/furniture.js';
 
 // Which street a fixture belongs to comes from sim/world.js; how it stands on
 // that street is this file's business.
@@ -22,7 +23,7 @@ const ARM = 1.8;
 // arm is the same length; both offsets are measured off the way's centre-line.
 const CROSS_POLE_OUT = 4.2;
 const CROSS_HEAD_OUT = 2.4;
-const LAMPS = [
+const HAND_LAMPS = [
   ...[-45, -27, -9, 9, 27, 45].flatMap((z, i) => {
     const side = i % 2 === 0 ? -1 : 1;
     return [MAIN_X, EAST_X].map((ax) => ({
@@ -74,6 +75,8 @@ const LAMPS = [
     zone: 1,
   },
 ];
+// On a generated world the plan places the lamps; the hand preset keeps its table.
+const LAMPS = WORLD_FURNITURE ? WORLD_FURNITURE.lamps : HAND_LAMPS;
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);
 const HEAD_DARK = new THREE.Color(0x11100c);
