@@ -19,17 +19,43 @@ the street is still there, rendering, on the other side of a wall you made. A
 other. The cut is immediate, covered by a 320 ms fade (a stairwell is a fade, not a
 load).
 
+## Grown lots — pillar 1
+
+Since slice 061, a lot the city grew has a street door too. Every parcel at **LOW**
+or higher offers a place and a door, and the door goes when the building is cleared
+or declines below LOW. The face is not typed: `streetFace()` in `sim/interior.js`
+takes the parcel's shell footprint and picks the one of its four sides whose midpoint
+stands nearest a road (`nearestEdge()` in `sim/world.js`), so a new seed just works.
+The room is authored in that face's frame, sized from the shell — `a` across the
+face, `d` into the building — and its fixtures are footprints in `parcelItems()`:
+
+| Use | Inside |
+|---|---|
+| `com` | counter, shelf wall, fridge wall; at MID or higher, a café table |
+| `res` | mailbox wall, a stair core, a flat door |
+| `ind` | racking both sides, a parked forklift, a roller door |
+
+`syncInterior(state)` (after `tickZoning`) rebuilds the city's places and links each
+tick; `createInterior(city)` binds the city once, in main.js. `occupiedParcel()` names
+the lot the player is inside, and `tickZoning(city, dt, street, hold)` defers that
+parcel's decline or ordered demolition until they leave, so the room cannot vanish
+around them. Render draws every grown door as **one instanced mesh** (one geometry,
+a use tint and a power-zone attribute per instance) and builds each room the first
+frame the player stands in it, behind the door fade; only the active room is ever
+geometry. The `res` flat door is dressing, not an enterable second space yet (see
+**Not yet**).
+
 ## Where things live
 
 | File | Side | What it holds |
 |---|---|---|
-| `src/sim/interior.js` | sim, pure | `SPACES` (layout: room, floor, furniture footprints, camera rig), `DOORS`, the state (`space`, `near`), collision (`tickInterior`), `useDoor`, and `frameCamera` — where the follow cam may go |
-| `src/render/interior.js` | render | light baking, the patched material, placement, `updateInteriors` (visibility, power, steam, key light) |
-| `src/render/interiorsets.js` | render | one builder per furniture `kind`, and the light rig for each room |
+| `src/sim/interior.js` | sim, pure | `SPACES` (layout: room, floor, furniture footprints, camera rig), `DOORS`, the state (`space`, `near`), collision (`tickInterior`), `useDoor`, `frameCamera`, and the grown-lot derivation (`parcelSpace`, `parcelPlace`, `syncInterior`, `occupiedParcel`) |
+| `src/render/interior.js` | render | light baking, the patched material, placement, the instanced grown-lot doors, the per-lot rooms, `updateInteriors` (visibility, power, steam, key light) |
+| `src/render/interiorsets.js` | render | one builder per furniture `kind`, the light rig for each room, `parcelRoom`/`parcelDoor` |
 | `src/render/interiorkit.js` | render | the painted atlas and the part helpers (`box`, `slab`, `panel`, `tiled`, `part`) |
 | `src/render/doorhud.js` | DOM | the `E · …` prompt and the fade |
-| `tests/interior.spec.js` | headless | enter/exit, walls hold, counter holds, sliding, roof bounds, camera stays in the room |
-| `tests/interior-gate.spec.js` | browser | `E` in and out, the blackout darkens the room, the roof, both under 175 draws |
+| `tests/interior.spec.js` | headless | enter/exit, walls hold, counter holds, sliding, roof bounds, camera stays in the room, and every grown lot's door |
+| `tests/interior-gate.spec.js` | browser | `E` in and out, the blackout darkens the room, the roof, a zoned shop, all under 175 draws |
 
 `src/main.js` only wires it: `tickInterior` after `tickPlayer`, `updateInteriors`
 after the zone loop, `frameCamera` after the camera is placed, `E` in the keydown
@@ -146,12 +172,24 @@ worktree, gitignored):
 
 Worst frame measured: **164**, the gate pose through a blackout, under 175.
 
+Slice 061 grows doors on the lots. Measured on the macOS Metal gate on this
+worktree (same instrument, every `rAF`): the street budget line reads
+**124 → 125** — the grown-lot doors are **one** `InstancedMesh`, +1. Inside a
+grown `com` lot the browser gate reads **103 / 175**; `scripts/shot.mjs` reads
+**99 (com), 99 (res), 103 (ind)**, peaks 125 / 103 / 103. A room is built the
+first frame the player stands in it and hidden otherwise, so it costs nothing
+until entered; the street doors always draw one.
+
 ## Evidence
 
 `docs/shots/wave2-interiors-street-door.png` (the door, its lantern and noren, and
 the `E · ENTER RAMEN` prompt), `-inside.png`, `-blackout.png` (the same framing,
 lights dead, the gas still burning), `-roof.png` and `-roof-avenue.png` (by day,
 from the crown; a crane on a growth lot shows over the east row).
+
+`docs/shots/slice-061-zoned-interiors-com.png`, `-res.png` and `-ind.png`: the
+play camera inside one grown lot of each use, from a single `scripts/shot.mjs`
+call (draws printed above).
 
 ## Not yet
 
@@ -163,7 +201,11 @@ from the crown; a crane on a growth lot shows over the east row).
   nearer a lot (the east-row tower at z = -44, 26 m, looks straight down on the
   lot in the gap behind it and across at the south-west pair) is the better
   second roof.
-- One shop, one roof. The next nine copy this file.
+- The `res` lot's flat is a door and a wall, not yet a second space you can walk
+  through: the lobby is enterable, the flat behind it is not. It wants its own
+  sub-room and a second link.
+- One hand-placed shop and one roof. The next nine copy this file; the grown lots
+  copy it from `sim/interior.js`.
 
 ## Things learned the hard way
 

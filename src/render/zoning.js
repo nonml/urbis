@@ -12,7 +12,8 @@
 //   site kit  one InstancedMesh with per-instance colour: hoarding, crane,
 //             netting, plinth, parapet, plant.
 import * as THREE from 'three';
-import { STAGE, builtHeight } from '../sim/zoning.js';
+import { STAGE, SETBACK, builtHeight } from '../sim/zoning.js';
+import { craneBase } from '../sim/interior.js';
 import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
@@ -24,8 +25,7 @@ const ARCHITECTURE = { com: GLASS, res: CONCRETE, ind: CONCRETE };
 // the grey concrete it stands in front of: homes in warm stone, sheds cooler.
 const TINT = { com: [1, 1, 1], res: [1.16, 1.02, 0.86], ind: [0.86, 0.9, 0.96] };
 
-// The shell stands this far inside the hoarding line on every side.
-export const SETBACK = 1.2;
+// SETBACK (sim/zoning.js) is the shell's inset from the hoarding line.
 const HOARDING_HEIGHT = 2.4;
 export const HOARDING_THICK = 0.12;
 export const PAD_RISE = 0.5;   // gravel over the lot, above the verge swell (<= 0.45)
@@ -125,7 +125,8 @@ function raiseCrane(rig, p, i, h) {
   const yaw = zone.rest + zone.swing * Math.sin((p.stage + p.progress) * Math.PI * 2);
   const hookY = h + 3;
   const jibY = mastTop - JIB_DEPTH;
-  kitBox(rig, PAINT.crane, p.x, 0, p.z, MAST, mastTop, MAST);
+  const base = craneBase(p);
+  kitBox(rig, PAINT.crane, p.x, base, p.z, MAST, mastTop - base, MAST);
   kitBox(rig, PAINT.crane, p.x, mastTop, p.z, 0.9, 4.5, 0.9);
   kitBox(rig, PAINT.crane, p.x, jibY, p.z, JIB + COUNTER_JIB, JIB_DEPTH, 1, yaw, (JIB - COUNTER_JIB) / 2);
   kitBox(rig, PAINT.ballast, p.x, jibY - 1.8, p.z, 2.2, 1.8, 1.8, yaw, -COUNTER_JIB + 1.2);
