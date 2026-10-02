@@ -6,15 +6,7 @@ import { getGlowTex } from './signs.js';
 import { mulberry32 } from '../sim/rng.js';
 import { zoneAt } from '../sim/street.js';
 import { loadPBRMaps, standardFromMaps } from './materials.js';
-
-const SHOPS = [
-  { x: -6.0, z: -12, ry: Math.PI / 2, kind: 0 },
-  { x: 6.0, z: 2, ry: -Math.PI / 2, kind: 1 },
-  { x: -6.0, z: 22, ry: Math.PI / 2, kind: 2 },
-  { x: 35.5, z: -20, ry: Math.PI / 2, kind: 1 },
-  { x: 50.0, z: 14, ry: -Math.PI / 2, kind: 0 },
-  { x: 10, z: -60.9, ry: Math.PI, kind: 2 },
-];
+import { PUDDLES, SHOPS, VENTS } from '../sim/dressing.js';
 
 // A signwriter's colours: a painted board and the letters on it. Lacquer red
 // under lantern orange, navy under old gold, white on medical blue.
@@ -120,7 +112,7 @@ export function buildShops(texLoader, maxAniso) {
   // names out with its lamps. Six materials became two.
   const mats = signGeos.map((geos, zone) => {
     const mat = new THREE.MeshBasicMaterial({ map: signTex });
-    group.add(new THREE.Mesh(mergeGeometries(geos), mat));
+    if (geos.length) group.add(new THREE.Mesh(mergeGeometries(geos), mat));
     return { mat, zone, seed: zone * 2.6 + 3 };
   });
   const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
@@ -148,18 +140,6 @@ function blobTexture() {
   }
   return new THREE.CanvasTexture(c);
 }
-
-const PUDDLES = [
-  // x, z, size, surface y (0.025 road / 0.145 sidewalk)
-  // First entry is the hero puddle: left-lane water a few metres from the start
-  // camera, clear of the z=20 zebra. Both facts are the whole slice — water far
-  // down the street is a few grey pixels, and a mirror laid over crosswalk paint
-  // reads as a stain rather than as water.
-  [-1.5, 25.5, 8, 0.025], [2.2, -8, 9, 0.025], [42.5, 4, 8, 0.025], [46, -24, 6, 0.025],
-  [20, -64, 8, 0.025], [1.2, 34, 6, 0.025], [43, 30, 7, 0.025],
-  [-5.9, -3, 4, 0.145], [5.9, 30, 4, 0.145], [38.2, 22, 4, 0.145],
-  [49.8, -12, 4, 0.145], [16, -69.3, 5, 0.145], [0.5, 2, 6, 0.025],
-];
 
 // Mirror puddles (VGA-002). The water reflects the city itself, sampled from a
 // cube the street re-shoots only when the light changes. A probe running every
@@ -194,7 +174,7 @@ export function buildPuddles() {
     transparent: true, alphaMap: edge, depthWrite: false,
   }));
   for (const [zone, zoneGeos] of geos.entries()) {
-    group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone]));
+    if (zoneGeos.length) group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone]));
   }
   return { group, mats };
 }
@@ -258,12 +238,6 @@ export function tickCityMirror(renderer, scene, mirror) {
   renderer.setRenderTarget(prevTarget, prevFace, prevLevel);
   renderer.shadowMap.autoUpdate = prevShadows;
 }
-
-const VENTS = [
-  { x: -5.5, z: -30, phase: 0 },
-  { x: 46.5, z: 8, phase: 0.8 },
-  { x: -5.5, z: -14, phase: 1.6 },
-];
 
 // Aviation beacons on tall crowns: one merged mesh, one synced pulse.
 // Stars: one static dome of points above the fog.
