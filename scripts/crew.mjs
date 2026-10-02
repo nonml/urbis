@@ -351,7 +351,8 @@ async function runQueue(state, files) {
   // Re-read every round, so the director can append tasks to a running queue.
   // Several queues run as one board: each lane is a developer, lanes run at once.
   const read = () => {
-    const qs = files.map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
+    // A queue not written yet is skipped, so a board can name one the director is still writing.
+    const qs = files.filter((f) => fs.existsSync(f)).map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
     return { milestone: qs.map((q) => q.milestone).join(' + '), tasks: qs.flatMap((q) => q.tasks) };
   };
   let queue = read();
