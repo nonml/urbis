@@ -43,7 +43,11 @@ export const PIN_CLEAR = 1.2;
 // that faces no other avenue; between two avenues, half the gap minus the
 // building line and BACK_GAP, capped at ROW_DEPTH_MAX.
 export function rowDepth(district, ax, side) {
-  return ROW_DEPTH_MAX;
+  const xs = district.avenues.map((a) => a.x).sort((p, q) => p - q);
+  const neighbour = xs[xs.indexOf(ax) + side];
+  if (neighbour === undefined) return ROW_DEPTH_MAX;
+  const fair = Math.abs(neighbour - ax) / 2 - BUILD_LINE - BACK_GAP;
+  return Math.min(ROW_DEPTH_MAX, fair);
 }
 
 // Where a row may stand on one avenue side, as sorted [z0, z1] runs: the
@@ -52,7 +56,27 @@ export function rowDepth(district, ax, side) {
 // rowDepth), cut ROW_END_GAP wider than its CROSSING_BAND. Runs shorter than
 // MIN_RUN are dropped.
 export function rowRuns(district, ax, side) {
-  return [];
+  const depth = rowDepth(district, ax, side);
+  const near = ax + side * BUILD_LINE;
+  const far = ax + side * (BUILD_LINE + depth);
+  const bx0 = Math.min(near, far);
+  const bx1 = Math.max(near, far);
+  const clear = CROSSING_BAND + ROW_END_GAP;
+  const cuts = district.crossings
+    .filter((c) => c.x0 < bx1 + ROW_END_GAP && c.x1 > bx0 - ROW_END_GAP)
+    .map((c) => [c.z - clear, c.z + clear])
+    .sort((p, q) => p[0] - q[0]);
+  const avenue = district.avenues.find((a) => a.x === ax);
+  const end = avenue.z1 - ROW_END_GAP;
+  const runs = [];
+  let cursor = avenue.z0 + ROW_END_GAP;
+  for (const [cz0, cz1] of cuts) {
+    const stop = Math.min(cz0, end);
+    if (stop - cursor >= MIN_RUN) runs.push([cursor, stop]);
+    cursor = Math.max(cursor, cz1);
+  }
+  if (end - cursor >= MIN_RUN) runs.push([cursor, end]);
+  return runs;
 }
 
 // The district's lots, as [x, z, w, d] like zoning's LOTS: LOTS_MIN..LOTS_MAX of
