@@ -35,6 +35,15 @@ test('a new game takes its seed from the url, and pins the fixed one without it'
     expect(await page.evaluate(() => window.__game.seed)).toBe(20260916);
 });
 
+test('the generated world boots from its seed', async ({ page }) => {
+    const errors = [];
+    page.on('pageerror', (e) => errors.push(e.message));
+    await page.goto('/?gen=1&seed=5');
+    await page.waitForFunction(() => window.__game);
+    expect(await page.evaluate(() => window.__game.seed)).toBe(5);
+    expect(errors).toEqual([]);
+});
+
 test(`whole frame stays within ${DRAW_BUDGET} draws`, async ({ page }) => {
     await boot(page);
 

@@ -4,13 +4,15 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
-import { AVENUE_X, way } from '../sim/world.js';
+import { AVENUE_X, CROSSINGS } from '../sim/world.js';
 
 // Which street a fixture belongs to comes from sim/world.js; how it stands on
 // that street is this file's business.
 const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
-const PLAZA_Z = way('plaza').z;
-const SOUTH_Z = way('south').z;
+// The two crossings the fixtures are keyed to, in declaration order —
+// generated districts carry no hand way names.
+const PLAZA_Z = CROSSINGS[0].z;
+const SOUTH_Z = CROSSINGS[CROSSINGS.length - 1].z;
 
 // Explicit per-lamp placement: pole base (x,z), head offset toward the road,
 // instance yaw, blackout zone. Main + east avenues share the z rhythm.

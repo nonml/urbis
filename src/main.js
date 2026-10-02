@@ -1,4 +1,5 @@
 // Bootstrap: sim ticks, render reads. HUD shows measured numbers only.
+import { SEED } from './boot.js';
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
@@ -127,21 +128,6 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
 });
 // Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
 const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
-
-function seedFromUrl() {
-  const raw = new URLSearchParams(location.search).get('seed');
-  if (!/^\d+$/.test(raw ?? '')) return null;
-  const n = Number(raw);
-  return n > 0 && n < 2 ** 31 ? n : null;
-}
-function freshSeed() {
-  return Date.now() % 2147483647 || 1;
-}
-// A new game is a new city (AGENTS.md). ?seed=N replays one; automated runs
-// (navigator.webdriver) pin the fixed seed so the gate and shots stay comparable.
-const FIXED_SEED = 20260916;
-const SEED = seedFromUrl() ?? (navigator.webdriver ? FIXED_SEED : freshSeed());
-console.info('urbis seed', SEED);
 
 const street = createStreet(SEED);
 const city = createCity(SEED);

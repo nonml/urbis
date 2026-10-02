@@ -1,14 +1,16 @@
 // Living-street sim: sidewalk walkers, lane traffic, lamp-zone blackout hack.
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
-import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUE_X, way, wayLength } from './world.js';
+import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUES, AVENUE_X, CROSSINGS, wayLength } from './world.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
 
 const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
-const PLAZA = way('plaza');
-const SOUTH = way('south');
+// The two crossings street life is keyed to, in declaration order — generated
+// districts carry no hand way names, and a one-crossing district plays both.
+const PLAZA = CROSSINGS[0];
+const SOUTH = CROSSINGS[CROSSINGS.length - 1];
 
 // Parked cars sit just inside the kerb, and walkers keep two lines each side of
 // an avenue: one off the kerb, one up against the shopfronts.
@@ -36,7 +38,7 @@ export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
 // Half an avenue's run. Walkers and traffic wrap here, so the loop is exactly
 // as long as the tarmac is.
-export const STREET_HALF = wayLength(way('main')) / 2;
+export const STREET_HALF = wayLength(AVENUES[0]) / 2;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
 export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];

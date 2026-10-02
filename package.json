@@ -12,6 +12,7 @@
     "check:rng": "node scripts/check_no_math_random.mjs",
     "check:boundary": "node scripts/check_boundary.mjs",
     "check:overlap": "node scripts/check_overlap.mjs",
+    "check:layouts": "node scripts/check_layouts.mjs",
     "validate": "node scripts/validate_content.mjs",
     "test": "playwright test",
     "test:ui": "playwright test --ui",

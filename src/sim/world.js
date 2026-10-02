@@ -9,6 +9,8 @@
 // It also owns the heightfield — see "The ground gets a Y" at the foot of the
 // file. Anything that sits on the ground asks heightAt() instead of assuming 0.
 import { mulberry32 } from './rng.js';
+import { generateDistrict } from './citygen.js';
+import { worldSeed } from './seedstore.js';
 
 // Carriageway geometry. ROAD_HALF in render/block.js is the same 3.5; lanes sit
 // 2 m off the centre-line because that is where traffic has always been drawn.
@@ -23,7 +25,7 @@ const GROUND_Y = 0;
 // Avenues run N-S along z, crossings run E-W along x. Each is declared as a
 // span; the graph is derived by cutting every span where the other axis meets
 // it, so an intersection is never written down twice.
-const DOWNTOWN = {
+const HAND_DOWNTOWN = {
   id: 'downtown',
   avenues: [
     { id: 'main', x: 0, z0: -100, z1: 100, lanes: 2 },
@@ -43,6 +45,9 @@ const DOWNTOWN = {
   // stops at x = 52 and past it is park, not street.
   drive: { minX: -52, maxX: 52, minZ: -68, maxZ: 100 },
 };
+
+const { seed, generate } = worldSeed();
+const DOWNTOWN = generate ? generateDistrict(seed) : HAND_DOWNTOWN;
 
 export const DISTRICTS = [DOWNTOWN];
 

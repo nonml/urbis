@@ -1,6 +1,7 @@
 // Building overlap check — VGA-084 sub-slice 1, "No overlap".
 //
 //   npm run check:overlap
+//   node scripts/check_overlap.mjs --seed N    (generated layout, meter mode)
 //
 // Two buildings that pass through each other are a bug (AGENTS.md, "Not a toy
 // either"). This builds the real towers, silhouettes and skyline ring headless,
@@ -28,6 +29,7 @@
 // The stubs are the ones scripts/dump_geometry.mjs uses: canvases only paint
 // atlases and the loader only returns textures, so neither moves a vertex.
 import { registerHooks } from 'node:module';
+import { setWorldSeed } from '../src/sim/seedstore.js';
 
 const MAX_OVERLAPS = 0;
 const MAX_ROAD = 7;
@@ -88,6 +90,14 @@ globalThis.document = {
   },
 };
 
+// --seed N measures a generated layout. The ratchets are locked to the shipped
+// hand layout, so here the same numbers print and the script always exits 0.
+// world.js reads this on its first evaluation, so it must be set before any
+// src/ module is imported.
+const seedFlag = process.argv.indexOf('--seed');
+const genSeed = seedFlag === -1 ? null : Number(process.argv[seedFlag + 1]);
+if (genSeed !== null) setWorldSeed(genSeed, true);
+
 const THREE = await import('three');
 const { buildTowers, buildSkyline } = await import('../src/render/block.js');
 const { createCity } = await import('../src/sim/zoning.js');
@@ -122,13 +132,15 @@ for (let i = 0; i < buildings.length; i++) {
 for (const [a, b] of pairs) console.log(`  ${fmt(a)}  ×  ${fmt(b)}`);
 console.log(`overlap: ${pairs.length} intersecting pairs among ${buildings.length} buildings and ${lots.length} lots (ratchet ${MAX_OVERLAPS})`);
 
-if (pairs.length > MAX_OVERLAPS) {
-  console.error(`overlap FAIL — ${pairs.length - MAX_OVERLAPS} new. Fix the placement; never raise MAX_OVERLAPS.`);
-  process.exit(1);
-}
-if (pairs.length < MAX_OVERLAPS) {
-  console.error(`overlap FAIL — good news: lower MAX_OVERLAPS in scripts/check_overlap.mjs to ${pairs.length}.`);
-  process.exit(1);
+if (genSeed === null) {
+  if (pairs.length > MAX_OVERLAPS) {
+    console.error(`overlap FAIL — ${pairs.length - MAX_OVERLAPS} new. Fix the placement; never raise MAX_OVERLAPS.`);
+    process.exit(1);
+  }
+  if (pairs.length < MAX_OVERLAPS) {
+    console.error(`overlap FAIL — good news: lower MAX_OVERLAPS in scripts/check_overlap.mjs to ${pairs.length}.`);
+    process.exit(1);
+  }
 }
 
 const ways = [
@@ -161,20 +173,22 @@ const worst = Math.min(...rows.map((r) => r.built));
 console.log(`frontage: ${rows.map((r) => `${r.name} ${(r.built * 100).toFixed(0)}%`).join(', ')}`);
 console.log(`frontage: worst row ${(worst * 100).toFixed(1)}% (ratchet ${(MIN_FRONTAGE * 100).toFixed(1)}%)`);
 
-let failed = false;
-if (onRoad.length > MAX_ROAD) {
-  console.error(`road FAIL — ${onRoad.length - MAX_ROAD} new. Fix the placement; never raise MAX_ROAD.`);
-  failed = true;
-} else if (onRoad.length < MAX_ROAD) {
-  console.error(`road FAIL — good news: lower MAX_ROAD in scripts/check_overlap.mjs to ${onRoad.length}.`);
-  failed = true;
+if (genSeed === null) {
+  let failed = false;
+  if (onRoad.length > MAX_ROAD) {
+    console.error(`road FAIL — ${onRoad.length - MAX_ROAD} new. Fix the placement; never raise MAX_ROAD.`);
+    failed = true;
+  } else if (onRoad.length < MAX_ROAD) {
+    console.error(`road FAIL — good news: lower MAX_ROAD in scripts/check_overlap.mjs to ${onRoad.length}.`);
+    failed = true;
+  }
+  const floor = Math.floor(worst * 1000) / 1000;
+  if (floor < MIN_FRONTAGE) {
+    console.error(`frontage FAIL — worst row fell below ${MIN_FRONTAGE}. Never lower MIN_FRONTAGE.`);
+    failed = true;
+  } else if (floor > MIN_FRONTAGE) {
+    console.error(`frontage FAIL — good news: raise MIN_FRONTAGE in scripts/check_overlap.mjs to ${floor}.`);
+    failed = true;
+  }
+  if (failed) process.exit(1);
 }
-const floor = Math.floor(worst * 1000) / 1000;
-if (floor < MIN_FRONTAGE) {
-  console.error(`frontage FAIL — worst row fell below ${MIN_FRONTAGE}. Never lower MIN_FRONTAGE.`);
-  failed = true;
-} else if (floor > MIN_FRONTAGE) {
-  console.error(`frontage FAIL — good news: raise MIN_FRONTAGE in scripts/check_overlap.mjs to ${floor}.`);
-  failed = true;
-}
-if (failed) process.exit(1);

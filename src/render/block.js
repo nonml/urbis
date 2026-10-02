@@ -10,17 +10,19 @@ import { displaceToTerrain } from './landscape.js';
 import { mulberry32 } from '../sim/rng.js';
 import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
-  isAvenue, way, wayCenter, wayLength,
+  isAvenue, wayCenter, wayLength,
 } from '../sim/world.js';
 import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 
 // Where the city is comes from sim/world.js — this file draws the road graph,
-// it does not get a second opinion about where the roads are.
-const PLAZA = way('plaza');
-const SOUTH = way('south');
+// it does not get a second opinion about where the roads are. The ways the
+// street furniture is keyed to are read in declaration order: generated
+// districts have no hand way names to look up.
+const PLAZA = CROSSINGS[0];
+const SOUTH = CROSSINGS[CROSSINGS.length - 1];
 // Every avenue runs the same span today, and the markings that straddle the
 // zone boundary at z = 0 are cut against it.
-const STREET_LEN = wayLength(way('main'));
+const STREET_LEN = wayLength(AVENUES[0]);
 // The ground under and beyond the city. One mesh, one draw — subdividing it is
 // what lets it carry a Y (law 4 bans splitting it, not refining it). 4 m cells
 // resolve the lip where relief meets the flat road corridor, which blends over
@@ -203,14 +205,16 @@ function buildMarkings() {
   crossDashes(SOUTH, 3);
   crossDashes(PLAZA, 2);
   // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
-  // avenue, each at its own z so the three do not line up across the district.
-  for (const [id, cz] of [['main', 20], ['east', -20], ['west', 10]]) {
+  // avenue, each at its own z so they do not line up across the district.
+  for (const [k, cz] of [20, -20, 10].entries()) {
+    const av = AVENUES[k];
+    if (!av) break;
     const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
     for (let i = -3; i <= 3; i++) {
       const q = stripe.clone();
       q.rotateX(-Math.PI / 2);
       q.rotateY(Math.PI / 2);
-      q.translate(way(id).x, 0.02, cz + i * 0.7);
+      q.translate(av.x, 0.02, cz + i * 0.7);
       push(q, cz);
     }
   }
