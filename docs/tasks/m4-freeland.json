@@ -1,0 +1,14 @@
+{
+  "milestone": "4: a new city leaves the player free land to zone",
+  "tasks": [
+    {
+      "id": "m4-freeland",
+      "lane": "freeland",
+      "goal": "Fill freeLand(parcels) in src/sim/zoning.js so every district of a generated city starts with its FREE_LOTS least-started empty lots unzoned, exactly as its comment says.",
+      "files": ["src/sim/zoning.js"],
+      "test": "tests/zoning-freeland.spec.js",
+      "commit": "feat(zoning): a new city leaves free land to zone",
+      "notes": "Only the freeLand body changes; delete its void line and the comment sentence 'Milestone 4 skeleton: a stub, with its test in tests/zoning-freeland.todo.js.' The body: `for (const zone of new Set(parcels.map((p) => p.powerZone))) { parcels.filter((p) => p.powerZone === zone && p.stage === STAGE.EMPTY).sort((a, b) => a.progress - b.progress).slice(0, FREE_LOTS).forEach((p) => { p.use = null; p.zoned = null; p.progress = 0; }); }` (Array.prototype.sort is stable, so ties keep index order). createCity already calls it. tests/zoning.spec.js, tests/economy.spec.js, tests/news.spec.js and tests/save.spec.js must stay green."
+    }
+  ]
+}

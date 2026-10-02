@@ -92,6 +92,18 @@ function makeParcel(rand, [x, z, w, d]) {
   };
 }
 
+// A new city leaves the player land to zone: a rezone that must knock a
+// building down first takes jobs away before it adds any, so empty land is
+// where a zoning change starts a chain. In each district of a generated world
+// (WORLD_PLAN set), the FREE_LOTS lots that start EMPTY with the least
+// progress (ties by index) start unzoned: use and zoned null, progress 0. The
+// hand preset keeps every lot zoned. Milestone 4 skeleton: a stub, with its
+// test in tests/zoning-freeland.todo.js.
+export const FREE_LOTS = 2;
+function freeLand(parcels) {
+  void parcels;
+}
+
 // Demand is the district economy's (sim/economy.js): what stands on the lots and
 // what happens in each district move it. A parcel reads its own district's
 // market through demandFor(); `demand` is the whole city's mean, for a glance.
@@ -103,6 +115,7 @@ function updateDemand(city, dt, street) {
 export function createCity(seed) {
   const rng = createStreams(seed);
   const parcels = (WORLD_PLAN?.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
+  if (WORLD_PLAN) freeLand(parcels);
   const economy = createEconomy(parcels, builtHeight, rng.sim);
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
