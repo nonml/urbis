@@ -1,0 +1,23 @@
+{
+  "milestone": "2c: the noodle-bar and roof towers stand clear of a generated world's roads",
+  "tasks": [
+    {
+      "id": "m2-pin-place",
+      "lane": "pinned",
+      "goal": "Fill in placePinned in src/sim/landmarks.js so on a generated world each pinned tower keeps its hand z when that is clear of the crossings, and otherwise moves the least it can along its avenue.",
+      "files": ["src/sim/landmarks.js"],
+      "test": "tests/pinned-place.spec.js",
+      "commit": "feat(landmarks): pinned towers move off a generated world's crossings",
+      "notes": "The comment above placePinned is the exact rule; the constants are final. Only z changes; every other field is copied. Place towers in table order and check each candidate z against the crossings (band c.z +- PIN_BAND, widened by PIN_GAP), the avenue's z0 and z1 (PIN_GAP inside), and the towers already placed (PIN_GAP apart). Try hand z first, then hand z - 0.5, hand z + 0.5, hand z - 1, hand z + 1, and so on. The hand preset must keep HAND_PINNED exactly."
+    },
+    {
+      "id": "m2-pin-doors",
+      "lane": "pinned",
+      "goal": "Make the noodle-bar street door and the roof-stair door in src/sim/interior.js follow their towers, so on a generated world they stand where they do on the hand map relative to the tower.",
+      "files": ["src/sim/interior.js"],
+      "test": "tests/pinned-doors.spec.js",
+      "commit": "feat(interiors): the noodle-bar and roof-stair doors move with their towers",
+      "notes": "In DOORS, the 'ramen-front' street arrive { x: -5.8, z: -9.0 } and the 'roof-stair' street face { x: -13.5, z: -42.4 } and arrive { x: -12.0, z: -40.9 } are hand coordinates. Rewrite each as an offset from its tower: towerCentreX(RAMEN_TOWER) or towerCentreX(ROOF_TOWER) for x, and RAMEN_TOWER.z or ROOF_TOWER.z for z, using the offsets that give exactly today's numbers on the hand preset (towerCentreX is -14.5 for ramen and -13.5 for roof there; the towers' z are -14 and -48). Name the offsets as constants. Nothing else moves."
+    }
+  ]
+}
