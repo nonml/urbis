@@ -14,6 +14,7 @@
 import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { BUILD_LINE, PINNED_TOWERS } from './landmarks.js';
+import { mulberry32 } from './rng.js';
 
 // A crossing's carriageway and both its walkways, from its centre-line.
 export const CROSSING_BAND = ROAD_HALF_WIDTH + WALKWAY_WIDTH;
@@ -79,13 +80,87 @@ export function rowRuns(district, ax, side) {
   return runs;
 }
 
+const EPS = 1e-6;
+// The pinned towers that stand on one avenue side, widened by PIN_CLEAR into
+// the z spans a lot may not cross. Only the district's first avenue carries
+// them, as the hand layout's two interiors do.
+function pinsOn(district, ax, side) {
+  if (ax !== district.avenues[0].x) return [];
+  return PINNED_TOWERS.filter((t) => t.side === side)
+    .map((t) => [t.z - (t.d + PIN_CLEAR) / 2, t.z + (t.d + PIN_CLEAR) / 2]);
+}
+
+// Sorted [z0, z1] runs less every hole, so the two never overlap by more than EPS.
+function subtractRuns(runs, holes) {
+  let out = runs.map(([z0, z1]) => [z0, z1]);
+  for (const [h0, h1] of holes) {
+    const next = [];
+    for (const [r0, r1] of out) {
+      if (h1 <= r0 + EPS || h0 >= r1 - EPS) { next.push([r0, r1]); continue; }
+      if (h0 > r0 + EPS) next.push([r0, h0]);
+      if (h1 < r1 - EPS) next.push([h1, r1]);
+    }
+    out = next;
+  }
+  return out;
+}
+
+// Pack LOT_FRONT-long lots along the free z runs, each on the side's building
+// line, rowDepth deep. An internal pairing so planLayout and deriveLots agree.
+function placeLots(ax, side, depth, free, rand) {
+  const x = ax + side * (BUILD_LINE + depth / 2);
+  const lots = [];
+  for (const [f0, f1] of free) {
+    let z = f0;
+    while (z + LOT_FRONT[0] <= f1 + EPS) {
+      const front = LOT_FRONT[0] + rand() * (LOT_FRONT[1] - LOT_FRONT[0]);
+      if (z + front > f1 + EPS) break;
+      lots.push([x, z + front / 2, depth, front]);
+      z += front;
+    }
+  }
+  return lots;
+}
+
+// One pass over every avenue side: the free z runs it offers, and the lots the
+// seed packs into them, tagged with their avenue and side.
+function districtLots(district, seed) {
+  const rand = mulberry32(seed);
+  const lo = district.drive.minZ;
+  const hi = district.drive.maxZ;
+  const sides = district.avenues.flatMap((a) => [-1, 1].map((side) => {
+    const depth = rowDepth(district, a.x, side);
+    const free = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side))
+      .map(([f0, f1]) => [Math.max(f0, lo), Math.min(f1, hi)])
+      .filter(([f0, f1]) => f1 - f0 > EPS);
+    return { ax: a.x, side, depth, lots: placeLots(a.x, side, depth, free, rand) };
+  }));
+  return pickLots(sides, rand);
+}
+
+// Take a seed-chosen LOTS_MIN..LOTS_MAX of the candidates, round-robin across
+// sides so the lots spread over the district.
+function pickLots(sides, rand) {
+  const target = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
+  const picked = [];
+  for (let k = 0; picked.length < target; k++) {
+    if (sides.every((s) => k >= s.lots.length)) break;
+    for (const s of sides) {
+      if (k < s.lots.length && picked.length < target) {
+        picked.push({ lot: s.lots[k], ax: s.ax, side: s.side, depth: s.depth });
+      }
+    }
+  }
+  return picked;
+}
+
 // The district's lots, as [x, z, w, d] like zoning's LOTS: LOTS_MIN..LOTS_MAX of
 // them from the seed, each on one avenue side's building line, rowDepth deep,
 // a LOT_FRONT long inside one of that side's rowRuns, wholly inside the
 // district's drive bounds in z, clear of the pinned towers, and never
 // overlapping another lot. The same seed always gives the same lots.
 export function deriveLots(district, seed) {
-  return [];
+  return districtLots(district, seed).map((p) => p.lot);
 }
 
 // Everything the street wall and zoning need: { lots, rows }. lots is
@@ -94,7 +169,16 @@ export function deriveLots(district, seed) {
 // pinned towers (on the district's first avenue) widened by PIN_CLEAR, with
 // runs shorter than MIN_RUN dropped.
 export function planLayout(district, seed) {
-  return { lots: [], rows: [] };
+  const picked = districtLots(district, seed);
+  const rows = district.avenues.flatMap((a) => [-1, 1].map((side) => {
+    const holes = picked.filter((p) => p.ax === a.x && p.side === side)
+      .map((p) => [p.lot[1] - p.lot[3] / 2 - LOT_CLEAR, p.lot[1] + p.lot[3] / 2 + LOT_CLEAR])
+      .concat(pinsOn(district, a.x, side));
+    const runs = subtractRuns(rowRuns(district, a.x, side), holes)
+      .filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EPS);
+    return { ax: a.x, side, depth: rowDepth(district, a.x, side), runs };
+  }));
+  return { lots: picked.map((p) => p.lot), rows };
 }
 
 // The plan of the world this game booted, which the street wall, zoning and the
