@@ -1,52 +1,47 @@
 # Urbis roadmap
 
-Owner: Claude, game director. Last set 2026-10-02. Every worker reads this before
-`docs/handoff/`. A phase is done when its **exit test** passes, never when its task
-list is empty.
+Owner: Claude, game director. Last set 2026-10-02 with the operator. Every worker reads
+this before `docs/handoff/` or `docs/tasks/`. A milestone is done when the player can
+do the thing in its row, proven in the running game, never when a task list is empty.
 
-The game: **build a city, then live in it.** Every new game generates a new city
-(`AGENTS.md`). Quality is judged by the six pillars in `AGENTS.md`, played by bots
-(`npm run scorecard`, `docs/scorecard/latest.md`). Nobody hand-tests.
+## The game
 
-## Phase 1: the loop works on any city (greybox)
+Cities: Skylines you can walk around in, and it never ends. Watch Dogs and GTA stop
+when their story runs out; this city keeps running: people move in and out, money
+shifts, blocks rise and fall. The long game is **poke it and watch**: every tool sets
+off a chain the player can watch spread. Story content is out of scope. Every new
+game generates a new city (`AGENTS.md`).
 
-Plain-box art is fine. No new art work starts until this exit test passes.
+## Milestones
 
-| Workstream | Owner brief | Pillar |
+| # | What the player can do when it is done | Status |
 |---|---|---|
-| New game generates the whole city: roads, lots, buildings, doors, signs | `procgen-*` (to be merged into one feature brief) | all |
-| Walk into what you zoned | `feature-interiors.md` | Build it, live in it |
-| Save, continue, New Game | `feature-saves.md` | The player feels capable |
-| Bots play the pillars every round | `feature-scorecard.md` | all |
+| 0 | Nothing new to play. The crew runs on its own: `scripts/crew.mjs run` hands out tasks, checks every answer with the gate, catches loops, moves stuck tasks up a model | done 2026-10-02 |
+| 1 | **Walk into what you built:** zone a lot, watch it grow, walk through its door into a room that matches what grew | DeepSeek trial on `feature-interiors.md` |
+| 2 | **A whole city to build on:** New Game makes a full city of streets and lots, not one district of 10 hand-placed lots | 2a queued: `docs/tasks/m2-layout.json` |
+| 3 | **The city lives on its own:** days pass, people commute from real homes to real jobs, population and money shift; leave it 10 minutes and it is different | |
+| 4 | **Poke it and watch:** a blackout, a chase, a zoning change each set off a chain you can watch spread, sized to the act | |
+| 5 | **Sell-or-not check:** 20 minutes of the whole loop; the operator decides. This is the finish line | |
 
-**Exit test:** the scorecard is all ✅ on 5 random seeds, `npm run check:layouts` reports
-zero buildings overlapping or on a road across 20 seeds, and the gate is green.
+Alongside all of them: **stop looking like a toy.** Real cars, people and buildings
+replace boxes, one swap per task (VGA-084 in `docs/VISUAL-GAP-ACTIONS.md`).
 
-## Phase 2: vertical slice
+## How the work runs
 
-One generated district at final look: materials, props, lighting and sound (there is
-no audio yet). Twenty minutes of the full loop: zone, watch it grow, walk, drive,
-enter, hack, and save.
-
-**Exit test:** the scorecard is all ✅, the contact sheet passes a director review
-against `docs/VISUAL-GAPS.md`, and draws stay ≤ 175 everywhere.
-
-## Phase 3: production
-
-More districts (`docs/BACKLOG.md` "World depth"), more interior templates, missions
-and arc content, verticality, underground.
-
-**Exit test:** each new district or system enters with its own scorecard row green.
-
-## Phase 4: alpha → beta → release
-
-- **Alpha:** every feature exists.
-- **Beta:** content complete, then bug fixing only.
-- **Release:** accessibility, Steam (`docs/BACKLOG.md` "Ship readiness").
+- **Claude** (a few sessions a week) plans each milestone as a skeleton: files, function
+  signatures, data shapes, and a test per piece that fails until it is done, committed
+  as `tests/<name>.todo.js` beside stubs that keep the game whole. Claude proves each
+  test can pass before handing it out, reviews lane branches, merges, and fixes what
+  the workers cannot: how systems fit together, the look, hard bugs.
+- **DeepSeek v4.1 flash** fills one task at a time. **GLM 5.3 flash** takes what
+  DeepSeek gets stuck on. Mimo is not used.
+- **`scripts/crew.mjs run docs/tasks/<queue>.json`** is the manager. It needs no
+  judgement: the test and the gate decide. It commits passes to the lane's branch
+  (`wt/<lane>`), never to main, and parks what neither model can finish.
 
 ## Rhythm
 
-- **Every change:** `npm run gate`.
-- **Every merge round:** `npm run scorecard`. Workers are pointed at the ❌ rows, and
-  the director reviews the contact sheet against the previous round.
-- **Phase end:** the exit test above decides go or no-go. Nothing else does.
+- **Every task:** the gate, run by the crew script.
+- **Every Claude session:** review and merge the lane branches, look at the screenshots,
+  write the next queue, start `run` before leaving.
+- **Every milestone:** the operator hears in plain words what they can now do.
