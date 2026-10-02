@@ -5,13 +5,6 @@
     "block": "UNIT 40",
     "air": "AIR 1"
   },
-  "streets": {
-    "west": "1st Avenue",
-    "main": "Main Street",
-    "east": "3rd Avenue",
-    "plaza": "Plaza Street",
-    "south": "Dock Street"
-  },
   "headings": { "n": "northbound", "s": "southbound", "e": "eastbound", "w": "westbound" },
   "modes": { "car": "in a vehicle", "foot": "on foot" },
   "causes": {

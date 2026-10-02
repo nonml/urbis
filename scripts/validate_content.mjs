@@ -6,7 +6,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { pathToFileURL } from 'url';
-import { AVENUES, CROSSINGS, WALK_BOUNDS } from '../src/sim/world.js';
+import { WALK_BOUNDS } from '../src/sim/world.js';
 import { STAGES } from '../src/sim/zoning.js';
 
 const QUIET = process.argv.includes('--quiet');
@@ -318,7 +318,6 @@ function checkDispatch(data) {
   if (!data) return;
   const w = 'dispatch.json';
   checkWordMap(`${w}.speakers`, data.speakers, SPEAKERS);
-  checkWordMap(`${w}.streets`, data.streets, [...AVENUES, ...CROSSINGS].map((way) => way.id));
   checkWordMap(`${w}.headings`, data.headings, ['n', 's', 'e', 'w']);
   checkWordMap(`${w}.modes`, data.modes, ['car', 'foot']);
   checkWordMap(`${w}.causes`, data.causes, ['blackout', 'speeding', 'evading']);
