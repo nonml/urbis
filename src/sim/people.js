@@ -52,8 +52,19 @@ export function newPerson(people, home) {
 // list's last ones with that home) — they leave the city, their job with them.
 // Everyone who stays keeps their record untouched.
 export function moveHomes(people, city) {
-  void people;
-  void city;
+  const want = city.parcels.map((p) => (p.use === 'res' ? lotPeople(p) : 0));
+  const have = new Array(want.length).fill(0);
+  const kept = [];
+  for (const q of people.list) {
+    if (have[q.home] < want[q.home]) {
+      have[q.home] += 1;
+      kept.push(q);
+    }
+  }
+  for (let i = 0; i < want.length; i++) {
+    for (let n = have[i]; n < want[i]; n++) kept.push(newPerson(people, i));
+  }
+  people.list = kept;
 }
 
 // Jobs: every com and ind lot ends the tick with at most lotPeople(p) workers.
@@ -63,8 +74,22 @@ export function moveHomes(people, city) {
 // centre; ties go to the earlier in the list), until places or people run out.
 // A person in work keeps their job while their lot keeps them.
 export function matchJobs(people, city) {
-  void people;
-  void city;
+  const places = city.parcels.map((p) => (p.use === 'com' || p.use === 'ind' ? lotPeople(p) : 0));
+  const staff = new Array(places.length).fill(0);
+  for (const q of people.list) {
+    if (q.job === null) continue;
+    if (staff[q.job] < places[q.job]) staff[q.job] += 1;
+    else q.job = null;
+  }
+  const dist = (home, job) => Math.hypot(home.x - job.x, home.z - job.z);
+  for (let j = 0; j < places.length; j++) {
+    const open = places[j] - staff[j];
+    if (open <= 0) continue;
+    const at = city.parcels[j];
+    const idle = people.list.filter((q) => q.job === null);
+    idle.sort((a, b) => dist(city.parcels[a.home], at) - dist(city.parcels[b.home], at));
+    for (let k = 0; k < open && k < idle.length; k++) idle[k].job = j;
+  }
 }
 
 export function tickPeople(people, city) {

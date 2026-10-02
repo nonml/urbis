@@ -1,6 +1,9 @@
 // Profiler overlay: DOM panel pinned above the targeted NPC.
-// Identity is always readable; the secret needs proximity (< 6m).
+// Identity is always readable; the secret needs proximity (< 6m). When the
+// game hands over the person the NPC stands for, home and work replace the
+// old abstract job and income: the pedestrian on the street is a real resident.
 import * as THREE from 'three';
+import { describe } from '../sim/people.js';
 
 const SECRET_RANGE = 6;
 let panel = null;
@@ -23,7 +26,7 @@ export function buildProfiler() {
 
 const proj = new THREE.Vector3();
 
-export function updateProfiler(camera, target) {
+export function updateProfiler(camera, target, person = null) {
   if (!panel) return null;
   if (!target) {
     panel.style.display = 'none';
@@ -37,9 +40,13 @@ export function updateProfiler(camera, target) {
   }
   const p = npc.profile;
   const near = dist < SECRET_RANGE;
+  const who = person ?? p;
+  const d = person ? describe(person) : null;
+  const work = d && (person.job === null ? d.work : `works ${d.work}`);
+  const about = d ? `home ${d.home} · ${work}` : `${p.job} · ${p.income}`;
   panel.innerHTML =
-    `<b style="color:#fff">${p.name}</b> · ${p.age}<br>` +
-    `${p.job} · ${p.income}<br>` +
+    `<b style="color:#fff">${who.name}</b> · ${who.age}<br>` +
+    `${about}<br>` +
     (near
       ? `<span style="color:#ffb14e">◆ ${p.secret}</span><br>`
       : `<span style="opacity:0.55">◆ signal weak — move closer</span><br>`) +
@@ -47,5 +54,5 @@ export function updateProfiler(camera, target) {
   panel.style.display = 'block';
   panel.style.left = `${(proj.x * 0.5 + 0.5) * window.innerWidth}px`;
   panel.style.top = `${(-proj.y * 0.5 + 0.5) * window.innerHeight - 8}px`;
-  return { name: p.name, dist: +dist.toFixed(1), secret: near };
+  return { name: who.name, dist: +dist.toFixed(1), secret: near };
 }
