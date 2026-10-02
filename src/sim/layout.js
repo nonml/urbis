@@ -105,51 +105,81 @@ function subtractRuns(runs, holes) {
   return out;
 }
 
-// Pack LOT_FRONT-long lots along the free z runs, each on the side's building
-// line, rowDepth deep. An internal pairing so planLayout and deriveLots agree.
-function placeLots(ax, side, depth, free, rand) {
-  const x = ax + side * (BUILD_LINE + depth / 2);
-  const lots = [];
-  for (const [f0, f1] of free) {
-    let z = f0;
-    while (z + LOT_FRONT[0] <= f1 + EPS) {
-      const front = LOT_FRONT[0] + rand() * (LOT_FRONT[1] - LOT_FRONT[0]);
-      if (z + front > f1 + EPS) break;
-      lots.push([x, z + front / 2, depth, front]);
-      z += front;
-    }
-  }
-  return lots;
+// The gap a lot keeps to the next lot on its row: room for a building's
+// MIN_RUN between them, plus each lot's own clear strip.
+const LOT_GAP = MIN_RUN + 2 * LOT_CLEAR;
+
+// The z bands the lots aim for: one equal slice of the drive per lot, so they
+// reach across the whole district instead of packing into the south end.
+function lotBands(lo, hi, count) {
+  const span = hi - lo;
+  return Array.from({ length: count }, (_, k) => [lo + (k * span) / count, lo + ((k + 1) * span) / count]);
 }
 
-// One pass over every avenue side: the free z runs it offers, and the lots the
-// seed packs into them, tagged with their avenue and side.
+// The [z0, z1] centre ranges a lot of front d may take inside [w0, w1] on one
+// side: inside a single row run, and LOT_GAP from every lot already on that row.
+function lotRanges(side, d, w0, w1) {
+  const ranges = [];
+  for (const [r0, r1] of side.runs) {
+    let segs = [[Math.max(r0 + d / 2, w0), Math.min(r1 - d / 2, w1)]];
+    for (const p of side.placed) {
+      const away = (d + p.d) / 2 + LOT_GAP - EPS;
+      const next = [];
+      for (const [a, b] of segs) {
+        if (a > b + EPS) continue;
+        if (p.z + away <= a + EPS || p.z - away >= b - EPS) { next.push([a, b]); continue; }
+        if (p.z - away > a + EPS) next.push([a, p.z - away]);
+        if (p.z + away < b - EPS) next.push([p.z + away, b]);
+      }
+      segs = next;
+    }
+    for (const [a, b] of segs) if (b >= a - EPS) ranges.push([a, b]);
+  }
+  return ranges;
+}
+
+// Place one lot with its centre inside [w0, w1]: a random avenue side, a random
+// front, then a random z inside the ranges that side still offers. Null when no
+// side has room there.
+function placeLot(sides, [w0, w1], rand) {
+  const order = sides.slice();
+  for (let i = order.length - 1; i > 0; i--) {
+    const j = Math.floor(rand() * (i + 1));
+    [order[i], order[j]] = [order[j], order[i]];
+  }
+  const spots = [];
+  for (const side of order) {
+    const d = LOT_FRONT[0] + rand() * (LOT_FRONT[1] - LOT_FRONT[0]);
+    for (const [a, b] of lotRanges(side, d, w0, w1)) spots.push({ side, d, a, b });
+  }
+  if (!spots.length) return null;
+  const spot = spots[Math.floor(rand() * spots.length)];
+  const z = spot.a + rand() * (spot.b - spot.a);
+  const { ax, side, depth } = spot.side;
+  const lot = [ax + side * (BUILD_LINE + depth / 2), z, depth, spot.d];
+  spot.side.placed.push({ z, d: spot.d });
+  return { lot, ax, side, depth };
+}
+
+// One pass over every avenue side: the side's free z runs, then one lot per
+// band so the lots spread across the district. A band with no room on any side
+// falls back to anywhere in the drive. Tagged with avenue and side for planLayout.
 function districtLots(district, seed) {
   const rand = mulberry32(seed);
   const lo = district.drive.minZ;
   const hi = district.drive.maxZ;
+  const count = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
   const sides = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const depth = rowDepth(district, a.x, side);
-    const free = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side))
+    const runs = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side))
       .map(([f0, f1]) => [Math.max(f0, lo), Math.min(f1, hi)])
       .filter(([f0, f1]) => f1 - f0 > EPS);
-    return { ax: a.x, side, depth, lots: placeLots(a.x, side, depth, free, rand) };
+    return { ax: a.x, side, depth, runs, placed: [] };
   }));
-  return pickLots(sides, rand);
-}
-
-// Take a seed-chosen LOTS_MIN..LOTS_MAX of the candidates, round-robin across
-// sides so the lots spread over the district.
-function pickLots(sides, rand) {
-  const target = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
   const picked = [];
-  for (let k = 0; picked.length < target; k++) {
-    if (sides.every((s) => k >= s.lots.length)) break;
-    for (const s of sides) {
-      if (k < s.lots.length && picked.length < target) {
-        picked.push({ lot: s.lots[k], ax: s.ax, side: s.side, depth: s.depth });
-      }
-    }
+  for (const band of lotBands(lo, hi, count)) {
+    const spot = placeLot(sides, band, rand) || placeLot(sides, [lo, hi], rand);
+    if (spot) picked.push(spot);
   }
   return picked;
 }
