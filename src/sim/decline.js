@@ -7,6 +7,7 @@
 // so decline has an order: a lot empties before it loses a floor. Its windows go
 // dark and the letting boards go up first; only an empty building comes down.
 import { AVENUES, CROSSINGS } from './world.js';
+import { streetName } from './streetnames.js';
 
 export const TREND = {
   GROWING: 'growing',     // floors going up, or tenants coming back
@@ -102,14 +103,13 @@ function doing(p) {
 // A junction a player can find: the nearest avenue, and the crossing it meets
 // when the lot is within a short block of one.
 const CORNER = 25;
-const title = (id) => id[0].toUpperCase() + id.slice(1);
 
 export function address(x, z) {
   const nearest = (ways, at) => ways.reduce((a, b) => (Math.abs(at(b)) < Math.abs(at(a)) ? b : a));
   const avenue = nearest(AVENUES, (a) => a.x - x);
   const crossing = nearest(CROSSINGS, (c) => c.z - z);
-  if (Math.abs(crossing.z - z) <= CORNER) return `${title(avenue.id)} & ${title(crossing.id)}`;
-  return `${title(avenue.id)} Ave`;
+  if (Math.abs(crossing.z - z) <= CORNER) return `${streetName(avenue)} & ${streetName(crossing)}`;
+  return `${streetName(avenue)} Ave`;
 }
 
 // Whether there is anything to say: the lot is changing, and it has a use.
