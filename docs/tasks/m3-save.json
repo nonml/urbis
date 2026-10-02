@@ -1,0 +1,14 @@
+{
+  "milestone": "3b: the people and the hour survive a save",
+  "tasks": [
+    {
+      "id": "m3-save",
+      "lane": "save",
+      "goal": "Put the people and the clock's hour, day and rate into the save in src/sim/save.js, and have src/main.js save its people and continue with the restored ones.",
+      "files": ["src/sim/save.js", "src/main.js"],
+      "test": "tests/save-people.spec.js",
+      "commit": "feat(save): the people and the hour survive a save",
+      "notes": "SAVE_VERSION becomes 2. serialize adds people: { list: a copy of each person { id, name, age, home, job }, nextId, rand: people.rand.dump() }. isSnapshot also requires s.people to be a plain object. In rebuild, people = createPeople(saved.seed) with the saved list, nextId and rand.load(saved rand) laid over it; reject (throw inside deserialize, so it returns null) a list that is not an array, a person whose id or age is not an integer, whose name is not a string, whose home is not an integer parcel index (0 to city.parcels.length - 1), or whose job is neither null nor such an index, and a nextId that is not an integer. applyClock also restores hour, day and rate with num(). In src/main.js: const people = restored?.people ?? createPeople(SEED), and pass people in the object given to serialize. tests/save.spec.js must stay green."
+    }
+  ]
+}
