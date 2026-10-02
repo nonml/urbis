@@ -237,7 +237,12 @@ async function assign(state, lane, task) {
   try {
     if (!changedPaths(dir).length) sh('git', ['merge', '--ff-only', '-q', 'main'], dir);
   } catch { /* the lane has commits of its own; it keeps building on them */ }
-  if (fs.existsSync(path.join(dir, todoOf(task.test)))) sh('git', ['mv', todoOf(task.test), task.test], dir);
+  const todo = todoOf(task.test);
+  // A task queued after the lane branched has its test on main only: bring it over.
+  if (!fs.existsSync(path.join(dir, todo)) && !fs.existsSync(path.join(dir, task.test))) {
+    sh('git', ['checkout', 'main', '--', todo], dir);
+  }
+  if (fs.existsSync(path.join(dir, todo))) sh('git', ['mv', todo, task.test], dir);
   const w = { name: lane, dir, task, model: TIERS[0], stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
   state.workers[lane] = w;
   state.tasks[task.id] = { status: 'working', lane, model: w.model };
@@ -336,12 +341,18 @@ async function tendBriefs(state) {
 }
 
 async function runQueue(state, file) {
-  const queue = JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  // Re-read every round, so the director can append tasks to a running queue.
+  const read = () => JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  let queue = read();
   state.tasks ??= {};
-  const lanes = [...new Set(queue.tasks.map((t) => t.lane))];
-  log(`queue ${queue.milestone}: ${queue.tasks.length} tasks in ${lanes.length} lanes`);
+  log(`queue ${queue.milestone}: ${queue.tasks.length} tasks`);
   for (;;) {
-    for (const lane of lanes) {
+    try {
+      queue = read();
+    } catch (e) {
+      log(`queue unreadable, keeping the last good one: ${e.message}`);
+    }
+    for (const lane of new Set(queue.tasks.map((t) => t.lane))) {
       try {
         for (const news of await stepLane(state, queue, lane)) log(news);
       } catch (e) {
