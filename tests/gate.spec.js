@@ -3,6 +3,8 @@ import { mkdirSync, writeFileSync } from 'fs';
 
 const DRAW_BUDGET = 175;
 const SHOT_DIR = 'docs/shots/gate';
+// createPlayer's spawn (src/sim/player.js), for the walk-away check below.
+const SPAWN = { x: 2.5, z: 26 };
 
 function saveShot(dataUrl, name) {
     mkdirSync(SHOT_DIR, { recursive: true });
@@ -85,4 +87,76 @@ test('the world changes while the player stands still', async ({ page }) => {
         { timeout: 30000 },
     );
     expect(await page.evaluate(() => window.__game.player())).toEqual(stood);
+});
+
+// The save half of continue: the player walks away from the spawn, a save is
+// forced, the page reloads, and they are standing where they stood — same seed.
+// ?savetest=1 is the only switch that lets an automated run read or write a save.
+test('a save continues the player where they stood', async ({ page }) => {
+    await page.goto('/?savetest=1');
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+    const seed = await page.evaluate(() => window.__game.seed);
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('w');
+    const before = await page.evaluate(() => window.__game.player());
+    // The walk happened, or the test would pass on a save that never worked.
+    expect(Math.hypot(before.x - SPAWN.x, before.z - SPAWN.z)).toBeGreaterThan(0.5);
+
+    expect(await page.evaluate(() => window.__game.saveNow())).toBe(true);
+    await page.reload();
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+    expect(await page.evaluate(() => window.__game.seed)).toBe(seed);
+    const after = await page.evaluate(() => window.__game.player());
+    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeLessThanOrEqual(0.5);
+});
+
+// The autosave on the way out: hiding the tab saves the game, and the next
+// boot continues from it.
+test('hiding the tab saves, and the game continues from it', async ({ page }) => {
+    await page.goto('/?savetest=1');
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+
+    await page.keyboard.down('w');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('w');
+    const before = await page.evaluate(() => window.__game.player());
+    expect(Math.hypot(before.x - SPAWN.x, before.z - SPAWN.z)).toBeGreaterThan(0.5);
+    await page.evaluate(() => {
+        Object.defineProperty(document, 'hidden', { value: true, configurable: true });
+        document.dispatchEvent(new Event('visibilitychange'));
+    });
+
+    await page.reload();
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+    const after = await page.evaluate(() => window.__game.player());
+    expect(Math.hypot(after.x - before.x, after.z - before.z)).toBeLessThanOrEqual(0.5);
+});
+
+// N: a new game is a new city (AGENTS.md). The save is wiped — the player is
+// back at the spawn after a save held them elsewhere — and under ?seed=7 the
+// replay URL goes with it, so the boot draws a seed of its own again.
+test('new game wipes the save and boots a city again', async ({ page }) => {
+    await page.goto('/?savetest=1');
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+    await page.keyboard.down('w');
+    await page.waitForTimeout(900);
+    await page.keyboard.up('w');
+    expect(await page.evaluate(() => window.__game.saveNow())).toBe(true);
+
+    await page.keyboard.press('n');
+    // Waiting on the outcome, not on the navigation: the save is gone, so the
+    // reloaded game stands at the spawn again.
+    await page.waitForFunction((spawn) => {
+        const p = window.__game?.player();
+        return p && Math.abs(p.x - spawn.x) < 0.1 && Math.abs(p.z - spawn.z) < 0.1;
+    }, SPAWN, { timeout: 30000 });
+
+    await page.goto('/?seed=7');
+    await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+    expect(await page.evaluate(() => window.__game.seed)).toBe(7);
+    await page.keyboard.press('n');
+    await page.waitForFunction(() => window.__game && window.__game.seed !== 7, null, { timeout: 30000 });
+    expect(await page.evaluate(() => window.__game.seed)).not.toBe(7);
 });

@@ -90,6 +90,30 @@ export function missionReset(m) {
   loadDef(m, m.idx);
 }
 
+// The contract board a save left in play (sim/save.js). Progress is worth
+// restoring because the board pays out on completion: without it a reload
+// would pay for the same contract twice. Returns null on a snapshot that does
+// not fit this content — a corrupt save is a missing save.
+export function missionRestore(m, saved) {
+  const def = Number.isInteger(saved.idx) ? m.defs[saved.idx] : null;
+  const ok = def
+    && Array.isArray(saved.done) && saved.done.length === def.steps.length
+    && saved.seen && typeof saved.seen === 'object'
+    && Number.isFinite(saved.balance) && Number.isFinite(saved.bannerUntil)
+    && typeof saved.bannerText === 'string'
+    && typeof saved.complete === 'boolean';
+  if (!ok) return null;
+  loadDef(m, saved.idx);
+  m.done = saved.done.map((d) => !!d);
+  m.seen = Object.fromEntries(Object.keys(saved.seen).map((k) => [k, true]));
+  m.complete = saved.complete;
+  m.balance = saved.balance;
+  m.bannerUntil = saved.bannerUntil;
+  m.bannerText = saved.bannerText;
+  syncPhases(m);
+  return m;
+}
+
 // ---------------------------------------------------------------------------
 // Runs: the same verbs, played in order. The contracts board above takes its
 // steps in any order and hears about the world through events. A story cannot:

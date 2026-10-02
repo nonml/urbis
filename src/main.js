@@ -1,5 +1,5 @@
 // Bootstrap: sim ticks, render reads. HUD shows measured numbers only.
-import { SEED } from './boot.js';
+import { SEED, SAVING } from './boot.js';
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
@@ -11,6 +11,8 @@ import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/want
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { districtReport } from './sim/economy.js';
 import { STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera } from './sim/interior.js';
+import { serialize, deserialize } from './sim/save.js';
+import { loadSave, writeSave, clearSave } from './savestore.js';
 import { buildGround, buildTowers, buildSkyline } from './render/block.js';
 import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
@@ -129,18 +131,21 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
 // Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
 const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
 
-const street = createStreet(SEED);
-const city = createCity(SEED);
+// The seed (and whether this is a saved game) was settled in boot.js, before the
+// world was built from it; here the saved city and street are restored on top.
+const restored = SAVING ? deserialize(loadSave()) : null;
+const street = restored?.street ?? createStreet(SEED);
+const city = restored?.city ?? createCity(SEED);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
 const economyPanel = buildEconomyPanel();
 const decline = buildDecline(city, maxAniso);
 scene.add(decline.mesh);
 const lotNote = buildLotNote();
-const player = createPlayer();
-player.mode = 'foot';
-const heroCar = createPlayerCar();
-const mission = createMission();
+const player = restored?.player ?? createPlayer();
+player.mode ??= 'foot';
+const heroCar = restored?.car ?? createPlayerCar();
+const mission = restored?.mission ?? createMission();
 const arc = createArc();
 const arcMarker = buildArcMarker(ARC.signs);
 scene.add(arcMarker.mesh);
@@ -160,7 +165,7 @@ scene.add(avatar.group);
 const shops = buildShops(texLoader, maxAniso);
 scene.add(shops.group);
 // Verticality: the noodle bar behind the RAMEN board and the roof next door.
-const interior = createInterior();
+const interior = restored?.interior ?? createInterior();
 const interiors = buildInteriors();
 scene.add(interiors.group);
 const doorHud = buildDoorHud();
@@ -258,8 +263,9 @@ scene.add(cityRig.mesh);
 const cityUi = bindCityView({ canvas, cam, camera, city, street, view: cityView, rig: cityRig });
 
 const keys = new Set();
-// Dev spawn presets for scripted verification (?spawn=east).
-const spawnPreset = new URLSearchParams(location.search).get('spawn');
+// Dev spawn presets for scripted verification (?spawn=east). A continued game
+// stands where the save left it, so the preset never overrides a load.
+const spawnPreset = restored ? null : new URLSearchParams(location.search).get('spawn');
 if (spawnPreset === 'east') {
   player.x = 49.5;
   player.z = 16;
@@ -403,6 +409,7 @@ window.addEventListener('keydown', (e) => {
   if (k === 'h') fireHack();
   if (k === 'f') toggleVehicle();
   if (k === 't') toggleDay(clock);
+  if (k === 'n') newGame();
   // The overview lifts off the street, never out of a shop or off a roof, and a
   // door is used at street scale, never from the overview.
   if (interior.space === STREET) cityKey(cityView, k, cam.yaw);
@@ -411,13 +418,44 @@ window.addEventListener('keydown', (e) => {
   if (k === '1' || k === '2') arcChoose(arc, Number(k), street.time);
 });
 
-const clock = createClock();
+const clock = restored?.clock ?? createClock();
 const hud = document.getElementById('hud');
 let lastProfile = null;
 let lockedNpc = null;
+
+// Save and continue: the sim serializes itself (src/sim/save.js) and this
+// decides when — every 30 s of play, and the moment the tab goes away.
+// Writing is never worth crashing over (src/savestore.js).
+const AUTOSAVE_SECS = 30;
+let autosaveIn = AUTOSAVE_SECS;
+// Set while a new game wipes the save: the document going down fires
+// visibilitychange one last time, and without this it would write the old game
+// straight back after newGame cleared it.
+let wiping = false;
+
+function doSave() {
+  if (!SAVING || wiping) return false;
+  return writeSave(serialize({ seed: SEED, clock, street, city, player, car: heroCar, interior, mission }));
+}
+
+// N: a new game is a new city (AGENTS.md). The save goes, and so does any
+// ?seed replay URL, so boot draws a fresh seed.
+function newGame() {
+  wiping = true;
+  clearSave();
+  const url = new URL(location.href);
+  url.searchParams.delete('seed');
+  location.href = url.toString();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) doSave();
+});
+
 // Minimal probe for scripted verification (screenshots, control checks).
 window.__game = {
   seed: SEED,
+  saveNow: doSave,
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
   draws: () => renderer.info.render.calls,
   hack: () => fireHack(),
@@ -800,6 +838,11 @@ function render() {
   fpsAcc += dt;
   fpsN++;
   hudTimer += dt;
+  autosaveIn -= dt;
+  if (autosaveIn <= 0) {
+    autosaveIn = AUTOSAVE_SECS;
+    doSave();
+  }
   if (hudTimer > 0.25) {
     fpsShown = Math.round(fpsN / fpsAcc);
     fpsAcc = 0;
@@ -815,7 +858,7 @@ function render() {
       `<b>URBIS</b> · ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
-      `H · blackout [${hackStatus()}]${speedLine}<br>` +
+      `H · blackout [${hackStatus()}]${speedLine} · N · new game<br>` +
       `<span class="${wanted.heat > 0 ? 'warn' : ''}">${stars}</span> · ₡${mission.balance}`;
     const obj = mission.phases.map((p, i) => `${mission.done[i] ? '✓' : '·'} ${p}`).join('<br>');
     missionPanel.innerHTML = `<b>◈ ${mission.id}</b><br>${obj}`;
