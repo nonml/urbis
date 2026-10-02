@@ -1,0 +1,23 @@
+{
+  "milestone": "2h: New Game makes a generated city",
+  "tasks": [
+    {
+      "id": "m2-newgame-pick",
+      "lane": "newgame",
+      "goal": "Fill in pickWorld in src/sim/newgame.js: the seed, whether the city is generated, and whether the session saves, from the URL, the browser, the save and the clock.",
+      "files": ["src/sim/newgame.js"],
+      "test": "tests/newgame-pick.spec.js",
+      "commit": "feat(newgame): a new game is a generated city, a continued game keeps its world",
+      "notes": "The comment above pickWorld is the exact rule. Remove the void lines and the stub return. Add two small helpers above it: seedOk(n) = Number.isInteger(n) && n > 0 && n < SEED_LIMIT, and readSaved(raw), which does JSON.parse(raw) inside try/catch and returns seedOk(s?.seed) ? { seed: s.seed, generate: s.generate === true } : null, or null on any error (JSON.parse(null) gives null, which also ends in null). In pickWorld: const params = new URLSearchParams(search); the url seed is the 'seed' param when /^\\d+$/ matches it and seedOk(Number(it)); gen from params.get('gen') ('1' true, '0' false, else null); saving as the comment says, using params.has('savetest'); savedWorld = saving ? readSaved(saved) : null; seed = savedWorld?.seed ?? urlSeed ?? (webdriver ? FIXED_SEED : (now % 2147483647 || 1)); generate = gen ?? savedWorld?.generate ?? !webdriver. Return exactly { seed, generate, saving }. No DOM, no imports."
+    },
+    {
+      "id": "m2-newgame-wire",
+      "lane": "newgame",
+      "goal": "Boot the world pickWorld picks: boot.js calls it, the save records whether the city was generated, and the game exposes it on window.__game.",
+      "files": ["src/boot.js", "src/sim/save.js", "src/main.js"],
+      "test": "tests/newgame-wire.spec.js",
+      "commit": "feat(newgame): New Game boots a generated city and the save remembers it",
+      "notes": "src/boot.js: replace everything after the imports with one call. Keep the import of setWorldSeed and loadSave, add import { pickWorld } from './sim/newgame.js'; delete seedFromUrl, savedSeed, freshSeed, FIXED_SEED and the old GENERATE / urlSeed / SAVING / SEED lines, and write const { seed: SEED, generate: GENERATE, saving: SAVING } = pickWorld({ search: location.search, webdriver: navigator.webdriver, saved: loadSave(), now: Date.now() }); then setWorldSeed(SEED, GENERATE); then console.info('urbis seed', SEED, GENERATE ? 'generated' : 'hand preset'); and keep export { SEED, GENERATE, SAVING }; at the end. Update the file's comments to say the rules live in sim/newgame.js. src/sim/save.js serialize: add the line generate: game.generate === true, right after seed: game.seed, (do not touch deserialize or SAVE_VERSION). src/main.js: the boot.js import becomes import { SEED, GENERATE, SAVING } from './boot.js'; the serialize call becomes serialize({ seed: SEED, generate: GENERATE, clock, ... } with the rest unchanged; and in the window.__game object add generated: GENERATE, right after seed: SEED, tests/newgame-pick.spec.js, tests/save.spec.js and tests/gate.spec.js must stay green."
+    }
+  ]
+}

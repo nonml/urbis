@@ -4,12 +4,13 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { heightAt } from './sim/world.js';
+import { WALK_BOUNDS, clampToBounds, heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
+import { tickCommute, commuteLabel } from './sim/commute.js';
 import { districtReport } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
@@ -412,8 +413,7 @@ function toggleVehicle() {
     cam.pitch = 0.22;
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
-    player.x = Math.max(-52, Math.min(70, heroCar.x + 1.8));
-    player.z = Math.max(-68, Math.min(100, heroCar.z));
+    ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
     cam.dist = 4.5;
@@ -490,6 +490,7 @@ window.__game = {
   tod: () => +clock.nightFactor.toFixed(3),
   hour: () => clock.hour,
   census: () => census(people),
+  walkersOut: () => street.npcs.filter((n) => n.out !== false).length,
   person: (k) => {
     if (people.list.length === 0) return null;
     return describe(people.list[k % people.list.length]);
@@ -558,6 +559,7 @@ if (CAPTURE) {
   // The end of the day/night glide, reached at once: a probe measuring the day
   // frame should not have to render 140 frames of dusk to get there.
   window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; clock.rate = 0; };
+  window.__game.setHour = (h) => { clock.hour = h; clock.rate = 0; };
   // Runs the street and the city ahead by `secs` of game time in the frame loop's
   // own 50 ms steps, so evidence of a minutes-long economic swing does not need
   // minutes of a software rasteriser. Nothing else is ticked; nothing is skipped.
@@ -571,8 +573,7 @@ if (CAPTURE) {
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
   window.__game.pose = (x, z, yaw) => {
-    player.x = Math.max(-52, Math.min(70, x));
-    player.z = Math.max(-68, Math.min(100, z));
+    ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, x, z));
     cam.yaw = yaw;
   };
   // Walk into a grown lot by use, the way the door would: pose the body on the
@@ -707,6 +708,7 @@ function render() {
   tickStreet(street, dt);
   tickZoning(city, dt, street, occupiedParcel(interior));
   tickPeople(people, city);
+  tickCommute(street, people, city, clock.hour, player.x, player.z);
   tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
@@ -858,7 +860,7 @@ function render() {
   const targetPerson = target && people.list.length > 0
     ? people.list[street.npcs.indexOf(target.npc) % people.list.length]
     : null;
-  lastProfile = driving ? null : updateProfiler(camera, target, targetPerson);
+  lastProfile = driving ? null : updateProfiler(camera, target, targetPerson, targetPerson ? commuteLabel(targetPerson, clock.hour) : null);
   showLotNote(lotNote, interior.space === STREET
     ? focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);

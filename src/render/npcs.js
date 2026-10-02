@@ -165,6 +165,14 @@ const _fwd = new THREE.Vector3();
 export function updateNPCs(rig, street) {
   const { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy } = rig;
   street.npcs.forEach((n, i) => {
+    if (n.out === false) {
+      dummy.position.set(n.x, 0, n.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(0, 0, 0);
+      dummy.updateMatrix();
+      for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) m.setMatrixAt(i, dummy.matrix);
+      return;
+    }
     const yaw = n.axis === 'x' ? (n.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (n.dir > 0 ? 0 : Math.PI);
     const moving = !isDark(street, zoneAt(n.z));
     const bob = moving ? Math.abs(Math.sin(n.phase)) * 0.05 : 0;
