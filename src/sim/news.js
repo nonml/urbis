@@ -83,7 +83,7 @@ export function newsBetween(before, after, city) {
     if (n === 0) return;
     lines.push(m.jobs > 0
       ? `${n} ${JOBS[m.use]} jobs moved into the ${d.name} district`
-      : `${n} ${JOBS[m.use]} jobs left the ${d.name} district`);
+      : `${n} ${JOBS[m.use]} jobs left the ${d.name} district${m.cause === 'dark' ? ' after the power cut' : ''}`);
   });
   return lines;
 }
