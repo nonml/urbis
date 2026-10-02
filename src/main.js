@@ -28,7 +28,8 @@ import {
   buildShops, buildPuddles, setPuddleGlow, buildCityMirror, showInMirror, onlyInMirror,
   cityMirrorStale, requestCityMirror, tickCityMirror, buildSteam, tickSteam, buildBeacons, buildStars,
 } from './render/setdress.js';
-import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } from './render/hackfx.js';
+import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit } from './render/hackfx.js';
+import { SUBSTATIONS } from './sim/anchors.js';
 import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
