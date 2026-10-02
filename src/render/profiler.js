@@ -26,7 +26,7 @@ export function buildProfiler() {
 
 const proj = new THREE.Vector3();
 
-export function updateProfiler(camera, target, person = null) {
+export function updateProfiler(camera, target, person = null, doing = null) {
   if (!panel) return null;
   if (!target) {
     panel.style.display = 'none';
@@ -43,7 +43,7 @@ export function updateProfiler(camera, target, person = null) {
   const who = person ?? p;
   const d = person ? describe(person) : null;
   const work = d && (person.job === null ? d.work : `works ${d.work}`);
-  const about = d ? `home ${d.home} · ${work}` : `${p.job} · ${p.income}`;
+  const about = d ? `home ${d.home} · ${work}${doing ? ` · ${doing}` : ''}` : `${p.job} · ${p.income}`;
   panel.innerHTML =
     `<b style="color:#fff">${who.name}</b> · ${who.age}<br>` +
     `${about}<br>` +
@@ -54,5 +54,5 @@ export function updateProfiler(camera, target, person = null) {
   panel.style.display = 'block';
   panel.style.left = `${(proj.x * 0.5 + 0.5) * window.innerWidth}px`;
   panel.style.top = `${(-proj.y * 0.5 + 0.5) * window.innerHeight - 8}px`;
-  return { name: who.name, dist: +dist.toFixed(1), secret: near };
+  return { name: who.name, dist: +dist.toFixed(1), secret: near, doing };
 }
