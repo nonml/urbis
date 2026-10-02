@@ -47,22 +47,25 @@ export const BOX_OUT = ROAD_HALF_WIDTH + 2.7;
 // than BAND to a crossing that meets the avenue (c.x0 <= av.x <= c.x1).
 // Ascending.
 export function avenueSpots(av, crossings, phase, step) {
-  void av;
-  void crossings;
-  void phase;
-  void step;
-  return [];
+  const near = crossings.filter((c) => c.x0 <= av.x && av.x <= c.x1);
+  const out = [];
+  for (let k = Math.ceil((av.z0 + END_CLEAR - phase) / step); phase + k * step <= av.z1 - END_CLEAR; k++) {
+    const z = phase + k * step;
+    if (near.every((c) => Math.abs(z - c.z) >= BAND)) out.push(z);
+  }
+  return out;
 }
 
 // The x's along crossing `c` on the rhythm phase + k * step, from c.x0 +
 // END_CLEAR to c.x1 - END_CLEAR inclusive, leaving out every x closer than BAND
 // to any avenue's centre-line. Ascending.
 export function crossingSpots(c, avenues, phase, step) {
-  void c;
-  void avenues;
-  void phase;
-  void step;
-  return [];
+  const out = [];
+  for (let k = Math.ceil((c.x0 + END_CLEAR - phase) / step); phase + k * step <= c.x1 - END_CLEAR; k++) {
+    const x = phase + k * step;
+    if (avenues.every((a) => Math.abs(x - a.x) >= BAND)) out.push(x);
+  }
+  return out;
 }
 
 // A kerbside rhythm for the avenue at x = ax, as the render's loops write it:
@@ -70,12 +73,12 @@ export function crossingSpots(c, avenues, phase, step) {
 // on a generated world the same rhythm down that avenue's whole length, off its
 // crossings: avenueSpots(the avenue at ax, CROSSINGS, from, step).
 export function rhythm(ax, from, to, step) {
-  void ax;
-  void AVENUES;
-  void CROSSINGS;
-  const out = [];
-  for (let z = from; z <= to; z += step) out.push(z);
-  return out;
+  if (!worldSeed().generate) {
+    const out = [];
+    for (let z = from; z <= to; z += step) out.push(z);
+    return out;
+  }
+  return avenueSpots(AVENUES.find((a) => a.x === ax), CROSSINGS, from, step);
 }
 
 // Street lamps { x, z, hx, hz, rotY, zone }, the shape render/lamps.js draws.
@@ -88,8 +91,29 @@ export function rhythm(ax, from, to, step) {
 // CROSS_HEAD_OUT, rotY -Math.PI / 2 for side 1 and Math.PI / 2 for side -1.
 // zone is 0 for a pole at z < 0 and 1 otherwise (the blackout's two halves).
 export function lampsFor(district) {
-  void district;
-  return [];
+  const sideOf = (i) => (i % 2 === 0 ? -1 : 1);
+  const lamps = [];
+  for (const a of district.avenues) {
+    avenueSpots(a, district.crossings, LAMP_PHASE, LAMP_STEP).forEach((z, i) => {
+      const side = sideOf(i);
+      lamps.push({
+        x: a.x + side * POLE_X, z,
+        hx: a.x + side * (POLE_X - ARM), hz: z,
+        rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
+      });
+    });
+  }
+  for (const c of district.crossings) {
+    crossingSpots(c, district.avenues, LAMP_PHASE, LAMP_STEP).forEach((x, i) => {
+      const side = sideOf(i);
+      const z = c.z + side * CROSS_POLE_OUT;
+      lamps.push({
+        x, z, hx: x, hz: c.z + side * CROSS_HEAD_OUT,
+        rotY: side > 0 ? -Math.PI / 2 : Math.PI / 2, zone: z < 0 ? 0 : 1,
+      });
+    });
+  }
+  return lamps;
 }
 
 // Parked cars [avenueX, side, z], the shape sim/street.js parks. Every avenue in
@@ -97,24 +121,32 @@ export function lampsFor(district) {
 // PARK_PHASE, PARK_STEP): one draw of mulberry32((seed ^ FURN_SALT) >>> 0) per
 // spot in that order, and the spot holds a car when the draw is < PARK_SHARE.
 export function parkedFor(district, seed) {
-  void district;
-  void mulberry32(seed ^ FURN_SALT);
-  return [];
+  const rand = mulberry32((seed ^ FURN_SALT) >>> 0);
+  const parked = [];
+  for (const a of district.avenues) {
+    for (const side of [-1, 1]) {
+      for (const z of avenueSpots(a, district.crossings, PARK_PHASE, PARK_STEP)) {
+        if (rand() < PARK_SHARE) parked.push([a.x, side, z]);
+      }
+    }
+  }
+  return parked;
 }
 
 // Utility boxes [x, z]. Every avenue in order, at avenueSpots(a, crossings,
 // BOX_PHASE, BOX_STEP), alternating sides from the west: x = a.x + side * BOX_OUT.
 export function boxesFor(district) {
-  void district;
-  return [];
+  return district.avenues.flatMap((a) => avenueSpots(a, district.crossings, BOX_PHASE, BOX_STEP)
+    .map((z, i) => [a.x + (i % 2 === 0 ? -1 : 1) * BOX_OUT, z]));
 }
 
 // Where a crossing meets an avenue { x, z }: zebra stripes and drain grates go
 // here. Every crossing in order, and for each every avenue it meets (c.x0 <=
 // a.x <= c.x1) in order: { x: a.x, z: c.z }.
 export function junctionsOf(district) {
-  void district;
-  return [];
+  return district.crossings.flatMap((c) => district.avenues
+    .filter((a) => c.x0 <= a.x && a.x <= c.x1)
+    .map((a) => ({ x: a.x, z: c.z })));
 }
 
 export function planFurniture(district, seed) {
