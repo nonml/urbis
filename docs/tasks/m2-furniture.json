@@ -1,0 +1,32 @@
+{
+  "milestone": "2d: street furniture follows a generated world's roads",
+  "tasks": [
+    {
+      "id": "m2-furn-spots",
+      "lane": "furniture",
+      "goal": "Fill in avenueSpots, crossingSpots and rhythm in src/sim/furniture.js: the spots kerbside furniture stands at, down an avenue or along a crossing, off the junctions.",
+      "files": ["src/sim/furniture.js"],
+      "test": "tests/furniture-spots.spec.js",
+      "commit": "feat(furniture): kerbside spots follow the generated roads, off the junctions",
+      "notes": "The comments above each function are the exact rule and the constants are final. avenueSpots: the crossings that meet the avenue are those with c.x0 <= av.x <= c.x1; walk k from Math.ceil((av.z0 + END_CLEAR - phase) / step) while phase + k * step <= av.z1 - END_CLEAR and keep z = phase + k * step when |z - c.z| >= BAND for every crossing that meets it. crossingSpots is the same along x between c.x0 + END_CLEAR and c.x1 - END_CLEAR, keeping x when |x - a.x| >= BAND for every avenue. rhythm: when worldSeed().generate is false return the plain from..to range exactly as the stub does now; otherwise return avenueSpots(the avenue in AVENUES whose x === ax, CROSSINGS, from, step). Leave lampsFor, parkedFor, boxesFor and junctionsOf as stubs."
+    },
+    {
+      "id": "m2-furn-tables",
+      "lane": "furniture",
+      "goal": "Fill in lampsFor, parkedFor, boxesFor and junctionsOf in src/sim/furniture.js, so a generated world plans its lamps, parked cars, utility boxes and junctions from its roads.",
+      "files": ["src/sim/furniture.js"],
+      "test": "tests/furniture-tables.spec.js",
+      "commit": "feat(furniture): a generated world plans its lamps, parked cars, boxes and junctions",
+      "notes": "The comments above each function are the exact rule. Sides alternate by index within each road's own list of spots: index 0 is side -1, index 1 side 1, and so on. lampsFor: avenues first, then crossings; a crossing lamp's zone comes from its pole z (c.z + side * CROSS_POLE_OUT), 0 when < 0. parkedFor: rand = mulberry32((seed ^ FURN_SALT) >>> 0), loop avenues, then side -1 then side 1, then the spots, one rand() per spot, push [a.x, side, z] when rand() < PARK_SHARE; remove the void lines. boxesFor: [a.x + side * BOX_OUT, z]. junctionsOf: crossings in order, avenues that meet each in order, { x: a.x, z: c.z }. tests/furniture-spots.spec.js must stay green."
+    },
+    {
+      "id": "m2-furn-wire",
+      "lane": "furniture",
+      "goal": "Draw a generated world's street furniture from the plan: lamps.js, street.js and block.js read WORLD_FURNITURE and rhythm() on a generated world, and keep their hand tables on the hand preset, so nothing is drawn at NaN on a world with two avenues.",
+      "files": ["src/render/lamps.js", "src/sim/street.js", "src/render/block.js"],
+      "test": "tests/furniture-wire.spec.js",
+      "commit": "feat(furniture): a generated world's lamps, parked cars and kerb clutter follow its roads",
+      "notes": "Import from ../sim/furniture.js (./furniture.js in sim/street.js). lamps.js: keep the hand table as HAND_LAMPS and use const LAMPS = WORLD_FURNITURE ? WORLD_FURNITURE.lamps : HAND_LAMPS. street.js: PARKED_SLOTS = WORLD_FURNITURE ? WORLD_FURNITURE.parked : the hand table. block.js, curb clutter: bollards loop over rhythm(ax, -80, 80, 16) instead of the for-loop; drain grates and the zebra stripes stay at PLAZA on the hand preset and on a generated world go at every WORLD_FURNITURE.junctions entry (x = j.x, z = j.z in place of ax and PLAZA.z); utility boxes come from WORLD_FURNITURE.boxes on a generated world and boxPositions on the hand preset; manholes loop over rhythm(ax, -48, 48, 24). In pavementFurniture every z loop becomes the matching rhythm(ax, from, to, step) with the same numbers, and the crates use WORLD_FURNITURE ? rhythm(ax, -34, 52, 48) : [-34, 14, 52]. The hand preset must draw exactly what it draws today: rhythm() returns the old ranges there. Draws stay within 175."
+    }
+  ]
+}
