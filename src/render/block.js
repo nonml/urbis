@@ -325,9 +325,12 @@ function streetWall(ax, side, rand) {
 }
 
 const SOUTH_TOWERS = [
-  // x-center, width, height (front face z=-61, facing the connector)
+  // x-center, width, height (front face z=-71.1, facing the connector)
   [-2, 11, 30], [10, 10, 42], [22, 11, 26], [34, 10, 36], [46, 11, 28],
 ];
+// Just south of the connector's road-and-walkway band (z -64 ± 6.5): the
+// podium's north face sits on the band edge, past the end of the play area.
+const SOUTH_ROW_Z = -76.1;
 
 // North terminus caps (z=104): close the avenue vistas so driving north
 // ends in lit towers, not black void. Beyond playable bounds, visual only.
@@ -830,7 +833,7 @@ export function buildTowers(texLoader, maxAniso) {
     }
   }
   SOUTH_TOWERS.forEach(([x, w, h], i) => {
-    emitTower(x, -66, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
+    emitTower(x, SOUTH_ROW_Z, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
   });
   TERMINUS_TOWERS.forEach(([x, z, w, h, d], i) => {
     emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);

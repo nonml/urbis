@@ -6,7 +6,7 @@
   { "text": "CAFE", "sub": "BAKERY", "color": "#7a5230", "side": -1, "z": 30, "y": 6.5 },
   { "text": "HOTEL", "sub": "EAST", "color": "#6e2430", "side": 1, "z": -14, "y": 8.5, "ax": 44 },
   { "text": "DELI", "sub": "& SUBS", "color": "#efe6d2", "side": -1, "z": 20, "y": 6.5, "ax": 44 },
-  { "text": "PARK", "sub": "24H", "color": "#1d4f91", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" },
+  { "text": "PARK", "sub": "24H", "color": "#1d4f91", "side": 0, "z": -70, "y": 8, "ax": 22, "face": "south" },
   { "text": "HOTEL", "sub": "WEST", "color": "#2b2f36", "side": -1, "z": -10, "y": 8.5, "ax": -44 },
   { "text": "BOOKS", "sub": "USED", "color": "#c9a227", "side": 1, "z": 30, "y": 6.5, "ax": -44 }
 ]

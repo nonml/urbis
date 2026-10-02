@@ -30,7 +30,7 @@
 import { registerHooks } from 'node:module';
 
 const MAX_OVERLAPS = 0;
-const MAX_ROAD = 12;
+const MAX_ROAD = 7;
 const MIN_FRONTAGE = 0.982;
 // Road half-width 3.5 m plus a 3 m walkway.
 const ROAD_BAND = 6.5;
