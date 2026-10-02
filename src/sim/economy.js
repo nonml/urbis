@@ -198,14 +198,11 @@ function flee(economy, d, dt) {
 
 // The police chase the player is in, told to the economy once a frame by main
 // after tickWanted: zone is the power zone the suspect is in, tier wanted.heat.
-// Milestone 4 skeleton: chaseIn and scare are stubs, with their test in
-// tests/economy-chase.todo.js.
 // chaseIn: d = economy.districts[zone]; when d exists and tier > 0, d.chase =
 // Math.max(d.chase, tier). Nothing else.
 export function chaseIn(economy, zone, tier) {
-  void economy;
-  void zone;
-  void tier;
+  const d = economy.districts[zone];
+  if (d && tier > 0) d.chase = Math.max(d.chase, tier);
 }
 
 // scare, called by flee every tick: when d.chase > 0, d.chaseFor += d.chase *
@@ -214,9 +211,12 @@ export function chaseIn(economy, zone, tier) {
 // }) and d.chaseFor = 0. Then d.chase = 0, so a chase that stops being told
 // stops counting.
 function scare(economy, d, dt) {
-  void economy;
-  void d;
-  void dt;
+  if (d.chase > 0) d.chaseFor += d.chase * dt;
+  else if (d.chaseFor > 0) {
+    d.flights.push({ at: economy.time + FLIGHT_SECS, jobs: d.size * FLIGHT_PER_CHASE_SEC * d.chaseFor, cause: 'chase' });
+    d.chaseFor = 0;
+  }
+  d.chase = 0;
 }
 
 function earn(d, dt) {
