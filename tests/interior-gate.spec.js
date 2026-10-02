@@ -90,7 +90,7 @@ async function gameSeconds(page, secs) {
 test('E walks into the noodle bar and out, a blackout kills its lights, the stair goes to the roof', async ({ page }) => {
     test.setTimeout(180000);
     await boot(page);
-    await useDoorAt(page, -5.4, -10.77, 'ENTER RAMEN');
+    await useDoorAt(page, -5.9, -10.77, 'ENTER RAMEN');
     await page.waitForFunction(() => window.__game.space() === 'ramen');
     await frames(page, 3);
     const inside = await peak(page, 8);
@@ -107,7 +107,7 @@ test('E walks into the noodle bar and out, a blackout kills its lights, the stai
     saveShot(await page.evaluate(() => window.__game.shot()), 'interior-dark');
     expect(dark).toBeLessThan(lit * 0.6);
 
-    await useDoorAt(page, -7.65, -10.77, 'LEAVE');
+    await useDoorAt(page, -8.15, -10.77, 'LEAVE');
     await page.waitForFunction(() => window.__game.space() === 'street');
 
     await useDoorAt(page, -13.5, -41.4, 'STAIRS TO ROOF');

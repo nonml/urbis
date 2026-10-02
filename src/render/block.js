@@ -7,6 +7,7 @@ import {
   zoneLit, zoneView, withZone,
 } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
+import { mulberry32 } from '../sim/rng.js';
 import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
   isAvenue, way, wayCenter, wayLength,
@@ -262,16 +263,66 @@ function buildMarkings() {
   return { group: g, mats };
 }
 
-const TOWERS = [
-  // side, z-center, width, height, depth
-  // (west row omits z=-32: the gap onto the promenade deck)
-  [-1, -48, 12, 34, 10], [-1, -14, 14, 44, 11],
-  [-1, 6, 11, 28, 10], [-1, 24, 13, 38, 10], [-1, 44, 10, 24, 10],
-  [1, -44, 11, 26, 10], [1, -26, 13, 40, 11], [1, -6, 10, 30, 10],
-  [1, 12, 12, 24, 10], [1, 30, 14, 46, 11], [1, 50, 10, 22, 10],
-  // North district (z 64–92, mirrored on every avenue)
-  [-1, 68, 12, 36, 10], [1, 78, 14, 48, 11], [-1, 90, 10, 28, 10],
+// Shaft face of every avenue row, metres from the avenue centre-line. The
+// podium stands 0.6 m proud of it, so the shopfronts meet the walkway edge.
+const BUILD_LINE = 7.5;
+// The two main-avenue towers the interiors are built into, kept exactly:
+// [side, z, w, h, d]. The roof is idx 0 and the noodle bar idx 1, as before,
+// so their facades and shopfronts do not change.
+const PINNED_TOWERS = [[-1, -48, 12, 34, 10], [-1, -14, 14, 44, 11]];
+// Where an avenue row may stand: south of the plaza crossing and north of it.
+const ROW_RUNS = [[-55.5, 33.5], [46.5, 97]];
+// A gap shorter than this stays open: narrower than any real building.
+const MIN_RUN = 6;
+// [avenue x, side, z0, z1]: stretches of a row that stay open.
+const KEEP_OUT = [
+  [0, -1, -42.4, -27],     // roof-stair yard and the promenade deck
+  [0, -1, 51, 61],         // LOTS[0]
+  [0, 1, 86, 96],          // LOTS[4]
+  [44, -1, -40, -31.5],    // LOTS[5]
+  [44, -1, 51, 61],        // LOTS[1]
+  [44, 1, -55.5, -51],     // LOTS[8], LOTS[9]
+  [44, 1, 57, 70.5],       // LOTS[2]
+  [44, 1, 86, 97],         // LOTS[3]
+  [-44, 1, -37, -27],      // the promenade deck
 ];
+const STREET_WALL_SEED = 2084;
+
+function subtract(runs, [a, b]) {
+  return runs.flatMap(([r0, r1]) => [[r0, Math.min(r1, a)], [Math.max(r0, b), r1]]).filter(([r0, r1]) => r1 > r0);
+}
+
+function styleFor(ax, z) {
+  if (ax === 0 && z < 40) return { kinds: [0, 1, 2, 5], h: [28, 52], front: [12, 20] }; // downtown core
+  if (ax === 0) return { kinds: [2, 3, 5], h: [18, 36], front: [9, 16] };               // north of the plaza
+  if (ax > 0) return { kinds: [1, 2, 4, 5], h: [18, 40], front: [9, 16] };              // east avenue
+  return { kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };                             // west: older brick
+}
+
+function streetWall(ax, side, rand) {
+  let runs = ROW_RUNS;
+  for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+  if (ax === AVENUE_X[0]) {
+    for (const [ps, z, , , d] of PINNED_TOWERS) {
+      if (ps === side) runs = subtract(runs, [z - (d + 1.2) / 2, z + (d + 1.2) / 2]);
+    }
+  }
+  const out = [];
+  for (const [r0, r1] of runs) {
+    let at = r0;
+    while (r1 - at >= MIN_RUN) {
+      const st = styleFor(ax, at);
+      let p = st.front[0] + rand() * (st.front[1] - st.front[0]);
+      if (r1 - at - p < MIN_RUN) p = r1 - at;
+      const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
+      const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
+      const w = 10 + rand() * 2;
+      out.push({ z: at + p / 2, d: p - 1.2, w, h, kind });
+      at += p;
+    }
+  }
+  return out;
+}
 
 const SOUTH_TOWERS = [
   // x-center, width, height (front face z=-61, facing the connector)
@@ -728,9 +779,9 @@ export function buildTowers(texLoader, maxAniso) {
   }
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   // `name` says which table row this is, so the overlap check can point at it.
-  function emitTower(cx, cz, w, h, d, idx, face, name) {
+  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % facades.length, door = true) {
     const zone = cz < 0 ? 0 : 1;
-    const shaft = facades[idx % facades.length][zone];
+    const shaft = facades[kind][zone];
     const pod = podiums[idx % podiums.length];
     pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, pod);
@@ -741,9 +792,11 @@ export function buildTowers(texLoader, maxAniso) {
     const doorW = Math.min(w * 0.35, 2.4);
     const doorH = 3.0;
     const faceZ = cz + (d + 1.2) / 2 + 0.01;
-    caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
-    // Small canopy over the door.
-    caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
+    if (door) {
+      caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
+      // Small canopy over the door.
+      caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
+    }
     if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
     shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
     let topY = h;
@@ -764,11 +817,17 @@ export function buildTowers(texLoader, maxAniso) {
     footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, name });
   }
   let idx = 0;
+  PINNED_TOWERS.forEach(([side, z, w, h, d], i) => {
+    emitTower(AVENUE_X[0] + side * (BUILD_LINE + w / 2), z, w, h, d, idx++, [-side, 0], `PINNED_TOWERS[${i}]`);
+  });
+  const rand = mulberry32(STREET_WALL_SEED);
   for (const ax of AVENUE_X) {
-    TOWERS.forEach(([side, z, w, h, d], i) => {
-      // The dressed face is the one the avenue sees, not an arbitrary +Z.
-      emitTower(ax + side * (8.5 + d / 2), z, w, h, d, idx++, [-side, 0], `TOWERS[${i}] avenue x=${ax}`);
-    });
+    for (const side of [-1, 1]) {
+      streetWall(ax, side, rand).forEach((b, i) => {
+        emitTower(ax + side * (BUILD_LINE + b.w / 2), b.z, b.w, b.h, b.d, idx++, [-side, 0],
+          `ROW[x=${ax} side ${side}][${i}]`, b.kind, false);
+      });
+    }
   }
   SOUTH_TOWERS.forEach(([x, w, h], i) => {
     emitTower(x, -66, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);

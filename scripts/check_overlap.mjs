@@ -30,8 +30,8 @@
 import { registerHooks } from 'node:module';
 
 const MAX_OVERLAPS = 0;
-const MAX_ROAD = 33;
-const MIN_FRONTAGE = 0.396;
+const MAX_ROAD = 12;
+const MIN_FRONTAGE = 0.982;
 // Road half-width 3.5 m plus a 3 m walkway.
 const ROAD_BAND = 6.5;
 // Shaft face of an avenue row, metres from the avenue centre-line; the podium

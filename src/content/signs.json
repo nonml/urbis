@@ -3,7 +3,7 @@
   { "text": "HOTEL", "sub": "★★★", "color": "#1f3a5f", "side": 1, "z": -6, "y": 8.5 },
   { "text": "BAR", "sub": "TAVERN", "color": "#24553a", "side": -1, "z": 6, "y": 6.5 },
   { "text": "24H", "sub": "OPEN", "color": "#e8a33d", "side": 1, "z": 24, "y": 6.5 },
-  { "text": "CAFE", "sub": "BAKERY", "color": "#7a5230", "side": -1, "z": 36, "y": 6.5 },
+  { "text": "CAFE", "sub": "BAKERY", "color": "#7a5230", "side": -1, "z": 30, "y": 6.5 },
   { "text": "HOTEL", "sub": "EAST", "color": "#6e2430", "side": 1, "z": -14, "y": 8.5, "ax": 44 },
   { "text": "DELI", "sub": "& SUBS", "color": "#efe6d2", "side": -1, "z": 20, "y": 6.5, "ax": 44 },
   { "text": "PARK", "sub": "24H", "color": "#1d4f91", "side": 0, "z": -59.9, "y": 8, "ax": 22, "face": "south" },
