@@ -24,7 +24,7 @@ const { ensureServer, createClient, readServerRegistry } = await import(PLUGIN);
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
-const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash', 'opencode-go/mimo-v2.6-pro'];
+const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash'];
 const STALL_MIN = 10;
 const POLL_MS = 30_000;
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
