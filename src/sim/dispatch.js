@@ -34,21 +34,18 @@ function headingOf(yaw) {
 // The street at (x, z) as the radio says it, by the name the lot note and the
 // news line use (sim/streetnames.js): an avenue is `${streetName(way)} Avenue`,
 // a crossing `${streetName(way)} Street`, where way is the avenue or crossing
-// whose id is streetAt(x, z). Milestone 4 skeleton: a stub, with its test in
-// tests/dispatch-names.todo.js; when it is filled, fill() uses it for {street}
-// and dispatch.json and scripts/validate_content.mjs drop their street list.
+// whose id is streetAt(x, z).
 export function streetWord(x, z) {
-  void x;
-  void z;
-  void AVENUES;
-  void CROSSINGS;
-  void streetName;
-  return '';
+  const id = streetAt(x, z);
+  const avenue = AVENUES.find((w) => w.id === id);
+  if (avenue) return `${streetName(avenue)} Avenue`;
+  const crossing = CROSSINGS.find((w) => w.id === id);
+  return crossing ? `${streetName(crossing)} Street` : '';
 }
 
 function fill(template, e) {
   const words = {
-    street: CHATTER.streets[streetAt(e.x, e.z)],
+    street: streetWord(e.x, e.z),
     heading: CHATTER.headings[headingOf(e.yaw ?? 0)],
     mode: CHATTER.modes[e.inCar ? 'car' : 'foot'],
     cause: CHATTER.causes[e.cause],
