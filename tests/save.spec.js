@@ -14,6 +14,7 @@ import { createPlayer, tickPlayer } from '../src/sim/player.js';
 import { createStreet, hackBlackout, isDark, tickStreet } from '../src/sim/street.js';
 import { createPlayerCar, tickPlayerCar } from '../src/sim/vehicle.js';
 import { createCity, tickZoning } from '../src/sim/zoning.js';
+import { createPeople, tickPeople } from '../src/sim/people.js';
 import { SAVE_VERSION, deserialize, serialize } from '../src/sim/save.js';
 
 const SEED = 20260916;           // the seed main.js boots the city with
@@ -29,6 +30,7 @@ function boot() {
         car: createPlayerCar(),
         interior: createInterior(),
         mission: createMission(),
+        people: createPeople(SEED),
     };
 }
 
@@ -38,6 +40,7 @@ function run(world, secs) {
         tickClock(world.clock, DT);
         tickStreet(world.street, DT);
         tickZoning(world.city, DT, world.street);
+        if (world.people) tickPeople(world.people, world.city);
     }
 }
 
