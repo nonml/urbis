@@ -102,7 +102,8 @@ export const PUDDLE_TRIES = 20;
 // With n candidates and m = Math.min(n, SHOPS_MAX - 1), shop i + 1 is
 // candidate Math.floor(i * n / m) for i = 0 .. m - 1. Every shop faces the
 // street from its own side, ry = Math.PI / 2 on side -1 and -Math.PI / 2 on
-// side 1, and shop k has kind k % 3.
+// side 1. Shop 0 is the one RAMEN (kind 0); the others alternate PAWN and
+// CLINIC, kind 1 + (i % 2) for shop i + 1, so no second noodle bar faces it.
 //
 // vents: one for each of shops 0, 2, 4, ... up to VENTS_MAX. With side = -1
 // when the shop's ry is Math.PI / 2 and 1 otherwise, a vent is { x: shop.x -
@@ -140,7 +141,7 @@ function shopsFor(district, seed) {
     }
   }
   const m = Math.min(cands.length, SHOPS_MAX - 1);
-  for (let i = 0; i < m; i += 1) shops.push({ ...cands[Math.floor((i * cands.length) / m)], kind: (i + 1) % 3 });
+  for (let i = 0; i < m; i += 1) shops.push({ ...cands[Math.floor((i * cands.length) / m)], kind: 1 + (i % 2) });
   return shops;
 }
 
