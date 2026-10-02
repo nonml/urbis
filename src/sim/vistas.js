@@ -4,9 +4,6 @@
 // the seed (docs/PROCGEN.md); on the hand preset render/block.js keeps its tables.
 // Pure (law 5): render/block.js reads WORLD_VISTAS, scripts/check_overlap.mjs
 // measures what it builds.
-//
-// Milestone 2 skeleton: the constants are final, the bodies are stubs that each
-// have a test in tests/vistas-*.todo.js.
 import { DISTRICTS } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { mulberry32 } from './rng.js';
@@ -38,15 +35,46 @@ export const RING_WEST = 2;
 export const RING_SPACE = 2;
 export const RING_MIN = 10;
 
+const RING_SALT = 0xffff; // ring's own stream: caps never move when it runs
+
+function half(v) {
+  return Math.round(v * 2) / 2;
+}
+
+function drawTower(rand) {
+  return {
+    w: half(RING_W[0] + rand() * (RING_W[1] - RING_W[0])),
+    d: half(RING_D[0] + rand() * (RING_D[1] - RING_D[0])),
+    h: half(RING_H[0] + rand() * (RING_H[1] - RING_H[0])),
+  };
+}
+
+// n towers on a side of `length`, first centre half a step in, each shape from
+// `make`, with the along-side dimension capped so neighbours keep RING_SPACE.
+function ringSide(rand, n, start, length, make) {
+  const step = length / n;
+  const cap = Math.floor((step - RING_SPACE) * 2) / 2;
+  const towers = [];
+  for (let k = 0; k < n; k++) towers.push(make(drawTower(rand), cap, start + (k + 0.5) * step));
+  return towers;
+}
+
 // A cap tower { x, z, w, d, h, face } at both ends of every avenue, centred on
 // its x. The north cap's near face is CAP_GAP past the avenue's z1 and its front
 // looks back down the avenue (face [0, -1]); the south cap mirrors it past z0
 // (face [0, 1]). w, d and h are drawn from CAP_W, CAP_D and CAP_H with
 // mulberry32(seed ^ VISTA_SALT).
 export function capsFor(district, seed) {
-  void district;
-  void seed;
-  return [];
+  const rand = mulberry32((seed ^ VISTA_SALT) >>> 0);
+  const caps = [];
+  for (const a of district.avenues) {
+    const w = Math.round((CAP_W[0] + rand() * (CAP_W[1] - CAP_W[0])) * 2) / 2;
+    const d = Math.round((CAP_D[0] + rand() * (CAP_D[1] - CAP_D[0])) * 2) / 2;
+    const h = Math.round((CAP_H[0] + rand() * (CAP_H[1] - CAP_H[0])) * 2) / 2;
+    caps.push({ x: a.x, z: a.z1 + CAP_GAP + d / 2, w, d, h, face: [0, -1] });
+    caps.push({ x: a.x, z: a.z0 - CAP_GAP - d / 2, w, d, h, face: [0, 1] });
+  }
+  return caps;
 }
 
 // The skyline ring { x, z, w, d, h }: RING_EAST towers down the east side,
@@ -56,9 +84,30 @@ export function capsFor(district, seed) {
 // drive's minX - WEST_GAP to the walk's maxX + RING_GAP, z from the avenues' z0
 // to z1 widened by CAP_GAP + CAP_D[1] + RING_GAP. No two ring towers overlap.
 export function ringFor(district, seed) {
-  void district;
-  void mulberry32(seed ^ VISTA_SALT);
-  return [];
+  const rand = mulberry32((seed ^ VISTA_SALT ^ RING_SALT) >>> 0);
+  const av = district.avenues;
+  const z0 = Math.min(...av.map((a) => a.z0));
+  const z1 = Math.max(...av.map((a) => a.z1));
+  const reach = CAP_GAP + CAP_D[1] + RING_GAP;
+  const eastFace = district.walk.maxX + RING_GAP;
+  const westFace = district.drive.minX - WEST_GAP;
+  const nsStart = district.drive.minX;
+  const nsLen = district.walk.maxX - district.drive.minX;
+
+  return [
+    ...ringSide(rand, RING_EAST, z0, z1 - z0, (t, cap, z) => ({
+      x: eastFace + t.w / 2, z, w: t.w, d: Math.min(t.d, cap), h: t.h,
+    })),
+    ...ringSide(rand, RING_WEST, z0 + 40, z1 - z0 - 80, (t, cap, z) => ({
+      x: westFace - t.w / 2, z, w: t.w, d: Math.min(t.d, cap), h: t.h,
+    })),
+    ...ringSide(rand, RING_NORTH, nsStart, nsLen, (t, cap, x) => ({
+      x, z: z1 + reach + t.d / 2, w: Math.min(t.w, cap), d: t.d, h: t.h,
+    })),
+    ...ringSide(rand, RING_SOUTH, nsStart, nsLen, (t, cap, x) => ({
+      x, z: z0 - reach - t.d / 2, w: Math.min(t.w, cap), d: t.d, h: t.h,
+    })),
+  ];
 }
 
 export function planVistas(district, seed) {
