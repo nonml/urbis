@@ -56,7 +56,9 @@ export function snapshot(city, people, street) {
 //    object as its move before, with m = that move and n =
 //    Math.round(Math.abs(m.jobs)), when n > 0: m.jobs > 0 gives `${n} ${JOBS[m.use]}
 //    jobs moved into the ${name} district`, else `${n} ${JOBS[m.use]} jobs left the
-//    ${name} district`.
+//    ${name} district`, and when m.cause === 'dark' (economy.js flee: the firm a
+//    power cut drove out) that line ends ` after the power cut`, so the chain
+//    reads in one line after the cut's own line has scrolled off.
 export function newsBetween(before, after, city) {
   const lines = [];
   const { districts } = city.economy;
