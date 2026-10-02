@@ -128,8 +128,23 @@ const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
 // Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
 const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
 
-const street = createStreet(20260916);
-const city = createCity(20260916);
+function seedFromUrl() {
+  const raw = new URLSearchParams(location.search).get('seed');
+  if (!/^\d+$/.test(raw ?? '')) return null;
+  const n = Number(raw);
+  return n > 0 && n < 2 ** 31 ? n : null;
+}
+function freshSeed() {
+  return Date.now() % 2147483647 || 1;
+}
+// A new game is a new city (AGENTS.md). ?seed=N replays one; automated runs
+// (navigator.webdriver) pin the fixed seed so the gate and shots stay comparable.
+const FIXED_SEED = 20260916;
+const SEED = seedFromUrl() ?? (navigator.webdriver ? FIXED_SEED : freshSeed());
+console.info('urbis seed', SEED);
+
+const street = createStreet(SEED);
+const city = createCity(SEED);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
 const economyPanel = buildEconomyPanel();
@@ -416,6 +431,7 @@ let lastProfile = null;
 let lockedNpc = null;
 // Minimal probe for scripted verification (screenshots, control checks).
 window.__game = {
+  seed: SEED,
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
   draws: () => renderer.info.render.calls,
   hack: () => fireHack(),

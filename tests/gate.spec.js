@@ -25,6 +25,16 @@ test('boots and exposes the debug API', async ({ page }) => {
     expect(errors).toEqual([]);
 });
 
+test('a new game takes its seed from the url, and pins the fixed one without it', async ({ page }) => {
+    await page.goto('/?seed=7');
+    await page.waitForFunction(() => window.__game?.seed > 0);
+    expect(await page.evaluate(() => window.__game.seed)).toBe(7);
+
+    await page.goto('/');
+    await page.waitForFunction(() => window.__game?.seed > 0);
+    expect(await page.evaluate(() => window.__game.seed)).toBe(20260916);
+});
+
 test(`whole frame stays within ${DRAW_BUDGET} draws`, async ({ page }) => {
     await boot(page);
 
