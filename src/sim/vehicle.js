@@ -1,6 +1,7 @@
 // Player vehicle: arcade handling, pure data. No collision yet —
 // road-clamped only (cutover polish will add poles, cars, facades).
 import { DRIVE_BOUNDS, clampToBounds, heightAt } from './world.js';
+import { SPAWN } from './spawn.js';
 
 export const CAR_TOP = 12;
 export const CAR_REVERSE = 4;
@@ -9,8 +10,9 @@ const BRAKE = 17;
 const TURN = 1.9;
 
 export function createPlayerCar() {
-  // Curb-parked beside the player spawn (2.5, 26) — the F prompt greets you.
-  return { x: 3.0, y: heightAt(3.0, 23.5), z: 23.5, yaw: Math.PI, speed: 0 };
+  // Curb-parked beside the player's spawn — the F prompt greets you.
+  const { x, z, yaw } = SPAWN.car;
+  return { x, y: heightAt(x, z), z, yaw, speed: 0 };
 }
 
 // input: {throttle -1..1, steer -1..1}. Returns {braking} for taillights.

@@ -40,7 +40,20 @@ export const LANE_EDGE = ROAD_HALF_WIDTH;
 // player at x = a.x + PLAYER_OUT and z = car z + PLAYER_AHEAD, both with yaw
 // Math.PI (facing -z, down the street).
 export function spawnFor(district) {
-  void district;
+  const a = district.avenues[0];
+  const meets = district.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);
+  const fits = (z) => meets.every((c) => Math.abs(z - c.z) >= SPAWN_CLEAR)
+    && district.walk.minZ + SPAWN_CLEAR <= z && z <= district.walk.maxZ - SPAWN_CLEAR;
+  for (let k = 0; k <= 200; k += 1) {
+    for (const z of k === 0 ? [SPAWN_Z] : [SPAWN_Z - k * SPAWN_STEP, SPAWN_Z + k * SPAWN_STEP]) {
+      if (fits(z)) {
+        return {
+          player: { x: a.x + PLAYER_OUT, z: z + PLAYER_AHEAD, yaw: Math.PI },
+          car: { x: a.x + CAR_OUT, z, yaw: Math.PI },
+        };
+      }
+    }
+  }
   return HAND_SPAWN;
 }
 

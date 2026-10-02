@@ -1,0 +1,23 @@
+{
+  "milestone": "2g: the hack, the chase and the story stand on a generated world's streets",
+  "tasks": [
+    {
+      "id": "m2-anchors-place",
+      "lane": "anchors",
+      "goal": "Fill in counterpartX, placeX, substationsFor, pursuitHomesFor and arcFor in src/sim/anchors.js: a generated world's substations, chase homes and story places, derived from its own avenues and crossings.",
+      "files": ["src/sim/anchors.js"],
+      "test": "tests/anchors-place.spec.js",
+      "commit": "feat(anchors): a generated world places its substations, chase and story on its own streets",
+      "notes": "The comments above each function are the exact rule; constants and hand tables are final. Remove the void lines and stub returns. counterpartX: a0 = district.avenues[0].x; east = avenue xs > a0, west = avenue xs < a0; 0 -> a0; 44 -> east.length ? Math.min(...east) : Math.max(...west); -44 -> west.length ? Math.max(...west) : Math.min(...east). placeX: start ax = HAND_AVENUE_X[0], loop the entries and take v only when Math.abs(x - v) < Math.abs(x - ax) (strictly less, so a tie keeps the earlier), return counterpartX(ax, district) + (x - ax). substationsFor: crossings that meet are c.x0 <= a.x && a.x <= c.x1 for a = district.avenues[0]; search z in the order n = 0, 1, 2, ...: step = Math.ceil(n / 2) * 0.5, z = hz + (n % 2 === 1 ? -step : step); stop at n = 800 and throw an Error if nothing fits; return exactly [{ x: a.x + SUB_OUT, z, zone: 0, face: -1 }, { x: a.x - SUB_OUT, z, zone: 1, face: 1 }] with each z from its own search (hand z -30 for zone 0, 30 for zone 1). pursuitHomesFor: HAND_PURSUIT_HOMES.map((h) => ({ x: district.avenues[0].x, z: h.z })). arcFor: const subs = substationsFor(district); build a new places object with Object.entries(def.places); a place whose id is in SUBSTATION_PLACES becomes { ...p, x: sub.x + sub.face * SUB_PLACE_IN, z: sub.z } with sub = subs[SUBSTATION_PLACES[id]], every other { ...p, x: placeX(p.x, district) }; return { ...def, places, signs: def.signs.map((s) => ({ ...s, x: placeX(s.x, district) })) }. Never write into def."
+    },
+    {
+      "id": "m2-anchors-wire",
+      "lane": "anchors",
+      "goal": "The game reads its anchors: hackfx and main read SUBSTATIONS from sim/anchors.js, the chase starts at PURSUIT_HOMES, and the arc is moved onto the world being played.",
+      "files": ["src/render/hackfx.js", "src/main.js", "src/sim/wanted.js", "src/sim/arc.js"],
+      "test": "tests/anchors-wire.spec.js",
+      "commit": "feat(anchors): the hack sparks, the chase starts and the story points at this world's streets",
+      "notes": "render/hackfx.js: delete the export const SUBSTATIONS = [...] table, add import { SUBSTATIONS } from '../sim/anchors.js'; after the BufferGeometryUtils import, and change const face = s.x > 0 ? -1 : 1; to const face = s.face; main.js: remove SUBSTATIONS from the './render/hackfx.js' import list and add a new line import { SUBSTATIONS } from './sim/anchors.js'; right after it. sim/wanted.js: add import { PURSUIT_HOMES } from './anchors.js'; after the world.js import, and in createWanted replace the two pursuit entries with ...PURSUIT_HOMES.map((h, i) => ({ active: false, x: h.x, y: heightAt(h.x, h.z), z: h.z, yaw: i === 0 ? 0 : Math.PI, speed: 0 })), keeping the pursuit: [ ... ] array around it. sim/arc.js: the json import becomes import RAW_ARC from '../content/arc.json' with { type: 'json' }; followed by import { worldArc } from './anchors.js'; and the line export { ARC }; becomes const ARC = worldArc(RAW_ARC); then export { ARC }; on the next line. tests/anchors-place.spec.js, tests/arc.spec.js and tests/arc-game.spec.js must stay green, and npm run validate must pass. Draws stay within 175."
+    }
+  ]
+}

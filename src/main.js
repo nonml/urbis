@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { heightAt } from './sim/world.js';
+import { WALK_BOUNDS, clampToBounds, heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
@@ -411,8 +411,7 @@ function toggleVehicle() {
     cam.pitch = 0.22;
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
-    player.x = Math.max(-52, Math.min(70, heroCar.x + 1.8));
-    player.z = Math.max(-68, Math.min(100, heroCar.z));
+    ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z));
     player.speed = 0;
     avatar.group.visible = true;
     cam.dist = 4.5;
@@ -570,8 +569,7 @@ if (CAPTURE) {
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
   window.__game.pose = (x, z, yaw) => {
-    player.x = Math.max(-52, Math.min(70, x));
-    player.z = Math.max(-68, Math.min(100, z));
+    ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, x, z));
     cam.yaw = yaw;
   };
   // Walk into a grown lot by use, the way the door would: pose the body on the

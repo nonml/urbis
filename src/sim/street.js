@@ -2,6 +2,7 @@
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
 import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUES, AVENUE_X, CROSSINGS, wayLength } from './world.js';
+import { WORLD_FURNITURE } from './furniture.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
@@ -24,13 +25,15 @@ const PLAZA_WALK_OUT = 5.2;
 const WALK_INSET = 2;
 
 // Curb parking slots: [avenueX, side, z]. Static, never ticked — density for
-// +0 draws (they ride the same traffic InstancedMeshes as moving cars).
-const PARKED_SLOTS = [
+// +0 draws (they ride the same traffic InstancedMeshes as moving cars). On a
+// generated world the plan parks them; the hand preset keeps its table.
+const HAND_PARKED_SLOTS = [
   [MAIN_X, 1, -70], [MAIN_X, -1, -52], [MAIN_X, 1, -30],
   [MAIN_X, -1, -12], [MAIN_X, 1, 8], [MAIN_X, -1, 26],
   [EAST_X, 1, -58], [EAST_X, -1, -34], [EAST_X, 1, -8], [EAST_X, -1, 54], [EAST_X, 1, 72],
   [WEST_X, -1, -64], [WEST_X, 1, -20], [WEST_X, -1, 60],
 ];
+const PARKED_SLOTS = WORLD_FURNITURE ? WORLD_FURNITURE.parked : HAND_PARKED_SLOTS;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
