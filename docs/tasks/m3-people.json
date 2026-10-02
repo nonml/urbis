@@ -1,0 +1,41 @@
+{
+  "milestone": "3a: the day runs and the people are real",
+  "tasks": [
+    {
+      "id": "m3-day",
+      "lane": "people",
+      "goal": "Make the day run on its own in src/sim/clock.js: fill in nightOf, and make createClock, tickClock and toggleDay keep an hour, a day count and a rate as the comment at the top describes.",
+      "files": ["src/sim/clock.js"],
+      "test": "tests/day.spec.js",
+      "commit": "feat(clock): the day runs on its own, dawn and dusk included",
+      "notes": "The constants are final. nightOf: 1 before DAWN[0] and from DUSK[1], 0 from DAWN[1] to before DUSK[0], and a smoothstep (t * t * (3 - 2 * t)) across dawn (falling) and dusk (rising). createClock adds hour: START_HOUR, day: 0, rate: 1 and starts nightFactor and nightTarget at nightOf(START_HOUR). tickClock: only when rate > 0, advance hour by dt * rate * 24 / DAY_SECS, wrap past 24 into day + 1, and set nightTarget = nightOf(hour); keep the existing nightFactor glide exactly as it is. toggleDay: at night (nightOf(hour) > 0.5) jump to DAY_HOUR, counting a day when that passes midnight (hour > DAY_HOUR); otherwise jump to NIGHT_HOUR; then nightTarget = nightOf(hour)."
+    },
+    {
+      "id": "m3-homes",
+      "lane": "people",
+      "goal": "Fill in moveHomes in src/sim/people.js so every res lot houses exactly lotPeople(p) real people, with people moving in and out as lots grow, empty and change use.",
+      "files": ["src/sim/people.js"],
+      "test": "tests/people-homes.spec.js",
+      "commit": "feat(people): every home on the lots is a person",
+      "notes": "The comment above moveHomes is the exact rule; the constants and the other functions are final. Walk people.list in order counting residents per home: keep a person while their home still wants more (lotPeople for a res lot, 0 otherwise), drop the rest, which drops the newest first. Then append newPerson(people, i) for each lot still short, lots in parcel order. Never call Math.random; newPerson already uses the people's seeded stream."
+    },
+    {
+      "id": "m3-jobs",
+      "lane": "people",
+      "goal": "Fill in matchJobs in src/sim/people.js so every shop and workshop place is held by a resident, the nearest out-of-work person first.",
+      "files": ["src/sim/people.js"],
+      "test": "tests/people-jobs.spec.js",
+      "commit": "feat(people): every job on the lots is held by a resident",
+      "notes": "The comment above matchJobs is the exact rule. Places per lot: lotPeople(p) for a com or ind lot, 0 for any other. First walk people.list in order and count each job lot's staff; anyone past their lot's places loses the job (job = null). Then for each job lot in parcel order with open places, take the people still out of work sorted by the distance from their home parcel's centre to the job parcel's centre (ties by list order) and hire as many as there are open places. tests/people-homes.spec.js must stay green."
+    },
+    {
+      "id": "m3-wire",
+      "lane": "people",
+      "goal": "Put the people and the running day into the game: main.js ticks the people, every pedestrian the profiler reads is one of them, the HUD shows the time, and a capture holds the clock.",
+      "files": ["src/main.js", "src/render/profiler.js"],
+      "test": "tests/people-wire.spec.js",
+      "commit": "feat(people): pedestrians are the people on the lots, and the clock runs in play",
+      "notes": "In src/main.js: const people = createPeople(SEED) beside the city; call tickPeople(people, city) right after the zoning tick each frame. Add to window.__game: census: () => census(people); person: (k) => the describe() of people.list[k % people.list.length], or null when nobody lives on the lots; hour: () => clock.hour. When CAPTURE is set, set clock.rate = 0 at boot, and make window.__game.night(n) set clock.rate = 0 too. Show the time of day as HH:MM in the top-right HUD line that already exists. In src/render/profiler.js take the person as a third argument of updateProfiler: when given, the panel shows the person's name and age, then 'home LOT n' and the work line from describe(), instead of the old job and income line; keep the secret line and the distance. In main.js pass the person for the targeted pedestrian: its index in street.npcs, mod people.list.length. Everything else stays."
+    }
+  ]
+}

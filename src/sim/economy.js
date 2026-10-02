@@ -11,7 +11,7 @@ const USES = ['res', 'com', 'ind'];
 
 // A resident or a worker for every 25 m² of floor, on the 3.5 m storey the lots
 // build to — a finished lot holds 20 to 120 people.
-const M3_PER_PERSON = 25 * 3.5;
+export const M3_PER_PERSON = 25 * 3.5;
 // The towers a district already stood in before any lot broke ground: this many
 // residents per m² of its lot land, about what the lots hold at full build. It
 // is balanced — as many jobs as homes, shops for its spending, workshops for its
