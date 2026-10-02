@@ -1,0 +1,29 @@
+{
+  "milestone": "1: walk into what you built, framed",
+  "tasks": [
+    {
+      "id": "m1-crane",
+      "lane": "interiors",
+      "goal": "Stop the tower crane's mast standing through a grown lot's room: add craneBase(p) to src/sim/interior.js and make raiseCrane in src/render/zoning.js stand the mast on it.",
+      "files": [
+        "src/sim/interior.js",
+        "src/render/zoning.js"
+      ],
+      "test": "tests/interior-crane.spec.js",
+      "commit": "fix(interiors): a climbing crane stands on the ground floor's ceiling, not through the room",
+      "notes": "craneBase(p) returns 0 below STAGE.LOW and the room's ceiling height (PARCEL_FLOOR plus the 3.0 room height parcelSpace uses; name that 3.0 as a constant and use it in both places) from LOW up. In raiseCrane, the mast box starts at craneBase(p) instead of 0 and keeps its top where it is now, so its height becomes mastTop - base. Import craneBase into src/render/zoning.js from ../sim/interior.js. Nothing else of the crane moves."
+    },
+    {
+      "id": "m1-framing",
+      "lane": "interiors",
+      "goal": "Rearrange the fixtures parcelItems puts in a grown room in src/sim/interior.js so the player never arrives inside furniture and the follow cam always has room behind them.",
+      "files": [
+        "src/sim/interior.js",
+        "src/render/interiorsets.js"
+      ],
+      "test": "tests/interior-framing.spec.js",
+      "commit": "fix(interiors): fixtures clear the arrival and the camera behind it",
+      "notes": "The failures are the residential stair core: in a narrow room it covers the arrival spot, and near the front it blocks the camera when the player turns. One way that works on every room: put the stair at the back of the room, d from max(d0 + 3.2, d1 - 3.2) to d1 - 0.5, and leave it out when the room is narrower than a1 >= 2.3 or that range is under 1.0 m. Do not move the arrival or change the camera code; fix the furniture. tests/interior.spec.js must stay green."
+    }
+  ]
+}

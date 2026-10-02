@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // The director's crew: OpenCode workers, one git worktree each, supervised.
 //
-//   node scripts/crew.mjs run <queue.json>  # works a milestone's task queue to the end
+//   node scripts/crew.mjs run <queue.json>...  # works task queues to the end, every lane at once
 //   node scripts/crew.mjs tasks             # where every queued task stands
 //   node scripts/crew.mjs start <name> <model> <brief.md> [extra instruction]
 //   node scripts/crew.mjs status
@@ -115,7 +115,9 @@ function taskPrompt(w) {
   ].filter(Boolean).join('\n');
 }
 
-const prompt = (w) => (w.task ? taskPrompt(w) : briefPrompt(w));
+// A queued task with a `brief` instead of a `test` is a whole feature: the brief's
+// finish lines and the gate decide it, and the director reviews the lane branch.
+const prompt = (w) => (w.task && !w.task.brief ? taskPrompt(w) : briefPrompt(w.task ? { ...w, brief: w.task.brief } : w));
 
 async function send(w, text) {
   const { c } = await client(w.dir);
@@ -153,7 +155,7 @@ async function sessionInfo(w) {
   return {
     busy: !!st[w.session],
     last,
-    loop: loopOf(msgs, LOOP_CALLS[w.task ? 'task' : 'brief']),
+    loop: loopOf(msgs, LOOP_CALLS[w.task && !w.task.brief ? 'task' : 'brief']),
     error: reply?.info?.error?.name ?? null,
     text: (reply?.parts ?? []).filter((p) => p.type === 'text').map((p) => p.text).join('\n'),
   };
@@ -232,17 +234,21 @@ function headFile(dir, ...files) {
   return null;
 }
 
+function bringTest(dir, test) {
+  const todo = todoOf(test);
+  // A task queued after the lane branched has its test on main only: bring it over.
+  if (!fs.existsSync(path.join(dir, todo)) && !fs.existsSync(path.join(dir, test))) {
+    sh('git', ['checkout', 'main', '--', todo], dir);
+  }
+  if (fs.existsSync(path.join(dir, todo))) sh('git', ['mv', todo, test], dir);
+}
+
 async function assign(state, lane, task) {
   const dir = worktree(lane);
   try {
     if (!changedPaths(dir).length) sh('git', ['merge', '--ff-only', '-q', 'main'], dir);
   } catch { /* the lane has commits of its own; it keeps building on them */ }
-  const todo = todoOf(task.test);
-  // A task queued after the lane branched has its test on main only: bring it over.
-  if (!fs.existsSync(path.join(dir, todo)) && !fs.existsSync(path.join(dir, task.test))) {
-    sh('git', ['checkout', 'main', '--', todo], dir);
-  }
-  if (fs.existsSync(path.join(dir, todo))) sh('git', ['mv', todo, task.test], dir);
+  if (task.test) bringTest(dir, task.test);
   const w = { name: lane, dir, task, model: TIERS[0], stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
   state.workers[lane] = w;
   state.tasks[task.id] = { status: 'working', lane, model: w.model };
@@ -253,6 +259,7 @@ async function assign(state, lane, task) {
 // What the answer touched that the task does not own: its test, or files off its list.
 function scopeFault(w) {
   const t = w.task;
+  if (t.brief) return null;
   const testPath = path.join(w.dir, t.test);
   const original = headFile(w.dir, t.test, todoOf(t.test));
   if (original !== null && (!fs.existsSync(testPath) || fs.readFileSync(testPath, 'utf8') !== original)) {
@@ -340,9 +347,13 @@ async function tendBriefs(state) {
   }
 }
 
-async function runQueue(state, file) {
+async function runQueue(state, files) {
   // Re-read every round, so the director can append tasks to a running queue.
-  const read = () => JSON.parse(fs.readFileSync(path.resolve(file), 'utf8'));
+  // Several queues run as one board: each lane is a developer, lanes run at once.
+  const read = () => {
+    const qs = files.map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
+    return { milestone: qs.map((q) => q.milestone).join(' + '), tasks: qs.flatMap((q) => q.tasks) };
+  };
   let queue = read();
   state.tasks ??= {};
   log(`queue ${queue.milestone}: ${queue.tasks.length} tasks`);
@@ -377,11 +388,14 @@ const state = load();
 const live = () => Object.values(state.workers).filter((w) => w.live);
 
 if (cmd === 'run') {
-  await runQueue(state, process.argv[3]);
+  await runQueue(state, process.argv.slice(3));
 } else if (cmd === 'tasks') {
   for (const [id, t] of Object.entries(state.tasks ?? {})) {
     console.log(`${id.padEnd(24)} ${t.status.padEnd(8)} ${t.lane.padEnd(12)} ${(t.model ?? '').split('/').at(-1).padEnd(20)} ${t.commit ?? ''}`);
   }
+} else if (cmd === 'start' && fs.existsSync(STATE) && /"live": true/.test(fs.readFileSync(STATE, 'utf8')) && process.env.CREW_FORCE !== '1') {
+  // A running `run` owns the state file and would overwrite this worker; queue it instead.
+  console.log('a supervisor may be running: add the brief to the queue as {"lane", "brief"} (CREW_FORCE=1 overrides)');
 } else if (cmd === 'start') {
   const [, , , name, model, brief, extra] = process.argv;
   const dir = worktree(name);
