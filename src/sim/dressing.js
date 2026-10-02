@@ -124,14 +124,70 @@ export const PUDDLE_TRIES = 20;
 // meets the avenue (c.x0 <= a.x <= c.x1) and from the avenue's MIDBLOCK_ZEBRA
 // entry, if it has one; otherwise it draws everything again, PUDDLE_TRIES times
 // in all, then is skipped.
+const half = (v) => Math.round(v * 2) / 2;
+const face = (side) => (side < 0 ? Math.PI / 2 : -Math.PI / 2);
+
+function shopsFor(district, seed) {
+  const a0 = district.avenues[0];
+  const ramen = placePinned(HAND_PINNED, a0, district.crossings).find((t) => t.id === 'ramen');
+  const shops = [{ x: a0.x + ramen.side * SHOP_OUT, z: ramen.z + RAMEN_SIGN_DZ, ry: face(ramen.side), kind: 0 }];
+  const cands = [];
+  for (const r of planLayout(district, seed).rows) {
+    for (const [r0, r1] of r.runs) {
+      const z0 = Math.max(r0, district.walk.minZ);
+      const z1 = Math.min(r1, district.walk.maxZ);
+      if (z1 - z0 >= SHOP_RUN) cands.push({ x: r.ax + r.side * SHOP_OUT, z: half((z0 + z1) / 2), ry: face(r.side) });
+    }
+  }
+  const m = Math.min(cands.length, SHOPS_MAX - 1);
+  for (let i = 0; i < m; i += 1) shops.push({ ...cands[Math.floor((i * cands.length) / m)], kind: (i + 1) % 3 });
+  return shops;
+}
+
+function ventsFor(shops) {
+  const vents = [];
+  for (let k = 0; k < shops.length && vents.length < VENTS_MAX; k += 2) {
+    const s = shops[k];
+    const side = s.ry === Math.PI / 2 ? -1 : 1;
+    vents.push({ x: s.x - side * (SHOP_OUT - VENT_OUT), z: s.z - VENT_BACK, phase: vents.length * VENT_PHASE });
+  }
+  return vents;
+}
+
+function puddlesFor(district, seed) {
+  const car = spawnFor(district).car;
+  const puddles = [[car.x + HERO_DX, car.z + HERO_DZ, HERO_SIZE, ROAD_Y]];
+  const rand = mulberry32((seed ^ DRESS_SALT) >>> 0);
+  const { minZ, maxZ } = district.drive;
+  const drawZ = () => half(minZ + PUDDLE_END + rand() * (maxZ - minZ - 2 * PUDDLE_END));
+  const drawSide = () => (rand() < 0.5 ? -1 : 1);
+  district.avenues.forEach((a, k) => {
+    const zebra = MIDBLOCK_ZEBRA[k];
+    for (let p = 0; p <= ROAD_PUDDLES; p += 1) {
+      for (let t = 0; t < PUDDLE_TRIES; t += 1) {
+        const z = drawZ();
+        const side = drawSide();
+        let q;
+        if (p < ROAD_PUDDLES) {
+          const off = PUDDLE_LANE[0] + Math.round(rand() * 2 * (PUDDLE_LANE[1] - PUDDLE_LANE[0])) / 2;
+          const size = PUDDLE_SIZE[0] + Math.floor(rand() * (PUDDLE_SIZE[1] - PUDDLE_SIZE[0] + 1));
+          q = [a.x + side * off, z, size, ROAD_Y];
+        } else {
+          q = [a.x + side * WALK_PUDDLE_OUT, z, WALK_PUDDLE_SIZE, WALK_Y];
+        }
+        const meets = district.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);
+        const clear = meets.every((c) => Math.abs(z - c.z) >= PUDDLE_CLEAR)
+          && (zebra === undefined || Math.abs(z - zebra) >= PUDDLE_CLEAR);
+        if (clear) { puddles.push(q); break; }
+      }
+    }
+  });
+  return puddles;
+}
+
 export function planDressing(district, seed) {
-  void district;
-  void seed;
-  void mulberry32;
-  void planLayout;
-  void placePinned;
-  void spawnFor;
-  return { shops: HAND_SHOPS, puddles: HAND_PUDDLES, vents: HAND_VENTS };
+  const shops = shopsFor(district, seed);
+  return { shops, puddles: puddlesFor(district, seed), vents: ventsFor(shops) };
 }
 
 // The dressing of the world being played: generated games only, null on the hand preset.
