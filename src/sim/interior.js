@@ -379,8 +379,12 @@ export function parcelPlace(p, i) {
 
 // Where a lot's tower crane stands its mast. On a bare site it stands on the
 // ground; from LOW up the lot has a room, so it climbs onto that room's ceiling.
+// The mast stands on the slab above the ceiling, not on the ceiling's own plane,
+// where its foot would z-fight the plaster and show as a dark patch in the room.
+const CRANE_SLAB = 0.3;
+
 export function craneBase(p) {
-  return p.stage < STAGE.LOW ? 0 : PARCEL_FLOOR + PARCEL_ROOM_HEIGHT;
+  return p.stage < STAGE.LOW ? 0 : PARCEL_FLOOR + PARCEL_ROOM_HEIGHT + CRANE_SLAB;
 }
 
 // The link between the lot's street face and its room, in world coordinates.
