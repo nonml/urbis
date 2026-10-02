@@ -275,7 +275,7 @@ const TOWERS = [
 
 const SOUTH_TOWERS = [
   // x-center, width, height (front face z=-61, facing the connector)
-  [-2, 12, 30], [10, 10, 42], [22, 14, 26], [34, 11, 36], [46, 12, 28],
+  [-2, 11, 30], [10, 10, 42], [22, 11, 26], [34, 10, 36], [46, 11, 28],
 ];
 
 // Mid-block infill (x,z,w,h,d): fills the dark voids between avenues so the
