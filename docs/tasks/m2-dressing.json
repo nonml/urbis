@@ -1,0 +1,23 @@
+{
+  "milestone": "2f: a generated world dresses its own streets",
+  "tasks": [
+    {
+      "id": "m2-dress-plan",
+      "lane": "dressing",
+      "goal": "Fill in planDressing in src/sim/dressing.js: a generated world's trade signs, puddles and steam vents, derived from its rows, roads, noodle-bar tower and start spot.",
+      "files": ["src/sim/dressing.js"],
+      "test": "tests/dressing-place.spec.js",
+      "commit": "feat(dressing): a generated world plans its own signs, water and steam",
+      "notes": "The comment above planDressing is the exact rule and every constant and hand table is final. Remove the void lines and the stub return. Write three helpers, shopsFor(district, seed), ventsFor(shops) and puddlesFor(district, seed), and return { shops, puddles: puddlesFor(district, seed), vents: ventsFor(shops) } with shops = shopsFor(district, seed). A shop object is exactly { x, z, ry, kind } (the RAMEN one too) and a candidate gets its kind added when picked: { ...candidate, kind }. A vent is exactly { x, z, phase }. A puddle is the array [x, z, size, y]. In puddlesFor make ONE rand for the whole district and draw in exactly the order the comment says: per try, z first, then side, then (road puddles only) offset, then size; a pavement puddle draws z then side only. The pavement puddle is the 4th puddle of each avenue (after its ROAD_PUDDLES road ones). Leave WORLD_DRESSING, SHOPS, PUDDLES and VENTS as they are."
+    },
+    {
+      "id": "m2-dress-wire",
+      "lane": "dressing",
+      "goal": "Draw the planned dressing: render/setdress.js reads SHOPS, PUDDLES and VENTS from sim/dressing.js instead of its own hand tables, and still boots when a world puts every shop or every puddle in one power zone.",
+      "files": ["src/render/setdress.js"],
+      "test": "tests/dressing-wire.spec.js",
+      "commit": "feat(dressing): a generated world's signs, water and steam follow its streets",
+      "notes": "In src/render/setdress.js: add import { PUDDLES, SHOPS, VENTS } from '../sim/dressing.js'; after the materials.js import, and delete the three local tables const SHOPS = [...], const PUDDLES = [...] (with its comment lines inside) and const VENTS = [...]. Keep every function body as it is except two lines: in buildShops the line group.add(new THREE.Mesh(mergeGeometries(geos), mat)); becomes if (geos.length) group.add(new THREE.Mesh(mergeGeometries(geos), mat)); and in buildPuddles the line group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone])); becomes if (zoneGeos.length) group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone])); because mergeGeometries throws on an empty list. The materials are still made for both zones. tests/dressing-place.spec.js must stay green. Draws stay within 175."
+    }
+  ]
+}

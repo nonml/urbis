@@ -2,6 +2,7 @@
 // The director's crew: OpenCode workers, one git worktree each, supervised.
 //
 //   node scripts/crew.mjs run <queue.json>...  # works task queues to the end, every lane at once
+//   node scripts/crew.mjs run               # works every queue in docs/tasks, new ones too
 //   node scripts/crew.mjs tasks             # where every queued task stands
 //   node scripts/crew.mjs start <name> <model> <brief.md> [extra instruction]
 //   node scripts/crew.mjs status
@@ -387,17 +388,27 @@ async function tendBriefs(state) {
   }
 }
 
+// `run` with no queue named works the whole board: every queue in BOARD, listed
+// again each round, so a lane the director commits while it runs starts without a
+// restart. It waits BOARD_IDLE_MS with nothing to do before it gives up.
+const BOARD = 'docs/tasks';
+const BOARD_IDLE_MS = 20 * 60_000;
+
 async function runQueue(state, files) {
   // Re-read every round, so the director can append tasks to a running queue.
   // Several queues run as one board: each lane is a developer, lanes run at once.
+  const named = () => (files.length ? files
+    : fs.readdirSync(BOARD).filter((f) => f.endsWith('.json')).sort().map((f) => path.join(BOARD, f)));
   const read = () => {
     // A queue not written yet is skipped, so a board can name one the director is still writing.
-    const qs = files.filter((f) => fs.existsSync(f)).map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
-    return { milestone: qs.map((q) => q.milestone).join(' + '), tasks: qs.flatMap((q) => q.tasks) };
+    const qs = named().filter((f) => fs.existsSync(f)).map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
+    const open = qs.filter((q) => q.tasks.some((t) => state.tasks?.[t.id]?.status !== 'done'));
+    return { milestone: open.map((q) => q.milestone).join(' + ') || 'the board', tasks: qs.flatMap((q) => q.tasks) };
   };
   let queue = read();
   state.tasks ??= {};
   log(`queue ${queue.milestone}: ${queue.tasks.length} tasks`);
+  let idle = 0;
   for (;;) {
     try {
       queue = read();
@@ -415,7 +426,8 @@ async function runQueue(state, files) {
     await tendBriefs(state).catch((e) => log(`briefs: ${e.message}`));
     save(state);
     // stepLane hands out every task it can, so no live worker means nothing else can move.
-    if (!Object.values(state.workers).some((w) => w.live)) break;
+    if (Object.values(state.workers).some((w) => w.live)) idle = 0;
+    else if (files.length || (idle += POLL_MS) > BOARD_IDLE_MS) break;
     await sleep(POLL_MS);
   }
   const count = (s) => queue.tasks.filter((t) => state.tasks[t.id]?.status === s).length;

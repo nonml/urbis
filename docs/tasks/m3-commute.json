@@ -1,0 +1,23 @@
+{
+  "milestone": "3c: the street follows the clock",
+  "tasks": [
+    {
+      "id": "m3-commute",
+      "lane": "commute",
+      "goal": "Fill in shareOut, threshold, commuteGoal, commuteLabel and tickCommute in src/sim/commute.js: how many walkers are out at each hour, and which way each commuter walks.",
+      "files": ["src/sim/commute.js"],
+      "test": "tests/commute.spec.js",
+      "commit": "feat(commute): the street follows the clock, commuters walk to work and home",
+      "notes": "The comments above each function are the exact rule and the constants are final. Remove the void lines and the stub returns. shareOut: return SHARE.find((b) => hour < b.to).share. threshold: return (i * GOLDEN) % 1. commuteGoal: hour >= RUSH_AM[0] && hour < RUSH_AM[1] gives person.job === null ? null : parcels[person.job]; hour >= RUSH_PM[0] && hour < RUSH_PM[1] gives parcels[person.home]; otherwise null. commuteLabel uses the same two windows and returns the strings 'heading to work' (only when person.job !== null) and 'heading home'. tickCommute: compute shareOut(hour) once, then street.npcs.forEach((n, i) => ...) following the comment; return early for a walker whose axis is not 'z' or when people.list is empty, AFTER its out flag is set."
+    },
+    {
+      "id": "m3-commute-wire",
+      "lane": "commute",
+      "goal": "Run the commute in the game: main ticks it every frame, a walker who has gone indoors is not drawn, casts no shadow and cannot be profiled, and the profiler says when a commuter is heading to work or home.",
+      "files": ["src/main.js", "src/render/npcs.js", "src/render/blobs.js", "src/sim/street.js", "src/render/profiler.js"],
+      "test": "tests/commute-wire.spec.js",
+      "commit": "feat(commute): walkers go indoors at night and fill the street at the rush",
+      "notes": "main.js: add import { tickCommute, commuteLabel } from './sim/commute.js'; after the people.js import. In the frame loop, right after the line tickPeople(people, city); add tickCommute(street, people, city, clock.hour, player.x, player.z); In the window.__game object, after census: () => census(people), add walkersOut: () => street.npcs.filter((n) => n.out !== false).length, In the if (CAPTURE) block, after the window.__game.night line, add window.__game.setHour = (h) => { clock.hour = h; clock.rate = 0; }; Change updateProfiler(camera, target, targetPerson) to updateProfiler(camera, target, targetPerson, targetPerson ? commuteLabel(targetPerson, clock.hour) : null). render/npcs.js updateNPCs: first thing inside street.npcs.forEach((n, i) => {, when n.out === false set dummy position (n.x, 0, n.z), rotation (0, 0, 0), scale (0, 0, 0), dummy.updateMatrix(), call setMatrixAt(i, dummy.matrix) on each of bodies, heads, legL, legR, armL, armR, hats, faces, glasses, and return. render/blobs.js updateBlobs: for a walker with n.out === false use _d.scale.set(0, 0, 0) instead of its normal scale (keep k++ so the cars' slots do not move). sim/street.js profilerTarget: first line in the loop, if (n.out === false) continue; render/profiler.js: the signature becomes export function updateProfiler(camera, target, person = null, doing = null); the about line becomes d ? `home ${d.home} · ${work}${doing ? ` · ${doing}` : ''}` : (the old non-person text, unchanged); and the returned object adds doing. tests/commute.spec.js, tests/save.spec.js and tests/people-*.spec.js must stay green. Draws stay within 175."
+    }
+  ]
+}
