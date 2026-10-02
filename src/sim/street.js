@@ -251,6 +251,7 @@ export function profilerTarget(street, px, pz, fx, fz) {
   let best = null;
   let bestD = 12;
   for (const n of street.npcs) {
+    if (n.out === false) continue;
     const dx = n.x - px;
     const dz = n.z - pz;
     const d = Math.hypot(dx, dz);

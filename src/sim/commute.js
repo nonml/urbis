@@ -34,30 +34,31 @@ export const ARRIVE = 4;
 
 // The share of walkers out at `hour` (0 <= hour < 24), from SHARE.
 export function shareOut(hour) {
-  void hour;
-  return 1;
+  return SHARE.find((b) => hour < b.to).share;
 }
 
 // The fractional part of i * GOLDEN.
 export function threshold(i) {
-  void i;
-  return 0;
+  return (i * GOLDEN) % 1;
 }
 
 // The parcel a person is walking to at `hour`, or null: their job's parcel in
 // RUSH_AM when they have a job, their home's parcel in RUSH_PM, null otherwise.
 export function commuteGoal(person, parcels, hour) {
-  void person;
-  void parcels;
-  void hour;
+  if (hour >= RUSH_AM[0] && hour < RUSH_AM[1]) {
+    return person.job === null ? null : parcels[person.job];
+  }
+  if (hour >= RUSH_PM[0] && hour < RUSH_PM[1]) return parcels[person.home];
   return null;
 }
 
 // What the profiler says the person is doing: 'heading to work' when their goal
 // at this hour is their job, 'heading home' when it is their home, else null.
 export function commuteLabel(person, hour) {
-  void person;
-  void hour;
+  if (hour >= RUSH_AM[0] && hour < RUSH_AM[1]) {
+    return person.job === null ? null : 'heading to work';
+  }
+  if (hour >= RUSH_PM[0] && hour < RUSH_PM[1]) return 'heading home';
   return null;
 }
 
@@ -70,10 +71,13 @@ export function commuteLabel(person, hour) {
 //   goal is not null and Math.abs(goal.z - n.z) > ARRIVE, n.dir = Math.sign(goal.z - n.z).
 //   Every other walker keeps its dir.
 export function tickCommute(street, people, city, hour, px, pz) {
-  void street;
-  void people;
-  void city;
-  void hour;
-  void px;
-  void pz;
+  const share = shareOut(hour);
+  street.npcs.forEach((n, i) => {
+    const want = threshold(i) < share;
+    if (n.out === undefined) n.out = want;
+    else if (Math.hypot(n.x - px, n.z - pz) >= HIDE_DIST) n.out = want;
+    if (n.axis !== 'z' || people.list.length === 0) return;
+    const goal = commuteGoal(people.list[i % people.list.length], city.parcels, hour);
+    if (goal !== null && Math.abs(goal.z - n.z) > ARRIVE) n.dir = Math.sign(goal.z - n.z);
+  });
 }

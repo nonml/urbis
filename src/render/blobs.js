@@ -37,7 +37,8 @@ export function updateBlobs(mesh, street, player, heroCar) {
   for (const n of street.npcs) {
     _d.position.set(n.x, 0.16, n.z);
     _d.rotation.set(0, 0, 0);
-    _d.scale.set(0.9 * (n.bulk ?? 1), 1, 1.1);
+    if (n.out === false) _d.scale.set(0, 0, 0);
+    else _d.scale.set(0.9 * (n.bulk ?? 1), 1, 1.1);
     _d.updateMatrix();
     mesh.setMatrixAt(k++, _d.matrix);
   }
