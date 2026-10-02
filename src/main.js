@@ -9,6 +9,7 @@ import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
+import { createPeople, tickPeople, census, describe } from './sim/people.js';
 import { districtReport } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
@@ -139,6 +140,7 @@ const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars
 const restored = SAVING ? deserialize(loadSave()) : null;
 const street = restored?.street ?? createStreet(SEED);
 const city = restored?.city ?? createCity(SEED);
+const people = createPeople(SEED);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
 const economyPanel = buildEconomyPanel();
@@ -424,6 +426,9 @@ window.addEventListener('keydown', (e) => {
 });
 
 const clock = restored?.clock ?? createClock();
+// A capture holds the clock so the same seed, pose and hour reproduce: a shot
+// must not drift through the day while the rasteriser crawls.
+if (CAPTURE) clock.rate = 0;
 const hud = document.getElementById('hud');
 let lastProfile = null;
 let lockedNpc = null;
@@ -472,6 +477,12 @@ window.__game = {
   profile: () => lastProfile,
   heat: () => wanted.heat,
   tod: () => +clock.nightFactor.toFixed(3),
+  hour: () => clock.hour,
+  census: () => census(people),
+  person: (k) => {
+    if (people.list.length === 0) return null;
+    return describe(people.list[k % people.list.length]);
+  },
   pursuit: () => wanted.pursuit.map((p) => ({ active: p.active, x: +p.x.toFixed(1), z: +p.z.toFixed(1) })),
   mission: () => ({ id: mission.id, done: [...mission.done], balance: mission.balance, status: lastWantedStatus }),
   space: () => interior.space,
@@ -535,7 +546,7 @@ if (CAPTURE) {
   window.__game.ledger = drawLedger(renderer);
   // The end of the day/night glide, reached at once: a probe measuring the day
   // frame should not have to render 140 frames of dusk to get there.
-  window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; };
+  window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; clock.rate = 0; };
   // Runs the street and the city ahead by `secs` of game time in the frame loop's
   // own 50 ms steps, so evidence of a minutes-long economic swing does not need
   // minutes of a software rasteriser. Nothing else is ticked; nothing is skipped.
@@ -684,6 +695,7 @@ function render() {
   tickClock(clock, dt);
   tickStreet(street, dt);
   tickZoning(city, dt, street, occupiedParcel(interior));
+  tickPeople(people, city);
   tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
@@ -831,7 +843,11 @@ function render() {
   lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
   camera.lookAt(lookAt);
 
-  lastProfile = driving ? null : updateProfiler(camera, interior.space === STREET ? acquireTarget() : null);
+  const target = driving || interior.space !== STREET ? null : acquireTarget();
+  const targetPerson = target && people.list.length > 0
+    ? people.list[street.npcs.indexOf(target.npc) % people.list.length]
+    : null;
+  lastProfile = driving ? null : updateProfiler(camera, target, targetPerson);
   showLotNote(lotNote, interior.space === STREET
     ? focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
@@ -893,7 +909,9 @@ function render() {
       `H · blackout [${hackStatus()}]${speedLine} · N · new game<br>` +
       `<span class="${wanted.heat > 0 ? 'warn' : ''}">${stars}</span> · ₡${mission.balance}`;
     const obj = mission.phases.map((p, i) => `${mission.done[i] ? '✓' : '·'} ${p}`).join('<br>');
-    missionPanel.innerHTML = `<b>◈ ${mission.id}</b><br>${obj}`;
+    const hh = String(Math.floor(clock.hour)).padStart(2, '0');
+    const mm = String(Math.floor((clock.hour % 1) * 60)).padStart(2, '0');
+    missionPanel.innerHTML = `<b>◈ ${mission.id}</b> · ${hh}:${mm}<br>${obj}`;
     missionPanel.style.display = mission.complete && street.time > mission.bannerUntil ? 'none' : 'block';
     if (busted) {
       banner.textContent = 'BUSTED';
