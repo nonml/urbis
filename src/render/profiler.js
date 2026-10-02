@@ -41,7 +41,9 @@ export function updateProfiler(camera, target, person = null) {
   const p = npc.profile;
   const near = dist < SECRET_RANGE;
   const who = person ?? p;
-  const about = person ? `home ${describe(person).home} · ${describe(person).work}` : `${p.job} · ${p.income}`;
+  const d = person ? describe(person) : null;
+  const work = d && (person.job === null ? d.work : `works ${d.work}`);
+  const about = d ? `home ${d.home} · ${work}` : `${p.job} · ${p.income}`;
   panel.innerHTML =
     `<b style="color:#fff">${who.name}</b> · ${who.age}<br>` +
     `${about}<br>` +

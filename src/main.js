@@ -902,16 +902,16 @@ function render() {
     const speedLine = driving ? ` · ${Math.abs(heroCar.speed * 3.6).toFixed(0)} km/h` : '';
     const stars = '★'.repeat(wanted.heat) + '☆'.repeat(3 - wanted.heat);
     const busted = isBusted(wanted, street.time);
+    const hh = String(Math.floor(clock.hour)).padStart(2, '0');
+    const mm = String(Math.floor((clock.hour % 1) * 60)).padStart(2, '0');
     hud.innerHTML =
-      `<b>URBIS</b> · ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
+      `<b>URBIS</b> · ${hh}:${mm} ${clock.nightFactor > 0.5 ? '☾ night' : '☀ day'} · rain<br>` +
       `draws <b class="${over ? 'warn' : ''}">${draws}</b> / ${DRAW_BUDGET} · ` +
       `${fpsShown} fps · ${tris}M tris<br>` +
       `H · blackout [${hackStatus()}]${speedLine} · N · new game<br>` +
       `<span class="${wanted.heat > 0 ? 'warn' : ''}">${stars}</span> · ₡${mission.balance}`;
     const obj = mission.phases.map((p, i) => `${mission.done[i] ? '✓' : '·'} ${p}`).join('<br>');
-    const hh = String(Math.floor(clock.hour)).padStart(2, '0');
-    const mm = String(Math.floor((clock.hour % 1) * 60)).padStart(2, '0');
-    missionPanel.innerHTML = `<b>◈ ${mission.id}</b> · ${hh}:${mm}<br>${obj}`;
+    missionPanel.innerHTML = `<b>◈ ${mission.id}</b><br>${obj}`;
     missionPanel.style.display = mission.complete && street.time > mission.bannerUntil ? 'none' : 'block';
     if (busted) {
       banner.textContent = 'BUSTED';
