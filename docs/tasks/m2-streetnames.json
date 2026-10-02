@@ -1,0 +1,14 @@
+{
+  "milestone": "2j: a generated world's streets have names",
+  "tasks": [
+    {
+      "id": "m2-names",
+      "lane": "streetnames",
+      "goal": "Fill in nameStreets in src/sim/streetnames.js and make lot addresses in src/sim/decline.js read street names, so a generated world never shows 'Av0 & Cr1'.",
+      "files": ["src/sim/streetnames.js", "src/sim/decline.js"],
+      "test": "tests/streetnames.spec.js",
+      "commit": "feat(streetnames): a generated world's streets have names, Main, East, West and the rest by the seed",
+      "notes": "The comment above nameStreets is the exact rule. Remove the void lines and the stub return. Body: const main = district.avenues[0]; const names = { [main.id]: 'Main' }; for (const hand of [44, -44]) { const x = counterpartX(hand, district); const a = district.avenues.find((v) => v.x === x); if (!(a.id in names)) names[a.id] = a.x > main.x ? 'East' : 'West'; } const rand = mulberry32((seed ^ NAME_SALT) >>> 0); const avenues = AVENUE_NAMES.slice(); const crossings = CROSSING_NAMES.slice(); for (const a of district.avenues) { if (!(a.id in names)) names[a.id] = avenues.splice(Math.floor(rand() * avenues.length), 1)[0]; } for (const c of district.crossings) names[c.id] = crossings.splice(Math.floor(rand() * crossings.length), 1)[0]; return names; In src/sim/decline.js: add import { streetName } from './streetnames.js'; on the line after import { AVENUES, CROSSINGS } from './world.js';. Delete the line const title = (id) => id[0].toUpperCase() + id.slice(1); and in address() use streetName(avenue) and streetName(crossing) where it used title(avenue.id) and title(crossing.id). Nothing else changes. tests/gate.spec.js must stay green: the hand preset reads exactly as before."
+    }
+  ]
+}
