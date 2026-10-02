@@ -1,0 +1,32 @@
+{
+  "milestone": "2b: a generated world's vistas derived, nothing overlaps",
+  "tasks": [
+    {
+      "id": "m2-caps",
+      "lane": "vistas",
+      "goal": "Fill in capsFor in src/sim/vistas.js so every avenue of a generated district gets a lit cap tower at each end, centred on it.",
+      "files": ["src/sim/vistas.js"],
+      "test": "tests/vistas-caps.spec.js",
+      "commit": "feat(vistas): a cap tower at both ends of every avenue",
+      "notes": "The comment above capsFor is the exact rule; the constants are final, do not change them. Use only the district passed in. Draw w, d, h from CAP_W, CAP_D, CAP_H with one mulberry32((seed ^ VISTA_SALT) >>> 0) stream and round each to a half-metre (Math.round(v * 2) / 2). North cap z = a.z1 + CAP_GAP + d / 2, south cap z = a.z0 - CAP_GAP - d / 2."
+    },
+    {
+      "id": "m2-ring",
+      "lane": "vistas",
+      "goal": "Fill in ringFor in src/sim/vistas.js so a generated district gets a skyline ring of towers past its built edge on the east, north and south, and two far out to the west.",
+      "files": ["src/sim/vistas.js"],
+      "test": "tests/vistas-ring.spec.js",
+      "commit": "feat(vistas): a skyline ring derived from the district",
+      "notes": "Use its own mulberry32 stream (for example (seed ^ VISTA_SALT ^ 0xffff) >>> 0) so capsFor's values do not move. Lay each side out along a line: east towers along z from the avenues' lowest z0 to highest z1, with their west face on x = walk.maxX + RING_GAP; north and south towers along x from drive.minX to walk.maxX, with their near face on z = z1 + CAP_GAP + CAP_D[1] + RING_GAP (north) or z0 - CAP_GAP - CAP_D[1] - RING_GAP (south); west towers along z from z0 + 40 to z1 - 40, with their east face on x = drive.minX - WEST_GAP. On a side of length L with n towers, tower k is centred at the side's start + (k + 0.5) * L / n, and its size along the side is capped at L / n - RING_SPACE so neighbours never touch. Sizes come from RING_W, RING_D, RING_H."
+    },
+    {
+      "id": "m2-vistas-wire",
+      "lane": "vistas",
+      "goal": "Make src/render/block.js build WORLD_VISTAS' caps and ring on a generated world instead of the hand SOUTH_TOWERS, TERMINUS_TOWERS and RING tables.",
+      "files": ["src/render/block.js"],
+      "test": "tests/vistas-wire.spec.js",
+      "commit": "feat(block): a generated world's vistas stand where the plan says",
+      "notes": "Import WORLD_VISTAS from ../sim/vistas.js. In buildTowers, when WORLD_VISTAS is set, emit each cap with emitTower(c.x, c.z, c.w, c.h, c.d, idx++, c.face, `CAPS[${i}]`) and skip both SOUTH_TOWERS and TERMINUS_TOWERS. In buildSkyline, when WORLD_VISTAS is set, build its ring instead of RING; mind that RING rows are [x, z, w, h, d]. With WORLD_VISTAS null (the hand preset) nothing may change. PINNED_TOWERS on a road is a known separate problem; the test ignores it."
+    }
+  ]
+}
