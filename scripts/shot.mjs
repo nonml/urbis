@@ -54,6 +54,9 @@ try {
   });
   for (const [i, p] of poses.entries()) {
     for (const k of p.keys ?? []) await page.keyboard.press(k);
+    // `js` runs one capture probe (window.__game.enterLot('com')) before the
+    // wait, so a pose can stand inside a space the keys cannot reach.
+    if (p.js) await page.evaluate(p.js);
     await page.waitForTimeout(p.wait ?? 1500);
     const png = await page.evaluate(() => window.__game.shot());
     const name = `${prefix}-${p.name ?? i}.png`;

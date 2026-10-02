@@ -12,7 +12,7 @@
 //   site kit  one InstancedMesh with per-instance colour: hoarding, crane,
 //             netting, plinth, parapet, plant.
 import * as THREE from 'three';
-import { STAGE, builtHeight } from '../sim/zoning.js';
+import { STAGE, SETBACK, builtHeight } from '../sim/zoning.js';
 import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
@@ -24,8 +24,7 @@ const ARCHITECTURE = { com: GLASS, res: CONCRETE, ind: CONCRETE };
 // the grey concrete it stands in front of: homes in warm stone, sheds cooler.
 const TINT = { com: [1, 1, 1], res: [1.16, 1.02, 0.86], ind: [0.86, 0.9, 0.96] };
 
-// The shell stands this far inside the hoarding line on every side.
-export const SETBACK = 1.2;
+// SETBACK (sim/zoning.js) is the shell's inset from the hoarding line.
 const HOARDING_HEIGHT = 2.4;
 export const HOARDING_THICK = 0.12;
 export const PAD_RISE = 0.5;   // gravel over the lot, above the verge swell (<= 0.45)

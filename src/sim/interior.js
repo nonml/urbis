@@ -7,6 +7,8 @@
 // The pattern every later interior copies is docs/INTERIORS.md.
 import { zoneAt } from './street.js';
 import { PINNED_TOWERS, towerCentreX } from './landmarks.js';
+import { STAGE, SETBACK } from './zoning.js';
+import { nearestEdge } from './world.js';
 
 export const STREET = 'street';
 
@@ -231,23 +233,206 @@ export function doorEnds() {
 }
 
 // ---------------------------------------------------------------------------
+// Grown lots. Every parcel at LOW or higher has a street door. Its face is the
+// shell side standing nearest a road, so placement is derived from the lot and
+// the world's own road graph (docs/PROCGEN.md), never a typed coordinate. The
+// room behind it is authored in the same facade frame the hand-placed spaces
+// use, so what a player bumps into is what render builds.
+
+// The room's floor datum sits on the lot's plinth (render/zoning.js raises a
+// PAD_RISE + 0.12 plinth under every shell), a slab's rise below the boards.
+const PARCEL_FLOOR = 0.62;
+// The room never reaches the shell's own faces: the camera must not sit between
+// the room and the wall behind it.
+const PARCEL_WALL = 0.4;
+// The face already stands SETBACK inside the hoarding, so the street spot and
+// arrival add that back and clear the fence.
+const PARCEL_OUT = SETBACK + 0.5;
+const PARCEL_ARRIVE_OUT = PARCEL_OUT + 1.0;
+// How far inside the face the door spot and the arrival stand.
+const PARCEL_IN = 1.3;
+const PARCEL_ARRIVE_IN = 2.6;
+
+const PARCEL_SIDES = [
+  { out: [1, 0], spanZ: true },
+  { out: [-1, 0], spanZ: true },
+  { out: [0, 1], spanZ: false },
+  { out: [0, -1], spanZ: false },
+];
+
+const itemMid = (r) => (r[0] + r[1]) / 2;
+
+function parcelSide(p, s) {
+  const hw = Math.max(1.6, p.w / 2 - SETBACK);
+  const hd = Math.max(1.6, p.d / 2 - SETBACK);
+  const [fx, fz] = s.out;
+  return {
+    out: s.out,
+    x: p.x + fx * hw,
+    z: p.z + fz * hd,
+    faceLen: s.spanZ ? hd * 2 : hw * 2,
+    depth: s.spanZ ? hw * 2 : hd * 2,
+  };
+}
+
+// Which of the four shell faces stands nearest a road. Ties break in table
+// order, so the choice is deterministic.
+function streetFace(p) {
+  let best = parcelSide(p, PARCEL_SIDES[0]);
+  let bestD = nearestEdge(best.x, best.z).dist;
+  for (const s of PARCEL_SIDES.slice(1)) {
+    const side = parcelSide(p, s);
+    const d = nearestEdge(side.x, side.z).dist;
+    if (d < bestD) { best = side; bestD = d; }
+  }
+  return best;
+}
+
+// Fixtures along the walls, leaving the entry corridor clear: everything sits
+// outside a ∈ [-0.7, 0.8] or deeper than the arrival at d = PARCEL_ARRIVE_IN.
+// A shop, a residential lobby, a workshop — bigger at MID and above.
+function parcelItems(use, stage, a, d) {
+  const [a0, a1] = a;
+  const [d0, d1] = d;
+  const big = stage >= STAGE.MID;
+  if (use === 'res') {
+    return [
+      { kind: 'mailboxes', a: [a0, a0 + 0.4], d: [d0 + 0.6, d0 + 2.4], top: 1.6 },
+      { kind: 'stair', a: [a1 - 1.5, a1 - 0.15], d: [d0 + 0.6, d1 - 0.5], top: 3.0 },
+      { kind: 'flatdoor', a: [-0.6, 0.6], d: [d1 - 0.1, d1 - 0.04], top: 2.15, solid: false },
+      { kind: 'plant', a: [a1 - 0.95, a1 - 0.35], d: [d0 + 0.5, d0 + 1.0], top: 1.2 },
+    ];
+  }
+  if (use === 'ind') {
+    return [
+      { kind: 'shelf', a: [a0, a0 + 0.45], d: [d0 + 0.7, d1 - 0.8], top: 3.0 },
+      { kind: 'shelf', a: [a1 - 0.45, a1], d: [d0 + 0.7, d1 - 1.6], top: 3.0 },
+      { kind: 'forklift', a: [0.2, 1.4], d: [Math.max(d0 + 2.3, d1 - 2.0), d1 - 0.8], top: 1.9 },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.5], d: [d0 + 0.7, d0 + 1.25], top: 0.9 },
+      { kind: 'roller', a: [-1.3, 1.3], d: [d1 - 0.1, d1 - 0.04], top: 2.6, solid: false },
+    ];
+  }
+  const items = [
+    { kind: 'counter', a: [a0, a0 + 0.6], d: [d0 + 0.7, d1 - 0.6], top: 1.05 },
+    { kind: 'shelf', a: [a1 - 0.45, a1 - 0.05], d: [d0 + 0.7, d1 - 1.3], top: 2.05 },
+    { kind: 'fridge', a: [a1 - 1.8, a1 - 0.7], d: [d1 - 0.8, d1 - 0.2], top: 1.95 },
+    { kind: 'crates', a: [a0 + 0.2, a0 + 1.0], d: [d0 + 0.7, d0 + 1.25], top: 0.9 },
+  ];
+  if (big) items.push({ kind: 'cafe', a: [a0 + 1.1, a0 + 2.6], d: [d1 - 2.6, d1 - 1.3], top: 0.95 });
+  return items;
+}
+
+// Where a room's light comes from, in its frame: [a, y, d, strength, reach].
+// No gas here — the flame channel belongs to the noodle bar.
+function parcelLights(a, d) {
+  const A = Math.max(1, a[1]);
+  const [d0, d1] = d;
+  const midD = itemMid(d);
+  return {
+    lamp: [
+      [-A * 0.55, 2.7, midD, 0.85, 2.6],
+      [A * 0.55, 2.7, midD, 0.85, 2.6],
+      [0, 2.7, d0 + 1.0, 0.7, 2.2],
+      [0, 2.7, d1 - 1.0, 0.7, 2.2],
+    ],
+    flame: [],
+    window: { d: d0, falloff: 2.2 },
+    emergency: [[0, 2.35, d0 + 0.7, 0.55, 2.4]],
+  };
+}
+
+export function parcelSpace(p, i) {
+  const side = streetFace(p);
+  const halfA = Math.max(1.2, side.faceLen / 2 - PARCEL_WALL);
+  const a = [-halfA, halfA];
+  const d = [0.65, Math.max(3.4, side.depth - PARCEL_WALL)];
+  return {
+    id: `lot:${i}`,
+    name: `LOT ${i}`,
+    indoor: true,
+    parcel: i,
+    use: p.use,
+    stage: p.stage,
+    frame: { x: side.x, z: side.z, out: side.out },
+    floor: PARCEL_FLOOR,
+    height: 3.0,
+    room: { a, d },
+    items: parcelItems(p.use, p.stage, a, d),
+    rig: { dist: 2.7, pitch: 0.5 },
+    lights: parcelLights(a, d),
+  };
+}
+
+export function parcelPlace(p, i) {
+  return worldSpace(parcelSpace(p, i));
+}
+
+// The link between the lot's street face and its room, in world coordinates.
+function parcelEnds(place) {
+  const fr = place.frame;
+  const doorIn = toWorld(fr, 0, PARCEL_IN);
+  const arriveIn = toWorld(fr, 0.6, PARCEL_ARRIVE_IN);
+  const spot = toWorld(fr, 0, -PARCEL_OUT);
+  const arrive = toWorld(fr, 0, -PARCEL_ARRIVE_OUT);
+  return [
+    {
+      space: STREET, x: spot.x, z: spot.z,
+      arrive: { x: arrive.x, z: arrive.z, yaw: frameYaw(fr) }, label: 'ENTER',
+    },
+    {
+      space: place.id, x: doorIn.x, z: doorIn.z,
+      arrive: { x: arriveIn.x, z: arriveIn.z, yaw: yawIn(fr, 'in') }, label: 'LEAVE',
+    },
+  ];
+}
+
+// ---------------------------------------------------------------------------
 // State.
 
-export function createInterior() {
-  return { space: STREET, near: null, lastX: null, lastZ: null };
+export function createInterior(city = null) {
+  const state = { space: STREET, near: null, lastX: null, lastZ: null, places: null, links: null, hold: -1 };
+  if (city) state.city = city;
+  return state;
+}
+
+// Rebuild what the city currently offers: a place and a door for every grown
+// lot. Called every tick, after the city moved. `hold` is the parcel the player
+// is standing in — sim/zoning.js defers its decline while they are inside.
+export function syncInterior(state) {
+  if (!state.city) return;
+  const places = new Map(PLACES);
+  const links = LINKS.slice();
+  let hold = -1;
+  state.city.parcels.forEach((p, i) => {
+    if (p.use === null || p.stage < STAGE.LOW) return;
+    const place = parcelPlace(p, i);
+    places.set(place.id, place);
+    links.push({ id: `${place.id}-door`, parcelUse: p.use, ends: parcelEnds(place) });
+    if (state.space === place.id) hold = i;
+  });
+  state.places = places;
+  state.links = links;
+  state.hold = hold;
 }
 
 export function isIndoors(state) {
-  return PLACES.get(state.space)?.indoor ?? false;
+  return currentPlace(state)?.indoor ?? false;
 }
 
 export function currentPlace(state) {
-  return PLACES.get(state.space) ?? null;
+  return state.places?.get(state.space) ?? PLACES.get(state.space) ?? null;
+}
+
+// The parcel whose room the player is standing in, or -1 on the street and in
+// the hand-placed spaces. sim/zoning.js defers this parcel's decline.
+export function occupiedParcel(state) {
+  const id = state.space;
+  return id.startsWith('lot:') ? Number(id.slice(4)) : -1;
 }
 
 // The door end this spot can use, and the end it leads to.
 export function doorAt(state, x, z) {
-  for (const link of LINKS) {
+  for (const link of state.links ?? LINKS) {
     const [p, q] = link.ends;
     for (const [from, to] of [[p, q], [q, p]]) {
       if (from.space !== state.space) continue;
@@ -260,6 +445,7 @@ export function doorAt(state, x, z) {
 // Per tick, after tickPlayer: keep the player inside the space they are in and
 // note which door, if any, they can reach.
 export function tickInterior(state, player) {
+  syncInterior(state);
   settle(state, player);
   state.near = doorAt(state, player.x, player.z);
 }
@@ -273,7 +459,7 @@ export function useDoor(state, player) {
   player.z = door.to.arrive.z;
   player.yaw = door.to.arrive.yaw;
   player.speed = 0;
-  const place = PLACES.get(state.space);
+  const place = currentPlace(state);
   if (place) player.y = place.floor;
   state.lastX = player.x;
   state.lastZ = player.z;
@@ -314,7 +500,7 @@ function clampToRoom(place, x, z) {
 }
 
 function settle(state, player) {
-  const place = PLACES.get(state.space);
+  const place = currentPlace(state);
   if (!place) {
     state.lastX = player.x;
     state.lastZ = player.z;
@@ -394,7 +580,7 @@ function along(p, dir, t) {
 }
 
 export function frameCamera(state, pivot, eye) {
-  const place = PLACES.get(state.space);
+  const place = currentPlace(state);
   if (!place) return eye;
   const p = [pivot.x, pivot.y, pivot.z];
   const dir = [eye.x - pivot.x, eye.y - pivot.y, eye.z - pivot.z];

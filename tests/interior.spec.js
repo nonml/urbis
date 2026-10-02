@@ -4,9 +4,12 @@
 // the roof are there to be seen, under budget — is interior-gate.spec.js.
 import { test, expect } from '@playwright/test';
 import { createPlayer, tickPlayer } from '../src/sim/player.js';
+import { createStreet, tickStreet } from '../src/sim/street.js';
+import { STAGE, USES, createCity, tickZoning, zoneParcel } from '../src/sim/zoning.js';
+import { pinDemand } from '../src/sim/decline.js';
 import {
-  BODY_RADIUS, SPACES, STREET, createInterior, currentPlace, doorEnds, frameCamera, placeOf,
-  standable, tickInterior, useDoor,
+  BODY_RADIUS, SPACES, STREET, createInterior, currentPlace, doorEnds, frameCamera, occupiedParcel,
+  isIndoors, placeOf, standable, syncInterior, tickInterior, useDoor,
 } from '../src/sim/interior.js';
 
 const DT = 0.05;
@@ -192,4 +195,114 @@ test('on the street the sim leaves the player and the camera alone', () => {
   expect(player.z).toBeLessThan(26 - 5);
   const eye = { x: 1, y: 2, z: 3 };
   expect(frameCamera(state, { x: 0, y: 1, z: 0 }, eye)).toBe(eye);
+});
+
+// ---------------------------------------------------------------------------
+// Grown lots (docs/handoff/feature-interiors.md). One lot of each use is zoned,
+// grown to LOW, and walked into through its own street door; then one is cleared
+// and its door has to go with the building.
+
+const SEED = 20260916;
+const TICKS_PER_SEC = Math.round(1 / DT);
+
+// Walk from wherever the body stands toward a point, the way a player does.
+function walkToward(state, player, x, z, secs) {
+  for (let i = 0, n = Math.round(secs / DT); i < n; i++) {
+    const yaw = Math.atan2(x - player.x, z - player.z);
+    tickPlayer(player, { mx: Math.sin(yaw), mz: Math.cos(yaw), hurry: true }, DT);
+    tickInterior(state, player);
+  }
+}
+
+function untilGrown(city, street, picks) {
+  const ready = () => USES.every((use) => city.parcels[picks[use]].stage >= STAGE.LOW);
+  for (let i = 0; i < 900 * TICKS_PER_SEC && !ready(); i++) {
+    tickStreet(street, DT);
+    tickZoning(city, DT, street);
+  }
+  return ready();
+}
+
+test('every grown lot of every use has a door, and it goes when the lot is cleared', () => {
+  const city = createCity(SEED);
+  const street = createStreet(SEED);
+  for (const use of USES) pinDemand(city, use, 1);
+
+  // Three empty lots zoned for one use each, so each breaks ground as that use.
+  const picks = {};
+  USES.forEach((use, k) => {
+    const p = city.parcels[k];
+    p.use = null; p.zoned = null; p.stage = STAGE.EMPTY; p.progress = 0; p.building = false;
+    zoneParcel(city, k, use);
+    picks[use] = k;
+  });
+  expect(untilGrown(city, street, picks)).toBe(true);
+
+  const interior = createInterior(city);
+  syncInterior(interior);
+  for (const use of USES) expect(interior.links.some((l) => l.parcelUse === use)).toBe(true);
+
+  // Walk the body from the street, through each door, and back out.
+  for (const use of USES) {
+    const player = createPlayer();
+    const link = interior.links.find((l) => l.parcelUse === use);
+    const streetEnd = link.ends[0];
+    standAt(player, streetEnd.arrive.x, streetEnd.arrive.z);
+    walkToward(interior, player, streetEnd.x, streetEnd.z, 2.5);
+    tickInterior(interior, player);
+    expect(useDoor(interior, player)).not.toBeNull();
+    expect(isIndoors(interior)).toBe(true);
+    expect(interior.space).toBe(`lot:${picks[use]}`);
+
+    const inside = interior.links.find((l) => l.parcelUse === use).ends[1];
+    walkToward(interior, player, inside.x, inside.z, 2.5);
+    tickInterior(interior, player);
+    expect(useDoor(interior, player)).not.toBeNull();
+    expect(interior.space).toBe(STREET);
+  }
+
+  // Clear the commercial lot: its building comes down and its door goes with it.
+  zoneParcel(city, picks.com, null);
+  for (let i = 0; i < 400 * TICKS_PER_SEC && city.parcels[picks.com].stage !== STAGE.EMPTY; i++) {
+    tickStreet(street, DT);
+    tickZoning(city, DT, street);
+  }
+  expect(city.parcels[picks.com].stage).toBe(STAGE.EMPTY);
+  syncInterior(interior);
+  expect(interior.links.some((l) => l.id === `lot:${picks.com}-door`)).toBe(false);
+});
+
+test('a building the player stands inside does not decline around them', () => {
+  const city = createCity(SEED);
+  const street = createStreet(SEED);
+  const i = 6;                              // res at LOW on this seed
+  const interior = createInterior(city);
+  syncInterior(interior);
+  const player = createPlayer();
+  const enterEnd = interior.links.find((l) => l.id === `lot:${i}-door`).ends[0];
+  standAt(player, enterEnd.x, enterEnd.z);
+  tickInterior(interior, player);
+  expect(useDoor(interior, player)).not.toBeNull();
+  expect(interior.space).toBe(`lot:${i}`);
+
+  // Every market dead: on its own the lot would empty and shed floors.
+  for (const use of USES) pinDemand(city, use, 0);
+  const stage = city.parcels[i].stage;
+  const run = (secs) => {
+    for (let t = 0; t < secs; t += DT) {
+      tickStreet(street, DT);
+      tickZoning(city, DT, street, occupiedParcel(interior));
+    }
+  };
+  run(180);
+  expect(city.parcels[i].stage).toBe(stage);
+
+  // Step back out through the same door; the decline resumes.
+  const leaveEnd = interior.links.find((l) => l.id === `lot:${i}-door`).ends[1];
+  standAt(player, leaveEnd.x, leaveEnd.z);
+  tickInterior(interior, player);
+  expect(useDoor(interior, player)).not.toBeNull();
+  expect(interior.space).toBe(STREET);
+  run(220);
+  expect(city.parcels[i].stage).toBeLessThan(stage);
 });

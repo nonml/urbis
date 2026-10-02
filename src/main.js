@@ -10,7 +10,10 @@ import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero,
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { districtReport } from './sim/economy.js';
-import { STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera } from './sim/interior.js';
+import {
+  STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
+  occupiedParcel, syncInterior,
+} from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
 import { loadSave, writeSave, clearSave } from './savestore.js';
 import { buildGround, buildTowers, buildSkyline } from './render/block.js';
@@ -164,9 +167,11 @@ const avatar = buildPlayer();
 scene.add(avatar.group);
 const shops = buildShops(texLoader, maxAniso);
 scene.add(shops.group);
-// Verticality: the noodle bar behind the RAMEN board and the roof next door.
-const interior = restored?.interior ?? createInterior();
-const interiors = buildInteriors();
+// Verticality: the noodle bar behind the RAMEN board and the roof next door,
+// plus a street door and a room on every grown lot (sim/interior.js).
+const interior = restored?.interior ?? createInterior(city);
+interior.city = city;
+const interiors = buildInteriors(city);
 scene.add(interiors.group);
 const doorHud = buildDoorHud();
 const puddles = buildPuddles();
@@ -548,6 +553,30 @@ if (CAPTURE) {
     player.z = Math.max(-68, Math.min(100, z));
     cam.yaw = yaw;
   };
+  // Walk into a grown lot by use, the way the door would: pose the body on the
+  // street spot, then use the door. Capture-only so nothing in play moves a
+  // player behind the camera. Returns the space id, or null when no grown lot
+  // of that use exists yet.
+  window.__game.enterLot = (use) => {
+    interior.space = STREET;
+    syncInterior(interior);
+    const link = interior.links.find((l) => l.parcelUse === use);
+    if (!link) return null;
+    const from = link.ends[0];
+    player.mode = 'foot';
+    avatar.group.visible = true;
+    player.x = from.x;
+    player.z = from.z;
+    player.speed = 0;
+    tickInterior(interior, player);
+    enterDoor();
+    return interior.space === STREET ? null : interior.space;
+  };
+  // The door ends the sim currently offers, for a test to aim at.
+  window.__game.doorList = () => interior.links.map((l) => ({
+    id: l.id, use: l.parcelUse ?? null,
+    ends: l.ends.map((e) => ({ space: e.space, x: +e.x.toFixed(3), z: +e.z.toFixed(3), label: e.label })),
+  }));
   // Decline on demand: hold a market where it is needed and run the world on
   // ahead — clock, street and city, in the frame loop's longest step, so it is
   // the same sim — instead of waiting minutes for the swell to slump. Software
@@ -654,7 +683,7 @@ function render() {
   const driving = player.mode === 'drive';
   tickClock(clock, dt);
   tickStreet(street, dt);
-  tickZoning(city, dt, street);
+  tickZoning(city, dt, street, occupiedParcel(interior));
   tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
@@ -707,6 +736,9 @@ function render() {
     }
     setPuddleGlow(puddles, z, b);
     setSlit(fx, z, b);
+    // The grown lots' street doors: their lit fascias and glazing ride their
+    // own zone, so a blackout kills one side of the street and not the other.
+    interiors.parcel.views[z].emissiveIntensity = (0.3 + 0.7 * nf) * b;
     streakMeshes[z].material.opacity = 0.55 * nf * b;
     const mk = markingMats[z];
     mk.color.setScalar((0.25 + 0.75 * nf) * (0.05 + 0.95 * b));
@@ -720,7 +752,7 @@ function render() {
     const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(street.time, e.seed);
     e.mat.color.setScalar((0.3 + 0.7 * nf) * (0.06 + 0.94 * b));
   }
-  updateInteriors(interiors, interior, { glows, night: nf, time: street.time, elapsed: clock.elapsed });
+  updateInteriors(interiors, interior, { glows, night: nf, time: street.time, elapsed: clock.elapsed, city });
   rain.visible = !isIndoors(interior);
   // Up on a roof it rains on the roof: the rain box rides up with the player.
   rain.position.y = interior.space === STREET ? 0 : player.y - ROOF_RAIN_BELOW;

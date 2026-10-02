@@ -492,3 +492,161 @@ export function roofTop(place) {
   for (const it of place.items) ROOF_BUILDERS[it.kind]?.(it, out);
   return out;
 }
+
+// ---------------------------------------------------------------------------
+// Grown lots: a shop, a residential lobby, a workshop. Authored in the parcel's
+// own facade frame, the same convention the hand-placed spaces use, so the sim's
+// item footprints and the built furniture cannot drift.
+
+function shopCounter(item, out) {
+  const dm = mid(item.d);
+  const dl = span(item.d);
+  out.push(part(slab(0.5, 0.92, dl, lo(item) + 0.25, SLAB + 0.46, dm), 0x8a5a34, CELL.wood));
+  out.push(part(slab(0.58, 0.05, dl + 0.06, lo(item) + 0.29, 0.96, dm), 0xe0c090, CELL.wood));
+  out.push(part(box(0.04, 0.04, dl, lo(item) + 0.53, 0.34, dm), 0xb08a3a));
+  out.push(part(box(0.5, 0.3, 0.5, lo(item) + 0.25, 1.35, item.d[0] + 0.45), 0x2a2a2a));
+}
+
+function mailboxes(item, out) {
+  const a = lo(item) + 0.2;
+  const dl = span(item.d);
+  const h = item.top - SLAB;
+  out.push(part(box(0.4, h, dl, a, SLAB + h / 2, mid(item.d)), 0x6a6f74));
+  const n = Math.max(2, Math.floor(dl / 0.38));
+  for (let k = 0; k < n; k += 1) {
+    const d = item.d[0] + 0.2 + (k * (dl - 0.4)) / Math.max(1, n - 1);
+    out.push(part(box(0.44, 0.3, 0.3, a + 0.03, SLAB + 0.5 + (k % 2) * 0.55, d), 0xb8bcc0));
+  }
+}
+
+function stairCore(item, out) {
+  const a = mid(item.a);
+  const dm = mid(item.d);
+  const h = item.top - SLAB;
+  out.push(part(slab(span(item.a), h, span(item.d), a, SLAB + h / 2, dm, 0.7), 0x8a8f94));
+  for (let k = 1; k * 0.22 < h; k += 1) {
+    out.push(part(box(span(item.a) + 0.04, 0.04, 0.06, a, SLAB + k * 0.22, item.d[0] + k * 0.24), 0x6a6f74));
+  }
+  out.push(part(box(0.05, 0.05, span(item.d), item.a[0] + 0.12, 0.95, dm), 0x3a3e42));
+}
+
+function flatDoor(item, out) {
+  const h = item.top - SLAB;
+  out.push(part(box(span(item.a), h, 0.05, mid(item.a), SLAB + h / 2, mid(item.d)), 0x6a4a2a, CELL.wood));
+  out.push(part(box(span(item.a) + 0.12, 0.1, 0.07, mid(item.a), item.top + 0.03, mid(item.d)), DARK_TIMBER));
+  out.push(part(box(0.04, 0.22, 0.08, mid(item.a) + 0.24, 1.02, mid(item.d)), 0xb08a3a));
+}
+
+function plantPot(item, out) {
+  const a = mid(item.a);
+  const d = mid(item.d);
+  out.push(part(cylinder(0.2, 0.15, 0.5, a, SLAB + 0.25, d, 12), 0x8a8378));
+  out.push(part(ball(0.32, a, SLAB + 0.88, d), 0x3d5730));
+  out.push(part(ball(0.22, a + 0.18, SLAB + 0.72, d - 0.1), 0x466b36));
+}
+
+function forklift(item, out) {
+  const a = mid(item.a);
+  const d = mid(item.d);
+  const w = span(item.a);
+  out.push(part(box(w * 0.8, 0.5, 1.1, a, SLAB + 0.55, d), 0xd8a01c));
+  out.push(part(box(0.5, 0.7, 0.6, a, SLAB + 1.15, d - 0.25), 0x3a3e42));
+  for (const da of [-0.36, 0.36]) out.push(part(cylinder(0.18, 0.18, 0.14, a + da, SLAB + 0.18, d + 0.3, 12), 0x1a1a1a));
+  out.push(part(box(0.08, 1.6, 0.08, a - w * 0.45, SLAB + 0.8, d - 0.9), 0x4a4e54));
+  out.push(part(box(0.8, 0.06, 0.5, a - w * 0.45, SLAB + 0.06, d - 1.05), 0x4a4e54));
+}
+
+function rollerDoor(item, out) {
+  const a = mid(item.a);
+  const h = item.top - SLAB;
+  out.push(part(panel(span(item.a), h, 'in', a, SLAB + h / 2, mid(item.d)), 0x9a958c, CELL.plain));
+  for (let y = 0.15; y < h; y += 0.3) {
+    out.push(part(box(span(item.a), 0.04, 0.05, a, SLAB + y, mid(item.d) - 0.03), 0x7a756c));
+  }
+}
+
+function cafeSet(item, out) {
+  const a = mid(item.a);
+  const d = mid(item.d);
+  out.push(part(cylinder(0.04, 0.04, 0.72, a, SLAB + 0.36, d, 8), 0x2a2a2a));
+  out.push(part(cylinder(0.42, 0.42, 0.05, a, SLAB + 0.74, d, 18), 0x9a6a42, CELL.wood));
+  for (const da of [-0.68, 0.68]) {
+    out.push(part(box(0.4, 0.05, 0.4, a + da, SLAB + 0.46, d), 0x5a3a20, CELL.wood));
+    out.push(part(box(0.4, 0.5, 0.05, a + da, SLAB + 0.7, d - 0.18), 0x5a3a20, CELL.wood));
+    for (const [qa, qd] of [[-0.16, -0.16], [0.16, -0.16], [-0.16, 0.16], [0.16, 0.16]]) {
+      out.push(part(cylinder(0.03, 0.03, 0.46, a + da + qa, SLAB + 0.23, d + qd, 6), 0x2a2a2a));
+    }
+  }
+}
+
+const PARCEL_BUILDERS = {
+  counter: shopCounter, mailboxes, stair: stairCore, flatdoor: flatDoor, plant: plantPot,
+  forklift, roller: rollerDoor, cafe: cafeSet, shelf: shelfUnit, fridge, crates,
+};
+
+const PARCEL_GLASS = [0, 0, 1.6, 0];
+const DOOR_HALF = 0.75;
+
+function parcelFront(place, out) {
+  const { a, d } = place.room;
+  const f = d[0];
+  const top = place.height;
+  const piece = (a0, a1, y0, y1) => {
+    out.push(...tiled(a1 - a0, y1 - y0, 0.5, 'in', (a0 + a1) / 2, (y0 + y1) / 2, f, PLASTER, CELL.plain));
+  };
+  if (a[0] < -DOOR_HALF) piece(a[0], -DOOR_HALF, SLAB, top);
+  if (a[1] > DOOR_HALF) piece(DOOR_HALF, a[1], SLAB, top);
+  piece(-DOOR_HALF, DOOR_HALF, 2.35, top);
+  out.push(part(box(1.4, 2.3, 0.07, 0, SLAB + 1.15, f + 0.04), 0x5a3820, CELL.wood));
+  out.push(part(panel(1.12, 1.5, 'in', 0, SLAB + 1.35, f + 0.02), 0xffffff, CELL.frost, PARCEL_GLASS));
+  out.push(part(box(0.03, 0.3, 0.05, 0.5, SLAB + 1.0, f + 0.08), 0xb08a3a));
+  // A shop and a lobby open their front with frosted glazing; a workshop keeps
+  // the wall, so its only opening is the personnel door.
+  if (place.use === 'ind') return;
+  for (const [a0, a1] of [[a[0] + 0.15, -DOOR_HALF - 0.1], [DOOR_HALF + 0.1, a[1] - 0.15]]) {
+    if (a1 - a0 > 0.5) {
+      out.push(part(panel(a1 - a0, 1.5, 'in', (a0 + a1) / 2, SLAB + 1.25, f + 0.02), 0xffffff, CELL.frost, PARCEL_GLASS));
+    }
+  }
+}
+
+function parcelShell(place, out) {
+  const { a, d } = place.room;
+  const top = place.height;
+  out.push(...tiled(span(a), span(d), 0.5, 'up', mid(a), SLAB, mid(d), 0xffffff, CELL.floor));
+  out.push(...tiled(span(a), span(d), 0.6, 'down', mid(a), top, mid(d), PLASTER, CELL.plain));
+  wall(out, span(d), 'right', a[0], mid(d), top);
+  wall(out, span(d), 'left', a[1], mid(d), top);
+  wall(out, span(a), 'out', mid(a), d[1], top);
+  parcelFront(place, out);
+}
+
+export function parcelRoom(place) {
+  const out = [];
+  parcelShell(place, out);
+  const A = place.room.a[1];
+  const dm = mid(place.room.d);
+  // Ceiling lamps, directly above the baked sources in sim/interior.js.
+  for (const a of [-A * 0.55, A * 0.55]) {
+    out.push(part(cylinder(0.22, 0.22, 0.05, a, place.height - 0.03, dm, 20), 0xfff4e0, CELL.plain, PANEL_LAMP));
+  }
+  for (const it of place.items) PARCEL_BUILDERS[it.kind]?.(it, out);
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// The street door hung on every grown lot, its parts authored at the frame's
+// origin and instanced by render/interior.js. One geometry, one draw, per
+// instance a use tint and a power zone.
+
+export function parcelDoor(out = []) {
+  out.push(part(box(2.2, 0.5, 0.9, 0, 0.25, 0.25), 0x5e5a55));
+  for (const a of [-0.8, 0.8]) out.push(part(box(0.1, 2.5, 0.16, a, 0.5 + 1.25, 0.06), DARK_TIMBER));
+  out.push(part(box(1.7, 0.12, 0.18, 0, 3.0, 0.06), DARK_TIMBER));
+  out.push(part(box(1.3, 1.9, 0.06, 0, 0.5 + 0.95, 0.04), 0x5a3820, CELL.wood));
+  out.push(part(panel(1.15, 1.4, 'out', 0, 0.5 + 1.2, 0.08), 0xffffff, CELL.doorglass));
+  out.push(part(box(0.03, 0.34, 0.05, 0.5, 0.5 + 0.95, 0.1), 0xb08a3a));
+  out.push(part(panel(1.5, 0.42, 'out', 0, 3.32, 0.08), 0xffffff, CELL.lamp));
+  out.push(part(box(2.4, 0.1, 0.7, 0, 3.6, 0.25), DARK_TIMBER));
+  return out;
+}

@@ -11,7 +11,7 @@
 // missing save. localStorage and the autosave clock are not here (src/savestore.js
 // and main.js own them).
 import { createClock } from './clock.js';
-import { createInterior, placeOf, STREET } from './interior.js';
+import { createInterior, currentPlace, placeOf, STREET } from './interior.js';
 import { createMission, missionRestore } from './mission.js';
 import { createPlayer } from './player.js';
 import { createStreet } from './street.js';
@@ -181,7 +181,10 @@ function applyCity(city, s) {
 
 function applyInterior(interior, s) {
   interior.space = str(s.space);
-  if (interior.space !== STREET && !placeOf(interior.space)) throw new Error('save: unknown space');
+  // A grown lot's room is `lot:<index>`; its geometry is rebuilt from the city
+  // on the next tick, so the save only has to name a space the sim can offer.
+  const known = interior.space === STREET || placeOf(interior.space) || /^lot:\d+$/.test(interior.space);
+  if (!known) throw new Error('save: unknown space');
   interior.lastX = maybe(num)(s.lastX);
   interior.lastZ = maybe(num)(s.lastZ);
   return interior;
@@ -195,7 +198,7 @@ function applyPlayer(player, s, interior) {
   player.walkPhase = num(s.walkPhase);
   player.mode = s.mode === 'drive' ? 'drive' : 'foot';
   // Height is the ground's answer, never the save's (world.js heightAt).
-  const place = placeOf(interior.space);
+  const place = currentPlace(interior);
   player.y = place ? place.floor : heightAt(player.x, player.z);
   return player;
 }

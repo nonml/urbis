@@ -11,7 +11,8 @@
 // site hangs none of it: stopped is not failing.
 import * as THREE from 'three';
 import { hasFloors } from '../sim/decline.js';
-import { HOARDING_THICK, PAD_RISE, SETBACK } from './zoning.js';
+import { SETBACK } from '../sim/zoning.js';
+import { HOARDING_THICK, PAD_RISE } from './zoning.js';
 
 const CELL_W = 256;
 const CELL_H = 128;

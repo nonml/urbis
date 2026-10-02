@@ -11,6 +11,11 @@ export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
 export const STAGE = Object.fromEntries(STAGES.map((name, i) => [name, i]));
 export const USES = ['res', 'com', 'ind'];
 
+// The shell stands this far inside the hoarding line on every side. It lives
+// here, not in render/zoning.js, because the interiors derive their door face
+// and room from the same building footprint the shell is drawn at.
+export const SETBACK = 1.2;
+
 // Empty land: centre x, centre z, width along x, depth along z. Read off the
 // tower, road, tree and verge tables and then checked from the street — every
 // lot clears every carriageway, footway, podium, trunk and grass strip. Five
@@ -169,10 +174,14 @@ export function zoneParcel(city, index, use) {
   return true;
 }
 
-export function tickZoning(city, dt, street) {
+export function tickZoning(city, dt, street, hold = -1) {
   city.time += dt;
   updateDemand(city, dt, street);
-  for (const p of city.parcels) {
+  city.parcels.forEach((p, i) => {
+    // The player's own building waits for them: while they stand inside it,
+    // its decline (or ordered demolition) is deferred, so the space they are
+    // in never disappears around them.
+    if (i === hold) return;
     const powered = !isDark(street, p.powerZone);
     if (p.zoned !== null && p.use === p.zoned) {
       // A pinned market (capture probes, sim/decline.js) outranks the economy.
@@ -181,7 +190,7 @@ export function tickZoning(city, dt, street) {
       // A demolition the player ordered stops in a blackout like any other work.
       clearLot(p, dt);
     }
-  }
+  });
 }
 
 // How tall the parcel stands right now: the finished stage plus the share of the

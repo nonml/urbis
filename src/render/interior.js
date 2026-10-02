@@ -14,11 +14,13 @@
 // main's to hide indoors.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { STREET, doorEnds, frameYaw, isIndoors, placeOf } from '../sim/interior.js';
+import { STREET, currentPlace, doorEnds, frameYaw, isIndoors, placeOf, parcelSpace } from '../sim/interior.js';
+import { STAGE } from '../sim/zoning.js';
 import { blink } from '../sim/street.js';
 import { getGlowTex } from './signs.js';
 import { buildAtlas } from './interiorkit.js';
-import { RAMEN_LIGHTS, ramenFront, ramenRoom, roofTop, stairDoor } from './interiorsets.js';
+import { zoneLit, zoneView } from './materials.js';
+import { RAMEN_LIGHTS, parcelDoor, parcelRoom, ramenFront, ramenRoom, roofTop, stairDoor } from './interiorsets.js';
 
 // ---------------------------------------------------------------------------
 // Baked light. Each vertex stores how much of each light reaches it — the
@@ -162,7 +164,98 @@ function buildSteamSprite(room) {
   return s;
 }
 
-export function buildInteriors() {
+// The street doors on grown lots: one instanced mesh, one geometry, a use tint
+// and a power zone per instance. Its material lights both zones from the same
+// per-instance `zone` attribute the shells wear, so a blackout kills one side
+// of the street and not the other (VGA-007).
+const DOOR_TINT = { com: 0xffffff, res: 0xf2e6d0, ind: 0xd6dde4 };
+const _dm = new THREE.Matrix4();
+const _dq = new THREE.Quaternion();
+const _dp = new THREE.Vector3();
+const _done = new THREE.Vector3(1, 1, 1);
+const _dc = new THREE.Color();
+const DOOR_UP = new THREE.Vector3(0, 1, 0);
+
+function parcelDoorMaterial(atlas) {
+  return zoneLit(new THREE.MeshStandardMaterial({
+    map: atlas.albedo, vertexColors: true, emissiveMap: atlas.glow, emissive: 0xffffff,
+    roughness: 0.72, metalness: 0.14, envMapIntensity: 0.5,
+  }), 'parcel-doors');
+}
+
+function buildParcels(city, atlas) {
+  const group = new THREE.Group();
+  const n = Math.max(1, city.parcels.length);
+  const geo = mergeGeometries(parcelDoor());
+  geo.setAttribute('zone', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
+  const mat = parcelDoorMaterial(atlas);
+  const doors = new THREE.InstancedMesh(geo, mat, n);
+  doors.count = 0;
+  doors.castShadow = false;
+  doors.receiveShadow = false;
+  group.add(doors);
+  return { group, doors, mat, views: [zoneView(mat, 0), zoneView(mat, 1)], rooms: new Map() };
+}
+
+function updateParcelDoors(rig, city) {
+  let k = 0;
+  city.parcels.forEach((p, i) => {
+    if (p.use === null || p.stage < STAGE.LOW) return;
+    const fr = parcelSpace(p, i).frame;
+    _dp.set(fr.x, 0, fr.z);
+    _dq.setFromAxisAngle(DOOR_UP, frameYaw(fr));
+    rig.doors.setMatrixAt(k, _dm.compose(_dp, _dq, _done));
+    rig.doors.geometry.attributes.zone.setX(k, p.powerZone);
+    rig.doors.setColorAt(k, _dc.setHex(DOOR_TINT[p.use] ?? 0xffffff));
+    k += 1;
+  });
+  rig.doors.count = k;
+  rig.doors.instanceMatrix.needsUpdate = true;
+  if (rig.doors.instanceColor) rig.doors.instanceColor.needsUpdate = true;
+  rig.doors.geometry.attributes.zone.needsUpdate = true;
+  // The door count changes as lots grow and clear; a stale sphere culls one.
+  rig.doors.computeBoundingSphere();
+}
+
+function roomKey(place) {
+  const [a0, a1] = place.room.a;
+  const [d0, d1] = place.room.d;
+  return `${place.use}:${place.stage}:${a0.toFixed(2)},${a1.toFixed(2)},${d0.toFixed(2)},${d1.toFixed(2)}`;
+}
+
+// A room is built the first frame the player stands in it, behind the door
+// fade. Only the space they are in is ever geometry; the rest cost nothing.
+function ensureRoom(rig, roomMat, place) {
+  const key = roomKey(place);
+  const cur = rig.rooms.get(place.id);
+  if (cur && cur.key === key) return cur.mesh;
+  if (cur) {
+    rig.group.remove(cur.mesh);
+    cur.mesh.geometry.dispose();
+  }
+  const parts = placed(parcelRoom(place).map((g) => bake(g, place.lights)), place.frame, place.floor);
+  const mesh = merged(parts, roomMat);
+  mesh.visible = false;
+  rig.group.add(mesh);
+  rig.rooms.set(place.id, { key, mesh });
+  return mesh;
+}
+
+// Drop rooms whose lot has cleared, so no geometry outlives its building.
+function pruneRooms(rig, city) {
+  const grown = new Set();
+  city.parcels.forEach((p, i) => {
+    if (p.use !== null && p.stage >= STAGE.LOW) grown.add(`lot:${i}`);
+  });
+  for (const [id, r] of rig.rooms) {
+    if (grown.has(id)) continue;
+    rig.group.remove(r.mesh);
+    r.mesh.geometry.dispose();
+    rig.rooms.delete(id);
+  }
+}
+
+export function buildInteriors(city) {
   const atlas = buildAtlas();
   const ramen = placeOf('ramen');
   const roomMat = bakedMaterial(atlas);
@@ -171,11 +264,12 @@ export function buildInteriors() {
   const outside = merged(outsideParts(), outsideMaterial(atlas));
   outside.receiveShadow = true;
   const steam = buildSteamSprite(ramen);
+  const parcel = buildParcels(city, atlas);
   const group = new THREE.Group();
-  group.add(room, outside, steam);
+  group.add(room, outside, steam, parcel.group);
   room.visible = false;
   steam.visible = false;
-  return { group, room, roomMat, outside, steam, zone: ramen.zone, key: 0 };
+  return { group, room, roomMat, outside, steam, parcel, zone: ramen.zone, key: 0 };
 }
 
 // ---------------------------------------------------------------------------
@@ -220,13 +314,25 @@ function tickSteam(rig, elapsed, power) {
   s.material.opacity = Math.sin(k * Math.PI) * (0.18 + 0.4 * power);
 }
 
-export function updateInteriors(rig, state, { glows, night, time, elapsed }) {
+export function updateInteriors(rig, state, { glows, night, time, elapsed, city }) {
+  const place = currentPlace(state);
   const indoors = isIndoors(state);
-  const power = zonePower(glows, rig.zone, time);
-  rig.room.visible = indoors;
-  rig.steam.visible = indoors;
+  const inParcel = !!place && place.parcel !== undefined;
+  if (city) {
+    updateParcelDoors(rig.parcel, city);
+    pruneRooms(rig.parcel, city);
+  }
+  // The space the player is in owns the room's light: the noodle bar's zone or
+  // the lot they walked into. Only one room is ever visible, so one shared
+  // baked material can answer for it.
+  const zone = place?.zone ?? rig.zone;
+  const power = zonePower(glows, zone, time);
+  rig.room.visible = indoors && !inParcel;
+  rig.steam.visible = indoors && !inParcel;
   rig.outside.visible = !indoors;
   rig.outside.material.emissiveIntensity = power * (DAY_FLOOR + (1 - DAY_FLOOR) * night);
+  for (const r of rig.parcel.rooms.values()) r.mesh.visible = false;
+  if (inParcel) ensureRoom(rig.parcel, rig.roomMat, place).visible = true;
   const flicker = 0.9 + 0.1 * Math.sin(elapsed * 23) * Math.sin(elapsed * 7.3);
   rig.key = indoors ? KEY_INDOOR * power + 1.2 * flicker : 0;
   if (!indoors) return;

@@ -120,3 +120,32 @@ test('E walks into the noodle bar and out, a blackout kills its lights, the stai
     expect(roof).toBeLessThanOrEqual(DRAW_BUDGET);
     saveShot(await page.evaluate(() => window.__game.shot()), 'interior-roof');
 });
+
+// Pillar 1 at last: a lot the city grew has a street door, and the door opens
+// onto a shop. Enter a grown commercial lot through window.__game, measure the
+// frame inside it, and walk back out through the same door.
+test('a zoned shop opens onto the street, under budget', async ({ page }) => {
+    test.setTimeout(180000);
+    await boot(page);
+
+    const space = await page.evaluate(() => window.__game.enterLot('com'));
+    expect(space).toMatch(/^lot:/);
+    await page.waitForFunction(() => window.__game.space().startsWith('lot:'));
+    await frames(page, 3);
+    const inside = await peak(page, 8);
+    console.log(`zoned shop draws: ${inside} / ${DRAW_BUDGET}`);
+    expect(inside).toBeLessThanOrEqual(DRAW_BUDGET);
+    // The room is actually drawn, not a black cut: an unlit frame would pass
+    // the draw count and prove nothing.
+    expect(await brightness(page)).toBeGreaterThan(3);
+    saveShot(await page.evaluate(() => window.__game.shot()), 'zoned-shop');
+
+    const leave = await page.evaluate(() => {
+        const link = window.__game.doorList().find((l) => l.use === 'com');
+        return link.ends.find((e) => e.label === 'LEAVE');
+    });
+    await page.evaluate(([x, z]) => window.__game.pose(x, z, 0), [leave.x, leave.z]);
+    await page.waitForFunction(() => window.__game.door() === 'LEAVE', null, { timeout: 15000 });
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__game.space() === 'street');
+});
