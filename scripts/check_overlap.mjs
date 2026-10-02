@@ -18,7 +18,7 @@
 // atlases and the loader only returns textures, so neither moves a vertex.
 import { registerHooks } from 'node:module';
 
-const MAX_OVERLAPS = 52;
+const MAX_OVERLAPS = 40;
 // Faces that touch are a party wall, not an overlap.
 const TOUCH = 0.01;
 // The seed main.js boots the city with; lot geometry does not depend on it.

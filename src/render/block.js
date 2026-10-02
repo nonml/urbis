@@ -830,15 +830,6 @@ export function buildTowers(texLoader, maxAniso) {
   });
   group.add(new THREE.Mesh(mergeGeometries(shopGeos.flat()), mats.shopGlass));
 
-  const silhouettes = [
-    box(20, 60, 16, -58, 30, -30), box(24, 74, 18, 34, 37, -8),
-    box(18, 52, 14, -56, 26, 26), box(22, 66, 16, 32, 33, 38),
-    box(22, 62, 16, 74, 31, -20), box(20, 56, 16, 72, 28, 30),
-    box(26, 48, 16, 22, 24, -100),
-  ];
-  const silMat = new THREE.MeshBasicMaterial({ color: 0x080c16 });
-  group.add(new THREE.Mesh(mergeGeometries(silhouettes), silMat));
-  footprints.push(...silhouettes.map((g, i) => ({ ...footprintOf(g), name: `silhouettes[${i}]` })));
   return {
     group, beacons: beaconPts, facadeMats: mats.facadeMats,
     zoneMats: mats.zoneMats, kinds: mats.kinds, mirrorProxies, shopPools, footprints,
