@@ -179,9 +179,18 @@ function moveFirm(economy, d) {
 // d.fleeAt = Infinity. It never draws from economy.rand, so the other
 // district's stream stays in step.
 function flee(economy, d, dt) {
-  void economy;
-  void d;
-  void dt;
+  if (d.dark) d.darkFor += dt;
+  else if (d.darkFor > 0) {
+    d.fleeAt = economy.time + FLIGHT_SECS;
+    d.fleeJobs = d.size * FLIGHT_PER_DARK_SEC * d.darkFor;
+    d.darkFor = 0;
+  }
+  if (economy.time < d.fleeAt) return;
+  const use = d.firms.com >= d.firms.ind ? 'com' : 'ind';
+  const jobs = Math.min(d.fleeJobs, d.firms[use]);
+  d.firms[use] -= jobs;
+  if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' };
+  d.fleeAt = Infinity;
 }
 
 function earn(d, dt) {
