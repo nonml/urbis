@@ -58,6 +58,14 @@ const WEALTH_RISE_SECS = 25;
 const WEALTH_FALL_SECS = 15;
 const DARK_DRAIN_SECS = 60;
 
+// A firm that sat through a power cut gives up on the district (milestone 4: a
+// poke sets off a chain the player can watch, sized to the act). FLIGHT_SECS
+// after the power comes back, jobs worth FLIGHT_PER_DARK_SEC of the district for
+// every second it was dark leave: one hack is about one lot-sized firm. The news
+// line reports it, and the lots answer the floor the district now wants less of.
+export const FLIGHT_SECS = 4;
+export const FLIGHT_PER_DARK_SEC = 0.015;
+
 // A use whose floor moved less than this many people in a tick is holding.
 const STILL = 1e-6;
 
@@ -80,6 +88,9 @@ function makeDistrict(id, lots, rand) {
     dark: false,
     nextMove: lerp(MOVE_MIN_SECS, MOVE_MAX_SECS, rand()),
     last: null,
+    darkFor: 0,
+    fleeAt: Infinity,
+    fleeJobs: 0,
     lots: perUse(() => 0),
     floor: perUse(() => 0),
     trend: perUse(() => 0),
@@ -157,6 +168,31 @@ function moveFirm(economy, d) {
   d.nextMove = economy.time + lerp(MOVE_MIN_SECS, MOVE_MAX_SECS, wait);
 }
 
+// The firm a power cut drives out. Milestone 4 skeleton: a stub, with its test
+// in tests/economy-flight.todo.js.
+// While d.dark, d.darkFor grows by dt. On a tick lit again with d.darkFor > 0:
+// d.fleeAt = economy.time + FLIGHT_SECS, d.fleeJobs = d.size *
+// FLIGHT_PER_DARK_SEC * d.darkFor, and d.darkFor = 0. On a tick with
+// economy.time >= d.fleeAt: use = 'com' when d.firms.com >= d.firms.ind, else
+// 'ind'; jobs = Math.min(d.fleeJobs, d.firms[use]); d.firms[use] -= jobs; when
+// jobs > 0, d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' }; then
+// d.fleeAt = Infinity. It never draws from economy.rand, so the other
+// district's stream stays in step.
+function flee(economy, d, dt) {
+  if (d.dark) d.darkFor += dt;
+  else if (d.darkFor > 0) {
+    d.fleeAt = economy.time + FLIGHT_SECS;
+    d.fleeJobs = d.size * FLIGHT_PER_DARK_SEC * d.darkFor;
+    d.darkFor = 0;
+  }
+  if (economy.time < d.fleeAt) return;
+  const use = d.firms.com >= d.firms.ind ? 'com' : 'ind';
+  const jobs = Math.min(d.fleeJobs, d.firms[use]);
+  d.firms[use] -= jobs;
+  if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' };
+  d.fleeAt = Infinity;
+}
+
 function earn(d, dt) {
   const employment = Math.min(d.jobs, d.homes) / d.homes;
   const target = d.dark ? 0 : employment;
@@ -175,6 +211,7 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
     d.dark = isDark(street, d.id);
+    flee(economy, d, dt);
     if (economy.time >= d.nextMove) moveFirm(economy, d);
     price(d);
     earn(d, dt);

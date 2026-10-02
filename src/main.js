@@ -11,6 +11,7 @@ import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/want
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
+import { createNews, tickNews, liveNews } from './sim/news.js';
 import { districtReport } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
@@ -47,6 +48,7 @@ import { hideFaded } from './render/faded.js';
 import { buildEconomyPanel, updateEconomyPanel } from './render/economy.js';
 import { buildDecline } from './render/decline.js';
 import { buildLotNote, showLotNote } from './render/lotnote.js';
+import { buildNews, showNews } from './render/news.js';
 import { focusParcel, pinDemand } from './sim/decline.js';
 import { createCityView, cityKey, tickCityView } from './sim/cityview.js';
 import { buildCityView } from './render/cityview.js';
@@ -149,6 +151,8 @@ const economyPanel = buildEconomyPanel();
 const decline = buildDecline(city, maxAniso);
 scene.add(decline.mesh);
 const lotNote = buildLotNote();
+const news = createNews();
+const newsLine = buildNews();
 const player = restored?.player ?? createPlayer();
 player.mode ??= 'foot';
 const heroCar = restored?.car ?? createPlayerCar();
@@ -491,6 +495,7 @@ window.__game = {
   tod: () => +clock.nightFactor.toFixed(3),
   hour: () => clock.hour,
   census: () => census(people),
+  news: () => liveNews(news, street.time),
   walkersOut: () => street.npcs.filter((n) => n.out !== false).length,
   person: (k) => {
     if (people.list.length === 0) return null;
@@ -710,6 +715,7 @@ function render() {
   tickZoning(city, dt, street, occupiedParcel(interior));
   tickPeople(people, city);
   tickCommute(street, people, city, clock.hour, player.x, player.z);
+  tickNews(news, city, people, street);
   tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
@@ -864,6 +870,7 @@ function render() {
   lastProfile = driving ? null : updateProfiler(camera, target, targetPerson, targetPerson ? commuteLabel(targetPerson, clock.hour) : null);
   showLotNote(lotNote, interior.space === STREET
     ? focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
+  showNews(newsLine, liveNews(news, street.time));
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   if (driving && lockedNpc) lockedNpc = null;
   if (driving) {

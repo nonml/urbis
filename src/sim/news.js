@@ -58,10 +58,32 @@ export function snapshot(city, people, street) {
 //    jobs moved into the ${name} district`, else `${n} ${JOBS[m.use]} jobs left the
 //    ${name} district`.
 export function newsBetween(before, after, city) {
-  void before;
-  void after;
-  void city;
-  return [];
+  const lines = [];
+  const { districts } = city.economy;
+  districts.forEach((d, i) => {
+    if (!before.dark[i] && after.dark[i]) lines.push(`Power cut in the ${d.name} district`);
+    if (before.dark[i] && !after.dark[i]) lines.push(`Power back in the ${d.name} district`);
+  });
+  city.parcels.forEach((p, i) => {
+    const was = before.stages[i];
+    const now = after.stages[i];
+    if (was === now) return;
+    const noun = NOUN[p.use];
+    const at = address(p.x, p.z);
+    if (was === STAGE.EMPTY && now === STAGE.SITE) lines.push(`${noun} breaking ground at ${at}`);
+    else if (now === STAGE.HIGH) lines.push(`${noun} topped out at ${at}`);
+    else if (now === STAGE.EMPTY) lines.push(`${noun} at ${at} came down`);
+  });
+  districts.forEach((d, i) => {
+    const m = after.moves[i];
+    if (m === null || m === before.moves[i]) return;
+    const n = Math.round(Math.abs(m.jobs));
+    if (n === 0) return;
+    lines.push(m.jobs > 0
+      ? `${n} ${JOBS[m.use]} jobs moved into the ${d.name} district`
+      : `${n} ${JOBS[m.use]} jobs left the ${d.name} district`);
+  });
+  return lines;
 }
 
 // One frame: now = snapshot(city, people, street). When news.last is not null,
@@ -73,16 +95,23 @@ export function newsBetween(before, after, city) {
 // and news.residents becomes now.residents. Then news.last = now, and the oldest
 // items are dropped until there are at most NEWS_MAX.
 export function tickNews(news, city, people, street) {
-  void news;
-  void city;
-  void people;
-  void street;
+  const now = snapshot(city, people, street);
+  const push = (text) => news.items.push({ at: street.time, text });
+  if (news.last !== null) newsBetween(news.last, now, city).forEach(push);
+  if (news.residents === null) news.residents = now.residents;
+  else {
+    const moved = now.residents - news.residents;
+    if (Math.abs(moved) >= CROWD) {
+      push(moved > 0 ? `${moved} people moved into the city` : `${-moved} people moved out of the city`);
+      news.residents = now.residents;
+    }
+  }
+  news.last = now;
+  if (news.items.length > NEWS_MAX) news.items.splice(0, news.items.length - NEWS_MAX);
 }
 
 // The texts of the items younger than NEWS_SECS at street time `now` (now - at <
 // NEWS_SECS), oldest first.
 export function liveNews(news, now) {
-  void news;
-  void now;
-  return [];
+  return news.items.filter((i) => now - i.at < NEWS_SECS).map((i) => i.text);
 }

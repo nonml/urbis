@@ -16,6 +16,7 @@ import {
 import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
 import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS } from '../sim/vistas.js';
+import { MIDBLOCK } from '../sim/streetscape.js';
 
 // Where the city is comes from sim/world.js — this file draws the road graph,
 // it does not get a second opinion about where the roads are. The ways the
@@ -101,7 +102,7 @@ export function buildGround(texLoader, maxAniso) {
     ...AVENUES.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
     ...flankingSlabs(PLAZA, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
     ...flankingSlabs(SOUTH, WALKWAY_WIDTH, WALK_RISE, 0.0),
-    box(22, WALK_RISE, 9, -17, 0.0, -32),   // river promenade slab
+    ...(WORLD_PLAN ? [] : [box(22, WALK_RISE, 9, -17, 0.0, -32)]),   // river promenade slab, hand preset only
   ]);
   const walkMesh = new THREE.Mesh(walks, walkMat);
   walkMesh.receiveShadow = true;
@@ -115,7 +116,7 @@ export function buildGround(texLoader, maxAniso) {
     ...AVENUES.flatMap(kerbRails),
     ...kerbRails(SOUTH),
     ...kerbRails(PLAZA),
-    box(0.35, 1.0, 9, -27.8, 0.5, -32),     // river promenade parapet
+    ...(WORLD_PLAN ? [] : [box(0.35, 1.0, 9, -27.8, 0.5, -32)]),     // river promenade parapet, hand preset only
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
   curbMesh.receiveShadow = true;
@@ -213,16 +214,15 @@ function buildMarkings() {
   crossDashes(SOUTH, 3);
   crossDashes(PLAZA, 2);
   // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
-  // avenue, each at its own z so they do not line up across the district.
-  for (const [k, cz] of [20, -20, 10].entries()) {
-    const av = AVENUES[k];
-    if (!av) break;
-    const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
+  // avenue, each at its own z so they do not line up across the district
+  // (sim/streetscape.js places them).
+  const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
+  for (const { x, z: cz } of MIDBLOCK) {
     for (let i = -3; i <= 3; i++) {
       const q = stripe.clone();
       q.rotateX(-Math.PI / 2);
       q.rotateY(Math.PI / 2);
-      q.translate(av.x, 0.02, cz + i * 0.7);
+      q.translate(x, 0.02, cz + i * 0.7);
       push(q, cz);
     }
   }
@@ -661,10 +661,12 @@ function posterCluster(out, at, span, base, idx, f) {
     const h = 0.58 + ((seed % 5) * 0.11);
     const geo = posterCell(new THREE.PlaneGeometry(h * 0.72, h), (seed * 5) % 4);
     geo.rotateZ((((seed * 13) % 11) - 5) * 0.014);
-    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17));
+    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17), i);
     if (Math.abs(base) < span / 2) out.push(geo);
   }
 }
+
+const POSTER_LAYER = 0.006;
 
 function posterWall(out, cx, cz, pw, pd, idx) {
   for (let f = 0; f < 4; f += 1) {
@@ -672,9 +674,12 @@ function posterWall(out, cx, cz, pw, pd, idx) {
     const dir = f % 2 ? 1 : -1;
     const span = (alongZ ? pd : pw) - 1.6;
     const t = (alongZ ? pw : pd) / 2 + 0.03;
-    const at = (geo, u, y) => {
+    // Each later bill in a cluster is pasted POSTER_LAYER further out, so two
+    // that overlap never share a plane and z-fight into black stripes.
+    const at = (geo, u, y, layer) => {
+      const off = t + layer * POSTER_LAYER;
       geo.rotateY(alongZ ? dir * Math.PI / 2 : (dir > 0 ? 0 : Math.PI));
-      geo.translate(alongZ ? cx + dir * t : cx + u, y, alongZ ? cz + u : cz + dir * t);
+      geo.translate(alongZ ? cx + dir * off : cx + u, y, alongZ ? cz + u : cz + dir * off);
     };
     for (const base of [-span * 0.28, span * 0.3]) posterCluster(out, at, span, base, idx, f);
   }
