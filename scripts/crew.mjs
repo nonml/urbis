@@ -31,7 +31,7 @@ import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
 const PLUGIN = path.join(process.env.HOME, '.claude/plugins/cache/naicud-opencode-plugin-cc/opencode/1.22.0/scripts/lib/opencode-server.mjs');
-const { ensureServer, createClient, readServerRegistry } = await import(PLUGIN);
+const { ensureServer, createClient, readServerRegistry, isServerRunning } = await import(PLUGIN);
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
@@ -64,19 +64,61 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // The server the plugin registered for this worktree (several worktrees may share
 // one); a new worktree gets its own. The directory header scopes every call.
+// A server that died (a reboot, a killed supervisor) stays in the registry: skip it.
 async function client(dir) {
-  const known = readServerRegistry(dir)[0];
+  let known = null;
+  for (const e of readServerRegistry(dir)) {
+    if (await isServerRunning(e.host ?? '127.0.0.1', e.port)) {
+      known = e;
+      break;
+    }
+  }
   const url = known ? `http://${known.host ?? '127.0.0.1'}:${known.port}` : (await ensureServer({ cwd: dir })).url;
   return { url, c: createClient(url, { directory: dir }) };
 }
 
+const hasBranch = (b) => {
+  try {
+    sh('git', ['rev-parse', '--verify', '-q', `refs/heads/${b}`]);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 function worktree(name) {
   const dir = path.join(ROOT, '..', `urbis-wt-${name}`);
   if (!fs.existsSync(dir)) {
-    sh('git', ['worktree', 'add', '-q', '-b', `wt/${name}`, dir, 'main']);
+    const b = `wt/${name}`;
+    sh('git', ['worktree', 'add', '-q', ...(hasBranch(b) ? [dir, b] : ['-b', b, dir, 'main'])]);
     fs.symlinkSync(path.join(ROOT, 'node_modules'), path.join(dir, 'node_modules'));
   }
   return dir;
+}
+
+// Brings a clean lane up to main. A lane branch none of whose commits came from this
+// board (one left by an earlier session) is set aside as wt/<lane>-old-<date> and the
+// lane starts again from main: building on weeks-old code fails every task.
+function freshLane(state, lane, dir) {
+  if (changedPaths(dir).length) return;
+  try {
+    sh('git', ['merge', '--ff-only', '-q', 'main'], dir);
+    return;
+  } catch { /* the lane has commits main lacks */ }
+  const ours = Object.values(state.tasks).some((t) => {
+    if (t.lane !== lane || !t.commit) return false;
+    try {
+      sh('git', ['merge-base', '--is-ancestor', t.commit, 'HEAD'], dir);
+      return true;
+    } catch {
+      return false;
+    }
+  });
+  if (ours) return;   // the lane has commits of its own; it keeps building on them
+  const old = `wt/${lane}-old-${new Date().toISOString().slice(0, 10)}`;
+  sh('git', ['branch', '-f', old, 'HEAD'], dir);
+  sh('git', ['reset', '-q', '--hard', 'main'], dir);
+  log(`${lane}: wt/${lane} was an old branch, kept as ${old}; the lane starts from main`);
 }
 
 function ports(state, name) {
@@ -245,9 +287,7 @@ function bringTest(dir, test) {
 
 async function assign(state, lane, task) {
   const dir = worktree(lane);
-  try {
-    if (!changedPaths(dir).length) sh('git', ['merge', '--ff-only', '-q', 'main'], dir);
-  } catch { /* the lane has commits of its own; it keeps building on them */ }
+  freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
   const w = { name: lane, dir, task, model: TIERS[0], stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
   state.workers[lane] = w;
