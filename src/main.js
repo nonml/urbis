@@ -7,7 +7,10 @@ import { createPlayer, tickPlayer } from './sim/player.js';
 import { WALK_BOUNDS, clampToBounds, heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
-import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
+import {
+  createWanted, wantedOnBlackout, tickWanted, isBusted, drainEvents, forceTier, forceSearch,
+} from './sim/wanted.js';
+import { createDispatch, tickDispatch } from './sim/dispatch.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
@@ -24,7 +27,8 @@ import { buildSigns, buildPools } from './render/signs.js';
 import { buildLamps } from './render/lamps.js';
 import { buildNPCs, updateNPCs } from './render/npcs.js';
 import { buildTraffic, updateTraffic, updateCarPools, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
-import { buildPursuitCar, updatePursuit } from './render/police.js';
+import { buildPolice, updatePolice } from './render/police.js';
+import { buildDispatchHud, updateDispatchHud } from './ui/dispatch.js';
 import { buildPlayer, updatePlayer } from './render/player.js';
 import {
   buildShops, buildPuddles, setPuddleGlow, buildCityMirror, showInMirror, onlyInMirror,
@@ -169,8 +173,10 @@ const traffic = buildTraffic(street);
 scene.add(traffic.group);
 const heroRig = buildPlayerCar(scene, heroCar);
 scene.add(heroRig.group);
-const pursuitRigs = [buildPursuitCar(), buildPursuitCar()];
-for (const r of pursuitRigs) scene.add(r.group);
+const police = buildPolice(scene);
+const dispatch = createDispatch(20260916);
+const radio = buildDispatchHud();
+let policeHold = false;
 const avatar = buildPlayer();
 scene.add(avatar.group);
 const shops = buildShops(texLoader, maxAniso);
@@ -365,7 +371,7 @@ function fireHack() {
   const pz = driving ? heroCar.z : player.z;
   const zone = zoneAt(pz);
   if (hackBlackout(street, zone) === 0) return;
-  wantedOnBlackout(wanted);
+  wantedOnBlackout(wanted, px, pz, street.time);
   firePulse(fx, px, pz);
   const sub = SUBSTATIONS.find((s) => s.zone === zone);
   fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
@@ -492,6 +498,15 @@ window.__game = {
   enter: () => toggleVehicle(),
   profile: () => lastProfile,
   heat: () => wanted.heat,
+  wanted: () => ({
+    tier: wanted.heat, contact: wanted.contact, status: lastWantedStatus,
+    units: wanted.pursuit.filter((u) => u.active && !u.leaving).length,
+    roadblock: wanted.response.roadblock.active,
+    strip: wanted.response.strip.active ? { x: wanted.response.strip.x, z: wanted.response.strip.z } : null,
+    heli: wanted.response.heli.active, flat: heroCar.flat ?? 0,
+    search: wanted.search.active ? { x: wanted.search.x, z: wanted.search.z, r: +wanted.search.r.toFixed(1) } : null,
+    radio: dispatch.lines.map((l) => `${l.speaker}: ${l.text}`),
+  }),
   tod: () => +clock.nightFactor.toFixed(3),
   hour: () => clock.hour,
   census: () => census(people),
@@ -543,6 +558,33 @@ if (CAPTURE) {
       tickZoning(city, 0.05, street);
       tickCityView(cityView, city, 0.05, new Set());
     }
+  };
+}
+
+// Capture-only police probe, bound behind ?capture=1 below. It calls the same
+// sim entry points play does (a tier, a lost suspect) and can hold the pursuit
+// still, so evidence is framed at the play camera instead of chased for.
+function policeProbe() {
+  const suspect = () => {
+    const b = player.mode === 'drive' ? heroCar : player;
+    return { x: b.x, z: b.z, yaw: b.yaw };
+  };
+  return {
+    tier: (n) => forceTier(wanted, n, suspect(), street.time),
+    search: (x, z, yaw = 0, age = 0) => forceSearch(wanted, x, z, yaw, street.time, age),
+    hold: (on) => { policeHold = on; },
+    flash: (t) => { police.flashFreeze = t; },
+    drive: (x, z, yaw, speed = 0) => {
+      Object.assign(heroCar, { x, z, yaw, speed, y: heightAt(x, z) });
+      Object.assign(player, { x, z });
+      if (player.mode !== 'drive') toggleVehicle();
+      cam.yaw = yaw;
+    },
+    unit: (i, x, z, yaw) => Object.assign(wanted.pursuit[i], { x, z, yaw, y: heightAt(x, z), speed: 0 }),
+    heli: (x, z, aimX, aimZ, y = 24) => Object.assign(wanted.response.heli, { x, y, z, aimX, aimZ }),
+    view: (pitch, dist) => Object.assign(cam, { pitch, dist }),
+    flat: (v) => { heroCar.flat = v; },
+    reset: () => Object.assign(wanted, createWanted()),
   };
 }
 
@@ -630,6 +672,7 @@ if (CAPTURE) {
     cam.dist = Math.max(3, Math.min(14, dist));
   };
   window.__game.arcSkip = () => arcSkipStep(arc);
+  window.__game.police = policeProbe();
 }
 
 chunks.warm(player.x, player.z);
@@ -827,19 +870,21 @@ function render() {
   heroKey.position.set(hx, (driving ? heroCar.y : player.y) + 2.4, hz);
   heroKey.intensity = 14 * night;
   if (isIndoors(interior)) heroKey.intensity = interiors.key;
-  let tx = driving ? heroCar.x : player.x;
-  let tz = driving ? heroCar.z : player.z;
-  // Threat pull: a fresh hack drags pursuit toward the dead zone (re-012).
-  if (street.lastHack && street.time - street.lastHack.at < 6 && wanted.heat > 0) {
-    tx = 2;
-    tz = street.lastHack.zone === 0 ? -30 : 30;
-  }
-  lastWantedStatus = tickWanted(wanted, dt, tx, tz, driving, heroCar.speed, isDark(street, zoneAt(tz)), street.time);
+  // A hack pulls the units to the scene of it: wantedOnBlackout sets the search there.
+  const suspect = {
+    x: hx, z: hz, yaw: driving ? heroCar.yaw : player.yaw, inCar: driving, car: heroCar,
+    body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
+  };
+  if (!policeHold) lastWantedStatus = tickWanted(wanted, dt, suspect, street.time);
+  tickDispatch(dispatch, drainEvents(wanted), street.time);
   if (lastWantedStatus === 'busted' && !mission.complete) {
     missionReset(mission);
     missionNote(mission, 'BUSTED — contract reset', street.time, 3);
   }
-  wanted.pursuit.forEach((p, i) => updatePursuit(pursuitRigs[i], p, clock.elapsed));
+  updatePolice(police, wanted, {
+    time: street.time, elapsed: clock.elapsed, night: clock.nightFactor, camera, heroRig, heroCar, fx,
+  });
+  updateDispatchHud(radio, dispatch, street.time);
   mission.balance += tickArc(arc, {
     x: hx, z: hz, inCar: driving, dark: DARK, heat: wanted.heat, profile: lastProfile?.name ?? null,
     parcels: city.parcels, busted: lastWantedStatus === 'busted',

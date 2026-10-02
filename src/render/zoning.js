@@ -14,6 +14,7 @@
 import * as THREE from 'three';
 import { STAGE, SETBACK, builtHeight } from '../sim/zoning.js';
 import { craneBase } from '../sim/interior.js';
+import { AVENUES, CROSSINGS, ROAD_HALF_WIDTH } from '../sim/world.js';
 import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
@@ -184,7 +185,13 @@ export function buildZoning(city, kinds, footprints) {
   kit.castShadow = true;
   kit.receiveShadow = true;
   group.add(kit);
-  const rects = [...footprints, ...city.parcels];
+  // The carriageways count as obstacles too: a jib swung low over the road reads
+  // from the pavement as a yellow bar floating across the street, not a crane.
+  const roads = [
+    ...AVENUES.map((a) => ({ x: a.x, z: (a.z0 + a.z1) / 2, w: ROAD_HALF_WIDTH * 2, d: a.z1 - a.z0 })),
+    ...CROSSINGS.map((c) => ({ x: (c.x0 + c.x1) / 2, z: c.z, w: c.x1 - c.x0, d: ROAD_HALF_WIDTH * 2 })),
+  ];
+  const rects = [...footprints, ...city.parcels, ...roads];
   const slew = city.parcels.map((p) => slewZone(p, rects));
   const rig = { shells, kit, kitCount: 0, slew };
   const meshes = [kit, ...Object.values(shells)];
