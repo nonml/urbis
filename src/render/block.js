@@ -278,20 +278,6 @@ const SOUTH_TOWERS = [
   [-2, 11, 30], [10, 10, 42], [22, 11, 26], [34, 10, 36], [46, 11, 28],
 ];
 
-// Mid-block infill (x,z,w,h,d): fills the dark voids between avenues so the
-// district reads as city blocks, not three streets. Merged into the same
-// facade draws (+0 draws). Keeps clear of roads (x=0/±44 ±4, z=40 ±4, z=-64 ±4).
-const INFILL_TOWERS = [
-  [22, -48, 14, 30, 12], [-22, -48, 12, 26, 10],
-  [22, -24, 12, 38, 11], [-22, -24, 14, 32, 12],
-  [22, -4, 10, 24, 10], [-22, -4, 12, 28, 11],
-  [22, 14, 13, 36, 11], [-22, 14, 11, 26, 10],
-  [22, 28, 10, 22, 10], [-22, 28, 12, 30, 11],
-  [22, 70, 12, 34, 11], [-22, 70, 14, 40, 12],
-  [22, 88, 10, 26, 10], [-22, 88, 12, 32, 11],
-  [66, -20, 12, 30, 11], [66, 30, 14, 38, 12],
-];
-
 // North terminus caps (z=104): close the avenue vistas so driving north
 // ends in lit towers, not black void. Beyond playable bounds, visual only.
 const TERMINUS_TOWERS = [
@@ -779,9 +765,6 @@ export function buildTowers(texLoader, maxAniso) {
   }
   SOUTH_TOWERS.forEach(([x, w, h], i) => {
     emitTower(x, -66, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
-  });
-  INFILL_TOWERS.forEach(([x, z, w, h, d], i) => {
-    emitTower(x, z, w, h, d, idx++, [x > 0 ? -1 : 1, 0], `INFILL_TOWERS[${i}]`);
   });
   TERMINUS_TOWERS.forEach(([x, z, w, h, d], i) => {
     emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
