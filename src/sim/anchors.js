@@ -49,17 +49,24 @@ export const SUBSTATION_PLACES = { substation_s: 0 };
 // nearest west (the largest x less than avenues[0].x), or failing that the
 // nearest east.
 export function counterpartX(handAx, district) {
-  void handAx;
-  void district;
-  return 0;
+  const a0 = district.avenues[0].x;
+  const xs = district.avenues.map((a) => a.x);
+  const east = xs.filter((x) => x > a0);
+  const west = xs.filter((x) => x < a0);
+  if (handAx === 0) return a0;
+  if (handAx === 44) return east.length ? Math.min(...east) : Math.max(...west);
+  return west.length ? Math.max(...west) : Math.min(...east);
 }
 
 // A hand x moved onto a generated world: find the HAND_AVENUE_X entry nearest x
 // (on a tie the earlier entry), and keep x's offset from it on its counterpart:
 // counterpartX(ax, district) + (x - ax).
 export function placeX(x, district) {
-  void district;
-  return x;
+  let ax = HAND_AVENUE_X[0];
+  for (const v of HAND_AVENUE_X) {
+    if (Math.abs(x - v) < Math.abs(x - ax)) ax = v;
+  }
+  return counterpartX(ax, district) + (x - ax);
 }
 
 // A generated world's substations, zone 0 then zone 1. Zone 0 is { x:
@@ -70,15 +77,28 @@ export function placeX(x, district) {
 // SUB_CLEAR to district.walk.maxZ - SUB_CLEAR, and is at least SUB_CLEAR from
 // the z of every crossing that meets the main avenue (c.x0 <= a.x <= c.x1).
 export function substationsFor(district) {
-  void district;
-  return HAND_SUBSTATIONS;
+  const a = district.avenues[0];
+  const met = district.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);
+  const zFor = (hz, zone) => {
+    for (let n = 0; n <= 800; n += 1) {
+      const step = Math.ceil(n / 2) * 0.5;
+      const z = hz + (n % 2 === 1 ? -step : step);
+      const inZone = zone === 0 ? z < 0 : z >= 0;
+      const inWalk = z >= district.walk.minZ + SUB_CLEAR && z <= district.walk.maxZ - SUB_CLEAR;
+      if (inZone && inWalk && met.every((c) => Math.abs(z - c.z) >= SUB_CLEAR)) return z;
+    }
+    throw new Error(`substationsFor: no z for zone ${zone}`);
+  };
+  return [
+    { x: a.x + SUB_OUT, z: zFor(HAND_SUBSTATIONS[0].z, 0), zone: 0, face: -1 },
+    { x: a.x - SUB_OUT, z: zFor(HAND_SUBSTATIONS[1].z, 1), zone: 1, face: 1 },
+  ];
 }
 
 // A generated world's chase cars wait on its main avenue: each HAND_PURSUIT_HOMES
 // entry with x = district.avenues[0].x and its z unchanged.
 export function pursuitHomesFor(district) {
-  void district;
-  return HAND_PURSUIT_HOMES;
+  return HAND_PURSUIT_HOMES.map((h) => ({ x: district.avenues[0].x, z: h.z }));
 }
 
 // The arc definition (content/arc.json) moved onto a generated world: a new
@@ -88,8 +108,17 @@ export function pursuitHomesFor(district) {
 // z: sub.z } of substationsFor(district)[index]. Each sign keeps its fields but
 // x becomes placeX(x, district). def itself is never changed.
 export function arcFor(def, district) {
-  void district;
-  return def;
+  const subs = substationsFor(district);
+  const places = {};
+  for (const [id, p] of Object.entries(def.places)) {
+    if (id in SUBSTATION_PLACES) {
+      const sub = subs[SUBSTATION_PLACES[id]];
+      places[id] = { ...p, x: sub.x + sub.face * SUB_PLACE_IN, z: sub.z };
+    } else {
+      places[id] = { ...p, x: placeX(p.x, district) };
+    }
+  }
+  return { ...def, places, signs: def.signs.map((s) => ({ ...s, x: placeX(s.x, district) })) };
 }
 
 // The world being played: generated games move everything, the hand preset

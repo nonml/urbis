@@ -4,14 +4,10 @@
 import * as THREE from 'three';
 import { getGlowTex } from './signs.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { SUBSTATIONS } from '../sim/anchors.js';
 
 const SPARKS = 24;
 const HALF = 12;
-
-export const SUBSTATIONS = [
-  { x: 8.3, z: -30, zone: 0 },
-  { x: -8.3, z: 30, zone: 1 },
-];
 
 export function buildHackFx() {
   const group = new THREE.Group();
@@ -46,7 +42,7 @@ export function buildHackFx() {
     const post2 = new THREE.CylinderGeometry(0.07, 0.07, 0.9, 6);
     post2.translate(s.x + 0.35, 2.4, s.z);
     bodies.push(post2);
-    const face = s.x > 0 ? -1 : 1;
+    const face = s.face;
     dummy.position.set(s.x + face * 0.61, 1.6, s.z);
     dummy.rotation.set(0, face > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
     dummy.scale.set(1, 1, 1);

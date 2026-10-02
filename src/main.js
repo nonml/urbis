@@ -10,6 +10,7 @@ import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero,
 import { createWanted, wantedOnBlackout, tickWanted, isBusted } from './sim/wanted.js';
 import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
+import { tickCommute, commuteLabel } from './sim/commute.js';
 import { districtReport } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
@@ -28,7 +29,8 @@ import {
   buildShops, buildPuddles, setPuddleGlow, buildCityMirror, showInMirror, onlyInMirror,
   cityMirrorStale, requestCityMirror, tickCityMirror, buildSteam, tickSteam, buildBeacons, buildStars,
 } from './render/setdress.js';
-import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit, SUBSTATIONS } from './render/hackfx.js';
+import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit } from './render/hackfx.js';
+import { SUBSTATIONS } from './sim/anchors.js';
 import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
 import { loadPropInstances, buildTrees } from './render/props.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
@@ -489,6 +491,7 @@ window.__game = {
   tod: () => +clock.nightFactor.toFixed(3),
   hour: () => clock.hour,
   census: () => census(people),
+  walkersOut: () => street.npcs.filter((n) => n.out !== false).length,
   person: (k) => {
     if (people.list.length === 0) return null;
     return describe(people.list[k % people.list.length]);
@@ -557,6 +560,7 @@ if (CAPTURE) {
   // The end of the day/night glide, reached at once: a probe measuring the day
   // frame should not have to render 140 frames of dusk to get there.
   window.__game.night = (n) => { clock.nightFactor = n; clock.nightTarget = n; clock.rate = 0; };
+  window.__game.setHour = (h) => { clock.hour = h; clock.rate = 0; };
   // Runs the street and the city ahead by `secs` of game time in the frame loop's
   // own 50 ms steps, so evidence of a minutes-long economic swing does not need
   // minutes of a software rasteriser. Nothing else is ticked; nothing is skipped.
@@ -705,6 +709,7 @@ function render() {
   tickStreet(street, dt);
   tickZoning(city, dt, street, occupiedParcel(interior));
   tickPeople(people, city);
+  tickCommute(street, people, city, clock.hour, player.x, player.z);
   tickCityView(cityView, city, dt, keys);
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
@@ -856,7 +861,7 @@ function render() {
   const targetPerson = target && people.list.length > 0
     ? people.list[street.npcs.indexOf(target.npc) % people.list.length]
     : null;
-  lastProfile = driving ? null : updateProfiler(camera, target, targetPerson);
+  lastProfile = driving ? null : updateProfiler(camera, target, targetPerson, targetPerson ? commuteLabel(targetPerson, clock.hour) : null);
   showLotNote(lotNote, interior.space === STREET
     ? focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);

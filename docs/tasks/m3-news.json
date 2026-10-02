@@ -1,0 +1,23 @@
+{
+  "milestone": "3d: the city tells you what just changed",
+  "tasks": [
+    {
+      "id": "m3-news",
+      "lane": "news",
+      "goal": "Fill in newsBetween, tickNews and liveNews in src/sim/news.js: the lines that say what changed between two frames of the city, kept and aged.",
+      "files": ["src/sim/news.js"],
+      "test": "tests/news.spec.js",
+      "commit": "feat(news): the city says what just changed, lots, firms, power and people",
+      "notes": "The comments above each function are the exact rules. Remove the void lines and stub returns; do not touch createNews, snapshot or the constants. newsBetween: const lines = []; const { districts } = city.economy; districts.forEach((d, i) => { if (!before.dark[i] && after.dark[i]) push `Power cut in the ${d.name} district`; if (before.dark[i] && !after.dark[i]) push `Power back in the ${d.name} district`; }); then city.parcels.forEach((p, i) => { const was = before.stages[i]; const now = after.stages[i]; if (was === now) return; const noun = NOUN[p.use]; const at = address(p.x, p.z); if (was === STAGE.EMPTY && now === STAGE.SITE) push `${noun} breaking ground at ${at}`; else if (now === STAGE.HIGH) push `${noun} topped out at ${at}`; else if (now === STAGE.EMPTY) push `${noun} at ${at} came down`; }); then districts.forEach((d, i) => { const m = after.moves[i]; if (m === null || m === before.moves[i]) return; const n = Math.round(Math.abs(m.jobs)); if (n === 0) return; push m.jobs > 0 ? `${n} ${JOBS[m.use]} jobs moved into the ${d.name} district` : `${n} ${JOBS[m.use]} jobs left the ${d.name} district`; }); return lines. tickNews: const now = snapshot(city, people, street); const push = (text) => news.items.push({ at: street.time, text }); if (news.last !== null) newsBetween(news.last, now, city).forEach(push); if (news.residents === null) news.residents = now.residents; else { const moved = now.residents - news.residents; if (Math.abs(moved) >= CROWD) { push(moved > 0 ? `${moved} people moved into the city` : `${-moved} people moved out of the city`); news.residents = now.residents; } } news.last = now; if (news.items.length > NEWS_MAX) news.items.splice(0, news.items.length - NEWS_MAX); liveNews: return news.items.filter((i) => now - i.at < NEWS_SECS).map((i) => i.text);"
+    },
+    {
+      "id": "m3-news-wire",
+      "lane": "news",
+      "goal": "Put the news on screen: main.js ticks it every frame after the commute and shows the live lines top right (render/news.js is already written).",
+      "files": ["src/main.js"],
+      "test": "tests/news-wire.spec.js",
+      "commit": "feat(news): the news line shows top right while the city runs",
+      "notes": "Only src/main.js changes. 1) After the line import { tickCommute, commuteLabel } from './sim/commute.js'; add import { createNews, tickNews, liveNews } from './sim/news.js'; 2) After the line import { buildLotNote, showLotNote } from './render/lotnote.js'; add import { buildNews, showNews } from './render/news.js'; 3) After the line const lotNote = buildLotNote(); add const news = createNews(); and const newsLine = buildNews(); 4) In the window.__game object, after census: () => census(people), add news: () => liveNews(news, street.time), 5) In render(), right after tickCommute(street, people, city, clock.hour, player.x, player.z); add tickNews(news, city, people, street); 6) In render(), right after the showLotNote(lotNote, ...) statement (it spans two lines and ends with : null);) add showNews(newsLine, liveNews(news, street.time)); Check that the names news and newsLine are not already used in main.js. tests/news.spec.js and tests/gate.spec.js must stay green."
+    }
+  ]
+}

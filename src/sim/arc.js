@@ -3,9 +3,11 @@
 // docs/ARC.md. Pure state (law 5): render and the HUD read it, only main ticks
 // it, and it reads the city without ever writing to it.
 // The attribute lets Node (the headless tests) load the same module Vite bundles.
-import ARC from '../content/arc.json' with { type: 'json' };
+import RAW_ARC from '../content/arc.json' with { type: 'json' };
+import { worldArc } from './anchors.js';
 import { activeStep, createRun, isNear, missionOnChoice, missionPoll, missionRewind, siteFor } from './mission.js';
 
+const ARC = worldArc(RAW_ARC);
 export { ARC };
 
 // Coldest to warmest. A choice moves a contact along this scale and it stays
