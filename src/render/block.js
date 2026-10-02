@@ -661,10 +661,12 @@ function posterCluster(out, at, span, base, idx, f) {
     const h = 0.58 + ((seed % 5) * 0.11);
     const geo = posterCell(new THREE.PlaneGeometry(h * 0.72, h), (seed * 5) % 4);
     geo.rotateZ((((seed * 13) % 11) - 5) * 0.014);
-    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17));
+    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17), i);
     if (Math.abs(base) < span / 2) out.push(geo);
   }
 }
+
+const POSTER_LAYER = 0.006;
 
 function posterWall(out, cx, cz, pw, pd, idx) {
   for (let f = 0; f < 4; f += 1) {
@@ -672,9 +674,12 @@ function posterWall(out, cx, cz, pw, pd, idx) {
     const dir = f % 2 ? 1 : -1;
     const span = (alongZ ? pd : pw) - 1.6;
     const t = (alongZ ? pw : pd) / 2 + 0.03;
-    const at = (geo, u, y) => {
+    // Each later bill in a cluster is pasted POSTER_LAYER further out, so two
+    // that overlap never share a plane and z-fight into black stripes.
+    const at = (geo, u, y, layer) => {
+      const off = t + layer * POSTER_LAYER;
       geo.rotateY(alongZ ? dir * Math.PI / 2 : (dir > 0 ? 0 : Math.PI));
-      geo.translate(alongZ ? cx + dir * t : cx + u, y, alongZ ? cz + u : cz + dir * t);
+      geo.translate(alongZ ? cx + dir * off : cx + u, y, alongZ ? cz + u : cz + dir * off);
     };
     for (const base of [-span * 0.28, span * 0.3]) posterCluster(out, at, span, base, idx, f);
   }
