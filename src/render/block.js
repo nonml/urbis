@@ -670,6 +670,30 @@ function footprintOf(geometry) {
   return { x: (min.x + max.x) / 2, z: (min.z + max.z) / 2, w: max.x - min.x, d: max.z - min.z };
 }
 
+// The top of a row building: a parapet wall around the roof edge and, on
+// masonry, a two-step cornice under it. Real roofs end in an edge, not a lid.
+const PARAPET_H = 1.1;
+const PARAPET_T = 0.3;
+const MASONRY_KINDS = [3, 4, 5];
+// The setback crown is built at this fraction of the shaft footprint.
+const CROWN = 0.72;
+
+function roofline(caps, cx, cz, w, top, d, kind) {
+  caps.push(
+    box(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz + d / 2 - PARAPET_T / 2),
+    box(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz - d / 2 + PARAPET_T / 2),
+    box(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx + w / 2 - PARAPET_T / 2, top + PARAPET_H / 2, cz),
+    box(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx - w / 2 + PARAPET_T / 2, top + PARAPET_H / 2, cz),
+    box(w + 0.3, 0.12, d + 0.3, cx, top + PARAPET_H + 0.06, cz),
+  );
+  if (MASONRY_KINDS.includes(kind)) {
+    caps.push(
+      box(w + 0.8, 0.45, d + 0.8, cx, top - 0.55, cz),
+      box(w + 0.45, 0.25, d + 0.45, cx, top - 0.9, cz),
+    );
+  }
+}
+
 export function buildTowers(texLoader, maxAniso) {
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
@@ -800,14 +824,19 @@ export function buildTowers(texLoader, maxAniso) {
     shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
-      const uw = w * 0.72;
+      const uw = w * CROWN;
       const uh = h * 0.3;
-      const ud = d * 0.72;
+      const ud = d * CROWN;
       shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, FACADE_TILE));
       topY = h + uh;
     }
-    caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
-    caps.push(box(w + 0.9, 0.35, d + 0.9, cx, topY + 0.1, cz));
+    if (door) {
+      caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
+      caps.push(box(w + 0.9, 0.35, d + 0.9, cx, topY + 0.1, cz));
+    } else {
+      roofline(caps, cx, cz, w, h, d, kind);
+      if (topY > h) roofline(caps, cx, cz, w * CROWN, topY, d * CROWN, kind);
+    }
     const ux = cx + (idx % 3 - 1) * w * 0.22;
     const uz = cz + ((idx + 1) % 3 - 1) * d * 0.22;
     caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
