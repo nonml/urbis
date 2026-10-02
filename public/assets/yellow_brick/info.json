@@ -1,0 +1,12 @@
+{
+  "id": "yellow_brick",
+  "name": "Yellow Brick",
+  "type": "textures",
+  "authors": {
+    "Rob Tuytel": "All"
+  },
+  "license": "CC0",
+  "source": "https://polyhaven.com/a/yellow_brick",
+  "res": "1k",
+  "fmt": "jpg"
+}

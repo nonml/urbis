@@ -14,6 +14,9 @@ were copied (no preview renders). Each folder keeps its upstream `info.json`.
 - ambientCG Plaster003 — CC0 — https://ambientcg.com/view?id=Plaster003 — tower podiums A
 - ambientCG PaintedPlaster017 — CC0 — https://ambientcg.com/view?id=PaintedPlaster017 — tower podiums B
 - Poly Haven Concrete Wall 008 — CC0 — https://polyhaven.com/a/concrete_wall_008 — vendored, unwired (needs linear-workflow loader for Diffuse/nor_gl/arm naming)
+- Poly Haven Red Brick — CC0 — https://polyhaven.com/a/red_brick — tower facade (VGA-084.2a)
+- Poly Haven Yellow Brick — CC0 — https://polyhaven.com/a/yellow_brick — tower facade (VGA-084.2a)
+- Poly Haven Sandstone Blocks 08 — CC0 — https://polyhaven.com/a/sandstone_blocks_08 — tower facade (VGA-084.2a)
 - Poly Haven Street Lamp 01 / fire hydrant / metal trash can (GLTF, CC0, Josh Dean + authors in per-folder info.json) — vendored under models/, unwired: GLB→instanced pipeline lands in its own slice
 
 Technique mined alongside (from their `AssetLoader.js` + buildings materials):

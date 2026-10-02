@@ -1,0 +1,12 @@
+{
+  "id": "red_brick",
+  "name": "Red Brick",
+  "type": "textures",
+  "authors": {
+    "Rob Tuytel": "All"
+  },
+  "license": "CC0",
+  "source": "https://polyhaven.com/a/red_brick",
+  "res": "1k",
+  "fmt": "jpg"
+}

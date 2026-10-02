@@ -290,8 +290,9 @@ const FACADE_MAPS = [
   ['normal', 'normal', false], ['rough', 'roughness', false], ['metal', 'metalness', false],
 ];
 
-// Three facade architectures so the skyline is not one tower repeated: lit curtain
-// glass in two tints, and poured concrete with the same windows punched through it.
+// Six facade architectures so the skyline is not one tower repeated: lit curtain
+// glass in two tints, poured concrete, red brick, pale brick and dressed stone —
+// the last four with the same windows punched through them.
 // A blackout has to kill one zone's windows and leave the other burning; each
 // material lights both zones from a per-vertex zone (zoneLit), so that costs no
 // draw of its own.
@@ -389,10 +390,16 @@ function towerMaterials(texLoader, maxAniso) {
   dayColor.wrapS = dayColor.wrapT = THREE.RepeatWrapping;
   dayColor.anisotropy = maxAniso;
   const concrete = loadPolyHavenMaps(texLoader, maxAniso, 'concrete_wall_008', 1, 1);
+  const redBrick = loadPolyHavenMaps(texLoader, maxAniso, 'red_brick', 8, 8);
+  const paleBrick = loadPolyHavenMaps(texLoader, maxAniso, 'yellow_brick', 6, 6);
+  const stone = loadPolyHavenMaps(texLoader, maxAniso, 'sandstone_blocks_08', 4, 4);
   const kinds = [
     facadeMaterial(nightMaps, dayColor, 0x9aa2ae),
     facadeMaterial(nightMaps, dayColor, 0x8a94a8),
     concreteFacadeMaterial(concrete, nightMaps.emission, 0x767a83),
+    concreteFacadeMaterial(redBrick, nightMaps.emission, 0x8a7a72),
+    concreteFacadeMaterial(paleBrick, nightMaps.emission, 0x8c8880),
+    concreteFacadeMaterial(stone, nightMaps.emission, 0x86837d),
   ];
   for (const m of kinds) m.userData.baseTint = m.color.clone();
   const podium = [
@@ -785,7 +792,7 @@ export function buildTowers(texLoader, maxAniso) {
   }
   // Mirror proxy (VGA-002): one merged copy of every facade, so the reflection
   // probe redraws the city in one pass instead of six. Water cannot tell glass
-  // from concrete at reflection scale, so all three architectures borrow the
+  // from concrete at reflection scale, so all six architectures borrow the
   // glass material — and each zone still dies with its own lights, because the
   // proxy carries the same zone stamp.
   const mirrorProxy = new THREE.Mesh(
