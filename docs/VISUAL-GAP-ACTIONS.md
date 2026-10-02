@@ -167,8 +167,11 @@ remaining neon element is now a defect, and this item goes before every other op
     baked or vertex AO and bevelled geometry.
 
   **Order inside the item:** one slice each, each with its own play-camera evidence.
-  1. **No overlap.** ⏳ Checker in the gate (`npm run check:overlap`, 57 pairs at the
-     podium, ratchet); fixes briefed step by step in `docs/handoff/VGA-084-1.md`.
+  1. **No overlap.** ✅ DONE (slice 053: 57 → 0 pairs, `check:overlap` gates it at 0.
+     South row narrowed `c05642b`, silhouettes deleted `57e118a`, ring moved out
+     `88fd38b`, infill deleted `8bd1d3a`. Evidence `slice-053-step1..4-street/city.png`.
+     Draws 123 → 122. The setback axis was left: it causes none of the pairs and moves
+     the noodle bar door, so it goes with sub-slice 2.)
      A headless test that fails if any two building footprints
      intersect, wired into the gate. Then fit the infill into real gaps, correct the
      setback axis, and move the silhouettes and ring out of the district. Moving tower

@@ -92,6 +92,7 @@ Each slice proved itself in a screenshot under budget. Evidence in `docs/shots/`
 | 050 | The player zones the city: Z overview, R C I X (`ad67e3b`) | +0 street; overview ≤ 168 before reclaim | `wave2-cityview-*.png` |
 | 051 | Walk into the city: a noodle bar and a roof (verticality v1, VGA-078, `6837f5a`) | +1 at the door | `wave2-interiors-*.png` |
 | 052 | Six missions, three people, two choices the district remembers; radio deferred, no audio yet (`58ba12a`) | +1 with the marker up | `wave2-arc-*.png` |
+| 053 | No two buildings overlap: south row narrowed, silhouettes and infill deleted, ring moved out; `check:overlap` gates it at 0 (VGA-084.1, `c05642b` `57e118a` `88fd38b` `8bd1d3a`) | −1 (122) | `slice-053-step{1..4}-*.png` |
 
 **Bookkeeping note.** Slices 013–015 were originally planned as Wanted / Arc+Radio /
 Verticality. An operator redirect sent visual-gap work first, and those numbers were
