@@ -13,6 +13,7 @@
 //             netting, plinth, parapet, plant.
 import * as THREE from 'three';
 import { STAGE, SETBACK, builtHeight } from '../sim/zoning.js';
+import { craneBase } from '../sim/interior.js';
 import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
@@ -124,7 +125,8 @@ function raiseCrane(rig, p, i, h) {
   const yaw = zone.rest + zone.swing * Math.sin((p.stage + p.progress) * Math.PI * 2);
   const hookY = h + 3;
   const jibY = mastTop - JIB_DEPTH;
-  kitBox(rig, PAINT.crane, p.x, 0, p.z, MAST, mastTop, MAST);
+  const base = craneBase(p);
+  kitBox(rig, PAINT.crane, p.x, base, p.z, MAST, mastTop - base, MAST);
   kitBox(rig, PAINT.crane, p.x, mastTop, p.z, 0.9, 4.5, 0.9);
   kitBox(rig, PAINT.crane, p.x, jibY, p.z, JIB + COUNTER_JIB, JIB_DEPTH, 1, yaw, (JIB - COUNTER_JIB) / 2);
   kitBox(rig, PAINT.ballast, p.x, jibY - 1.8, p.z, 2.2, 1.8, 1.8, yaw, -COUNTER_JIB + 1.2);

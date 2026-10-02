@@ -242,6 +242,9 @@ export function doorEnds() {
 // The room's floor datum sits on the lot's plinth (render/zoning.js raises a
 // PAD_RISE + 0.12 plinth under every shell), a slab's rise below the boards.
 const PARCEL_FLOOR = 0.62;
+// The room's clear height above its floor. A climbing crane stands its mast on
+// the ground floor's ceiling, so this is where the mast starts.
+const PARCEL_ROOM_HEIGHT = 3.0;
 // The room never reaches the shell's own faces: the camera must not sit between
 // the room and the wall behind it.
 const PARCEL_WALL = 0.4;
@@ -355,7 +358,7 @@ export function parcelSpace(p, i) {
     stage: p.stage,
     frame: { x: side.x, z: side.z, out: side.out },
     floor: PARCEL_FLOOR,
-    height: 3.0,
+    height: PARCEL_ROOM_HEIGHT,
     room: { a, d },
     items: parcelItems(p.use, p.stage, a, d),
     rig: { dist: 2.7, pitch: 0.5 },
@@ -365,6 +368,12 @@ export function parcelSpace(p, i) {
 
 export function parcelPlace(p, i) {
   return worldSpace(parcelSpace(p, i));
+}
+
+// Where a lot's tower crane stands its mast. On a bare site it stands on the
+// ground; from LOW up the lot has a room, so it climbs onto that room's ceiling.
+export function craneBase(p) {
+  return p.stage < STAGE.LOW ? 0 : PARCEL_FLOOR + PARCEL_ROOM_HEIGHT;
 }
 
 // The link between the lot's street face and its room, in world coordinates.
