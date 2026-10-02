@@ -1,0 +1,61 @@
+{
+  "milestone": "2a: a generated district where the street wall and the lots fit",
+  "tasks": [
+    {
+      "id": "m2-rows",
+      "lane": "layout",
+      "goal": "Fill in rowDepth and rowRuns in src/sim/layout.js so every street-wall row on a generated district stays off the crossings and never backs into the row facing it.",
+      "files": [
+        "src/sim/layout.js"
+      ],
+      "test": "tests/layout-rows.spec.js",
+      "commit": "feat(layout): street-wall rows derived from the roads",
+      "notes": "The comments above each function in layout.js are the exact rules; the constants are final, do not change them. Use only the district passed in, never world.js globals. Avenues are not sorted by x in every district."
+    },
+    {
+      "id": "m2-lots",
+      "lane": "layout",
+      "goal": "Fill in deriveLots and planLayout in src/sim/layout.js so every generated district gets 6 to 12 lots set into its rows, and the plan cuts those lots and the pinned towers out of the rows.",
+      "files": [
+        "src/sim/layout.js"
+      ],
+      "test": "tests/layout-lots.spec.js",
+      "commit": "feat(layout): zonable lots derived from the rows and the seed",
+      "notes": "Seed the randomness with mulberry32 from src/sim/rng.js, never Math.random. Keep each lot's avenue and side while you place it (an internal helper can return them); deriveLots returns only [x, z, w, d]. rowDepth and rowRuns are done and tested; build on them."
+    },
+    {
+      "id": "m2-zoning",
+      "lane": "layout",
+      "goal": "Make createCity in src/sim/zoning.js zone WORLD_PLAN.lots on a generated world, and keep the hand LOTS table on the hand preset.",
+      "files": [
+        "src/sim/zoning.js"
+      ],
+      "test": "tests/layout-zoning.spec.js",
+      "commit": "feat(zoning): a generated city zones the lots its layout plan derives",
+      "notes": "WORLD_PLAN is exported by src/sim/layout.js and is null on the hand preset. This is a two-line change: import it, and pick WORLD_PLAN.lots or LOTS. Do not touch LOTS itself."
+    },
+    {
+      "id": "m2-streetwall",
+      "lane": "layout",
+      "goal": "Make the street wall in src/render/block.js and the frontage meter in scripts/check_overlap.mjs read WORLD_PLAN.rows on a generated world, so row buildings stop overlapping each other, the lots and the roads.",
+      "files": [
+        "src/render/block.js",
+        "scripts/check_overlap.mjs"
+      ],
+      "test": "tests/layout-streetwall.spec.js",
+      "commit": "feat(block): the street wall stands where the layout plan says",
+      "notes": "Import WORLD_PLAN from src/sim/layout.js (in check_overlap.mjs, import it after the seed is set, like the other src/ imports there). In streetWall(ax, side, rand): when WORLD_PLAN has a row for this ax and side, use its runs instead of ROW_RUNS minus KEEP_OUT, and cap each building's w at the row's depth. Keep calling rand() the same number of times. In the checker's frontage loop, use the same plan runs when there is a plan. With no plan (the hand preset) nothing may change: npm run check:overlap must print the same numbers as before."
+    },
+    {
+      "id": "m2-spread",
+      "lane": "layout",
+      "goal": "Change how deriveLots in src/sim/layout.js places lots so they spread across the whole district instead of packing into the south end of each street, with room for a building between any two lots on one row.",
+      "files": [
+        "src/sim/layout.js"
+      ],
+      "test": "tests/layout-spread.spec.js",
+      "commit": "fix(layout): lots spread over the district, not packed at one end",
+      "notes": "tests/layout-lots.spec.js must stay green too. One way that works on every seed: split the drive z range into as many equal bands as lots wanted, try to place lot k at a random z inside band k on a random avenue side, and fall back to anywhere in the range when band k has no room after a few tries. Reject a spot that crosses a pinned tower, leaves its row run, or comes within MIN_RUN + 2 * LOT_CLEAR of another lot on the same row. Keep using the seeded mulberry32; planLayout must keep cutting exactly the lots deriveLots returns."
+    }
+  ]
+}
