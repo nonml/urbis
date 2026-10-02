@@ -12,7 +12,7 @@ import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { districtReport } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
-  occupiedParcel, syncInterior,
+  occupiedParcel, syncInterior, doorEnds,
 } from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
 import { loadSave, writeSave, clearSave } from './savestore.js';
@@ -333,6 +333,16 @@ if (spawnPreset === 'east') {
   cam.yaw = Math.PI / 2;
   cam.pitch = 0.08;
   cam.dist = 14;
+} else if (spawnPreset?.startsWith('door-')) {
+  // Where leaving a street door puts you (?spawn=door-ramen-front), turned back
+  // to face it: frames the door on any world, wherever its tower stands.
+  const end = doorEnds().find((e) => e.door === spawnPreset.slice(5) && e.space === STREET);
+  if (end) {
+    player.x = end.arrive.x;
+    player.z = end.arrive.z;
+    player.yaw = end.arrive.yaw + Math.PI;
+    cam.yaw = player.yaw;
+  }
 }
 window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
 window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
