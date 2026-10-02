@@ -12,13 +12,21 @@
 // player's city with a different one.
 // Pure (law 5): no DOM; boot.js hands it location.search, navigator.webdriver,
 // the raw saved string and Date.now().
-//
-// Milestone 2 skeleton: the constants are final; pickWorld is a stub with its
-// test in tests/newgame-pick.todo.js.
 
 export const FIXED_SEED = 20260916;
 // Seeds are 1 .. SEED_LIMIT - 1.
 export const SEED_LIMIT = 2 ** 31;
+
+const seedOk = (n) => Number.isInteger(n) && n > 0 && n < SEED_LIMIT;
+
+const readSaved = (raw) => {
+  try {
+    const s = JSON.parse(raw);
+    return seedOk(s?.seed) ? { seed: s.seed, generate: s.generate === true } : null;
+  } catch {
+    return null;
+  }
+};
 
 // { seed, generate, saving } for one boot. `search` is location.search, `webdriver`
 // navigator.webdriver, `saved` the raw string in the save slot or null, `now`
@@ -35,9 +43,14 @@ export const SEED_LIMIT = 2 ** 31;
 // - generate: gen when not null, else savedWorld.generate when there is a saved
 //   world, else !webdriver.
 export function pickWorld({ search, webdriver, saved, now }) {
-  void search;
-  void webdriver;
-  void saved;
-  void now;
-  return { seed: FIXED_SEED, generate: false, saving: false };
+  const params = new URLSearchParams(search);
+  const rawSeed = params.get('seed');
+  const urlSeed = /^\d+$/.test(rawSeed) && seedOk(Number(rawSeed)) ? Number(rawSeed) : null;
+  const rawGen = params.get('gen');
+  const gen = rawGen === '1' ? true : rawGen === '0' ? false : null;
+  const saving = urlSeed === null && gen === null && (params.has('savetest') || !webdriver);
+  const savedWorld = saving ? readSaved(saved) : null;
+  const seed = savedWorld?.seed ?? urlSeed ?? (webdriver ? FIXED_SEED : now % 2147483647 || 1);
+  const generate = gen ?? savedWorld?.generate ?? !webdriver;
+  return { seed, generate, saving };
 }
