@@ -8,8 +8,9 @@ import { mulberry32 } from '../sim/rng.js';
 
 // Static decor — placement lists live at the call site, not here.
 
-// Leaf clumps: [x, y, z, radius]. Roughly a shell from y2.7 to y5.1, deliberately
-// asymmetric so no two profiles of the same tree read the same.
+// Leaf masses: [x, y, z, radius]. Each is a roughly spherical volume of leaf
+// cards; the ten sit on a shell from y2.7 to y5.1, deliberately asymmetric so no
+// two profiles of the same tree read the same.
 const CANOPY_CLUMPS = [
   [0, 3.05, 0, 1.15], [0.88, 3.30, 0.28, 0.82], [-0.78, 3.20, -0.38, 0.86],
   [0.26, 3.90, -0.72, 0.72], [-0.36, 4.02, 0.66, 0.68], [0.56, 4.48, 0.16, 0.58],
@@ -128,6 +129,33 @@ function treeSpots() {
   return spots;
 }
 
+// Alpha-cut leaf card sprite: 26 white ellipses on transparent. White so the
+// per-instance leaf colour set by setColorAt tints each card through the map.
+function leafTexture() {
+  const size = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = canvas.height = size;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, size, size);
+  ctx.fillStyle = '#ffffff';
+  const rng = mulberry32(78);
+  for (let i = 0; i < 26; i++) {
+    const rx = 6 + rng() * 5;
+    const ry = 3 + rng() * 2;
+    const angle = rng() * Math.PI * 2;
+    ctx.save();
+    ctx.translate(rng() * size, rng() * size);
+    ctx.rotate(angle);
+    ctx.beginPath();
+    ctx.ellipse(0, 0, rx, ry, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
+}
+
 export function buildTrees() {
   const group = new THREE.Group();
   const rand = mulberry32(77);
@@ -135,15 +163,28 @@ export function buildTrees() {
   const trunkGeo = new THREE.CylinderGeometry(0.06, 0.16, 3.0, 8);
   trunkGeo.translate(0, 1.5, 0);
   const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2c251c, roughness: 0.95 });
-  // Canopy as a cluster of leaf clumps, not three big spheres. Three spheres
-  // give a convex outline, and a convex green outline at play distance reads as
-  // a boulder — that is the single thing that made these trees look moulded.
-  // Ten small clumps on a rough shell put notches in the silhouette instead.
-  const canopyGeo = mergeGeometries(CANOPY_CLUMPS.map(([x, y, z, r]) => {
-    const g = new THREE.IcosahedronGeometry(r, 1);
-    g.scale(1, 0.85, 1);
-    g.translate(x, y, z);
-    return g;
+  // Canopy as leaf cards, not solid volumes: 18 small alpha-cut quads seeded
+  // inside each leaf mass. The cut outline breaks the silhouette and lets sky
+  // through, so it reads as foliage instead of green balls.
+  const cardRng = mulberry32(79);
+  const canopyGeo = mergeGeometries(CANOPY_CLUMPS.flatMap(([x, y, z, r]) => {
+    const cards = [];
+    for (let i = 0; i < 18; i++) {
+      const g = new THREE.PlaneGeometry(1.1 * r, 1.1 * r);
+      g.rotateX(cardRng() * Math.PI * 2);
+      g.rotateY(cardRng() * Math.PI * 2);
+      g.rotateZ(cardRng() * Math.PI * 2);
+      const rad = 0.8 * r * Math.cbrt(cardRng());
+      const theta = cardRng() * Math.PI * 2;
+      const phi = Math.acos(2 * cardRng() - 1);
+      g.translate(
+        x + rad * Math.sin(phi) * Math.cos(theta),
+        y + rad * Math.cos(phi),
+        z + rad * Math.sin(phi) * Math.sin(theta),
+      );
+      cards.push(g);
+    }
+    return cards;
   }));
   // Branch stubs: 2–3 short limbs poking from the trunk into the canopy.
   const branchGeo = mergeGeometries([
@@ -151,15 +192,15 @@ export function buildTrees() {
     (() => { const g = new THREE.CylinderGeometry(0.025, 0.05, 0.8, 5); g.rotateZ(-0.5); g.translate(-0.3, 3.0, 0.2); return g; })(),
     (() => { const g = new THREE.CylinderGeometry(0.02, 0.04, 0.6, 5); g.rotateX(0.4); g.translate(0.1, 2.2, -0.35); return g; })(),
   ]);
-  // Organic displacement: break the perfect icosahedron silhouette.
+  // Organic displacement: break the branch silhouette. Leaf cards are already
+  // irregular, and jittering their corners would warp the alpha cut.
   {
     const hash3 = (x, y, z) => {
       const s = Math.sin(x * 12.9898 + y * 78.233 + z * 37.719) * 43758.5453;
       return s - Math.floor(s);
     };
-    // Clumps are small now, so they get a small jitter; a 0.45 shove that suited
-    // 1.6m spheres turns a 0.5m clump inside out.
-    for (const [geo, amp] of [[canopyGeo, 0.16], [branchGeo, 0.4]]) {
+    // Branches are thin, so they take a modest shove.
+    for (const [geo, amp] of [[branchGeo, 0.4]]) {
       const p = geo.attributes.position;
       for (let i = 0; i < p.count; i++) {
         const ix = Math.round(p.getX(i) * 4);
@@ -188,6 +229,7 @@ export function buildTrees() {
   }
   const canopyMat = new THREE.MeshStandardMaterial({
     roughness: 1.0, envMapIntensity: 0.55, vertexColors: true,
+    map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide,
   });
   const branchMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
   const spots = treeSpots();
