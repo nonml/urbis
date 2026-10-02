@@ -1,0 +1,14 @@
+{
+  "milestone": "4a: a power cut drives a firm out of the district",
+  "tasks": [
+    {
+      "id": "m4-flight",
+      "lane": "flight",
+      "goal": "Fill in flee() in src/sim/economy.js: a firm gives up on a district a few seconds after a power cut ends, sized to how long it was dark.",
+      "files": ["src/sim/economy.js"],
+      "test": "tests/economy-flight.spec.js",
+      "commit": "feat(economy): a power cut drives a firm out of the dark district",
+      "notes": "Only the body of flee() changes; the comment above it is the exact rule. Remove the three void lines. Body: if (d.dark) d.darkFor += dt; else if (d.darkFor > 0) { d.fleeAt = economy.time + FLIGHT_SECS; d.fleeJobs = d.size * FLIGHT_PER_DARK_SEC * d.darkFor; d.darkFor = 0; } if (economy.time < d.fleeAt) return; const use = d.firms.com >= d.firms.ind ? 'com' : 'ind'; const jobs = Math.min(d.fleeJobs, d.firms[use]); d.firms[use] -= jobs; if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' }; d.fleeAt = Infinity; Never call economy.rand in flee. Do not touch the constants, makeDistrict or tickEconomy. tests/economy.spec.js, tests/zoning.spec.js and tests/decline.spec.js must stay green."
+    }
+  ]
+}
