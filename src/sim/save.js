@@ -88,6 +88,7 @@ export function serialize(game) {
   return {
     version: SAVE_VERSION,
     seed: game.seed,
+    generate: game.generate === true,
     clock: { ...game.clock },
     street: snapshotStreet(game.street),
     city: snapshotCity(game.city),
