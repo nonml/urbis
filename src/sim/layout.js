@@ -33,8 +33,8 @@ export const MIN_RUN = 6;
 
 // How many lots a district offers, how long each runs along its avenue, and the
 // clear strip left between a lot and the row buildings either side of it.
-export const LOTS_MIN = 6;
-export const LOTS_MAX = 12;
+export const LOTS_MIN = 16;
+export const LOTS_MAX = 28;
 export const LOT_FRONT = [8, 14];
 export const LOT_CLEAR = 1;
 // Total clearance a pinned tower keeps along its row, as block.js has always cut it.
