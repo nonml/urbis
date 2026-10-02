@@ -1,0 +1,14 @@
+{
+  "milestone": "4b: the news says a firm left because of the power cut",
+  "tasks": [
+    {
+      "id": "m4-cause",
+      "lane": "cause",
+      "goal": "In src/sim/news.js newsBetween, a firm move whose cause is 'dark' ends its line with ' after the power cut'.",
+      "files": ["src/sim/news.js"],
+      "test": "tests/news-cause.spec.js",
+      "commit": "feat(news): a firm a power cut drove out says so",
+      "notes": "Only the firm-move line in newsBetween changes (step 3 of the comment above it). Where the line `${n} ${JOBS[m.use]} jobs left the ${d.name} district` is built, append (m.cause === 'dark' ? ' after the power cut' : '') to the jobs-left line only. Do not touch anything else. tests/news.spec.js must stay green."
+    }
+  ]
+}
