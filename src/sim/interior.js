@@ -299,12 +299,19 @@ function parcelItems(use, stage, a, d) {
   const [d0, d1] = d;
   const big = stage >= STAGE.MID;
   if (use === 'res') {
-    return [
+    const items = [
       { kind: 'mailboxes', a: [a0, a0 + 0.4], d: [d0 + 0.6, d0 + 2.4], top: 1.6 },
-      { kind: 'stair', a: [a1 - 1.5, a1 - 0.15], d: [d0 + 0.6, d1 - 0.5], top: 3.0 },
       { kind: 'flatdoor', a: [-0.6, 0.6], d: [d1 - 0.1, d1 - 0.04], top: 2.15, solid: false },
       { kind: 'plant', a: [a1 - 0.95, a1 - 0.35], d: [d0 + 0.5, d0 + 1.0], top: 1.2 },
     ];
+    // The stair core backs onto the rear wall so it never covers the arrival or
+    // the follow cam's line behind the player. A room too narrow across, or too
+    // shallow to give the core a metre of depth, goes without one.
+    const back = [Math.max(d0 + 3.2, d1 - 3.2), d1 - 0.5];
+    if (a1 >= 2.3 && back[1] - back[0] >= 1.0) {
+      items.push({ kind: 'stair', a: [a1 - 1.5, a1 - 0.15], d: back, top: 3.0 });
+    }
+    return items;
   }
   if (use === 'ind') {
     return [
