@@ -1,5 +1,5 @@
 // Bootstrap: sim ticks, render reads. HUD shows measured numbers only.
-import { SEED, SAVING } from './boot.js';
+import { SEED, GENERATE, SAVING } from './boot.js';
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
@@ -460,7 +460,7 @@ let wiping = false;
 
 function doSave() {
   if (!SAVING || wiping) return false;
-  return writeSave(serialize({ seed: SEED, clock, street, city, player, car: heroCar, interior, mission, people }));
+  return writeSave(serialize({ seed: SEED, generate: GENERATE, clock, street, city, player, car: heroCar, interior, mission, people }));
 }
 
 // N: a new game is a new city (AGENTS.md). The save goes, and so does any
@@ -480,6 +480,7 @@ document.addEventListener('visibilitychange', () => {
 // Minimal probe for scripted verification (screenshots, control checks).
 window.__game = {
   seed: SEED,
+  generated: GENERATE,
   saveNow: doSave,
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
   draws: () => renderer.info.render.calls,
