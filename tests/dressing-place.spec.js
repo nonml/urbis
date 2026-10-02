@@ -43,7 +43,7 @@ function expected(d, seed) {
     }
   }
   const m = Math.min(cands.length, SHOPS_MAX - 1);
-  for (let i = 0; i < m; i += 1) shops.push({ ...cands[Math.floor((i * cands.length) / m)], kind: (i + 1) % 3 });
+  for (let i = 0; i < m; i += 1) shops.push({ ...cands[Math.floor((i * cands.length) / m)], kind: 1 + (i % 2) });
   const vents = [];
   for (let k = 0; k < shops.length && vents.length < VENTS_MAX; k += 2) {
     const s = shops[k];
@@ -98,6 +98,7 @@ test('the RAMEN board hangs on the noodle bar and every other sign on a wall wid
     const { shops } = planDressing(d, seed);
     const ramen = placePinned(HAND_PINNED, d.avenues[0], d.crossings).find((t) => t.id === 'ramen');
     expect(shops[0].kind, `seed ${seed}`).toBe(0);
+    expect(shops.slice(1).some((s) => s.kind === 0), `seed ${seed}: a second RAMEN`).toBe(false);
     expect(Math.abs(shops[0].z - ramen.z) + 3, `seed ${seed}: RAMEN off its tower`).toBeLessThanOrEqual(ramen.d / 2);
     expect(shops.length, `seed ${seed}`).toBeGreaterThan(1);
     expect(shops.length, `seed ${seed}`).toBeLessThanOrEqual(SHOPS_MAX);

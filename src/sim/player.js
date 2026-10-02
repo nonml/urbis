@@ -1,15 +1,17 @@
 // On-foot player state. Pure data — render reads, main ticks.
 import { WALK_BOUNDS, clampToBounds, heightAt } from './world.js';
+import { SPAWN } from './spawn.js';
 
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
 
 export function createPlayer() {
+  const { x, z, yaw } = SPAWN.player;
   return {
-    x: 2.5,
-    y: heightAt(2.5, 26),
-    z: 26,
-    yaw: Math.PI, // facing -z, into the street
+    x,
+    y: heightAt(x, z),
+    z,
+    yaw,
     speed: 0,
     walkPhase: 0,
   };
