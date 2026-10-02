@@ -52,8 +52,19 @@ export function newPerson(people, home) {
 // list's last ones with that home) — they leave the city, their job with them.
 // Everyone who stays keeps their record untouched.
 export function moveHomes(people, city) {
-  void people;
-  void city;
+  const want = city.parcels.map((p) => (p.use === 'res' ? lotPeople(p) : 0));
+  const have = new Array(want.length).fill(0);
+  const kept = [];
+  for (const q of people.list) {
+    if (have[q.home] < want[q.home]) {
+      have[q.home] += 1;
+      kept.push(q);
+    }
+  }
+  for (let i = 0; i < want.length; i++) {
+    for (let n = have[i]; n < want[i]; n++) kept.push(newPerson(people, i));
+  }
+  people.list = kept;
 }
 
 // Jobs: every com and ind lot ends the tick with at most lotPeople(p) workers.
