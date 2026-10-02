@@ -140,7 +140,7 @@ const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars
 const restored = SAVING ? deserialize(loadSave()) : null;
 const street = restored?.street ?? createStreet(SEED);
 const city = restored?.city ?? createCity(SEED);
-const people = createPeople(SEED);
+const people = restored?.people ?? createPeople(SEED);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
 const economyPanel = buildEconomyPanel();
@@ -455,7 +455,7 @@ let wiping = false;
 
 function doSave() {
   if (!SAVING || wiping) return false;
-  return writeSave(serialize({ seed: SEED, clock, street, city, player, car: heroCar, interior, mission }));
+  return writeSave(serialize({ seed: SEED, clock, street, city, player, car: heroCar, interior, mission, people }));
 }
 
 // N: a new game is a new city (AGENTS.md). The save goes, and so does any
