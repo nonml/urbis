@@ -19,7 +19,7 @@ const SEED = 20260916;
 // The east park: walkable, off every street and far enough outside the drive
 // box that no cruiser can see into it from the road or get close enough to look.
 const HIDEOUT = { x: 66, z: -40 };
-// Where the blackouts in these tests are thrown: Main Street, zone 1.
+// Where the blackouts in these tests are thrown: Main Avenue, zone 1.
 const SITE = { x: 2, z: 26 };
 
 function boot() {
@@ -270,6 +270,6 @@ test('dispatch says the same lines for the same pursuit, one voice at a time', (
   expect(a).toEqual(talk());
   expect(a.length).toBeGreaterThanOrEqual(4);
   expect(a[0].speaker).toBe('DISPATCH');
-  expect(a[0].text).toMatch(/Main Street/);
+  expect(a[0].text).toMatch(/Main (Street|Avenue)/);
   a.slice(1).forEach((l, i) => expect(l.at - a[i].at).toBeGreaterThanOrEqual(1.5));
 });

@@ -1,0 +1,14 @@
+{
+  "milestone": "4c: the police radio names a generated city's streets by their own names",
+  "tasks": [
+    {
+      "id": "m4-radio",
+      "lane": "radio",
+      "goal": "Fill streetWord(x, z) in src/sim/dispatch.js so the radio says the street names the lot note uses, make fill() use it for {street}, and drop the hand-written street list from dispatch.json and its check from the validator.",
+      "files": ["src/sim/dispatch.js", "src/content/dispatch.json", "scripts/validate_content.mjs"],
+      "test": "tests/dispatch-names.spec.js",
+      "commit": "feat(dispatch): the radio names a generated city's streets",
+      "notes": "Four small edits, nothing else. (1) src/sim/dispatch.js streetWord body: `const id = streetAt(x, z); const avenue = AVENUES.find((w) => w.id === id); if (avenue) return `${streetName(avenue)} Avenue`; const crossing = CROSSINGS.find((w) => w.id === id); return crossing ? `${streetName(crossing)} Street` : '';` and delete the void lines and the comment's last sentence ('Milestone 4 skeleton: ... street list.'). (2) In fill(), `street: CHATTER.streets[streetAt(e.x, e.z)]` becomes `street: streetWord(e.x, e.z)`. (3) src/content/dispatch.json: delete the whole \"streets\" block (7 lines), leave every other line as it is. (4) scripts/validate_content.mjs: delete the line `checkWordMap(`${w}.streets`, data.streets, ...)` in checkDispatch and change the world.js import to `import { WALK_BOUNDS } from '../src/sim/world.js';`. tests/wanted.spec.js must stay green; npm run validate must pass."
+    }
+  ]
+}

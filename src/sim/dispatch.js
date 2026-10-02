@@ -6,6 +6,8 @@
 import CHATTER from '../content/dispatch.json' with { type: 'json' };
 import { createStreams } from './rng.js';
 import { streetAt } from './patrol.js';
+import { AVENUES, CROSSINGS } from './world.js';
+import { streetName } from './streetnames.js';
 
 export { CHATTER };
 
@@ -27,6 +29,21 @@ function headingOf(yaw) {
   const north = Math.cos(yaw);
   if (Math.abs(north) >= Math.abs(east)) return north >= 0 ? 'n' : 's';
   return east >= 0 ? 'e' : 'w';
+}
+
+// The street at (x, z) as the radio says it, by the name the lot note and the
+// news line use (sim/streetnames.js): an avenue is `${streetName(way)} Avenue`,
+// a crossing `${streetName(way)} Street`, where way is the avenue or crossing
+// whose id is streetAt(x, z). Milestone 4 skeleton: a stub, with its test in
+// tests/dispatch-names.todo.js; when it is filled, fill() uses it for {street}
+// and dispatch.json and scripts/validate_content.mjs drop their street list.
+export function streetWord(x, z) {
+  void x;
+  void z;
+  void AVENUES;
+  void CROSSINGS;
+  void streetName;
+  return '';
 }
 
 function fill(template, e) {
