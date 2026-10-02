@@ -102,6 +102,9 @@ const THREE = await import('three');
 const { buildTowers, buildSkyline } = await import('../src/render/block.js');
 const { createCity } = await import('../src/sim/zoning.js');
 const { AVENUES, CROSSINGS } = await import('../src/sim/world.js');
+// A generated world has a plan of its own; its runs are the referee there. The
+// hand tables below measure the hand map and must not move.
+const { WORLD_PLAN } = await import('../src/sim/layout.js');
 // The building line is shared with the generator and the interior frames, not
 // a second copy that can drift. ROW_RUNS/KEEP_OUT stay local on purpose: the
 // checker must not read the generator's own idea of the gaps.
@@ -158,8 +161,11 @@ function subtract(runs, [a, b]) {
 const rows = [];
 for (const { x: ax } of AVENUES) {
   for (const side of [-1, 1]) {
-    let runs = ROW_RUNS;
-    for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+    const planRow = WORLD_PLAN?.rows.find((r) => r.ax === ax && r.side === side);
+    let runs = planRow ? planRow.runs : ROW_RUNS;
+    if (!planRow) {
+      for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+    }
     runs = runs.filter(([r0, r1]) => r1 - r0 >= MIN_RUN);
     const lineX = ax + side * BUILD_LINE;
     const walls = towers.filter((t) => Math.abs(t.x - lineX) < t.w / 2).map((t) => [t.z - t.d / 2, t.z + t.d / 2]);
