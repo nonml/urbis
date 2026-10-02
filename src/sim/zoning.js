@@ -97,11 +97,20 @@ function makeParcel(rand, [x, z, w, d]) {
 // where a zoning change starts a chain. In each district of a generated world
 // (WORLD_PLAN set), the FREE_LOTS lots that start EMPTY with the least
 // progress (ties by index) start unzoned: use and zoned null, progress 0. The
-// hand preset keeps every lot zoned. Milestone 4 skeleton: a stub, with its
-// test in tests/zoning-freeland.todo.js.
+// hand preset keeps every lot zoned.
 export const FREE_LOTS = 2;
 function freeLand(parcels) {
-  void parcels;
+  for (const zone of new Set(parcels.map((p) => p.powerZone))) {
+    parcels
+      .filter((p) => p.powerZone === zone && p.stage === STAGE.EMPTY)
+      .sort((a, b) => a.progress - b.progress)
+      .slice(0, FREE_LOTS)
+      .forEach((p) => {
+        p.use = null;
+        p.zoned = null;
+        p.progress = 0;
+      });
+  }
 }
 
 // Demand is the district economy's (sim/economy.js): what stands on the lots and
