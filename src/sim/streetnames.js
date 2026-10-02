@@ -29,9 +29,21 @@ export const CROSSING_NAMES = ['Canal', 'Market', 'Foundry', 'Union', 'Bridge', 
 //    copy of AVENUE_NAMES for avenues and a copy of CROSSING_NAMES for crossings
 //    (one copy each, so no name repeats; one rand stream for both).
 export function nameStreets(district, seed) {
-  void district;
-  void seed;
-  return {};
+  const main = district.avenues[0];
+  const names = { [main.id]: 'Main' };
+  for (const hand of [44, -44]) {
+    const x = counterpartX(hand, district);
+    const a = district.avenues.find((v) => v.x === x);
+    if (!(a.id in names)) names[a.id] = a.x > main.x ? 'East' : 'West';
+  }
+  const rand = mulberry32((seed ^ NAME_SALT) >>> 0);
+  const avenues = AVENUE_NAMES.slice();
+  const crossings = CROSSING_NAMES.slice();
+  for (const a of district.avenues) {
+    if (!(a.id in names)) names[a.id] = avenues.splice(Math.floor(rand() * avenues.length), 1)[0];
+  }
+  for (const c of district.crossings) names[c.id] = crossings.splice(Math.floor(rand() * crossings.length), 1)[0];
+  return names;
 }
 
 const NAMES = worldSeed().generate ? nameStreets(DISTRICTS[0], worldSeed().seed) : {};
