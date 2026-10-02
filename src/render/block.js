@@ -8,6 +8,7 @@ import {
 } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
 import { mulberry32 } from '../sim/rng.js';
+import { WORLD_PLAN } from '../sim/layout.js';
 import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
   isAvenue, wayCenter, wayLength,
@@ -300,13 +301,20 @@ function styleFor(ax, z) {
 }
 
 function streetWall(ax, side, rand) {
-  let runs = ROW_RUNS;
-  for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
-  if (ax === AVENUE_X[0]) {
-    for (const t of PINNED_TOWERS) {
-      if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
+  // A generated world carries its own plan: the runs already have the lots and
+  // pinned towers cut out, and the row's depth is the back-of-building limit.
+  // The hand preset keeps its tables so the gate's numbers do not move.
+  const planRow = WORLD_PLAN?.rows.find((r) => r.ax === ax && r.side === side);
+  let runs = planRow ? planRow.runs : ROW_RUNS;
+  if (!planRow) {
+    for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+    if (ax === AVENUE_X[0]) {
+      for (const t of PINNED_TOWERS) {
+        if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
+      }
     }
   }
+  const depthCap = planRow ? planRow.depth : Infinity;
   const out = [];
   for (const [r0, r1] of runs) {
     let at = r0;
@@ -316,7 +324,7 @@ function streetWall(ax, side, rand) {
       if (r1 - at - p < MIN_RUN) p = r1 - at;
       const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
       const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
-      const w = 10 + rand() * 2;
+      const w = Math.min(10 + rand() * 2, depthCap);
       out.push({ z: at + p / 2, d: p - 1.2, w, h, kind });
       at += p;
     }

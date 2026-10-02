@@ -3,6 +3,7 @@
 // ticks it (law 5). Why growth lives on empty land instead of on the 68 shipped
 // towers is docs/ZONING.md.
 import { createStreams } from './rng.js';
+import { WORLD_PLAN } from './layout.js';
 import { isDark, zoneAt } from './street.js';
 import { cityDemand, createEconomy, demandFor, tickEconomy } from './economy.js';
 import { TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
@@ -96,7 +97,7 @@ function updateDemand(city, dt, street) {
 
 export function createCity(seed) {
   const rng = createStreams(seed);
-  const parcels = LOTS.map((lot) => makeParcel(rng.world, lot));
+  const parcels = (WORLD_PLAN?.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
   const economy = createEconomy(parcels, builtHeight, rng.sim);
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
