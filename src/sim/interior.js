@@ -6,6 +6,7 @@
 //
 // The pattern every later interior copies is docs/INTERIORS.md.
 import { zoneAt } from './street.js';
+import { PINNED_TOWERS, towerCentreX } from './landmarks.js';
 
 export const STREET = 'street';
 
@@ -57,20 +58,39 @@ function yawIn(fr, heading) {
 // The spaces.
 //
 // RAMEN is the noodle bar behind the RAMEN fascia on the main avenue: the
-// 44 m tower on the west side at z = -14 (block.js PINNED_TOWERS[1] on the main avenue).
-// Its podium face is x = -6.9 and the noodle-bar bay of its glazing is centred
-// on z = -10.77; the door is hung in that bay. The room stops 0.65 m short of
-// the face on purpose — that is where the tower's shaft begins, and a camera
-// inside the shaft sees none of the city's single-sided boxes from behind.
+// 44 m tower on the west side at z = -14 (landmarks.js PINNED_TOWERS 'ramen').
+// Its podium face and the noodle-bar bay of its glazing are derived below; the
+// door is hung in that bay. The room stops 0.65 m short of the face on purpose
+// — that is where the tower's shaft begins, and a camera inside the shaft sees
+// none of the city's single-sided boxes from behind.
 //
-// ROOF is the crown of the neighbouring tower to the south (PINNED_TOWERS[0], 34 m
-// with a setback crown to 44.2 m). It is the roof on this side of the avenue
-// with a clear line to the growth lots: the south-west pair below it, the one
-// in the gap in the east row across the avenue, the two past the east avenue.
-// Its walking surface is the crown's lip plate, 12.9 x 10.9 m at y 44.475.
+// ROOF is the crown of the neighbouring tower to the south (PINNED_TOWERS
+// 'roof', 34 m with a setback crown to 44.2 m). It is the roof on this side of
+// the avenue with a clear line to the growth lots: the south-west pair below
+// it, the one in the gap in the east row across the avenue, the two past the
+// east avenue. Its walking surface is the crown's lip plate, 12.9 x 10.9 m at
+// y 44.475.
 
-const RAMEN_FRAME = { x: -6.9, z: -10.77, out: [1, 0] };
-const ROOF_FRAME = { x: -7.05, z: -48, out: [1, 0] };
+// How far the podium and the crown lip stand proud of the shaft face, and which
+// bay of the noodle bar's glazing the door is hung in. The frames below and the
+// render's own placement both read these, so the numbers cannot drift apart.
+const PODIUM_LIP = 1.2;
+const CROWN_LIP = 0.9;
+const RAMEN_BAY_DZ = 3.23;
+
+const RAMEN_TOWER = PINNED_TOWERS.find((t) => t.id === 'ramen');
+const ROOF_TOWER = PINNED_TOWERS.find((t) => t.id === 'roof');
+
+const RAMEN_FRAME = {
+  x: towerCentreX(RAMEN_TOWER) - RAMEN_TOWER.side * (RAMEN_TOWER.w + PODIUM_LIP) / 2,
+  z: RAMEN_TOWER.z + RAMEN_BAY_DZ,
+  out: [-RAMEN_TOWER.side, 0],
+};
+const ROOF_FRAME = {
+  x: towerCentreX(ROOF_TOWER) - ROOF_TOWER.side * (ROOF_TOWER.w + CROWN_LIP) / 2,
+  z: ROOF_TOWER.z,
+  out: [-ROOF_TOWER.side, 0],
+};
 
 // Everything in a space is a footprint in the frame plus a top above the floor.
 // `solid: false` is dressing a person can walk through (it stands inside a

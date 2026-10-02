@@ -5,8 +5,8 @@
 import { test, expect } from '@playwright/test';
 import { createPlayer, tickPlayer } from '../src/sim/player.js';
 import {
-  BODY_RADIUS, STREET, createInterior, currentPlace, doorEnds, frameCamera, placeOf, standable,
-  tickInterior, useDoor,
+  BODY_RADIUS, SPACES, STREET, createInterior, currentPlace, doorEnds, frameCamera, placeOf,
+  standable, tickInterior, useDoor,
 } from '../src/sim/interior.js';
 
 const DT = 0.05;
@@ -171,6 +171,16 @@ test('the shop camera never leaves the room or enters a shelf', () => {
     }
   }
   expect(bad).toEqual([]);
+});
+
+test('the interior frames derive from the pinned towers, not hand-copied numbers', () => {
+  const ramen = SPACES.find((s) => s.id === 'ramen').frame;
+  const roof = SPACES.find((s) => s.id === 'roof').frame;
+  // Podium face of the ramen tower and its glazing bay, and the roof crown lip.
+  expect(ramen.x).toBeCloseTo(-6.9, 2);
+  expect(ramen.z).toBeCloseTo(-10.77, 2);
+  expect(roof.x).toBeCloseTo(-7.05, 2);
+  expect(roof.z).toBeCloseTo(-48, 2);
 });
 
 test('on the street the sim leaves the player and the camera alone', () => {

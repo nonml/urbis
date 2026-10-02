@@ -34,9 +34,6 @@ const MAX_ROAD = 7;
 const MIN_FRONTAGE = 0.982;
 // Road half-width 3.5 m plus a 3 m walkway.
 const ROAD_BAND = 6.5;
-// Shaft face of an avenue row, metres from the avenue centre-line; the podium
-// stands 0.6 m proud of it.
-const BUILD_LINE = 7.5;
 const ROW_RUNS = [[-55.5, 33.5], [46.5, 97]];
 const MIN_RUN = 6;
 // [avenue x, side, z0, z1]: stretches of a row that must stay open.
@@ -95,6 +92,10 @@ const THREE = await import('three');
 const { buildTowers, buildSkyline } = await import('../src/render/block.js');
 const { createCity } = await import('../src/sim/zoning.js');
 const { AVENUES, CROSSINGS } = await import('../src/sim/world.js');
+// The building line is shared with the generator and the interior frames, not
+// a second copy that can drift. ROW_RUNS/KEEP_OUT stay local on purpose: the
+// checker must not read the generator's own idea of the gaps.
+const { BUILD_LINE } = await import('../src/sim/landmarks.js');
 const texLoader = { load: () => new THREE.Texture() };
 
 const towers = buildTowers(texLoader, 1).footprints;

@@ -12,6 +12,7 @@ import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
   isAvenue, way, wayCenter, wayLength,
 } from '../sim/world.js';
+import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 
 // Where the city is comes from sim/world.js — this file draws the road graph,
 // it does not get a second opinion about where the roads are.
@@ -263,13 +264,8 @@ function buildMarkings() {
   return { group: g, mats };
 }
 
-// Shaft face of every avenue row, metres from the avenue centre-line. The
-// podium stands 0.6 m proud of it, so the shopfronts meet the walkway edge.
-const BUILD_LINE = 7.5;
-// The two main-avenue towers the interiors are built into, kept exactly:
-// [side, z, w, h, d]. The roof is idx 0 and the noodle bar idx 1, as before,
-// so their facades and shopfronts do not change.
-const PINNED_TOWERS = [[-1, -48, 12, 34, 10], [-1, -14, 14, 44, 11]];
+// PINNED_TOWERS and BUILD_LINE live in sim/landmarks.js, shared with the
+// interior frames so neither hand-copies a coordinate from the other.
 // Where an avenue row may stand: south of the plaza crossing and north of it.
 const ROW_RUNS = [[-55.5, 33.5], [46.5, 97]];
 // A gap shorter than this stays open: narrower than any real building.
@@ -303,8 +299,8 @@ function streetWall(ax, side, rand) {
   let runs = ROW_RUNS;
   for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
   if (ax === AVENUE_X[0]) {
-    for (const [ps, z, , , d] of PINNED_TOWERS) {
-      if (ps === side) runs = subtract(runs, [z - (d + 1.2) / 2, z + (d + 1.2) / 2]);
+    for (const t of PINNED_TOWERS) {
+      if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
     }
   }
   const out = [];
@@ -820,8 +816,8 @@ export function buildTowers(texLoader, maxAniso) {
     footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, name });
   }
   let idx = 0;
-  PINNED_TOWERS.forEach(([side, z, w, h, d], i) => {
-    emitTower(AVENUE_X[0] + side * (BUILD_LINE + w / 2), z, w, h, d, idx++, [-side, 0], `PINNED_TOWERS[${i}]`);
+  PINNED_TOWERS.forEach((t, i) => {
+    emitTower(towerCentreX(t), t.z, t.w, t.h, t.d, idx++, [-t.side, 0], `PINNED_TOWERS[${i}]`);
   });
   const rand = mulberry32(STREET_WALL_SEED);
   for (const ax of AVENUE_X) {
