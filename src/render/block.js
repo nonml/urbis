@@ -14,6 +14,7 @@ import {
   isAvenue, wayCenter, wayLength,
 } from '../sim/world.js';
 import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
+import { WORLD_VISTAS } from '../sim/vistas.js';
 
 // Where the city is comes from sim/world.js — this file draws the road graph,
 // it does not get a second opinion about where the roads are. The ways the
@@ -869,12 +870,18 @@ export function buildTowers(texLoader, maxAniso) {
       });
     }
   }
-  SOUTH_TOWERS.forEach(([x, w, h], i) => {
-    emitTower(x, SOUTH_ROW_Z, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
-  });
-  TERMINUS_TOWERS.forEach(([x, z, w, h, d], i) => {
-    emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
-  });
+  if (WORLD_VISTAS) {
+    WORLD_VISTAS.caps.forEach((c, i) => {
+      emitTower(c.x, c.z, c.w, c.h, c.d, idx++, c.face, `CAPS[${i}]`);
+    });
+  } else {
+    SOUTH_TOWERS.forEach(([x, w, h], i) => {
+      emitTower(x, SOUTH_ROW_Z, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
+    });
+    TERMINUS_TOWERS.forEach(([x, z, w, h, d], i) => {
+      emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
+    });
+  }
   // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
   // architecture lights both halves of the district.
   for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
@@ -932,14 +939,18 @@ export function buildSkyline(texLoader, maxAniso) {
   emission.colorSpace = THREE.SRGBColorSpace;
   emission.wrapS = emission.wrapT = THREE.RepeatWrapping;
   emission.anisotropy = maxAniso;
-  const RING = [
-    // x, z, w, h, d — east wall, north rim, south rim (west stays open valley)
-    [110, -70, 22, 64, 18], [128, -30, 26, 88, 20], [112, 10, 20, 52, 16],
-    [130, 50, 24, 72, 18], [108, 82, 20, 58, 16],
-    [-20, 124, 24, 66, 18], [20, 124, 20, 84, 16], [60, 124, 26, 56, 20],
-    [-30, -102, 22, 60, 18], [15, -108, 24, 78, 20], [58, -100, 18, 50, 16],
-    [-76, 60, 18, 54, 16], [-78, -60, 20, 68, 18],
-  ];
+  // A generated world carries its own ring; the hand preset keeps its table so
+  // the gate's numbers do not move. Rows are [x, z, w, h, d].
+  const RING = WORLD_VISTAS
+    ? WORLD_VISTAS.ring.map((r) => [r.x, r.z, r.w, r.h, r.d])
+    : [
+      // x, z, w, h, d — east wall, north rim, south rim (west stays open valley)
+      [110, -70, 22, 64, 18], [128, -30, 26, 88, 20], [112, 10, 20, 52, 16],
+      [130, 50, 24, 72, 18], [108, 82, 20, 58, 16],
+      [-20, 124, 24, 66, 18], [20, 124, 20, 84, 16], [60, 124, 26, 56, 20],
+      [-30, -102, 22, 60, 18], [15, -108, 24, 78, 20], [58, -100, 18, 50, 16],
+      [-76, 60, 18, 54, 16], [-78, -60, 20, 68, 18],
+    ];
   const geos = RING.map(([x, z, w, h, d]) => worldUVs(box(w, h, d, x, h / 2, z), w, h, d, 9));
   const mat = new THREE.MeshBasicMaterial({ map: emission });
   const footprints = geos.map((g, i) => ({ ...footprintOf(g), name: `RING[${i}]` }));
