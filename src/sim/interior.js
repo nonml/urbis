@@ -167,11 +167,22 @@ export const SPACES = [
 // A street end names the face its door is hung on — the render hangs the door
 // there — and its spot is a step out from that face onto the pavement.
 const DOOR_STEP = 1.0;
+// Each street door stands the same way relative to its tower on every world:
+// x from towerCentreX, z from the tower's own z. These offsets give today's
+// hand-map spots (-5.8, -9.0), (-13.5, -42.4) and (-12.0, -40.9).
+const RAMEN_DOOR_ARRIVE = { dx: 8.7, dz: 5.0 };
+const ROOF_DOOR_FACE = { dx: 0, dz: 5.6 };
+const ROOF_DOOR_ARRIVE = { dx: 1.5, dz: 7.1 };
+// The offset spot on the hand map, hung off the tower so it travels with it.
+const towerSpot = (tower, off) => ({ x: towerCentreX(tower) + off.dx, z: tower.z + off.dz });
 export const DOORS = [
   {
     id: 'ramen-front',
     ends: [
-      { space: STREET, face: RAMEN_FRAME, arrive: { x: -5.8, z: -9.0, yaw: 0 }, label: 'ENTER RAMEN' },
+      {
+        space: STREET, face: RAMEN_FRAME,
+        arrive: { ...towerSpot(RAMEN_TOWER, RAMEN_DOOR_ARRIVE), yaw: 0 }, label: 'ENTER RAMEN',
+      },
       { space: 'ramen', at: [0, 1.25], arrive: { at: [0.6, 2.7], heading: 'in' }, label: 'LEAVE' },
     ],
   },
@@ -181,8 +192,9 @@ export const DOORS = [
     id: 'roof-stair',
     ends: [
       {
-        space: STREET, face: { x: -13.5, z: -42.4, out: [0, 1] },
-        arrive: { x: -12.0, z: -40.9, yaw: Math.PI / 2 }, label: 'STAIRS TO ROOF',
+        space: STREET, face: { ...towerSpot(ROOF_TOWER, ROOF_DOOR_FACE), out: [0, 1] },
+        arrive: { ...towerSpot(ROOF_TOWER, ROOF_DOOR_ARRIVE), yaw: Math.PI / 2 },
+        label: 'STAIRS TO ROOF',
       },
       { space: 'roof', at: [-2.0, 6.4], arrive: { at: [-0.9, 5.2], heading: 'out' }, label: 'STAIRS DOWN' },
     ],
