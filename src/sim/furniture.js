@@ -47,22 +47,25 @@ export const BOX_OUT = ROAD_HALF_WIDTH + 2.7;
 // than BAND to a crossing that meets the avenue (c.x0 <= av.x <= c.x1).
 // Ascending.
 export function avenueSpots(av, crossings, phase, step) {
-  void av;
-  void crossings;
-  void phase;
-  void step;
-  return [];
+  const near = crossings.filter((c) => c.x0 <= av.x && av.x <= c.x1);
+  const out = [];
+  for (let k = Math.ceil((av.z0 + END_CLEAR - phase) / step); phase + k * step <= av.z1 - END_CLEAR; k++) {
+    const z = phase + k * step;
+    if (near.every((c) => Math.abs(z - c.z) >= BAND)) out.push(z);
+  }
+  return out;
 }
 
 // The x's along crossing `c` on the rhythm phase + k * step, from c.x0 +
 // END_CLEAR to c.x1 - END_CLEAR inclusive, leaving out every x closer than BAND
 // to any avenue's centre-line. Ascending.
 export function crossingSpots(c, avenues, phase, step) {
-  void c;
-  void avenues;
-  void phase;
-  void step;
-  return [];
+  const out = [];
+  for (let k = Math.ceil((c.x0 + END_CLEAR - phase) / step); phase + k * step <= c.x1 - END_CLEAR; k++) {
+    const x = phase + k * step;
+    if (avenues.every((a) => Math.abs(x - a.x) >= BAND)) out.push(x);
+  }
+  return out;
 }
 
 // A kerbside rhythm for the avenue at x = ax, as the render's loops write it:
@@ -70,12 +73,12 @@ export function crossingSpots(c, avenues, phase, step) {
 // on a generated world the same rhythm down that avenue's whole length, off its
 // crossings: avenueSpots(the avenue at ax, CROSSINGS, from, step).
 export function rhythm(ax, from, to, step) {
-  void ax;
-  void AVENUES;
-  void CROSSINGS;
-  const out = [];
-  for (let z = from; z <= to; z += step) out.push(z);
-  return out;
+  if (!worldSeed().generate) {
+    const out = [];
+    for (let z = from; z <= to; z += step) out.push(z);
+    return out;
+  }
+  return avenueSpots(AVENUES.find((a) => a.x === ax), CROSSINGS, from, step);
 }
 
 // Street lamps { x, z, hx, hz, rotY, zone }, the shape render/lamps.js draws.
