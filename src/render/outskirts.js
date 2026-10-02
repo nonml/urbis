@@ -29,7 +29,7 @@ import { mulberry32 } from '../sim/rng.js';
 // bands start clear of it, so "is this inside the city?" needs no second test.
 //
 // They wrap the south and the east only. West and north are the mountain
-// ranges: buildMountains() puts cone bases as far in as x = -36 on the west
+// ranges: buildMountains() puts mountain bases as far in as x = -36 on the west
 // ridge and z = 88 on the north one, and a shed inside a mountain is worse
 // than no shed. The west edge also stops short of the river strip (x -38..-26).
 //

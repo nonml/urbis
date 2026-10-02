@@ -1,4 +1,4 @@
-// Valley landscape: mountain ring, grass verges + park, grass tufts.
+// Valley landscape: smooth mountain ranges, grass verges + park, grass tufts.
 // Static merges — built once, then they sleep.
 //
 // The heightfield itself lives in sim/world.js — a mover has to ask how high the
@@ -110,37 +110,138 @@ export function buildGrassTufts() {
   return inst;
 }
 
+// Smooth terrain, not cones. One displaced grid per range, merged, so the
+// ranges read as rounded massifs instead of the pale spikes they replaced.
+const MOUNTAIN_CELL = 3;
+const MOUNTAIN_FLOOR = -4; // the cones sat 4 m sunk; keep their bases hidden
+const NOISE_SEED = 0x9e37;
+const ROCK_HEX = 0x232c3a;
+const SNOW_HEX = 0xdfe8f2;
+const ROCK_VARY = 0.08; // ±8% brightness, by the same noise as the detail
+
+function hash2(ix, iz) {
+  let h = Math.imul(ix, 374761393) ^ Math.imul(iz, 668265263) ^ NOISE_SEED;
+  h = Math.imul(h ^ (h >>> 13), 1274126177);
+  h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+
+// Value noise, [-1, 1]: the only texture the mountains need, and it must be
+// hash-based so it stays deterministic frame to frame and run to run.
+function valueNoise(x, z) {
+  const ix = Math.floor(x);
+  const iz = Math.floor(z);
+  const fx = x - ix;
+  const fz = z - iz;
+  const ux = fx * fx * (3 - 2 * fx);
+  const uz = fz * fz * (3 - 2 * fz);
+  const a = hash2(ix, iz);
+  const b = hash2(ix + 1, iz);
+  const c = hash2(ix, iz + 1);
+  const d = hash2(ix + 1, iz + 1);
+  const top = a + (b - a) * ux;
+  const bot = c + (d - c) * ux;
+  return (top + (bot - top) * uz) * 2 - 1;
+}
+
+// Ridged detail: coarse relief plus half of it again at finer frequency, so a
+// massif has broad shoulders and a broken crest rather than a smooth dome.
+function mountainNoise(x, z) {
+  return valueNoise(x / 18, z / 18) + 0.5 * valueNoise(x / 7, z / 7);
+}
+
+// The max over peaks, never the sum: overlapping cones used to bury each other,
+// and a sum would stand a wall wherever two ranges meet.
+function makeMountainHeight(peaks) {
+  return (x, z) => {
+    let base = 0;
+    for (const p of peaks) {
+      const t = Math.hypot(x - p.px, z - p.pz) / p.r;
+      if (t < 1) base = Math.max(base, p.h * (1 - t) ** 1.6);
+    }
+    return base + 7 * mountainNoise(x, z) * (base / 110) - 4;
+  };
+}
+
+function mountainGrid(rangePeaks, height, clamp) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const p of rangePeaks) {
+    minX = Math.min(minX, p.px - p.r);
+    maxX = Math.max(maxX, p.px + p.r);
+    minZ = Math.min(minZ, p.pz - p.r);
+    maxZ = Math.max(maxZ, p.pz + p.r);
+  }
+  if (clamp.maxX !== undefined) maxX = Math.min(maxX, clamp.maxX);
+  if (clamp.minZ !== undefined) minZ = Math.max(minZ, clamp.minZ);
+  const w = maxX - minX;
+  const d = maxZ - minZ;
+  const geo = new THREE.PlaneGeometry(
+    w, d, Math.round(w / MOUNTAIN_CELL), Math.round(d / MOUNTAIN_CELL)
+  );
+  geo.rotateX(-Math.PI / 2);
+  geo.translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    pos.setY(i, Math.max(MOUNTAIN_FLOOR, height(pos.getX(i), pos.getZ(i))));
+  }
+  pos.needsUpdate = true;
+  return geo;
+}
+
+function smoothstep(edge0, edge1, x) {
+  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
+  return t * t * (3 - 2 * t);
+}
+
+// Rock everywhere, snow only where it is both high and flat enough to settle.
+function paintMountains(geo) {
+  const pos = geo.attributes.position;
+  const nor = geo.attributes.normal;
+  const colors = new Float32Array(pos.count * 3);
+  const rock = new THREE.Color(ROCK_HEX);
+  const snow = new THREE.Color(SNOW_HEX);
+  const c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const y = pos.getY(i);
+    c.copy(rock).multiplyScalar(1 + ROCK_VARY * mountainNoise(x, pos.getZ(i)));
+    c.lerp(snow, smoothstep(52, 64, y) * smoothstep(0.45, 0.7, nor.getY(i)));
+    colors.set([c.r, c.g, c.b], i * 3);
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+}
+
 export function buildMountains() {
   const rand = mulberry32(133);
-  const rock = [];
-  const snow = [];
+  const peaks = [];
   const ridge = (cx, cz, n, alongX) => {
+    const from = peaks.length;
     for (let i = 0; i < n; i++) {
       const r = 24 + rand() * 16;
       const h = 60 + rand() * 50;
       const px = alongX ? cx + i * 26 + rand() * 10 : cx + (rand() - 0.5) * 24;
       const pz = alongX ? cz + (rand() - 0.5) * 24 : cz + i * 26 + rand() * 10;
-      const cone = new THREE.ConeGeometry(r, h, 6);
-      cone.translate(px, h / 2 - 4, pz);
-      rock.push(cone);
-      const sr = r * 0.42;
-      const sh = h * 0.42;
-      const cap = new THREE.ConeGeometry(sr, sh, 6);
-      cap.translate(px, h - 4 - sh / 2 + 1, pz);
-      snow.push(cap);
+      peaks.push({ px, pz, r, h });
     }
+    return peaks.slice(from);
   };
-  ridge(-88, -150, 12, false); // west range
-  ridge(-70, 140, 9, true); // north range
-  const rockMesh = new THREE.Mesh(
-    mergeGeometries(rock),
-    new THREE.MeshStandardMaterial({ color: 0x232c3a, roughness: 1.0, flatShading: true })
-  );
-  const snowMesh = new THREE.Mesh(
-    mergeGeometries(snow),
-    new THREE.MeshStandardMaterial({ color: 0xdfe8f2, roughness: 0.9, flatShading: true })
+  const west = ridge(-88, -150, 12, false); // west range
+  const north = ridge(-70, 140, 9, true); // north range
+  const height = makeMountainHeight(peaks);
+  const geo = mergeGeometries([
+    mountainGrid(west, height, { maxX: -36 }),
+    mountainGrid(north, height, { minZ: 88 }),
+  ]);
+  geo.computeVertexNormals();
+  paintMountains(geo);
+  const mesh = new THREE.Mesh(
+    geo,
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
   );
   const g = new THREE.Group();
-  g.add(rockMesh, snowMesh);
+  g.add(mesh);
   return g;
 }
