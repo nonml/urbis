@@ -50,9 +50,22 @@ export const SIGN_GAP = 8;
 // HAND_MIDBLOCK[k % 3].z (a tie goes to the lower z); an avenue with no
 // candidate gets no zebra.
 export function zebrasFor(district, carZ) {
-  void district;
-  void carZ;
-  return [];
+  const { walk } = district;
+  const out = [];
+  district.avenues.forEach((a, k) => {
+    const lo = Math.max(a.z0, walk.minZ) + ZEBRA_END;
+    const hi = Math.min(a.z1, walk.maxZ) - ZEBRA_END;
+    const near = district.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);
+    const hz = HAND_MIDBLOCK[k % 3].z;
+    let best = null;
+    for (let z = Math.ceil(lo / ZEBRA_STEP) * ZEBRA_STEP; z <= hi; z += ZEBRA_STEP) {
+      if (near.some((c) => Math.abs(z - c.z) < ZEBRA_CLEAR)) continue;
+      if (k === 0 && Math.abs(z - carZ) < ZEBRA_CAR) continue;
+      if (best === null || Math.abs(z - hz) < Math.abs(best - hz)) best = z;
+    }
+    if (best !== null) out.push({ x: a.x, z: best });
+  });
+  return out;
 }
 
 // A generated world's blade signs: `defs` (content/signs.json, already
@@ -70,10 +83,36 @@ export function zebrasFor(district, carZ) {
 //   and a z closer than SIGN_GAP.
 // `rows` is planLayout's rows, `ramen` the RAMEN board as { side, z }.
 export function placeSigns(defs, district, rows, ramen) {
-  void district;
-  void rows;
-  void ramen;
-  return defs;
+  const { walk } = district;
+  const out = [];
+  for (const def of defs) {
+    if (def.face === 'south') continue;
+    let ax;
+    let side;
+    let z;
+    if (def.sub === 'RAMEN') {
+      ax = district.avenues[0].x;
+      side = ramen.side;
+      z = ramen.z;
+    } else {
+      ax = counterpartX(def.ax ?? 0, district);
+      side = def.side;
+      const row = rows.find((r) => r.ax === ax && r.side === side);
+      if (!row) continue;
+      z = null;
+      for (const [r0, r1] of row.runs) {
+        const lo = Math.max(r0, walk.minZ) + SIGN_IN;
+        const hi = Math.min(r1, walk.maxZ) - SIGN_IN;
+        if (lo > hi) continue;
+        const c = Math.min(hi, Math.max(lo, def.z));
+        if (z === null || Math.abs(c - def.z) < Math.abs(z - def.z)) z = c;
+      }
+      if (z === null) continue;
+    }
+    if (out.some((o) => o.ax === ax && o.side === side && Math.abs(o.z - z) < SIGN_GAP)) continue;
+    out.push({ ...def, ax, side, z });
+  }
+  return out;
 }
 
 // The RAMEN board (sim/dressing.js shops[0]) as { side, z }: it faces the road

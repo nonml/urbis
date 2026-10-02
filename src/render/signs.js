@@ -4,6 +4,8 @@ import { blink } from '../sim/street.js';
 
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import SIGN_DEFS from '../content/signs.json';
+import { worldSigns } from '../sim/streetscape.js';
+import { WORLD_PLAN } from '../sim/layout.js';
 
 // Runtime guard: content errors must degrade to a missing sign, never a dead boot.
 function validSign(s) {
@@ -11,7 +13,7 @@ function validSign(s) {
     && /^#[0-9a-fA-F]{6}$/.test(s.color || '') && [-1, 0, 1].includes(s.side)
     && typeof s.z === 'number' && typeof s.y === 'number';
 }
-const SIGNS = SIGN_DEFS.filter((s, i) => validSign(s) || (console.error(`[signs] bad def ${i}, skipped`), false));
+const SIGNS = worldSigns(SIGN_DEFS.filter((s, i) => validSign(s) || (console.error(`[signs] bad def ${i}, skipped`), false)));
 
 const SIGN_W = 1.5;
 const SIGN_H = 4.5;
@@ -235,7 +237,7 @@ export function buildSigns() {
   group.add(glows);
   group.add(new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 })));
   const alleys = buildAlleyGlows(zoneMats);
-  group.add(alleys.mesh);
+  if (alleys.mesh) group.add(alleys.mesh);
   const tick = makeTick(faceAttr, alleys.attr, glows);
   return { group, pools, zoneMats, zoneSprites, streakSources, tick };
 }
@@ -259,17 +261,19 @@ function makeTick(faceAttr, alleyAttr, glows) {
       glows.setColorAt(e.index, tinted.copy(e.color).multiplyScalar(night * b));
     }
     faceAttr.needsUpdate = true;
-    alleyAttr.needsUpdate = true;
+    if (alleyAttr) alleyAttr.needsUpdate = true;
     glows.instanceColor.needsUpdate = true;
   };
 }
 
-const ALLEYS = [
+// A generated world has no alleys drawn yet, so it has no wash.
+const ALLEYS = WORLD_PLAN ? [] : [
   { x: -13, z: -41, color: '#4d4032' },
   { x: 13, z: 21, color: '#52402c' },
 ];
 
 function buildAlleyGlows(zoneMats) {
+  if (!ALLEYS.length) return { mesh: null, attr: null };
   const geos = [];
   const attr = quadColors(ALLEYS.length);
   const color = new THREE.Color();

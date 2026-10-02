@@ -16,6 +16,7 @@ import {
 import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
 import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS } from '../sim/vistas.js';
+import { MIDBLOCK } from '../sim/streetscape.js';
 
 // Where the city is comes from sim/world.js — this file draws the road graph,
 // it does not get a second opinion about where the roads are. The ways the
@@ -101,7 +102,7 @@ export function buildGround(texLoader, maxAniso) {
     ...AVENUES.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
     ...flankingSlabs(PLAZA, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
     ...flankingSlabs(SOUTH, WALKWAY_WIDTH, WALK_RISE, 0.0),
-    box(22, WALK_RISE, 9, -17, 0.0, -32),   // river promenade slab
+    ...(WORLD_PLAN ? [] : [box(22, WALK_RISE, 9, -17, 0.0, -32)]),   // river promenade slab, hand preset only
   ]);
   const walkMesh = new THREE.Mesh(walks, walkMat);
   walkMesh.receiveShadow = true;
@@ -115,7 +116,7 @@ export function buildGround(texLoader, maxAniso) {
     ...AVENUES.flatMap(kerbRails),
     ...kerbRails(SOUTH),
     ...kerbRails(PLAZA),
-    box(0.35, 1.0, 9, -27.8, 0.5, -32),     // river promenade parapet
+    ...(WORLD_PLAN ? [] : [box(0.35, 1.0, 9, -27.8, 0.5, -32)]),     // river promenade parapet, hand preset only
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
   curbMesh.receiveShadow = true;
@@ -213,16 +214,15 @@ function buildMarkings() {
   crossDashes(SOUTH, 3);
   crossDashes(PLAZA, 2);
   // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
-  // avenue, each at its own z so they do not line up across the district.
-  for (const [k, cz] of [20, -20, 10].entries()) {
-    const av = AVENUES[k];
-    if (!av) break;
-    const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
+  // avenue, each at its own z so they do not line up across the district
+  // (sim/streetscape.js places them).
+  const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
+  for (const { x, z: cz } of MIDBLOCK) {
     for (let i = -3; i <= 3; i++) {
       const q = stripe.clone();
       q.rotateX(-Math.PI / 2);
       q.rotateY(Math.PI / 2);
-      q.translate(av.x, 0.02, cz + i * 0.7);
+      q.translate(x, 0.02, cz + i * 0.7);
       push(q, cz);
     }
   }

@@ -238,7 +238,7 @@ function roadFlatRects() {
 // deck block.js lays at (-17, -32). Nothing in the graph describes a deck, so
 // it stays data.
 const PROMENADE = [-17, -32, 11, 4.5];
-const FLAT_RECTS = [...roadFlatRects(), PROMENADE];
+const FLAT_RECTS = [...roadFlatRects(), ...(generate ? [] : [PROMENADE])];
 
 // The built district as one rect (cx, cz, half-width, half-depth). Inside it the
 // relief is the verge swell only, so the 68 merged towers and the skyline ring

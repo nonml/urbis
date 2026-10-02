@@ -151,10 +151,10 @@ function taskPrompt(w) {
     t.notes ?? '',
     'Read the test and the files above first, and little else. Make your first edit within 3 minutes.',
     `Check with: npm run build && GATE_PORT=${w.gate} npx playwright test ${t.test}`,
-    `When that passes, run GATE_PORT=${w.gate} npm run gate once. It must be green.`,
+    'Do not run npm run gate: the crew runs the checks when you finish.',
     portsLine(w),
     'Do not commit, push, stash or checkout. Do not open or judge PNGs.',
-    'End with: the files you changed and the gate result.',
+    'End with: the files you changed and the test result.',
   ].filter(Boolean).join('\n');
 }
 
@@ -164,7 +164,18 @@ const prompt = (w) => (w.task && !w.task.brief ? taskPrompt(w) : briefPrompt(w.t
 
 async function send(w, text) {
   const { c } = await client(w.dir);
-  if (!w.session) w.session = (await c.createSession({ title: `crew ${w.name}` })).id;
+  if (w.session) {
+    // A session carried over from the lane's last task (assign) may be gone with
+    // its server; then the task starts a new one.
+    try {
+      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model });
+      w.lastSent = Date.now();
+      return;
+    } catch {
+      w.session = null;
+    }
+  }
+  w.session = (await c.createSession({ title: `crew ${w.name}` })).id;
   await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model });
   w.lastSent = Date.now();
 }
@@ -290,7 +301,11 @@ async function assign(state, lane, task) {
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
-  const w = { name: lane, dir, task, model: TIERS[0], stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
+  // The lane's next task goes on in the session its last one ran in, when that
+  // was on the same model: the worker has already read the files the two share.
+  const prev = state.workers[lane];
+  const session = prev?.session && prev.dir === dir && prev.model === TIERS[0] ? prev.session : null;
+  const w = { name: lane, dir, task, model: TIERS[0], session, stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
   state.workers[lane] = w;
   state.tasks[task.id] = { status: 'working', lane, model: w.model };
   await send(w, prompt(w));
@@ -313,9 +328,31 @@ function scopeFault(w) {
   return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
 }
 
+// A task's check is the gate cut to what the task can break: the static checks, the
+// build, its own test, every spec that names a file it changed, and gate.spec (the
+// draws). Minutes, not the full gate's twenty. The full gate still runs once per
+// lane, at review, before anything reaches main. A whole-brief task gets it all.
+const STATIC_CHECKS = ['lint', 'check:rng', 'check:boundary', 'check:overlap', 'validate', 'build'];
+
+function specsFor(w) {
+  const t = w.task;
+  const names = t.files.map((f) => path.basename(f));
+  const dir = path.join(w.dir, 'tests');
+  const named = fs.readdirSync(dir).filter((f) => f.endsWith('.spec.js'))
+    .filter((f) => names.some((n) => fs.readFileSync(path.join(dir, f), 'utf8').includes(n)))
+    .map((f) => `tests/${f}`);
+  return [...new Set([t.test, 'tests/gate.spec.js', ...named])];
+}
+
 function gateFault(w) {
   try {
-    const out = sh('npm', ['run', 'gate'], w.dir, { GATE_PORT: String(w.gate) });
+    const env = { GATE_PORT: String(w.gate) };
+    let out;
+    if (w.task.brief) out = sh('npm', ['run', 'gate'], w.dir, env);
+    else {
+      for (const check of STATIC_CHECKS) sh('npm', ['run', check], w.dir, env);
+      out = sh('npx', ['playwright', 'test', ...specsFor(w)], w.dir, env);
+    }
     w.draws = out.match(/draws: (\d+)/)?.[1] ?? null;
     return null;
   } catch (e) {
@@ -326,7 +363,7 @@ function gateFault(w) {
 function commitTask(w) {
   const t = w.task;
   sh('git', ['add', '-A'], w.dir);
-  const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: gate green, draws ${w.draws ?? 'not printed'}.`;
+  const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: task checks green, draws ${w.draws ?? 'not printed'}.`;
   sh('git', ['commit', '-q', '-m', t.commit ?? `feat: ${t.goal}`, '-m', why], w.dir);
   return sh('git', ['rev-parse', '--short', 'HEAD'], w.dir).trim();
 }
