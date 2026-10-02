@@ -14,11 +14,43 @@
 // gain). Lower it to the new count every time you fix pairs. Never raise it.
 // The item is done at 0.
 //
+// Two more measurements ride along, for VGA-084 sub-slice 2 (street walls):
+// - road: towers standing on a road or its walkway (half-width ROAD_BAND from
+//   each way's centre-line, src/sim/world.js). Ratchet MAX_ROAD, same rules.
+// - frontage: how much of each avenue row is a building wall. A row is the
+//   building line BUILD_LINE m out from an avenue's centre-line, over ROW_RUNS
+//   minus that row's KEEP_OUT gaps (lots, the promenade, the roof-stair yard).
+//   Runs shorter than MIN_RUN are not counted. Ratchet MIN_FRONTAGE: it fails
+//   if the worst row drops below it, and asks to be raised when it climbs.
+//   These tables are the brief's (docs/handoff/VGA-084-2b.md), kept here on
+//   purpose: the checker must not read the generator's own idea of the gaps.
+//
 // The stubs are the ones scripts/dump_geometry.mjs uses: canvases only paint
 // atlases and the loader only returns textures, so neither moves a vertex.
 import { registerHooks } from 'node:module';
 
 const MAX_OVERLAPS = 0;
+const MAX_ROAD = 33;
+const MIN_FRONTAGE = 0.396;
+// Road half-width 3.5 m plus a 3 m walkway.
+const ROAD_BAND = 6.5;
+// Shaft face of an avenue row, metres from the avenue centre-line; the podium
+// stands 0.6 m proud of it.
+const BUILD_LINE = 7.5;
+const ROW_RUNS = [[-55.5, 33.5], [46.5, 97]];
+const MIN_RUN = 6;
+// [avenue x, side, z0, z1]: stretches of a row that must stay open.
+const KEEP_OUT = [
+  [0, -1, -42.4, -27],     // roof-stair yard and the promenade deck
+  [0, -1, 51, 61],         // LOTS[0]
+  [0, 1, 86, 96],          // LOTS[4]
+  [44, -1, -40, -31.5],    // LOTS[5]
+  [44, -1, 51, 61],        // LOTS[1]
+  [44, 1, -55.5, -51],     // LOTS[8], LOTS[9]
+  [44, 1, 57, 70.5],       // LOTS[2]
+  [44, 1, 86, 97],         // LOTS[3]
+  [-44, 1, -37, -27],      // the promenade deck
+];
 // Faces that touch are a party wall, not an overlap.
 const TOUCH = 0.01;
 // The seed main.js boots the city with; lot geometry does not depend on it.
@@ -62,10 +94,12 @@ globalThis.document = {
 const THREE = await import('three');
 const { buildTowers, buildSkyline } = await import('../src/render/block.js');
 const { createCity } = await import('../src/sim/zoning.js');
+const { AVENUES, CROSSINGS } = await import('../src/sim/world.js');
 const texLoader = { load: () => new THREE.Texture() };
 
+const towers = buildTowers(texLoader, 1).footprints;
 const buildings = [
-  ...buildTowers(texLoader, 1).footprints,
+  ...towers,
   ...buildSkyline(texLoader, 1).footprints,
 ];
 const lots = createCity(SEED).parcels.map(({ x, z, w, d }, i) => ({ x, z, w, d, name: `LOTS[${i}]` }));
@@ -95,3 +129,51 @@ if (pairs.length < MAX_OVERLAPS) {
   console.error(`overlap FAIL — good news: lower MAX_OVERLAPS in scripts/check_overlap.mjs to ${pairs.length}.`);
   process.exit(1);
 }
+
+const ways = [
+  ...AVENUES.map((a) => ({ x: a.x, z: (a.z0 + a.z1) / 2, w: 2 * ROAD_BAND, d: a.z1 - a.z0, name: `road ${a.id}` })),
+  ...CROSSINGS.map((c) => ({ x: (c.x0 + c.x1) / 2, z: c.z, w: c.x1 - c.x0, d: 2 * ROAD_BAND, name: `road ${c.id}` })),
+];
+const onRoad = [];
+for (const t of towers) for (const r of ways) if (overlaps(t, r)) onRoad.push([t, r]);
+for (const [t, r] of onRoad) console.log(`  ${fmt(t)}  on  ${r.name}`);
+console.log(`road: ${onRoad.length} towers on a road or walkway (ratchet ${MAX_ROAD})`);
+
+function subtract(runs, [a, b]) {
+  return runs.flatMap(([r0, r1]) => [[r0, Math.min(r1, a)], [Math.max(r0, b), r1]]).filter(([r0, r1]) => r1 > r0);
+}
+const rows = [];
+for (const { x: ax } of AVENUES) {
+  for (const side of [-1, 1]) {
+    let runs = ROW_RUNS;
+    for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+    runs = runs.filter(([r0, r1]) => r1 - r0 >= MIN_RUN);
+    const lineX = ax + side * BUILD_LINE;
+    const walls = towers.filter((t) => Math.abs(t.x - lineX) < t.w / 2).map((t) => [t.z - t.d / 2, t.z + t.d / 2]);
+    let open = runs;
+    for (const w of walls) open = subtract(open, w);
+    const len = (rs) => rs.reduce((n, [r0, r1]) => n + r1 - r0, 0);
+    rows.push({ name: `x=${ax} side ${side}`, built: 1 - len(open) / len(runs) });
+  }
+}
+const worst = Math.min(...rows.map((r) => r.built));
+console.log(`frontage: ${rows.map((r) => `${r.name} ${(r.built * 100).toFixed(0)}%`).join(', ')}`);
+console.log(`frontage: worst row ${(worst * 100).toFixed(1)}% (ratchet ${(MIN_FRONTAGE * 100).toFixed(1)}%)`);
+
+let failed = false;
+if (onRoad.length > MAX_ROAD) {
+  console.error(`road FAIL — ${onRoad.length - MAX_ROAD} new. Fix the placement; never raise MAX_ROAD.`);
+  failed = true;
+} else if (onRoad.length < MAX_ROAD) {
+  console.error(`road FAIL — good news: lower MAX_ROAD in scripts/check_overlap.mjs to ${onRoad.length}.`);
+  failed = true;
+}
+const floor = Math.floor(worst * 1000) / 1000;
+if (floor < MIN_FRONTAGE) {
+  console.error(`frontage FAIL — worst row fell below ${MIN_FRONTAGE}. Never lower MIN_FRONTAGE.`);
+  failed = true;
+} else if (floor > MIN_FRONTAGE) {
+  console.error(`frontage FAIL — good news: raise MIN_FRONTAGE in scripts/check_overlap.mjs to ${floor}.`);
+  failed = true;
+}
+if (failed) process.exit(1);
