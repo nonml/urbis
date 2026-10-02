@@ -5,10 +5,6 @@
 // so, top right, for a few seconds (render/news.js).
 // Pure (law 5): main ticks it after the city and the people, render reads
 // liveNews. It only compares snapshots; it never decides anything.
-//
-// Milestone 3 skeleton: the constants, createNews and snapshot are final;
-// newsBetween, tickNews and liveNews are stubs with their test in
-// tests/news.todo.js.
 import { address } from './decline.js';
 import { STAGE } from './zoning.js';
 import { isDark } from './street.js';
@@ -24,6 +20,9 @@ export const CROWD = 5;
 export const NOUN = { res: 'Flats', com: 'Offices', ind: 'Workshops' };
 // What a moved firm's jobs are called, by use.
 export const JOBS = { com: 'office', ind: 'workshop' };
+// How a firm's leaving line ends, by its cause (economy.js flee): the chain
+// reads in one line after the poke's own line has scrolled off.
+export const WHY = { dark: ' after the power cut', chase: ' after the police chase' };
 
 export function createNews() {
   return { items: [], last: null, residents: null };
@@ -56,9 +55,8 @@ export function snapshot(city, people, street) {
 //    object as its move before, with m = that move and n =
 //    Math.round(Math.abs(m.jobs)), when n > 0: m.jobs > 0 gives `${n} ${JOBS[m.use]}
 //    jobs moved into the ${name} district`, else `${n} ${JOBS[m.use]} jobs left the
-//    ${name} district`, and when m.cause === 'dark' (economy.js flee: the firm a
-//    power cut drove out) that line ends ` after the power cut`, so the chain
-//    reads in one line after the cut's own line has scrolled off.
+//    ${name} district`, and when m.cause is set (economy.js flee: the firm a
+//    power cut or a chase drove out) that line ends WHY[m.cause].
 export function newsBetween(before, after, city) {
   const lines = [];
   const { districts } = city.economy;
@@ -83,7 +81,7 @@ export function newsBetween(before, after, city) {
     if (n === 0) return;
     lines.push(m.jobs > 0
       ? `${n} ${JOBS[m.use]} jobs moved into the ${d.name} district`
-      : `${n} ${JOBS[m.use]} jobs left the ${d.name} district${m.cause === 'dark' ? ' after the power cut' : ''}`);
+      : `${n} ${JOBS[m.use]} jobs left the ${d.name} district${WHY[m.cause] ?? ''}`);
   });
   return lines;
 }

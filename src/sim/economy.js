@@ -65,6 +65,11 @@ const DARK_DRAIN_SECS = 60;
 // line reports it, and the lots answer the floor the district now wants less of.
 export const FLIGHT_SECS = 4;
 export const FLIGHT_PER_DARK_SEC = 0.015;
+// A police chase scares trade off the district the same way (milestone 4c):
+// jobs worth FLIGHT_PER_CHASE_SEC of the district for every second of chase, per
+// tier (wanted.js heat), leave FLIGHT_SECS after the chase does. Half a minute
+// at tier 2 is about one lot-sized firm, like one hack.
+export const FLIGHT_PER_CHASE_SEC = 0.002;
 
 // A use whose floor moved less than this many people in a tick is holding.
 const STILL = 1e-6;
@@ -89,8 +94,10 @@ function makeDistrict(id, lots, rand) {
     nextMove: lerp(MOVE_MIN_SECS, MOVE_MAX_SECS, rand()),
     last: null,
     darkFor: 0,
-    fleeAt: Infinity,
-    fleeJobs: 0,
+    chase: 0,
+    chaseFor: 0,
+    // Firms that have given up and leave at `at`: { at, jobs, cause }, oldest first.
+    flights: [],
     lots: perUse(() => 0),
     floor: perUse(() => 0),
     trend: perUse(() => 0),
@@ -168,29 +175,48 @@ function moveFirm(economy, d) {
   d.nextMove = economy.time + lerp(MOVE_MIN_SECS, MOVE_MAX_SECS, wait);
 }
 
-// The firm a power cut drives out. Milestone 4 skeleton: a stub, with its test
-// in tests/economy-flight.todo.js.
-// While d.dark, d.darkFor grows by dt. On a tick lit again with d.darkFor > 0:
-// d.fleeAt = economy.time + FLIGHT_SECS, d.fleeJobs = d.size *
-// FLIGHT_PER_DARK_SEC * d.darkFor, and d.darkFor = 0. On a tick with
-// economy.time >= d.fleeAt: use = 'com' when d.firms.com >= d.firms.ind, else
-// 'ind'; jobs = Math.min(d.fleeJobs, d.firms[use]); d.firms[use] -= jobs; when
-// jobs > 0, d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' }; then
-// d.fleeAt = Infinity. It never draws from economy.rand, so the other
-// district's stream stays in step.
+// The firm a power cut drives out: while d.dark, d.darkFor counts the seconds;
+// on the first tick lit again a flight sized to them is booked FLIGHT_SECS out.
+// A flight that comes due takes its jobs from whichever of offices or works has
+// more firms, as far as there are any, and d.last says why (cause) for the news.
+// It never draws from economy.rand, so the other district's stream stays in step.
 function flee(economy, d, dt) {
   if (d.dark) d.darkFor += dt;
   else if (d.darkFor > 0) {
-    d.fleeAt = economy.time + FLIGHT_SECS;
-    d.fleeJobs = d.size * FLIGHT_PER_DARK_SEC * d.darkFor;
+    d.flights.push({ at: economy.time + FLIGHT_SECS, jobs: d.size * FLIGHT_PER_DARK_SEC * d.darkFor, cause: 'dark' });
     d.darkFor = 0;
   }
-  if (economy.time < d.fleeAt) return;
-  const use = d.firms.com >= d.firms.ind ? 'com' : 'ind';
-  const jobs = Math.min(d.fleeJobs, d.firms[use]);
-  d.firms[use] -= jobs;
-  if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: 'dark' };
-  d.fleeAt = Infinity;
+  scare(economy, d, dt);
+  while (d.flights.length > 0 && economy.time >= d.flights[0].at) {
+    const flight = d.flights.shift();
+    const use = d.firms.com >= d.firms.ind ? 'com' : 'ind';
+    const jobs = Math.min(flight.jobs, d.firms[use]);
+    d.firms[use] -= jobs;
+    if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: flight.cause };
+  }
+}
+
+// The police chase the player is in, told to the economy once a frame by main
+// after tickWanted: zone is the power zone the suspect is in, tier wanted.heat.
+// Milestone 4 skeleton: chaseIn and scare are stubs, with their test in
+// tests/economy-chase.todo.js.
+// chaseIn: d = economy.districts[zone]; when d exists and tier > 0, d.chase =
+// Math.max(d.chase, tier). Nothing else.
+export function chaseIn(economy, zone, tier) {
+  void economy;
+  void zone;
+  void tier;
+}
+
+// scare, called by flee every tick: when d.chase > 0, d.chaseFor += d.chase *
+// dt; otherwise, when d.chaseFor > 0, d.flights.push({ at: economy.time +
+// FLIGHT_SECS, jobs: d.size * FLIGHT_PER_CHASE_SEC * d.chaseFor, cause: 'chase'
+// }) and d.chaseFor = 0. Then d.chase = 0, so a chase that stops being told
+// stops counting.
+function scare(economy, d, dt) {
+  void economy;
+  void d;
+  void dt;
 }
 
 function earn(d, dt) {

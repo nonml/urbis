@@ -1,0 +1,14 @@
+{
+  "milestone": "4c: a police chase scares a firm out of the district it ran through",
+  "tasks": [
+    {
+      "id": "m4-chase",
+      "lane": "chase",
+      "goal": "Fill chaseIn and scare in src/sim/economy.js so a police chase books a firm's flight from its district, sized to its length and tier, exactly as their comments say.",
+      "files": ["src/sim/economy.js"],
+      "test": "tests/economy-chase.spec.js",
+      "commit": "feat(economy): a police chase scares a firm out of its district",
+      "notes": "Only the two stub bodies change; delete their void lines and the comment sentence 'Milestone 4 skeleton: chaseIn and scare are stubs, with their test in tests/economy-chase.todo.js.' chaseIn body: `const d = economy.districts[zone]; if (d && tier > 0) d.chase = Math.max(d.chase, tier);`. scare body: `if (d.chase > 0) d.chaseFor += d.chase * dt; else if (d.chaseFor > 0) { d.flights.push({ at: economy.time + FLIGHT_SECS, jobs: d.size * FLIGHT_PER_CHASE_SEC * d.chaseFor, cause: 'chase' }); d.chaseFor = 0; } d.chase = 0;`. flee, main.js and news.js are already wired. tests/economy-flight.spec.js and tests/news-cause.spec.js must stay green."
+    }
+  ]
+}

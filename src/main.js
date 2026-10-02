@@ -15,7 +15,7 @@ import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
-import { districtReport } from './sim/economy.js';
+import { districtReport, chaseIn } from './sim/economy.js';
 import {
   STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
   occupiedParcel, syncInterior, doorEnds,
@@ -876,6 +876,8 @@ function render() {
     body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
   };
   if (!policeHold) lastWantedStatus = tickWanted(wanted, dt, suspect, street.time);
+  // A chase scares trade off the district it runs through (economy.js flee).
+  chaseIn(city.economy, zoneAt(hz), wanted.heat);
   tickDispatch(dispatch, drainEvents(wanted), street.time);
   if (lastWantedStatus === 'busted' && !mission.complete) {
     missionReset(mission);
