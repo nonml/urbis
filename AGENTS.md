@@ -31,6 +31,14 @@ anything yet, and demand is a placeholder wave. The plan is `docs/ZONING.md`; th
 roadmap around it is `docs/CHARTER.md`. Do not pretend the rest exists, and do not
 quietly drop it from the vision. It is half the game.
 
+**Every new game generates a new city.** The operator set this on 2026-10-02: roads,
+blocks, lots and buildings all come from the new-game seed. It is **not built yet**.
+`main.js` boots one fixed seed, and the road graph (`src/sim/world.js`), the `LOTS`,
+the interiors' frames, `signs.json` and the mission spots are all hand-placed for that
+one layout. Treat every such coordinate as debt. New placement code derives from world
+data and the seed, never from numbers tuned to today's map. The 2b street wall's
+`KEEP_OUT` and `PINNED_TOWERS` tables are the first debt to pay.
+
 ### Visual target: a grounded modern city
 
 A believable contemporary city. Day and night carry equal weight; weather is variety,
