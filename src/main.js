@@ -3,8 +3,9 @@ import { SEED, GENERATE, SAVING } from './boot.js';
 import { createFixedStep, advance, setSpeed, snap, blend, STEP } from './game/loop.js';
 import { createRecorder, bindRecorder, loadReplay, createReplay } from './game/replay.js';
 import { bindProbe } from './game/probe.js';
+import { bindInput } from './game/input.js';
 import * as THREE from 'three';
-import { createClock, tickClock, toggleDay } from './sim/clock.js';
+import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { WALK_BOUNDS, DISTRICTS, clampToBounds, heightAt } from './sim/world.js';
@@ -56,14 +57,13 @@ import { buildDecline } from './render/decline.js';
 import { buildLotNote, showLotNote } from './render/lotnote.js';
 import { buildNews, showNews } from './render/news.js';
 import { focusParcel } from './sim/decline.js';
-import { createCityView, cityKey, tickCityView } from './sim/cityview.js';
+import { createCityView, tickCityView } from './sim/cityview.js';
 import { buildCityView } from './render/cityview.js';
-import { bindCityView } from './ui/cityview.js';
 import { buildInteriors, updateInteriors } from './render/interior.js';
 import { buildDoorHud, updateDoorHud, fadeThroughDoor } from './render/doorhud.js';
-import { ARC, createArc, tickArc, arcChoose, arcTarget, arcSigns } from './sim/arc.js';
+import { ARC, createArc, tickArc, arcTarget, arcSigns } from './sim/arc.js';
 import { buildArcMarker, updateArcMarker } from './render/arc.js';
-import { buildArcUI, updateArcUI, toggleJournal } from './render/arcui.js';
+import { buildArcUI, updateArcUI } from './render/arcui.js';
 
 const DRAW_BUDGET = 175;
 // One cube face of the reflection world, measured; the margin is the room a
@@ -265,31 +265,30 @@ window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, 
 // Follow cam: lower and closer than before — towers loom, street glow fills
 // the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
 const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5, ground: 0 };
-let dragging = false;
-let lastDragT = -10;
-let lastPX = 0;
-let lastPY = 0;
-canvas.addEventListener('pointerdown', (e) => { dragging = true; lastPX = e.clientX; lastPY = e.clientY; });
-window.addEventListener('pointermove', (e) => {
-  if (!dragging) return;
-  cam.yaw -= (e.clientX - lastPX) * 0.005;
-  cam.pitch = Math.max(0.08, Math.min(1.2, cam.pitch + (e.clientY - lastPY) * 0.004));
-  lastPX = e.clientX;
-  lastPY = e.clientY;
-  lastDragT = clock.elapsed;
-});
-window.addEventListener('pointerup', () => { dragging = false; });
-canvas.addEventListener('wheel', (e) => {
-  cam.dist = Math.max(3, Math.min(14, cam.dist * (1 + e.deltaY * 0.001)));
-}, { passive: true });
 
 // City view (Z): the same world from above, where the player zones the lots.
 const cityView = createCityView(city);
 const cityRig = buildCityView(city, cityView);
 scene.add(cityRig.mesh);
-const cityUi = bindCityView({ canvas, cam, camera, city, street, view: cityView, rig: cityRig });
 
-const keys = new Set();
+// Input (M3.T2) lives in game/input.js: keys, mouse, the city-view binding and
+// the foot/car reads. Drag and wheel deltas come back here, so the follow rig
+// can move to game/camera.js (M3.T3) without the input file changing.
+const clock = restored?.clock ?? createClock();
+// A capture holds the clock so the same seed, pose and hour reproduce: a shot
+// must not drift through the day while the rasteriser crawls.
+if (CAPTURE) clock.rate = 0;
+const look = (dx, dy) => {
+  cam.yaw -= dx * 0.005;
+  cam.pitch = Math.max(0.08, Math.min(1.2, cam.pitch + dy * 0.004));
+};
+const dolly = (dy) => {
+  cam.dist = Math.max(3, Math.min(14, cam.dist * (1 + dy * 0.001)));
+};
+const input = bindInput({
+  canvas, cam, camera, city, cityRig, cityView, street, clock, interior, arc, arcUI,
+  look, dolly, fireHack, toggleVehicle, enterDoor, newGame,
+});
 // Dev spawn presets for scripted verification (?spawn=east). A continued game
 // stands where the save left it, so the preset never overrides a load.
 const spawnPreset = restored ? null : new URLSearchParams(location.search).get('spawn');
@@ -366,8 +365,6 @@ if (spawnPreset === 'east') {
     cam.yaw = player.yaw;
   }
 }
-window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
-window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
 const DARK = [false, false];
 // The zone light the city mirror was last shot under, 1 lit or 0 dead.
@@ -445,25 +442,6 @@ function toggleVehicle() {
   }
 }
 
-window.addEventListener('keydown', (e) => {
-  if (e.repeat) return;
-  const k = e.key.toLowerCase();
-  if (k === 'h') fireHack();
-  if (k === 'f') toggleVehicle();
-  if (k === 't') toggleDay(clock);
-  if (k === 'n') newGame();
-  // The overview lifts off the street, never out of a shop or off a roof, and a
-  // door is used at street scale, never from the overview.
-  if (interior.space === STREET) cityKey(cityView, k, cam.yaw);
-  if (k === 'e' && cityView.mode === 'street') enterDoor();
-  if (k === 'j') toggleJournal(arcUI);
-  if (k === '1' || k === '2') arcChoose(arc, Number(k), street.time);
-});
-
-const clock = restored?.clock ?? createClock();
-// A capture holds the clock so the same seed, pose and hour reproduce: a shot
-// must not drift through the day while the rasteriser crawls.
-if (CAPTURE) clock.rate = 0;
 const hud = document.getElementById('hud');
 let lastProfile = null;
 let lockedNpc = null;
@@ -514,9 +492,6 @@ let firstFrame = true;
 let bootMs = 0;
 let braking = false;
 const lookAt = new THREE.Vector3();
-
-const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
-const HELD_CAR = { throttle: 0, steer: 0 };
 
 // M0-1 fixed step: the accumulator, and the reusable poses render() blends the
 // hero between the last two steps into.
@@ -590,30 +565,6 @@ bindProbe({
 const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
 const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
 
-function footInput() {
-  if (cityView.mode === 'city') return HELD_FOOT;
-  const lx = Math.sin(cam.yaw);
-  const lz = Math.cos(cam.yaw);
-  const rx = -lz;
-  const rz = lx;
-  let mx = 0;
-  let mz = 0;
-  if (keys.has('w')) { mx += lx; mz += lz; }
-  if (keys.has('s')) { mx -= lx; mz -= lz; }
-  if (keys.has('a')) { mx -= rx; mz -= rz; }
-  if (keys.has('d')) { mx += rx; mz += rz; }
-  const len = Math.hypot(mx, mz) || 1;
-  return { mx: mx / len, mz: mz / len, hurry: keys.has('shift') };
-}
-
-function driveInput() {
-  if (cityView.mode === 'city') return HELD_CAR;
-  return {
-    throttle: (keys.has('w') ? 1 : 0) + (keys.has('s') ? -1 : 0),
-    steer: (keys.has('a') ? -1 : 0) + (keys.has('d') ? 1 : 0),
-  };
-}
-
 // Sticky profiler lock: acquire by facing cone, hold while within 14m.
 function acquireTarget() {
   const fx = Math.sin(player.yaw);
@@ -661,14 +612,14 @@ function tickSim() {
   tickPeople(people, city);
   tickCommute(street, people, city, clock.hour, player.x, player.z);
   tickNews(news, city, people, street);
-  tickCityView(cityView, city, STEP, keys);
+  tickCityView(cityView, city, STEP, input.keys);
   if (driving) {
-    braking = tickPlayerCar(heroCar, driveInput(), STEP).braking;
-    if (!dragging && clock.elapsed - lastDragT > 2) {
+    braking = tickPlayerCar(heroCar, input.driveInput(), STEP).braking;
+    if (!input.dragging && clock.elapsed - input.lastDragT > 2) {
       cam.yaw += angDiff(heroCar.yaw, cam.yaw) * Math.min(1, STEP * 2.2);
     }
   } else {
-    tickPlayer(player, footInput(), STEP);
+    tickPlayer(player, input.footInput(), STEP);
     tickInterior(interior, player);
   }
   tickSteam(steam, clock.elapsed, STEP);
@@ -867,7 +818,7 @@ function render() {
     prompt.style.display = 'none';
   }
   cityRig.frame(camera, lookAt, scene);
-  cityUi.update();
+  input.cityUi.update();
   vacant.update(cityView.lift > 0);
   updateDoorHud(doorHud, driving ? null : interior.near);
 
