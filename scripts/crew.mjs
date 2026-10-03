@@ -54,7 +54,7 @@ const PORT_BLOCKS = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 72];
 // calls than this since its last edit, or the same call LOOP_REPEATS times, is a
 // loop. A whole-feature brief reads a lot before its first edit; a task should not.
 const EDIT_TOOLS = new Set(['edit', 'write', 'patch', 'multiedit', 'apply_patch']);
-const LOOP_CALLS = { brief: 60, task: 40 };
+const LOOP_CALLS = { brief: 100, task: 100 };
 const LOOP_REPEATS = 3;
 // Fixes a task's answer gets on one model before it moves up a tier.
 const FIX_TRIES = 2;
