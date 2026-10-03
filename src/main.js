@@ -1,5 +1,6 @@
 // Bootstrap: sim ticks, render reads. HUD shows measured numbers only.
 import { SEED, GENERATE, SAVING } from './boot.js';
+import { createFixedStep, advance, snap, blend, STEP } from './game/loop.js';
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
@@ -410,6 +411,9 @@ const ROOF_RAIN_BELOW = 12;
 // covers the jump.
 function enterDoor() {
   if (player.mode !== 'foot' || !useDoor(interior, player)) return;
+  // The door teleports; snap the draw pose to it so no frame blends the walk
+  // from the far side of the threshold.
+  snap(player);
   const rig = currentPlace(interior)?.rig ?? STREET_RIG;
   cam.yaw = player.yaw;
   cam.dist = rig.dist;
@@ -430,6 +434,9 @@ function toggleVehicle() {
     player.mode = 'foot';
     ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z));
     player.speed = 0;
+    // A step snap, not a step: without it the drawn avatar would blend from
+    // where it last stood on foot, possibly across the map.
+    snap(player);
     avatar.group.visible = true;
     cam.dist = 4.5;
     cam.pitch = 0.18;
@@ -593,6 +600,8 @@ function policeProbe() {
     drive: (x, z, yaw, speed = 0) => {
       Object.assign(heroCar, { x, z, yaw, speed, y: heightAt(x, z) });
       Object.assign(player, { x, z });
+      snap(heroCar);
+      snap(player);
       if (player.mode !== 'drive') toggleVehicle();
       cam.yaw = yaw;
     },
@@ -650,6 +659,7 @@ if (CAPTURE) {
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
   window.__game.pose = (x, z, yaw) => {
     ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, x, z));
+    snap(player);
     cam.yaw = yaw;
   };
   // Walk into a grown lot by use, the way the door would: pose the body on the
@@ -669,6 +679,7 @@ if (CAPTURE) {
     player.x = from.x;
     player.z = from.z;
     player.speed = 0;
+    snap(player);
     tickInterior(interior, player);
     enterDoor();
     return interior.space === STREET ? null : interior.space;
@@ -741,6 +752,7 @@ if (CAPTURE) {
         tickPlayer(player, input, 0.05);
         tickInterior(interior, player);
       }
+      snap(player);
       return { x: +player.x.toFixed(2), z: +player.z.toFixed(2) };
     },
     // The same for the hero car, so driving a loop is not minutes of rasteriser.
@@ -751,6 +763,7 @@ if (CAPTURE) {
         tickPlayerCar(heroCar, { throttle, steer }, 0.05);
         moved += Math.hypot(heroCar.x - before.x, heroCar.z - before.z);
       }
+      snap(heroCar);
       return { x: +heroCar.x.toFixed(2), z: +heroCar.z.toFixed(2), moved: +moved.toFixed(1) };
     },
     // Walk one avenue edge end to end inside the page: teleport to its start,
@@ -771,6 +784,7 @@ if (CAPTURE) {
       avatar.group.visible = true;
       ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, a.x, a.z));
       player.speed = 0;
+      snap(player);
       const dx = b.x - player.x;
       const dz = b.z - player.z;
       const len = Math.hypot(dx, dz) || 1;
@@ -803,6 +817,7 @@ if (CAPTURE) {
         }
         if (Math.hypot(player.x - b.x, player.z - b.z) <= reach) { reached = true; break; }
       }
+      snap(player);
       return {
         id: e.id, reached, camInside, samples, checks,
         maxBlocked: +maxBlocked.toFixed(3),
@@ -961,6 +976,12 @@ const lookAt = new THREE.Vector3();
 const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
 const HELD_CAR = { throttle: 0, steer: 0 };
 
+// M0-1 fixed step: the accumulator, and the reusable poses render() blends the
+// hero between the last two steps into.
+const fixed = createFixedStep();
+const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
+const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
+
 function footInput() {
   if (cityView.mode === 'city') return HELD_FOOT;
   const lx = Math.sin(cam.yaw);
@@ -1018,44 +1039,94 @@ function angDiff(a, b) {
   return d;
 }
 
-function render() {
-  requestAnimationFrame(render);
-  const now = performance.now();
-  const dt = Math.min((now - last) / 1000, 0.05);
-  last = now;
+// One fixed sim step (M0-1). Everything that advances game state happens here,
+// in the order render() used to run it, with the step for a timestep. The
+// camera's drive easing and the hero's braking ride the step too so a replay of
+// input by step reproduces the same world; render only draws.
+function tickSim() {
+  snap(player);
+  snap(heroCar);
   const driving = player.mode === 'drive';
-  tickClock(clock, dt);
-  tickStreet(street, dt);
-  tickZoning(city, dt, street, occupiedParcel(interior));
+  tickClock(clock, STEP);
+  tickStreet(street, STEP);
+  tickZoning(city, STEP, street, occupiedParcel(interior));
   tickPeople(people, city);
   tickCommute(street, people, city, clock.hour, player.x, player.z);
   tickNews(news, city, people, street);
-  tickCityView(cityView, city, dt, keys);
-  // Stream against the camera, because the camera is what the frustum belongs
-  // to. It is last frame's position; at a 160 m build radius one frame of lag
-  // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
-  const eye = streamOrigin ?? camera.position;
-  chunks.update(eye.x, eye.z);
+  tickCityView(cityView, city, STEP, keys);
   if (driving) {
-    const res = tickPlayerCar(heroCar, driveInput(), dt);
-    braking = res.braking;
-    updatePlayerCar(heroRig, heroCar, braking);
+    braking = tickPlayerCar(heroCar, driveInput(), STEP).braking;
     if (!dragging && clock.elapsed - lastDragT > 2) {
-      cam.yaw += angDiff(heroCar.yaw, cam.yaw) * Math.min(1, dt * 2.2);
+      cam.yaw += angDiff(heroCar.yaw, cam.yaw) * Math.min(1, STEP * 2.2);
     }
   } else {
-    tickPlayer(player, footInput(), dt);
+    tickPlayer(player, footInput(), STEP);
     tickInterior(interior, player);
-    updatePlayer(avatar, player);
   }
-  const glows = [zoneGlow(street, 0), zoneGlow(street, 1)];
-  const nf = clock.nightFactor;
+  tickSteam(steam, clock.elapsed, STEP);
+  tickHackFx(fx, STEP);
+  // DARK is sim truth about the two zones, so it settles on the step and the
+  // effects of it (mission notes) are step for step reproducible.
   for (let z = 0; z < 2; z++) {
     const dark = isDark(street, z);
     if (DARK[z] !== dark) {
       DARK[z] = dark;
       missionOnBlackout(mission, DARK, street.time);
     }
+  }
+  const hx = driving ? heroCar.x : player.x;
+  const hz = driving ? heroCar.z : player.z;
+  // A hack pulls the units to the scene of it: wantedOnBlackout sets the search there.
+  const suspect = {
+    x: hx, z: hz, yaw: driving ? heroCar.yaw : player.yaw, inCar: driving, car: heroCar,
+    body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
+  };
+  if (!policeHold) lastWantedStatus = tickWanted(wanted, STEP, suspect, street.time);
+  missionOnHeatZero(mission, wanted.heat, street.time);
+  // A chase scares trade off the district it runs through (economy.js flee).
+  chaseIn(city.economy, zoneAt(hz), wanted.heat);
+  tickDispatch(dispatch, drainEvents(wanted), street.time);
+  if (lastWantedStatus === 'busted' && !mission.complete) {
+    missionReset(mission);
+    missionNote(mission, 'BUSTED — contract reset', street.time, 3);
+  }
+  mission.balance += tickArc(arc, {
+    x: hx, z: hz, inCar: driving, dark: DARK, heat: wanted.heat, profile: lastProfile?.name ?? null,
+    parcels: city.parcels, busted: lastWantedStatus === 'busted',
+  }, street.time);
+}
+
+function render() {
+  requestAnimationFrame(render);
+  const now = performance.now();
+  // The sim sees the real frame delta and catches up in whole steps (capped at
+  // MAX_STEPS, so a slow frame cannot fast-forward the world); the render-side
+  // smoothing below still uses the clamped one, because a stalled frame must
+  // not make the follow cam jump.
+  const frame = (now - last) / 1000;
+  const dt = Math.min(frame, 0.05);
+  last = now;
+  const driving = player.mode === 'drive';
+  advance(fixed, frame);
+  for (let i = 0; i < fixed.steps; i++) tickSim();
+  // Stream against the camera, because the camera is what the frustum belongs
+  // to. It is last frame's position; at a 160 m build radius one frame of lag
+  // is 0.2 m of a 224 m hysteresis gap and nothing can see it.
+  const eye = streamOrigin ?? camera.position;
+  chunks.update(eye.x, eye.z);
+  // Draw the actor between the last two fixed steps (M0-1): the sim moved in
+  // whole 50 ms steps and this frame sits `alpha` of the way to the next.
+  blend(player, fixed.alpha, playerDraw);
+  playerDraw.mode = player.mode;
+  blend(heroCar, fixed.alpha, carDraw);
+  if (driving) updatePlayerCar(heroRig, carDraw, braking);
+  else updatePlayer(avatar, playerDraw);
+  const hx = driving ? carDraw.x : playerDraw.x;
+  const hz = driving ? carDraw.z : playerDraw.z;
+  const hy = driving ? carDraw.y : playerDraw.y;
+  const glows = [zoneGlow(street, 0), zoneGlow(street, 1)];
+  const nf = clock.nightFactor;
+  for (let z = 0; z < 2; z++) {
     // Re-shoot the mirror once a zone has settled, dead or lit, not the instant
     // the hack lands: the collapse and the relight both flicker, and a face shot
     // mid-flicker holds a half-lit street in the water until the next re-shoot.
@@ -1091,7 +1162,7 @@ function render() {
     mk.envMapIntensity = 0.1 + 0.6 * nf * b;
     mk.emissiveIntensity = 0.015 * nf * b;
   }
-  updateCarStreaks(carStreaks, heroCar, driving, wanted.pursuit, nf, street.time);
+  updateCarStreaks(carStreaks, carDraw, driving, wanted.pursuit, nf, street.time);
   signs.tick(signs.zoneMats, signs.zoneSprites, glows, street.time, nf);
   for (const e of shops.mats) {
     const v = glows[e.zone];
@@ -1103,10 +1174,7 @@ function render() {
   // Up on a roof it rains on the roof: the rain box rides up with the player.
   rain.position.y = interior.space === STREET ? 0 : player.y - ROOF_RAIN_BELOW;
   lamps.tick(street.time);
-  missionOnHeatZero(mission, wanted.heat, street.time);
   tickRain(rain, clock.elapsed);
-  tickSteam(steam, clock.elapsed, dt);
-  tickHackFx(fx, dt);
   const night = clock.nightFactor;
   updateDaylight(env, scene, bloom, night, renderer);
   grade.uniforms.uNight.value = night;
@@ -1134,42 +1202,23 @@ function render() {
   // instances, no extra draw. The hero keeps its lights on parked — the beacon
   // is the other half of finding the car again.
   updateCarPools(traffic.rig, [
-    { x: heroCar.x, z: heroCar.z, yaw: heroCar.yaw, speed: heroCar.speed, on: true },
+    { x: carDraw.x, z: carDraw.z, yaw: carDraw.yaw, speed: heroCar.speed, on: true },
     ...wanted.pursuit.map((p) => ({ x: p.x, z: p.z, yaw: p.yaw, speed: p.speed, on: p.active })),
   ], camera);
-  updateBlobs(blobs, street, player, heroCar);
-  const hx = driving ? heroCar.x : player.x;
-  const hz = driving ? heroCar.z : player.z;
-  heroKey.position.set(hx, (driving ? heroCar.y : player.y) + 2.4, hz);
+  updateBlobs(blobs, street, playerDraw, carDraw);
+  heroKey.position.set(hx, hy + 2.4, hz);
   heroKey.intensity = 14 * night;
   if (isIndoors(interior)) heroKey.intensity = interiors.key;
-  // A hack pulls the units to the scene of it: wantedOnBlackout sets the search there.
-  const suspect = {
-    x: hx, z: hz, yaw: driving ? heroCar.yaw : player.yaw, inCar: driving, car: heroCar,
-    body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
-  };
-  if (!policeHold) lastWantedStatus = tickWanted(wanted, dt, suspect, street.time);
-  // A chase scares trade off the district it runs through (economy.js flee).
-  chaseIn(city.economy, zoneAt(hz), wanted.heat);
-  tickDispatch(dispatch, drainEvents(wanted), street.time);
-  if (lastWantedStatus === 'busted' && !mission.complete) {
-    missionReset(mission);
-    missionNote(mission, 'BUSTED — contract reset', street.time, 3);
-  }
   updatePolice(police, wanted, {
     time: street.time, elapsed: clock.elapsed, night: clock.nightFactor, camera, heroRig, heroCar, fx,
   });
   updateDispatchHud(radio, dispatch, street.time);
-  mission.balance += tickArc(arc, {
-    x: hx, z: hz, inCar: driving, dark: DARK, heat: wanted.heat, profile: lastProfile?.name ?? null,
-    parcels: city.parcels, busted: lastWantedStatus === 'busted',
-  }, street.time);
   updateArcMarker(arcMarker, arcTarget(arc, city.parcels, hx, hz), arcSigns(arc), clock.elapsed, night, glows);
   updateArcUI(arcUI, arc, hx, hz, street.time);
 
-  const ax = driving ? heroCar.x : player.x;
-  const az = driving ? heroCar.z : player.z;
-  const ay = driving ? heroCar.y : player.y;
+  const ax = hx;
+  const az = hz;
+  const ay = hy;
   const cp = Math.cos(cam.pitch);
   const sp = Math.sin(cam.pitch);
   const cx = ax - Math.sin(cam.yaw) * cam.dist * cp;
@@ -1180,7 +1229,8 @@ function render() {
   cam.ground += (Math.max(ay, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * 6);
   camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
   if (!driving) camera.position.copy(frameCamera(interior, { x: ax, y: ay + CAM_PIVOT, z: az }, camera.position));
-  lookAt.set(ax + (driving ? Math.sin(heroCar.yaw) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(heroCar.yaw) * 3 : 0));
+  const ahead = driving ? carDraw.yaw : playerDraw.yaw;
+  lookAt.set(ax + (driving ? Math.sin(ahead) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(ahead) * 3 : 0));
   camera.lookAt(lookAt);
 
   const target = driving || interior.space !== STREET ? null : acquireTarget();
