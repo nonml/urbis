@@ -1,0 +1,205 @@
+{
+  "generatedAt": "2026-10-03T08:27:28.518Z",
+  "seeds": [
+    "20260916 hand",
+    "20260916 gen",
+    "gen 11",
+    "gen 22",
+    "gen 33",
+    "gen 44"
+  ],
+  "pillars": {
+    "Build it, live in it": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "lot:2-door → lot:2",
+        "detail": "walked into lot:2"
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "lot:2-door → lot:2",
+        "detail": "walked into lot:2"
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "lot:3-door → lot:3",
+        "detail": "walked into lot:3"
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "lot:2-door → lot:2",
+        "detail": "walked into lot:2"
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "lot:2-door → lot:2",
+        "detail": "walked into lot:2"
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "lot:3-door → lot:3",
+        "detail": "walked into lot:3"
+      }
+    },
+    "The city lives": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "parcel changed; npc 93%; car 50%",
+        "detail": "the district and its people moved with nobody touching anything"
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "parcel changed; npc 97%; car 41%",
+        "detail": "the district and its people moved with nobody touching anything"
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "parcel changed; npc 88%; car 43%",
+        "detail": "the district and its people moved with nobody touching anything"
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "parcel changed; npc 88%; car 33%",
+        "detail": "the district and its people moved with nobody touching anything"
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "parcel changed; npc 93%; car 42%",
+        "detail": "the district and its people moved with nobody touching anything"
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "parcel changed; npc 90%; car 33%",
+        "detail": "the district and its people moved with nobody touching anything"
+      }
+    },
+    "Every tool is expressive": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "zone 1: lit → dark",
+        "detail": ""
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "zone 1: lit → dark",
+        "detail": ""
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "zone 0: lit → dark",
+        "detail": ""
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "zone 0: lit → dark",
+        "detail": ""
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "zone 0: lit → dark",
+        "detail": ""
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "zone 1: lit → dark",
+        "detail": ""
+      }
+    },
+    "Consequence fits the act": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "1 zone changed",
+        "detail": "the effect stayed inside one zone"
+      }
+    },
+    "The player feels capable": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "edges 8/8; cam-in-building 0; frameCheck ≤ 0.000 (16/150 frames); car 83.4m",
+        "detail": "arrived on 8/8 avenue edges in the 20 s cap, camera always clear"
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "edges 10/10; cam-in-building 0; frameCheck ≤ 0.000 (13/150 frames); car 83.4m",
+        "detail": "arrived on 10/10 avenue edges in the 20 s cap, camera always clear"
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "edges 9/9; cam-in-building 0; frameCheck ≤ 0.000 (12/150 frames); car 83.4m",
+        "detail": "arrived on 9/9 avenue edges in the 20 s cap, camera always clear"
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "edges 6/6; cam-in-building 0; frameCheck ≤ 0.000 (18/153 frames); car 83.4m",
+        "detail": "arrived on 6/6 avenue edges in the 20 s cap, camera always clear"
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "edges 6/6; cam-in-building 0; frameCheck ≤ 0.000 (15/150 frames); car 83.4m",
+        "detail": "arrived on 6/6 avenue edges in the 20 s cap, camera always clear"
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "edges 11/11; cam-in-building 0; frameCheck ≤ 0.000 (17/197 frames); car 83.4m",
+        "detail": "arrived on 11/11 avenue edges in the 20 s cap, camera always clear"
+      }
+    },
+    "Beauty in the system": {
+      "20260916 hand": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      },
+      "20260916 gen": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      },
+      "gen 11": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      },
+      "gen 22": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      },
+      "gen 33": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      },
+      "gen 44": {
+        "pass": true,
+        "value": "lint 0 errors / 44 warnings; 12 functions > 60 lines",
+        "detail": "longest: render 245, buildTowers 224, createChunkManager 138"
+      }
+    }
+  }
+}

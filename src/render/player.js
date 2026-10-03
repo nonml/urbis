@@ -124,21 +124,23 @@ function shade(geo, [x, y, z], v) {
 
 export function buildPlayer() {
   const group = new THREE.Group();
-  // A cone flaring wider at the hem than at the shoulder is a chess pawn. The
-  // hem comes in under the shoulder line and the waist nips, so the silhouette
-  // reads as a person in a coat from behind instead of a game piece.
-  const coatProfile = [[0.255, 0], [0.247, 0.20], [0.222, 0.50], [0.248, 0.70], [0.232, 0.82]]
-    .map(([r, y]) => new THREE.Vector2(r, y));
-  const coatLathe = new THREE.LatheGeometry(coatProfile, 10);
-  coatLathe.translate(0, 0.68, 0);
-  // A body of revolution is a chess pawn. People are wide across and thin
-  // front-to-back, and they have a shoulder line the head sits between — this
-  // squash plus the yoke below is what turns the cone into a back to follow.
+  // A cone flaring wider at the hem than at the shoulder is a chess pawn, and a
+  // flat yoke box laid across the top is a coat hanger. Let the lathe itself
+  // carry the slope: hem -> waist nip -> widest shoulder -> neck, so the top
+  // runs into the head instead of stopping under a lid.
+  const coatProfile = [
+    [0.255, 0.66], [0.247, 0.86], [0.222, 1.10], [0.240, 1.28],
+    [0.252, 1.44], [0.205, 1.52], [0.120, 1.585],
+  ].map(([r, y]) => new THREE.Vector2(r, y));
+  const coatLathe = new THREE.LatheGeometry(coatProfile, 18);
+  // Wide across, thin front-to-back: a true body of revolution alone is a
+  // chess pawn from every angle.
   coatLathe.scale(1.02, 1, 0.68);
   const coatGeo = mergeGeometries([
     coatLathe,
-    (() => { const g = new THREE.BoxGeometry(0.50, 0.13, 0.24); g.translate(0, 1.44, 0); return g; })(),
-    (() => { const g = new THREE.CylinderGeometry(0.135, 0.152, 0.15, 10); g.translate(0, 1.55, -0.01); return g; })(),
+    // Collar and neck, both round, so the head sits on a person's neck.
+    (() => { const g = new THREE.CylinderGeometry(0.115, 0.088, 0.07, 16); g.translate(0, 1.55, -0.005); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.072, 0.085, 0.15, 16); g.translate(0, 1.60, 0); return g; })(),
   ]);
   bakeVerticalShade(weaveUVs(coatGeo), 0);
   const coatMat = new THREE.MeshStandardMaterial({
@@ -147,7 +149,7 @@ export function buildPlayer() {
   });
   const coat = new THREE.Mesh(coatGeo, coatMat);
   coat.castShadow = true;
-  const headGeo = new THREE.SphereGeometry(0.13, 12, 10);
+  const headGeo = new THREE.SphereGeometry(0.13, 18, 12);
   headGeo.scale(0.92, 1.12, 1.0);
   const head = new THREE.Mesh(
     headGeo,
@@ -155,49 +157,60 @@ export function buildPlayer() {
   );
   head.position.y = 1.70;
   const legMat = new THREE.MeshStandardMaterial({ color: 0x090b0e, roughness: 0.85 });
-  // Boot merged into the leg, so both feet ride the walk cycle for free. A leg
-  // that ends in a flat cylinder cap is the last thing that read as a peg.
+  // Trousers with a knee: the calf steps forward out of the thigh, so the leg
+  // bends where a leg bends instead of at the midpoint of one flat cylinder.
+  // The foot is a flattened capsule — a rounded toe at the front, a rounded
+  // heel at the back, merged in so both ride the walk cycle for free.
   const legGeo = mergeGeometries([
-    (() => { const g = new THREE.CylinderGeometry(0.075, 0.09, 0.72, 8); g.translate(0, -0.36, 0); return g; })(),
-    (() => { const g = new THREE.BoxGeometry(0.135, 0.09, 0.26); g.translate(0, -0.685, 0.04); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.088, 0.075, 0.34, 16); g.translate(0, -0.17, 0); return g; })(),
+    (() => { const g = new THREE.CylinderGeometry(0.075, 0.060, 0.30, 16); g.translate(0, -0.49, 0.016); return g; })(),
+    (() => {
+      const g = new THREE.CapsuleGeometry(0.052, 0.16, 4, 16);
+      g.rotateX(Math.PI / 2);
+      g.scale(0.92, 0.72, 1.0);
+      g.translate(0, -0.684, 0.045);
+      return g;
+    })(),
   ]);
   const legL = new THREE.Mesh(legGeo, legMat);
   legL.position.set(-0.11, 0.72, 0);
   const legR = new THREE.Mesh(legGeo, legMat);
   legR.position.set(0.11, 0.72, 0);
-  const armGeo = new THREE.CylinderGeometry(0.062, 0.072, 0.54, 7);
-  armGeo.translate(0, -0.26, 0);
+  // A sleeve that ends in a wrist and a hand, not a capped pipe: the capsule
+  // rounds the cuff, the palm is a small sphere below it.
+  const armGeo = mergeGeometries([
+    (() => { const g = new THREE.CapsuleGeometry(0.055, 0.34, 4, 16); g.translate(0, -0.225, 0); return g; })(),
+    (() => { const g = new THREE.SphereGeometry(0.058, 16, 10); g.translate(0, -0.448, 0.004); return g; })(),
+  ]);
   bakeVerticalShade(weaveUVs(armGeo), 1.40);
   const armL = new THREE.Mesh(armGeo, coatMat);
   armL.position.set(-0.278, 1.40, 0);
   const armR = new THREE.Mesh(armGeo, coatMat);
   armR.position.set(0.278, 1.40, 0);
-  // One dark-kit mesh: pack, its straps and lid, plus the hair cap. All one
-  // material, so the back of the hero gains the only object the player stares
-  // at all game without costing a draw. The shades are vertex multipliers on a
-  // near-black base — a black pack on a dark coat is a silhouette with nothing
-  // in it, and that read as one shape rather than a person carrying something.
+  // One dark-kit mesh: a capsule pack with a rounded flap, capsule straps, the
+  // belt and buckle, and the hair cap. All one material, so the back of the
+  // hero gains the only object the player stares at all game without costing a
+  // draw. The shades are vertex multipliers on a near-black base — a black pack
+  // on a dark coat is a silhouette with nothing in it, and that read as one
+  // shape rather than a person carrying something.
   const kitGeo = mergeGeometries([
-    shade(new THREE.BoxGeometry(0.28, 0.31, 0.16), [0, 1.29, -0.25], 2.3),
+    (() => { const g = new THREE.CapsuleGeometry(0.125, 0.15, 6, 16); g.scale(1.05, 1, 0.60); return shade(g, [0, 1.30, -0.25], 2.3); })(),
+    (() => { const g = new THREE.CapsuleGeometry(0.12, 0.10, 4, 16); g.scale(1.08, 0.5, 0.62); return shade(g, [0, 1.455, -0.255], 3.9); })(),
     // Belt. A coat with a waist is a garment; a coat without one is a cone
     // with a gradient painted on it, and the vertex ramp alone was never
     // going to carry the break on its own.
     (() => {
-      const g = new THREE.TorusGeometry(0.247, 0.026, 6, 20);
+      const g = new THREE.TorusGeometry(0.247, 0.026, 16, 24);
       g.rotateX(Math.PI / 2);
       g.scale(1.02, 1, 0.70);
       g.translate(0, 1.07, 0);
       return shade(g, [0, 0, 0], 1.5);
     })(),
+    (() => { const g = new THREE.SphereGeometry(0.035, 16, 10); return shade(g, [0.055, 1.07, 0.176], 3.4); })(),
+    (() => { const g = new THREE.CapsuleGeometry(0.018, 0.20, 3, 16); return shade(g, [-0.105, 1.40, -0.165], 1.6); })(),
+    (() => { const g = new THREE.CapsuleGeometry(0.018, 0.20, 3, 16); return shade(g, [0.105, 1.40, -0.165], 1.6); })(),
     (() => {
-      const g = new THREE.BoxGeometry(0.09, 0.075, 0.05);
-      return shade(g, [0.055, 1.07, 0.176], 3.4);
-    })(),
-    shade(new THREE.BoxGeometry(0.29, 0.07, 0.17), [0, 1.42, -0.252], 3.9),
-    shade(new THREE.BoxGeometry(0.06, 0.24, 0.05), [-0.11, 1.38, -0.155], 1.6),
-    shade(new THREE.BoxGeometry(0.06, 0.24, 0.05), [0.11, 1.38, -0.155], 1.6),
-    (() => {
-      const g = new THREE.SphereGeometry(0.152, 12, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
+      const g = new THREE.SphereGeometry(0.152, 16, 8, 0, Math.PI * 2, 0, Math.PI * 0.62);
       g.scale(0.90, 1.08, 1.02);
       g.translate(0, 1.695, -0.012);
       return shade(g, [0, 0, 0], 1);

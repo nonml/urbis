@@ -31,3 +31,6 @@ scripts/*.png
 screenshots/
 # Gate evidence (regenerated each run)
 docs/shots/gate/
+
+# The scorecard re-shoots its frames every run; the table in latest.md is the record.
+docs/scorecard/*.png

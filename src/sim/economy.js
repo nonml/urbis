@@ -74,6 +74,23 @@ export const FLIGHT_PER_CHASE_SEC = 0.002;
 // A use whose floor moved less than this many people in a tick is holding.
 const STILL = 1e-6;
 
+// The market constants above, read back by scripts/economy-probe.mjs so its
+// report quotes the shipped numbers instead of hard-coding a second copy.
+export function probeConstants() {
+  return {
+    balanced: BALANCED,
+    gapGain: GAP_GAIN,
+    firmsUsual: FIRMS_USUAL,
+    marketLagSecs: MARKET_LAG_SECS,
+    wealthRiseSecs: WEALTH_RISE_SECS,
+    wealthFallSecs: WEALTH_FALL_SECS,
+    darkDrainSecs: DARK_DRAIN_SECS,
+    flightSecs: FLIGHT_SECS,
+    flightPerDarkSec: FLIGHT_PER_DARK_SEC,
+    flightPerChaseSec: FLIGHT_PER_CHASE_SEC,
+  };
+}
+
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const perUse = (fn) => Object.fromEntries(USES.map((use) => [use, fn(use)]));

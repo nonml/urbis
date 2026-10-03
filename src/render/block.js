@@ -449,7 +449,9 @@ function uvCell(geo, kind) {
   return geo;
 }
 
-function towerMaterials(texLoader, maxAniso) {
+// The city's own day/night facade maps, loaded once and shared: the tower
+// architectures and the skyline ring tile the same FACADE_TILE window grid.
+function loadFacadeNightMaps(texLoader, maxAniso) {
   const nightMaps = {};
   for (const [slot, file, srgb] of FACADE_MAPS) {
     const t = texLoader.load(`assets/facade_glass_night/${file}.jpg`);
@@ -462,6 +464,11 @@ function towerMaterials(texLoader, maxAniso) {
   dayColor.colorSpace = THREE.SRGBColorSpace;
   dayColor.wrapS = dayColor.wrapT = THREE.RepeatWrapping;
   dayColor.anisotropy = maxAniso;
+  return { nightMaps, dayColor };
+}
+
+function towerMaterials(texLoader, maxAniso) {
+  const { nightMaps, dayColor } = loadFacadeNightMaps(texLoader, maxAniso);
   const concrete = loadPolyHavenMaps(texLoader, maxAniso, 'concrete_wall_008', 1, 1);
   const redBrick = loadPolyHavenMaps(texLoader, maxAniso, 'red_brick', 8, 8);
   const paleBrick = loadPolyHavenMaps(texLoader, maxAniso, 'yellow_brick', 6, 6);
@@ -705,6 +712,9 @@ const PARAPET_T = 0.3;
 const MASONRY_KINDS = [3, 4, 5];
 // The setback crown is built at this fraction of the shaft footprint.
 const CROWN = 0.72;
+// Only ring towers at least this tall get a setback crown, so the horizon gets
+// a few landmarks instead of every box wearing the same hat.
+const SKYLINE_CROWN_MIN = 62;
 
 function roofline(caps, cx, cz, w, top, d, kind) {
   caps.push(
@@ -947,13 +957,81 @@ export function buildTowers(texLoader, maxAniso) {
   };
 }
 
-// Horizon promise (VGA-054): lit-window ring beyond the playable blocks.
-// One merged mesh, dimmed to silhouette by day from main.
+// Horizon promise (VGA-054): a lit-window ring beyond the playable blocks.
+// The city's own facade map is a curtain wall fine enough that at city-view
+// distance a ring tower minifies it to TV static. So the ring paints its own
+// facade on the same FACADE_TILE grid, three floors and four bays to a tile,
+// with whole windows big enough to survive the distance. Mipmapped and one draw.
+const SKYLINE_FLOORS = 3;
+const SKYLINE_BAYS = 4;
+// One tile's lit windows, floor by floor. Half are lit, and no floor or bay is
+// lit end to end: a pattern that lines up repeats into stripes across the ring.
+const SKYLINE_LIT_PANES = ['#..#', '.##.', '#.#.'];
+
+function skylineCanvas(paint, maxAniso) {
+  const c = document.createElement('canvas');
+  c.width = 256;
+  c.height = 256;
+  paint(c.getContext('2d'));
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.anisotropy = maxAniso;
+  return t;
+}
+
+// wall, slab = spandrel band under the window, glass = unlit pane, lit = a lit
+// pane. When `lit` is null every window is painted glass (the day albedo).
+function paintSkylineFacade(g, { wall, slab, glass, lit }) {
+  const cellH = 256 / SKYLINE_FLOORS;
+  g.fillStyle = wall;
+  g.fillRect(0, 0, 256, 256);
+  if (lit) g.filter = 'blur(2.5px)';
+  const bayW = 256 / SKYLINE_BAYS;
+  for (let r = 0; r < SKYLINE_FLOORS; r++) {
+    g.fillStyle = slab;
+    g.fillRect(0, Math.round(r * cellH + cellH * 0.74), 256, Math.ceil(cellH * 0.26));
+    // Each bay is lit or dark on its own: a whole floor lit as one band put the
+    // same amber stripes on every tower in the ring (D7, slice-080).
+    for (let b = 0; b < SKYLINE_BAYS; b++) {
+      g.fillStyle = lit && SKYLINE_LIT_PANES[r][b] === '#' ? lit : glass;
+      g.fillRect(b * bayW + bayW * 0.1, r * cellH + cellH * 0.12, bayW * 0.8, cellH * 0.62);
+    }
+  }
+  if (lit) g.filter = 'none';
+}
+
+function skylineMaterial(day, night, emit) {
+  const mat = new THREE.MeshStandardMaterial({
+    map: night,
+    emissiveMap: emit,
+    emissive: 0xffffff,
+    emissiveIntensity: 0.8,
+    roughness: 0.9,
+    metalness: 0.0,
+    color: 0xffffff,
+    envMapIntensity: 1.0,
+  });
+  mat.userData.uNight = { value: 1 };
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uNight = mat.userData.uNight;
+    sh.uniforms.dayMap = { value: day };
+    sh.fragmentShader = sh.fragmentShader
+      .replace(
+        '#include <map_pars_fragment>',
+        '#include <map_pars_fragment>\nuniform sampler2D dayMap;\nuniform float uNight;'
+      )
+      .replace(
+        '#include <map_fragment>',
+        'vec4 dayTexel = texture2D( dayMap, vMapUv );\nvec4 nightTexel = texture2D( map, vMapUv );\ndiffuseColor *= mix( dayTexel, nightTexel, uNight );'
+      );
+    if (!sh.fragmentShader.includes('dayTexel')) console.error('[skyline] patch missed');
+  };
+  mat.customProgramCacheKey = () => 'skyline-facade';
+  return mat;
+}
+
 export function buildSkyline(texLoader, maxAniso) {
-  const emission = texLoader.load('assets/facade_glass_night/emission.jpg');
-  emission.colorSpace = THREE.SRGBColorSpace;
-  emission.wrapS = emission.wrapT = THREE.RepeatWrapping;
-  emission.anisotropy = maxAniso;
   // A generated world carries its own ring; the hand preset keeps its table so
   // the gate's numbers do not move. Rows are [x, z, w, h, d].
   const RING = WORLD_VISTAS
@@ -966,9 +1044,29 @@ export function buildSkyline(texLoader, maxAniso) {
       [-30, -102, 22, 60, 18], [15, -108, 24, 78, 20], [58, -100, 18, 50, 16],
       [-76, 60, 18, 54, 16], [-78, -60, 20, 68, 18],
     ];
-  const geos = RING.map(([x, z, w, h, d]) => worldUVs(box(w, h, d, x, h / 2, z), w, h, d, 9));
-  const mat = new THREE.MeshBasicMaterial({ map: emission });
-  const footprints = geos.map((g, i) => ({ ...footprintOf(g), name: `RING[${i}]` }));
+  const day = skylineCanvas((g) => paintSkylineFacade(g, {
+    wall: '#6a7075', slab: '#5f6569', glass: '#58626c', lit: null,
+  }), maxAniso);
+  const night = skylineCanvas((g) => paintSkylineFacade(g, {
+    wall: '#2b3037', slab: '#232830', glass: '#161c22', lit: null,
+  }), maxAniso);
+  const emit = skylineCanvas((g) => paintSkylineFacade(g, {
+    wall: '#000000', slab: '#000000', glass: '#000000', lit: '#ffd9a0',
+  }), maxAniso);
+  const mat = skylineMaterial(day, night, emit);
+  const geos = [];
+  RING.forEach(([x, z, w, h, d]) => {
+    geos.push(worldUVs(box(w, h, d, x, h / 2, z), w, h, d, FACADE_TILE));
+    // A setback crown caps the tallest: a stepped roof reads as a building, a
+    // bare box reads as a slab.
+    if (h >= SKYLINE_CROWN_MIN) {
+      const cw = w * CROWN;
+      const cd = d * CROWN;
+      const ch = h * 0.3;
+      geos.push(worldUVs(box(cw, ch, cd, x, h + ch / 2, z), cw, ch, cd, FACADE_TILE));
+    }
+  });
+  const footprints = RING.map(([x, z, w, , d], i) => ({ x, z, w, d, name: `RING[${i}]` }));
   const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
   mesh.frustumCulled = false;
   return { mesh, mat, footprints };

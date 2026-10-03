@@ -4,14 +4,14 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { WALK_BOUNDS, DISTRICTS, clampToBounds, heightAt } from './sim/world.js';
+import { WALK_BOUNDS, DISTRICTS, clampToBounds, heightAt, EDGES, node } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import {
   createWanted, wantedOnBlackout, tickWanted, isBusted, drainEvents, forceTier, forceSearch,
 } from './sim/wanted.js';
 import { createDispatch, tickDispatch } from './sim/dispatch.js';
-import { createCity, tickZoning, builtHeight, STAGES } from './sim/zoning.js';
+import { createCity, tickZoning, builtHeight, zoneParcel, STAGES } from './sim/zoning.js';
 import { createPeople, tickPeople, census, describe } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
@@ -47,6 +47,7 @@ import { buildGrassGround, buildGrassTufts, buildMountains } from './render/land
 import { createChunkManager } from './render/chunks.js';
 import { buildOutskirts } from './render/outskirts.js';
 import { buildZoning } from './render/zoning.js';
+import { buildVacant, isFree, streetPose } from './render/vacant.js';
 import { drawLedger } from './render/ledger.js';
 import { hideFaded } from './render/faded.js';
 import { buildEconomyPanel, updateEconomyPanel } from './render/economy.js';
@@ -151,6 +152,10 @@ const city = restored?.city ?? createCity(SEED);
 const people = restored?.people ?? createPeople(SEED);
 const growth = buildZoning(city, towers.kinds, towers.footprints);
 scene.add(growth.group);
+// Free land the player can zone (sim/zoning.js freeLand): its own programme, so
+// the district's growth kit is not touched by another worker's file.
+const vacant = buildVacant(city);
+scene.add(vacant.group);
 const economyPanel = buildEconomyPanel();
 const decline = buildDecline(city, maxAniso);
 scene.add(decline.mesh);
@@ -559,6 +564,17 @@ if (CAPTURE) {
       tickCityView(cityView, city, 0.05, new Set());
     }
   };
+  // The free land the district left open, and the sim's own zoning entry the
+  // city-view paint uses (sim/zoning.js zoneParcel). Capture-only: play never
+  // repositions a lot behind the camera.
+  window.__game.freeLots = () => city.parcels.flatMap((p, i) => (isFree(p) ? [{
+    index: i, x: +p.x.toFixed(3), z: +p.z.toFixed(3),
+    pose: Object.fromEntries(Object.entries(streetPose(p)).map(([k, v]) => [k, +v.toFixed(3)])),
+  }] : []));
+  window.__game.zone = (i, use) => zoneParcel(city, i, use);
+  // Aim the overview at one lot for evidence: a shot or a test that has to look
+  // at a thing a building hides from the district's opening heading.
+  window.__game.cityview.aim = (o) => Object.assign(cityView, o);
 }
 
 // Capture-only police probe, bound behind ?capture=1 below. It calls the same
@@ -594,6 +610,18 @@ function policeProbe() {
 // exists because the road graph does not reach the outskirts yet, so proving a
 // tile builds and disposes out there cannot be done by driving to it.
 if (CAPTURE) {
+  // Avatar geometry audit: mesh count and summed position-vertex count, so the
+  // player-body budget is a measured number and not an estimate.
+  window.__game.avatarStats = () => {
+    let meshes = 0;
+    let verts = 0;
+    avatar.group.traverse((o) => {
+      if (!o.isMesh) return;
+      meshes += 1;
+      verts += o.geometry.attributes.position.count;
+    });
+    return { meshes, verts };
+  };
   window.__game.chunks = {
     stats: () => ({ ...chunks.stats(), ms: chunks.cost(), pools: outskirts.stats() }),
     cost: () => chunks.cost(),
@@ -627,11 +655,13 @@ if (CAPTURE) {
   // Walk into a grown lot by use, the way the door would: pose the body on the
   // street spot, then use the door. Capture-only so nothing in play moves a
   // player behind the camera. Returns the space id, or null when no grown lot
-  // of that use exists yet.
+  // of that use (or parcel index, for the scorecard) exists yet.
   window.__game.enterLot = (use) => {
     interior.space = STREET;
     syncInterior(interior);
-    const link = interior.links.find((l) => l.parcelUse === use);
+    const link = typeof use === 'number'
+      ? interior.links.find((l) => l.id === `lot:${use}-door`)
+      : interior.links.find((l) => l.parcelUse === use);
     if (!link) return null;
     const from = link.ends[0];
     player.mode = 'foot';
@@ -665,6 +695,9 @@ if (CAPTURE) {
     // A/B for the draw count: the same frame with and without the boards.
     dressing: (on) => { decline.mesh.visible = on; },
   };
+  // Every working crane this frame: position, heading, jib length, and whether
+  // its whole boom clears the surrounding rects at that heading (render/zoning.js).
+  window.__game.cranes = () => growth.cranes();
   // The mouse's drag and wheel as numbers, clamped to the ranges the mouse has:
   // a framing any player can reach by hand, not a lab angle.
   window.__game.look = (pitch, dist = cam.dist) => {
@@ -673,43 +706,189 @@ if (CAPTURE) {
   };
   window.__game.arcSkip = () => arcSkipStep(arc);
   window.__game.police = policeProbe();
+  window.__game.policeOnScreen = policeOnScreen;
   window.__game.frameCheck = frameCheck;
   window.__game.pick = pickPixel;
+  // The pillar scorecard's probes (scripts/scorecard.mjs), capture-only like the
+  // rest of this block: they read sim state and call the frame loop's own tick
+  // functions, never draw, and are invisible to a player.
+  window.__game.scorecard = {
+    indoors: () => isIndoors(interior),
+    zone: (i, use) => zoneParcel(city, i, use),
+    npcs: () => street.npcs.map((n) => ({ x: +n.x.toFixed(2), z: +n.z.toFixed(2), out: n.out !== false })),
+    cars: () => street.cars.map((c) => ({ x: +(c.x ?? c.lane).toFixed(2), z: +(c.z ?? 0).toFixed(2), parked: !!c.parked })),
+    lights: () => ({
+      phase: [zonePhase(street, 0), zonePhase(street, 1)],
+      glow: [zoneGlow(street, 0), zoneGlow(street, 1)],
+      dark: [...DARK],
+    }),
+    edges: () => EDGES.map((e) => {
+      const a = node(e.a);
+      const b = node(e.b);
+      return { id: e.id, kind: e.kind, a: { x: a.x, z: a.z }, b: { x: b.x, z: b.z } };
+    }),
+    footprints: () => [
+      ...towers.footprints.map((f) => ({ x: f.x, z: f.z, w: f.w, d: f.d, name: f.name })),
+      ...skyline.footprints.map((f) => ({ x: f.x, z: f.z, w: f.w, d: f.d, name: f.name })),
+      ...city.parcels.map((p, i) => ({ x: p.x, z: p.z, w: p.w, d: p.d, name: `lot:${i}` })),
+    ],
+    // Walk the player along (mx, mz) for `secs` in the frame loop's own 50 ms
+    // steps — the same tickPlayer the loop calls, so a fast-forwarded walk is the
+    // walk. No draw: the real follow cam catches up on the next frame.
+    simWalk: (secs, mx, mz) => {
+      const input = { mx, mz, hurry: true };
+      for (let t = 0; t < secs; t += 0.05) {
+        tickPlayer(player, input, 0.05);
+        tickInterior(interior, player);
+      }
+      return { x: +player.x.toFixed(2), z: +player.z.toFixed(2) };
+    },
+    // The same for the hero car, so driving a loop is not minutes of rasteriser.
+    simDrive: (secs, throttle, steer) => {
+      let moved = 0;
+      for (let t = 0; t < secs; t += 0.05) {
+        const before = { x: heroCar.x, z: heroCar.z };
+        tickPlayerCar(heroCar, { throttle, steer }, 0.05);
+        moved += Math.hypot(heroCar.x - before.x, heroCar.z - before.z);
+      }
+      return { x: +heroCar.x.toFixed(2), z: +heroCar.z.toFixed(2), moved: +moved.toFixed(1) };
+    },
+    // Walk one avenue edge end to end inside the page: teleport to its start,
+    // step the player toward its end in the loop's 50 ms steps, place the real
+    // follow cam, and ask frameCheck() every `fcEvery` samples. Doing the whole
+    // edge in one call keeps a software-cheap walk from being an hour of
+    // round-trips. Returns whether the end was reached and the worst numbers.
+    walkEdge: (i, capSecs, stepSecs, fcEvery, reach) => {
+      const e = EDGES.filter((x) => x.kind === 'avenue')[i];
+      if (!e) return null;
+      const a = node(e.a);
+      const b = node(e.b);
+      // A previous bot may have left the player inside a lot; a walk can only be
+      // walked from the street, so stand them back on it first.
+      interior.space = STREET;
+      syncInterior(interior);
+      player.mode = 'foot';
+      avatar.group.visible = true;
+      ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, a.x, a.z));
+      player.speed = 0;
+      const dx = b.x - player.x;
+      const dz = b.z - player.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const input = { mx: dx / len, mz: dz / len, hurry: true };
+      cam.yaw = Math.atan2(input.mx, input.mz);
+      const solids = [
+        ...towers.footprints,
+        ...skyline.footprints,
+        ...city.parcels.map((p) => ({ x: p.x, z: p.z, w: p.w, d: p.d })),
+      ];
+      let reached = false;
+      let camInside = 0;
+      let maxBlocked = 0;
+      let samples = 0;
+      let checks = 0;
+      for (let t = 0; t < capSecs; t += stepSecs) {
+        const step = Math.min(stepSecs, capSecs - t);
+        for (let s = 0; s < step; s += 0.05) {
+          tickPlayer(player, input, 0.05);
+          tickInterior(interior, player);
+        }
+        placeFollowCamera();
+        const cx = camera.position.x;
+        const cz = camera.position.z;
+        if (solids.some((f) => Math.abs(cx - f.x) < f.w / 2 && Math.abs(cz - f.z) < f.d / 2)) camInside += 1;
+        samples += 1;
+        if (samples % fcEvery === 0) {
+          maxBlocked = Math.max(maxBlocked, frameCheck(2).blocked);
+          checks += 1;
+        }
+        if (Math.hypot(player.x - b.x, player.z - b.z) <= reach) { reached = true; break; }
+      }
+      return {
+        id: e.id, reached, camInside, samples, checks,
+        maxBlocked: +maxBlocked.toFixed(3),
+        gap: +Math.hypot(player.x - b.x, player.z - b.z).toFixed(1),
+      };
+    },
+  };
 }
 
 // Shot QC: what share of the frame is something closer than `near` metres to
 // the lens. A follow cam parked behind a car roof or inside a wall passes every
 // draw and fps check and still shows the player a slab; this puts a number on
-// it. Rays go through a grid of screen points; the avatar is the subject, so it
-// is not counted as blocking its own shot.
-const FRAME_GRID = { cols: 32, rows: 18 };
+// it. The avatar is the subject, so it is not counted blocking its own shot.
+//
+// It measures by rendering the scene once through a depth material into a 96 px
+// target and reading the nearest surface per pixel, not by raycasting a grid.
+// The city is a handful of merged meshes plus InstancedMeshes, and a ray sweep
+// tested every instance of every instanced mesh per grid cell: 3.5 s a call, 45
+// calls a scorecard run. The depth read is the same nearest-surface question and
+// answers in milliseconds, so a bot can ask it on every sampled frame as the
+// spec requires.
+const FC_WIDTH = 96;
+const fcDepth = new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking });
+let fcTarget = null;
 function frameCheck(near = 2) {
-  const ray = new THREE.Raycaster();
-  ray.far = near;
-  const ndc = new THREE.Vector2();
-  const blockers = new Map();
-  let blocked = 0;
-  for (let r = 0; r < FRAME_GRID.rows; r++) {
-    for (let c = 0; c < FRAME_GRID.cols; c++) {
-      ndc.set(((c + 0.5) / FRAME_GRID.cols) * 2 - 1, 1 - ((r + 0.5) / FRAME_GRID.rows) * 2);
-      ray.setFromCamera(ndc, camera);
-      const hit = ray.intersectObjects(scene.children, true)
-        .find((h) => h.object.visible && !isAvatar(h.object) && !seeThrough(h.object));
-      if (!hit) continue;
-      blocked += 1;
-      const mat = Array.isArray(hit.object.material) ? hit.object.material[0] : hit.object.material;
-      const key = `${hit.object.type} #${mat?.color?.getHexString() ?? '-'} ${hit.object.name}`.trim();
-      const seen = blockers.get(key) ?? { n: 0, at: hit.point.toArray().map((v) => +v.toFixed(1)) };
-      seen.n += 1;
-      blockers.set(key, seen);
-    }
+  const w = FC_WIDTH;
+  const h = Math.max(8, Math.round(FC_WIDTH / camera.aspect));
+  if (!fcTarget || fcTarget.width !== w || fcTarget.height !== h) {
+    fcTarget?.dispose();
+    fcTarget = new THREE.WebGLRenderTarget(w, h, { depthBuffer: true });
   }
-  const cells = FRAME_GRID.cols * FRAME_GRID.rows;
+  // Points (rain, stars, grass) and the additive glow passes never hide the
+  // street, and the avatar is the subject: hide all of them, exactly the set the
+  // old ray sweep skipped, so only real solids contribute depth.
+  const hidden = [];
+  scene.traverse((o) => {
+    if (!o.visible) return;
+    if (o.isPoints || o.isSprite || seeThrough(o)) { hidden.push(o); o.visible = false; }
+  });
+  const avatarWas = avatar.group.visible;
+  const prevOverride = scene.overrideMaterial;
+  const prevAuto = renderer.shadowMap.autoUpdate;
+  avatar.group.visible = false;
+  scene.overrideMaterial = fcDepth;
+  renderer.shadowMap.autoUpdate = false;
+  renderer.setRenderTarget(fcTarget);
+  renderer.render(scene, camera);
+  renderer.setRenderTarget(null);
+  renderer.shadowMap.autoUpdate = prevAuto;
+  scene.overrideMaterial = prevOverride;
+  avatar.group.visible = avatarWas;
+  for (const o of hidden) o.visible = true;
+
+  const px = new Uint8Array(w * h * 4);
+  renderer.readRenderTargetPixels(fcTarget, 0, 0, w, h, px);
+  // UnpackRGBAToDepth (three's packing.glsl): v = b0/256^4 + b1/256^3 + b2/256^2
+  // + b3/256, then perspectiveDepthToViewZ.
+  const { near: cn, far: cf } = camera;
+  let blocked = 0;
+  for (let i = 0; i < w * h; i++) {
+    const v = px[i * 4] / 4294967296 + px[i * 4 + 1] / 16777216 + px[i * 4 + 2] / 65536 + px[i * 4 + 3] / 256;
+    const viewZ = (cn * cf) / ((cf - cn) * v - cf);
+    if (-viewZ <= near) blocked += 1;
+  }
+  const cells = w * h;
   return {
     blocked: +(blocked / cells).toFixed(3),
-    blockers: [...blockers].sort((a, b) => b[1].n - a[1].n)
-      .map(([k, { n, at }]) => `${k} ${(n / cells * 100).toFixed(1)}% at ${at}`),
+    blockers: blocked ? [`${blocked}/${cells} px within ${near} m (depth pass)`] : [],
   };
+}
+
+// Where the on-foot follow cam stands, snapped (no easing step) so a probe can
+// walk the sim faster than real time and still ask frameCheck() a real camera
+// question. Mirrors the on-foot branch of render()'s camera block.
+function placeFollowCamera() {
+  const ax = player.x;
+  const az = player.z;
+  const ay = player.y;
+  const cp = Math.cos(cam.pitch);
+  const sp = Math.sin(cam.pitch);
+  const cx = ax - Math.sin(cam.yaw) * cam.dist * cp;
+  const cz = az - Math.cos(cam.yaw) * cam.dist * cp;
+  cam.ground = Math.max(ay, heightAt(cx, cz));
+  camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
+  camera.position.copy(frameCamera(interior, { x: ax, y: ay + CAM_PIVOT, z: az }, camera.position));
+  camera.lookAt(ax, ay + 1.7, az);
 }
 
 // Shot QC: what is under one pixel of a 1280x720 shot, so a reviewer can name
@@ -717,7 +896,9 @@ function frameCheck(near = 2) {
 function pickPixel(px, py, w = 1280, h = 720) {
   const ray = new THREE.Raycaster();
   ray.setFromCamera(new THREE.Vector2((px / w) * 2 - 1, 1 - (py / h) * 2), camera);
-  return ray.intersectObjects(scene.children, true).filter((hit) => hit.object.visible).slice(0, 3).map((hit) => {
+  // The follow cam frames the player at the centre: a pick asks about the world
+  // behind them, so the avatar never answers it.
+  return ray.intersectObjects(scene.children, true).filter((hit) => hit.object.visible && !isAvatar(hit.object)).slice(0, 6).map((hit) => {
     const mat = Array.isArray(hit.object.material) ? hit.object.material[0] : hit.object.material;
     const path = [];
     for (let o = hit.object; o.parent; o = o.parent) path.unshift(o.name || o.type);
@@ -738,6 +919,31 @@ function seeThrough(object) {
 function isAvatar(object) {
   for (let o = object; o; o = o.parent) if (o === avatar.group) return true;
   return false;
+}
+
+// Capture-only: where each live pursuit unit stands relative to the lens. `dist`
+// is to the player (the car while driving); `inFrame` is whether the unit's
+// centre projects inside the canvas; `visible` is whether the nearest solid
+// pixel there is the unit itself — nothing between the lens and it.
+function policeOnScreen(w = 1280, h = 720) {
+  const hero = player.mode === 'drive' ? heroCar : player;
+  const centre = new THREE.Vector3();
+  const eye = camera.position;
+  const cars = [
+    ...wanted.pursuit.filter((u) => u.active && !u.leaving),
+    ...wanted.response.roadblock.cars,
+  ];
+  return cars.map((u) => {
+    const dist = +Math.hypot(u.x - hero.x, u.z - hero.z).toFixed(1);
+    centre.set(u.x, u.y + 0.9, u.z);
+    const projected = centre.clone().project(camera);
+    const inFrame = projected.z < 1 && Math.abs(projected.x) <= 1 && Math.abs(projected.y) <= 1;
+    const hits = pickPixel((projected.x * 0.5 + 0.5) * w, (0.5 - projected.y * 0.5) * h, w, h)
+      .filter((t) => !t.see);
+    const visible = inFrame && hits.length > 0
+      && Math.abs(hits[0].dist - eye.distanceTo(centre)) < 1.6;
+    return { dist, inFrame, visible };
+  });
 }
 
 chunks.warm(player.x, player.z);
@@ -905,15 +1111,17 @@ function render() {
   updateDaylight(env, scene, bloom, night, renderer);
   grade.uniforms.uNight.value = night;
   grade.uniforms.uTime.value = clock.elapsed;
-  for (const m of towers.facadeMats) {
+  for (const m of [...towers.facadeMats, skyline.mat]) {
     m.userData.uNight.value = night;
     m.envMapIntensity = 1.1 + 1.4 * (1 - night);
   }
+  // The distant ring is lit facade by night, not a blackout target: it fades to
+  // its day albedo and back with the clock, independent of the two power zones.
+  skyline.mat.emissiveIntensity = 0.8 * night;
   groundMats.road.envMapIntensity = 0.85 - 0.15 * (1 - night);
   groundMats.walk.envMapIntensity = 0.5 - 0.15 * (1 - night);
   lamps.setDaylight(night);
   stars.material.opacity = 0.75 * night;
-  skyline.mat.color.setScalar(0.12 + 0.88 * night);
   for (const s of env.spots) s.intensity = 45 * night;
   const pulse = 0.55 + 0.45 * Math.sin(clock.elapsed * 5);
   beacons.mat.color.setRGB(0.4 + 0.6 * pulse, 0.05, 0.05);
@@ -996,6 +1204,7 @@ function render() {
   }
   cityRig.frame(camera, lookAt, scene);
   cityUi.update();
+  vacant.update(cityView.lift > 0);
   updateDoorHud(doorHud, driving ? null : interior.near);
 
   hideFaded(fadedDraws);

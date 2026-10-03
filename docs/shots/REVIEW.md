@@ -44,6 +44,30 @@ The first set of review poses stood the player at walk-box corners through
 `__game.pose`, which skips collision: a pose inside a block put the camera in a
 building. Review poses now come from walking, not from teleporting.
 
+## 2026-10-03 — slice-080, the crew's eleven lanes brought in together
+
+The operator brought every lane's uncommitted work onto main by hand and deleted the
+worktrees; these shots are of that combined build.
+
+| Shot | Verdict | Defects |
+|---|---|---|
+| slice-080-crew-s7-street / -s73-street | FAIL | D4, D5, D16 |
+| slice-080-crew-s7-close | PASS for the player | D16 |
+| slice-080-crew-s7-day | PASS for the player | D15, D16 |
+| slice-080-crew-s7-city | PASS for D7; frame FAIL | D8 |
+| slice-080-crew-s7-cityday | PASS for D7 | D8 |
+
+Shows the feature: the player is a person from behind now: a rounded coat, a
+backpack with soft edges, hands, a head on a neck, no boxes (D10 half fixed). The
+outer towers lost the TV static for whole lit windows. As brought in, every tower
+wore the same horizontal amber stripes, because a floor was lit end to end; in
+review each window is lit on its own, from a staggered tile, and the city view now
+reads as windows by night and pale facades by day. The skyline change also read
+each ring tower's height as its depth, which put 18 phantom overlaps in
+`check:overlap`; fixed in review. The cranes still sweep their jibs over streets in city view (D8),
+and the night road still has the puddle shards and the hard-sided streaks (D4, D5:
+the night-road lane built nothing).
+
 ## Defects
 
 | Id | Defect | Where | Status |
@@ -54,12 +78,13 @@ building. Review poses now come from walking, not from teleporting.
 | D4 | A hard-edged bright rectangle lies on the road under the player at night | seed 7 spawn, night | open |
 | D5 | Puddle reflections break into scattered glass-like shards | 076 tier2, lower left | open |
 | D6 | Mountains stand at fixed hand-map coordinates: a range rises inside the city on 127 of 300 seeds (94 m over the road on seed 73), and 99% of their slope is steeper than 55°, so they read as blue spikes | 077 city view, left; seed 73 street | **fixed** slice-079 (`m5-mountains`); `tests/landscape-place.spec.js`, 300 seeds |
-| D7 | The outer towers are giant boxes with a TV-static window texture | 077 city view, right | open |
+| D7 | The outer towers are giant boxes with a TV-static window texture | 077 city view, right | **fixed** slice-080 (`m5-skyline` and review) |
 | D8 | Crane jibs reach out over neighbouring roofs and off their lot | 077 city view | open |
 | D9 | The free land the slice added cannot be picked out in its own shot | 077 city view | open |
-| D10 | The player and the hero car are raw boxes | every street shot | open (VGA-084) |
+| D10 | The player and the hero car are raw boxes | every street shot | player **fixed** slice-080; the hero car is D16 |
 | D11 | The farmland and farm tracks stood at hand-map coordinates on every generated city | outskirts.js `BANDS`, `LANES` | **fixed** slice-079 (`m5-farmland`, `m5-farm-tracks`); `tests/outskirts-place.spec.js`, `outskirts-lanes.spec.js` |
-| D12 | Two story boards (`lot_arden`, `lot_trust`) overflow the sign atlas and print an error on every boot, beside a 404 | src/render/arc.js `packSigns`; no favicon | queued: `m5-boot-clean`, test `tests/boot-clean.todo.js` |
+| D12 | Two story boards (`lot_arden`, `lot_trust`) overflow the sign atlas and print an error on every boot, beside a 404 | src/render/arc.js `packSigns`; no favicon | **fixed** slice-080 (`m5-boot-clean`); `tests/boot-clean.spec.js`, 4 boots |
 | D13 | Between the last street and the fields the ground is a bare, flat, untextured plane | slice-079-farmland-s7-se-day, foreground | open; `m5-grass` greens the first 24 m |
-| D14 | The verges, pocket park and tufts stand at hand-map coordinates: on all 300 seeds grass lies across a street (826 m² on seed 73, where the z = 9 crossing runs into a lawn) | landscape.js `buildGrassGround`, `TUFT_RECTS` | queued: `m5-grass`, test `tests/grass-place.todo.js` |
+| D14 | The verges, pocket park and tufts stand at hand-map coordinates: on all 300 seeds grass lies across a street (826 m² on seed 73, where the z = 9 crossing runs into a lawn) | landscape.js `buildGrassGround`, `TUFT_RECTS` | **fixed** slice-080 (`m5-grass`); `tests/grass-place.spec.js`, 301 seeds |
 | D15 | By day, looking down a street toward the sun, the wet road reads as brushed steel | seed 73, (46, 9) facing east | open |
+| D16 | The hero car beside the spawn is still a slab with a cabin on it: the car-body lane changed the traffic, not the car the player stands next to | slice-080 street shots, right of the player | open |

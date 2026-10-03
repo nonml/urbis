@@ -80,7 +80,7 @@ function cruiserGeo() {
     tinted(bodyGeo, LIVERY_BLACK),
     box(0.02, 0.4, 2.0, -0.905, 0.64, -0.1, LIVERY_WHITE),
     box(0.02, 0.4, 2.0, 0.905, 0.64, -0.1, LIVERY_WHITE),
-    box(1.5, 0.02, 1.52, 0, 1.385, -0.02, LIVERY_WHITE),
+    box(1.5, 0.02, 0.96, 0, 1.445, -0.32, LIVERY_WHITE),
     tinted(trimGeo, TRIM),
     box(1.2, 0.08, 0.3, 0, 1.45, -0.2, TRIM),
     box(1.2, 0.3, 0.07, 0, 0.6, 2.33, TRIM),

@@ -38,7 +38,7 @@ const NETTING_BAND = 4.5;      // the working floors wrapped while a shell climb
 // is zoned: it slews only through the widest arc where jib and counter-jib clear
 // every tower, silhouette and other lot. Found once at boot, never re-checked.
 const MAST = 1.6;
-const JIB = 18;
+export const JIB = 18;
 const COUNTER_JIB = 6;
 const JIB_DEPTH = 1.1;
 const JIB_CLEAR = 0.9;         // half the jib's width plus a margin
@@ -63,12 +63,12 @@ function unitBox() {
   return g;
 }
 
-// Whether the whole boom — counter-jib behind the mast, jib ahead — clears
-// every rect when it points along `yaw`.
-function boomClears(p, yaw, rects) {
+// Whether the whole boom — counter-jib behind the mast, the first `jib` metres
+// of jib ahead — clears every rect when it points along `yaw`.
+function boomClears(p, yaw, jib, rects) {
   const dx = Math.cos(yaw);
   const dz = -Math.sin(yaw);
-  for (let along = -COUNTER_JIB; along <= JIB; along += 0.5) {
+  for (let along = -COUNTER_JIB; along <= jib; along += 0.5) {
     const x = p.x + dx * along;
     const z = p.z + dz * along;
     for (const r of rects) {
@@ -78,20 +78,37 @@ function boomClears(p, yaw, rects) {
   return true;
 }
 
-// The crane's zoning: the middle of the longest run of clear headings, and how
-// far either side of it the jib may slew.
-function slewZone(p, rects) {
-  const clear = Array.from({ length: HEADINGS }, (_, k) => boomClears(p, (k / HEADINGS) * Math.PI * 2, rects));
+// The middle of the longest run of headings a `jib`-long boom clears, and how
+// far either side of it the jib may slew; null when no heading clears.
+function clearZone(p, jib, rects) {
+  const clear = Array.from({ length: HEADINGS }, (_, k) => boomClears(p, (k / HEADINGS) * Math.PI * 2, jib, rects));
   let best = { from: 0, run: 0 };
   for (let from = 0; from < HEADINGS; from++) {
     let run = 0;
     while (run < HEADINGS && clear[(from + run) % HEADINGS]) run++;
     if (run > best.run) best = { from, run };
   }
+  if (best.run === 0) return null;
   const step = (Math.PI * 2) / HEADINGS;
   // A run of n clear headings spans n - 1 steps between its end samples.
-  const half = (Math.max(1, best.run) - 1) * step / 2;
+  const half = (best.run - 1) * step / 2;
   return { rest: best.from * step + half, swing: Math.min(SWING_MAX, half) };
+}
+
+// Jib lengths a boxed-in crane tries, longest first, as a share of JIB.
+const JIB_SHARES = [1, 0.75, 0.5];
+
+// The crane's zoning: the longest jib whose whole boom clears every rect at
+// some heading, plus the arc it may slew through. A boxed-in crane takes a
+// shorter jib; one no length clears at any heading stands jib-less. Pure, so
+// the clear test can be run against it without a browser (tests/crane-clear).
+export function craneRig(p, rects) {
+  for (const share of JIB_SHARES) {
+    const jib = JIB * share;
+    const zone = clearZone(p, jib, rects);
+    if (zone) return { rest: zone.rest, swing: zone.swing, jib };
+  }
+  return { rest: 0, swing: 0, jib: 0 };
 }
 
 const pos = new THREE.Vector3();
@@ -123,17 +140,22 @@ function fenceLot(rig, p) {
 function raiseCrane(rig, p, i, h) {
   const mastTop = Math.max(h + WORK_CLEAR, MAST_MIN);
   const zone = rig.slew[i];
+  const jib = zone.jib;
   const yaw = zone.rest + zone.swing * Math.sin((p.stage + p.progress) * Math.PI * 2);
   const hookY = h + 3;
   const jibY = mastTop - JIB_DEPTH;
   const base = craneBase(p);
   kitBox(rig, PAINT.crane, p.x, base, p.z, MAST, mastTop - base, MAST);
   kitBox(rig, PAINT.crane, p.x, mastTop, p.z, 0.9, 4.5, 0.9);
-  kitBox(rig, PAINT.crane, p.x, jibY, p.z, JIB + COUNTER_JIB, JIB_DEPTH, 1, yaw, (JIB - COUNTER_JIB) / 2);
-  kitBox(rig, PAINT.ballast, p.x, jibY - 1.8, p.z, 2.2, 1.8, 1.8, yaw, -COUNTER_JIB + 1.2);
   kitBox(rig, PAINT.cab, p.x, jibY - 1.6, p.z, 1.6, 1.5, 1.6, yaw, 1.6);
-  kitBox(rig, PAINT.cable, p.x, hookY, p.z, 0.07, jibY - hookY, 0.07, yaw, JIB * TROLLEY_AT);
-  kitBox(rig, PAINT.cable, p.x, hookY - 0.6, p.z, 0.6, 0.6, 0.6, yaw, JIB * TROLLEY_AT);
+  // A crane boxed in on every heading at every jib length stands as a mast and
+  // cab: nothing hangs in the air where a jib would have reached a neighbour.
+  if (jib > 0) {
+    kitBox(rig, PAINT.crane, p.x, jibY, p.z, jib + COUNTER_JIB, JIB_DEPTH, 1, yaw, (jib - COUNTER_JIB) / 2);
+    kitBox(rig, PAINT.ballast, p.x, jibY - 1.8, p.z, 2.2, 1.8, 1.8, yaw, -COUNTER_JIB + 1.2);
+    kitBox(rig, PAINT.cable, p.x, hookY, p.z, 0.07, jibY - hookY, 0.07, yaw, jib * TROLLEY_AT);
+    kitBox(rig, PAINT.cable, p.x, hookY - 0.6, p.z, 0.6, 0.6, 0.6, yaw, jib * TROLLEY_AT);
+  }
 }
 
 function dressParcel(rig, p, i) {
@@ -192,9 +214,24 @@ export function buildZoning(city, kinds, footprints) {
     ...CROSSINGS.map((c) => ({ x: (c.x0 + c.x1) / 2, z: c.z, w: c.x1 - c.x0, d: ROAD_HALF_WIDTH * 2 })),
   ];
   const rects = [...footprints, ...city.parcels, ...roads];
-  const slew = city.parcels.map((p) => slewZone(p, rects));
+  const slew = city.parcels.map((p) => craneRig(p, rects));
   const rig = { shells, kit, kitCount: 0, slew };
   const meshes = [kit, ...Object.values(shells)];
+  // Every crane drawn right now: its mast position, the heading its jib is at
+  // this frame, its jib length, and whether that whole boom clears every rect
+  // at that heading. Capture-only (main.js) so the clear test can be asserted
+  // against the same rects the render zoned it with.
+  function cranes() {
+    return city.parcels.flatMap((p, i) => {
+      if (!p.building) return [];
+      const zone = rig.slew[i];
+      const yaw = zone.rest + zone.swing * Math.sin((p.stage + p.progress) * Math.PI * 2);
+      return [{
+        x: +p.x.toFixed(2), z: +p.z.toFixed(2), yaw: +yaw.toFixed(3), jib: +zone.jib.toFixed(2),
+        clear: zone.jib === 0 || boomClears(p, yaw, zone.jib, rects),
+      }];
+    });
+  }
   // Rewritten every frame: the sim moves a parcel a little every tick, and a
   // few dozen matrices cost less than tracking which of them changed.
   function update() {
@@ -212,5 +249,5 @@ export function buildZoning(city, kinds, footprints) {
     }
   }
   update();
-  return { group, update };
+  return { group, update, cranes };
 }

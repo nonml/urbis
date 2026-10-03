@@ -6,40 +6,151 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 
-export const bodyGeo = mergeGeometries([
-  (() => { const g = new THREE.BoxGeometry(1.8, 0.55, 4.2); g.translate(0, 0.65, 0); return g; })(),
-  // Sloped hood + trunk: break the shoebox with wedges, not more boxes.
-  (() => { const g = new THREE.BoxGeometry(1.7, 0.28, 1.0); g.rotateX(0.22); g.translate(0, 0.82, 1.75); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.7, 0.28, 0.9); g.rotateX(-0.22); g.translate(0, 0.82, -1.75); return g; })(),
-  // Greenhouse as a frame, not a lid. The painted box that used to sit here
-  // enclosed the glass canopy on every side, so no car on the map had a single
-  // visible window — the whole fleet read as moulded plastic. Body keeps only
-  // the belt, the roof and four pillars; the glass fills the openings between.
-  (() => { const g = new THREE.BoxGeometry(1.58, 0.10, 2.06); g.translate(0, 0.925, -0.15); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.56, 0.09, 1.62); g.translate(0, 1.335, -0.02); return g; })(),
-]);
-// Everything a real car wears in black rubber and plastic — bumpers, mirrors,
-// pillars, rocker sills, wheel arches. Painting these body colour is what made
-// the fleet read as one moulded lump: a car is two materials, not one.
-export const trimGeo = mergeGeometries([
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.40, 0.12); g.rotateX(-0.35); g.translate(-0.71, 1.12, 0.90); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.40, 0.12); g.rotateX(-0.35); g.translate(0.71, 1.12, 0.90); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.42, 0.13); g.rotateX(0.42); g.translate(-0.70, 1.13, -0.98); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.42, 0.13); g.rotateX(0.42); g.translate(0.70, 1.13, -0.98); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, 2.1); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.86, 0.22, 0.3); g.translate(0, 0.42, -2.1); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.12, 0.1, 0.2); g.translate(-0.95, 1.05, 0.5); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.12, 0.1, 0.2); g.translate(0.95, 1.05, 0.5); return g; })(),
-  // Rockers run the wheelbase, arches flare 5cm proud of the door: the dark
-  // band is what stops a 1.8m-wide box from reading as a brick on castors.
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.20, 2.7); g.translate(-0.87, 0.41, 0); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(0.10, 0.20, 2.7); g.translate(0.87, 0.41, 0); return g; })(),
-  ...[[-0.90, 1.35], [0.90, 1.35], [-0.90, -1.35], [0.90, -1.35]].map(([x, z]) => {
-    const g = new THREE.BoxGeometry(0.10, 0.34, 1.05);
-    g.translate(x, 0.56, z);
+// --- Car bodies from a side profile, not boxes -----------------------------
+// A car used to be a stack of BoxGeometry: one saloon stretched into five
+// shapes by per-instance scale, which is why the whole fleet read as moulded
+// plastic (VGA-084 sub-slice 3). Each silhouette is now a THREE.Shape of the
+// car seen from the side — bonnet, windscreen rake, roof, rear screen, boot and
+// two wheel-arch cut-outs — run through ExtrudeGeometry with a small bevel so
+// the edges roll off instead of meeting at a CG corner. A handful of numbers
+// per shape builds all five. Width is the extrusion depth, so the profile is
+// drawn in (length, height) and turned onto the car's z axis after centring.
+const CAR_SPECS = [
+  { len: 4.50, width: 1.82, ground: 0.22, wheelR: 0.34, axleF: 1.38, axleR: -1.38,
+    archR: 0.46, belt: 0.94, nose: 0.72, winsh: 0.60, roofF: 0.16, roofR: -0.80,
+    roofY: 1.44, deck: 0.94, rearBase: -1.14, winRear: -1.06 },   // saloon
+  { len: 5.10, width: 1.94, ground: 0.24, wheelR: 0.36, axleF: 1.62, axleR: -1.58,
+    archR: 0.48, belt: 1.06, nose: 0.98, winsh: 1.44, roofF: 1.16, roofR: -1.98,
+    roofY: 2.00, deck: 1.86, rearBase: -2.10, winRear: 0.24 },    // van
+  { len: 3.85, width: 1.72, ground: 0.22, wheelR: 0.32, axleF: 1.16, axleR: -1.16,
+    archR: 0.44, belt: 0.90, nose: 0.68, winsh: 0.56, roofF: 0.12, roofR: -0.72,
+    roofY: 1.40, deck: 0.90, rearBase: -1.02, winRear: -0.94 },   // compact
+  { len: 4.80, width: 1.84, ground: 0.22, wheelR: 0.35, axleF: 1.45, axleR: -1.48,
+    archR: 0.47, belt: 0.96, nose: 0.74, winsh: 0.72, roofF: 0.28, roofR: -1.98,
+    roofY: 1.52, deck: 1.16, rearBase: -2.06, winRear: -1.98 },   // wagon
+  { len: 4.45, width: 1.86, ground: 0.21, wheelR: 0.33, axleF: 1.46, axleR: -1.42,
+    archR: 0.45, belt: 0.86, nose: 0.66, winsh: 0.48, roofF: -0.10, roofR: -0.96,
+    roofY: 1.28, deck: 0.82, rearBase: -1.52, winRear: -1.22 },   // coupe
+];
+const BEVEL = 0.03;
+const EXTRUDE = {
+  bevelEnabled: true, bevelSegments: 2, bevelThickness: BEVEL, bevelSize: 0.02,
+  bevelOffset: 0, curveSegments: 7, steps: 1,
+};
+
+// The wheel arch is the only concave edge in the profile: travel along the
+// rocker to the left of the wheel, then sweep over the top to its right.
+function arch(shape, cx, wheelR, archR, ground) {
+  const dy = wheelR - ground;
+  const dx = Math.sqrt(Math.max(0.01, archR * archR - dy * dy));
+  shape.lineTo(cx - dx, ground);
+  shape.absarc(cx, wheelR, archR,
+    Math.atan2(ground - wheelR, -dx), Math.atan2(ground - wheelR, dx), true);
+}
+
+function carProfile(s) {
+  const h = s.len / 2;
+  const p = new THREE.Shape();
+  p.moveTo(h, s.ground);
+  p.lineTo(h, s.nose);
+  p.lineTo(s.winsh, s.belt);
+  p.lineTo(s.roofF, s.roofY);
+  p.lineTo(s.roofR, s.roofY);
+  p.lineTo(s.rearBase, s.deck);
+  p.lineTo(-h, s.deck);
+  p.lineTo(-h, s.ground);
+  arch(p, s.axleR, s.wheelR, s.archR, s.ground);
+  arch(p, s.axleF, s.wheelR, s.archR, s.ground);
+  p.lineTo(h, s.ground);
+  return p;
+}
+
+function centerX(geo) {
+  geo.computeBoundingBox();
+  const b = geo.boundingBox;
+  geo.translate(-(b.min.x + b.max.x) / 2, 0, 0);
+}
+
+function carBodyGeo(s) {
+  const g = new THREE.ExtrudeGeometry(carProfile(s), { ...EXTRUDE, depth: s.width - 2 * BEVEL });
+  g.rotateY(-Math.PI / 2);
+  centerX(g);
+  return g;
+}
+
+function quadGeo(a, b, c, d) {
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([
+    ...a, ...b, ...c, ...a, ...c, ...d,
+  ], 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute([0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 0, 1], 2));
+  g.computeVertexNormals();
+  return g;
+}
+
+// One raked screen: a quad on the profile edge, pushed a few millimetres along
+// the outward normal so it sits proud of the painted body instead of z-fighting.
+function screenQuad(s, za, ya, zb, yb, xIn) {
+  const dz = zb - za;
+  const dy = yb - ya;
+  const L = Math.hypot(dz, dy) || 1;
+  const nz = dy / L;
+  const ny = -dz / L;
+  const off = 0.012;
+  return quadGeo(
+    [-xIn, ya + ny * off, za + nz * off],
+    [xIn, ya + ny * off, za + nz * off],
+    [xIn, yb + ny * off, zb + nz * off],
+    [-xIn, yb + ny * off, zb + nz * off],
+  );
+}
+
+// Glass is the dark band along the cabin: a pane per side between the pillars,
+// a raked windscreen and a rear screen. Inset from the pillars so paint always
+// frames it, and double-sided so both flanks read from the chase camera.
+function carGlassGeo(s) {
+  const xw = s.width / 2 + 0.006;
+  const bottom = s.belt + 0.02;
+  const top = s.roofY - 0.03;
+  const parts = [];
+  for (const side of [1, -1]) {
+    const X = side * xw;
+    parts.push(quadGeo(
+      [X, bottom, s.winsh - 0.10],
+      [X, top, s.roofF + 0.10],
+      [X, top, s.roofR - 0.10],
+      [X, bottom, s.winRear],
+    ));
+  }
+  const xIn = s.width / 2 - 0.09;
+  parts.push(screenQuad(s, s.winsh, s.belt, s.roofF, s.roofY, xIn));
+  parts.push(screenQuad(s, s.roofR, s.roofY, s.rearBase, s.deck, xIn));
+  return mergeGeometries(parts);
+}
+
+// Bumpers, rockers and mirrors are flat plates — the one place boxes still earn
+// their keep. The old pillar and arch-flare boxes are gone: the profile owns
+// the pillars and the arches now.
+function carTrimGeo(s) {
+  const h = s.len / 2;
+  const x = s.width / 2;
+  const plate = (w, ht, d, px, py, pz) => {
+    const g = new THREE.BoxGeometry(w, ht, d);
+    g.translate(px, py, pz);
     return g;
-  }),
-]);
+  };
+  const rockerLen = Math.max(0.6, Math.abs(s.axleF - s.axleR) - s.archR * 1.7);
+  const midZ = (s.axleF + s.axleR) / 2;
+  return mergeGeometries([
+    plate(s.width * 0.98, 0.22, 0.20, 0, 0.40, h - 0.07),
+    plate(s.width * 0.98, 0.22, 0.20, 0, 0.42, -(h - 0.07)),
+    plate(0.08, 0.12, rockerLen, -x + 0.02, s.ground + 0.04, midZ),
+    plate(0.08, 0.12, rockerLen, x - 0.02, s.ground + 0.04, midZ),
+    plate(0.10, 0.09, 0.16, -x - 0.05, s.belt + 0.06, s.winsh - 0.05),
+    plate(0.10, 0.09, 0.16, x + 0.05, s.belt + 0.06, s.winsh - 0.05),
+  ]);
+}
+
 // Tyre and rim in one mesh, told apart by a vertex-colour multiplier rather
 // than by a second material. They used to be two meshes whose hub cylinders
 // were exactly coincident — identical radius, length and centre — so they
@@ -47,17 +158,17 @@ export const trimGeo = mergeGeometries([
 // and every car on the map gets its rims back for free.
 const TYRE_SHADE = 0.05;
 const RIM_SHADE = 0.34;
-export const WHEEL_HUBS = [[-0.85, 1.35], [0.85, 1.35], [-0.85, -1.35], [0.85, -1.35]];
-export const wheelGeo = (() => {
+function carWheelGeo(s) {
+  const track = s.width / 2 - 0.06;
   const parts = [];
   const shades = [];
-  for (const [x, z] of WHEEL_HUBS) {
+  for (const [x, z] of [[-track, s.axleF], [track, s.axleF], [-track, s.axleR], [track, s.axleR]]) {
     for (const [geo, shade] of [
-      [new THREE.CylinderGeometry(0.35, 0.35, 0.25, 12), TYRE_SHADE],
-      [new THREE.CylinderGeometry(0.155, 0.155, 0.27, 10), RIM_SHADE],
+      [new THREE.CylinderGeometry(s.wheelR, s.wheelR, 0.25, 12), TYRE_SHADE],
+      [new THREE.CylinderGeometry(s.wheelR * 0.44, s.wheelR * 0.44, 0.27, 10), RIM_SHADE],
     ]) {
       geo.rotateZ(Math.PI / 2);
-      geo.translate(x, 0.35, z);
+      geo.translate(x, s.wheelR, z);
       parts.push(geo);
       shades.push([geo.attributes.position.count, shade]);
     }
@@ -70,11 +181,42 @@ export const wheelGeo = (() => {
   }
   merged.setAttribute('color', new THREE.BufferAttribute(color, 3));
   return merged;
-})();
+}
+
+// The saloon is what the player's car and the police cruiser build from.
+export const bodyGeo = carBodyGeo(CAR_SPECS[0]);
+export const trimGeo = carTrimGeo(CAR_SPECS[0]);
+export const wheelGeo = carWheelGeo(CAR_SPECS[0]);
 export function wheelMaterial() {
   return new THREE.MeshStandardMaterial({
     color: 0xc2c8d0, roughness: 0.55, metalness: 0.6, vertexColors: true,
   });
+}
+
+// Five silhouettes in one draw, the way policekit.js folds its four kit parts:
+// every vertex carries aShape, every instance carries iShape, and the vertex
+// shader folds the other four shapes onto a point. Law 4 keeps the fleet at one
+// InstancedMesh per material, whatever the body count.
+function tagShape(geo, part) {
+  const n = geo.attributes.position.count;
+  geo.setAttribute('aShape', new THREE.BufferAttribute(new Float32Array(n).fill(part), 1));
+  return geo;
+}
+const foldShapes = (build) => mergeGeometries(CAR_SPECS.map((s, i) => tagShape(build(s), i)));
+const fleetBodyGeo = foldShapes(carBodyGeo);
+const fleetGlassGeo = foldShapes(carGlassGeo);
+const fleetTrimGeo = foldShapes(carTrimGeo);
+const fleetWheelGeo = foldShapes(carWheelGeo);
+
+export function patchCarShape(mat, key) {
+  mat.onBeforeCompile = (sh) => {
+    sh.vertexShader = `attribute float aShape;\nattribute float iShape;\n${sh.vertexShader}`
+      .replace('#include <begin_vertex>', `#include <begin_vertex>
+        if (abs(aShape - iShape) > 0.5) transformed = vec3(0.0);`);
+    if (!sh.vertexShader.includes('aShape - iShape')) console.error(`[${key}] car shape patch missed`);
+  };
+  mat.customProgramCacheKey = () => key;
+  return mat;
 }
 export const beamGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(-0.55, 0.7, 2.11); return g; })(),
@@ -84,20 +226,17 @@ export const tailGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(-0.55, 0.75, -2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(0.55, 0.75, -2.11); return g; })(),
 ]);
-// Cabin + raked windshield in one glass shell, sized to fill the body frame
-// above with a hair of overlap at belt and roof so no seam of sky shows through.
-const canopyGeo = mergeGeometries([
-  (() => { const g = new THREE.BoxGeometry(1.50, 0.46, 1.66); g.translate(0, 1.13, -0.06); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.44, 0.36, 0.44); g.rotateX(-0.35); g.translate(0, 1.11, 0.92); return g; })(),
-  (() => { const g = new THREE.BoxGeometry(1.44, 0.38, 0.52); g.rotateX(0.42); g.translate(0, 1.11, -0.99); return g; })(),
-]);
+// Saloon glass; the fleet folds all five bands into one geometry below.
+const canopyGeo = carGlassGeo(CAR_SPECS[0]);
 const glassMat = new THREE.MeshStandardMaterial({
   // envMapIntensity is the whole story here. scene.environment is a PMREM of
   // RoomEnvironment, which is a lit studio and far brighter than 1.0; at 2.2 the
   // cabin mirrored it into a white slab and the chase camera — the view the
   // player holds for the whole game — stared at a blank block. Bisected against
-  // envMapIntensity 0: 0.22 keeps a tinted sheen without saturating.
+  // envMapIntensity 0: 0.22 keeps a tinted sheen without saturating. Double-sided
+  // because each window pane is a single quad: one winding faces out per flank.
   color: 0x0b1119, metalness: 0.55, roughness: 0.12, envMapIntensity: 0.22,
+  side: THREE.DoubleSide,
 });
 // Shared by every car on the map, so trim costs one draw for the whole fleet.
 const trimMat = new THREE.MeshStandardMaterial({
@@ -191,12 +330,8 @@ const poolGeo = mergeGeometries([lensGeo(-POOL_LENS_X), lensGeo(POOL_LENS_X)]);
 const TAIL_DIM = new THREE.Color(0x7a140e);
 const TAIL_BRAKE = new THREE.Color(0xff2a20);
 
-// Five bodies out of one. A second vehicle mesh would cost four draws — a
-// paint pass, a glass pass, a trim pass, a wheel pass — and the street does
-// not need four more models, it needs to stop being one model repeated.
-// Stretching the shared body per instance gives a van, a compact, a long
-// wagon and a low coupe for nothing, because the greenhouse and the glass
-// ride the same numbers and the roofline changes with them.
+// The shaped bodies carry their own dimensions; only the light quads and the
+// road pools still take a per-shape stretch, so this table survives for them.
 // Index matches SHAPE_COUNT in sim/street.js.
 const CAR_SHAPES = [
   [1.00, 1.00, 1.00],  // saloon
@@ -219,6 +354,18 @@ function placeOnCar(dummy, car, yOff, roundWheels = false) {
   return dummy.matrix;
 }
 
+// The shaped bodies carry their own dimensions, so they are never scaled. The
+// beams and pools keep riding placeOnCar's old stretch untouched.
+function placeShape(dummy, car, yOff) {
+  dummy.position.set(car.x ?? car.lane, yOff, car.z);
+  if (car.yaw !== undefined) dummy.rotation.set(0, car.yaw, 0);
+  else if (car.axis === 'x') dummy.rotation.set(0, car.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
+  else dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
+  return dummy.matrix;
+}
+
 export function buildTraffic(street) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
@@ -230,16 +377,27 @@ export function buildTraffic(street) {
   // slab with no colour left in them — the single worst object in the frame.
   // Metalness down, env down, roughness up a touch: the paint keeps its
   // colour, and there is still enough gloss for shop and street light to land on it.
-  const paintMat = new THREE.MeshStandardMaterial({
+  const paintMat = patchCarShape(new THREE.MeshStandardMaterial({
     roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
-  });
-  const bodies = new THREE.InstancedMesh(bodyGeo, paintMat, N);
+  }), 'car-body');
+  const bodies = new THREE.InstancedMesh(fleetBodyGeo, paintMat, N);
   bodies.castShadow = true;
-  const wheels = new THREE.InstancedMesh(wheelGeo, wheelMaterial(), N);
+  bodies.customDepthMaterial = patchCarShape(
+    new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'car-body-depth'
+  );
+  // One iShape array drives every folded mesh: a car's body, glass, trim and
+  // wheels all read their silhouette from the same instance value.
+  const iShape = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
+  for (const g of [fleetBodyGeo, fleetGlassGeo, fleetTrimGeo, fleetWheelGeo]) g.setAttribute('iShape', iShape);
+  const wheels = new THREE.InstancedMesh(fleetWheelGeo, patchCarShape(wheelMaterial(), 'car-wheel'), N);
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), N);
-  const glass = new THREE.InstancedMesh(canopyGeo, glassMat, N);
-  const trim = new THREE.InstancedMesh(trimGeo, trimMat, N);
+  const glass = new THREE.InstancedMesh(fleetGlassGeo, patchCarShape(new THREE.MeshStandardMaterial({
+    color: 0x0b1119, metalness: 0.55, roughness: 0.12, envMapIntensity: 0.22, side: THREE.DoubleSide,
+  }), 'car-glass'), N);
+  const trim = new THREE.InstancedMesh(fleetTrimGeo, patchCarShape(new THREE.MeshStandardMaterial({
+    color: 0x15171b, roughness: 0.62, metalness: 0.25, envMapIntensity: 1.1,
+  }), 'car-trim'), N);
   const poolMat = new THREE.MeshBasicMaterial({
     map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -257,8 +415,10 @@ export function buildTraffic(street) {
   group.add(glows);
   street.cars.forEach((c, i) => {
     bodies.setColorAt(i, new THREE.Color(c.paint));
+    iShape.setX(i, c.shape ?? 0);
   });
   bodies.instanceColor.needsUpdate = true;
+  iShape.needsUpdate = true;
   group.add(bodies, wheels, beams, tails, glass, trim, pools);
   const rig = { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy };
   updateCarPools(rig, [0, 0, 0].map(() => ({ x: 0, z: 0, yaw: 0, speed: 0, on: false })));
@@ -269,11 +429,11 @@ export function buildTraffic(street) {
 export function updateTraffic(rig, street, camera = null) {
   const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy } = rig;
   street.cars.forEach((c, i) => {
+    bodies.setMatrixAt(i, placeShape(dummy, c, 0));
+    glass.setMatrixAt(i, placeShape(dummy, c, 0));
+    trim.setMatrixAt(i, placeShape(dummy, c, 0));
+    wheels.setMatrixAt(i, placeShape(dummy, c, 0));
     const m = placeOnCar(dummy, c, 0);
-    bodies.setMatrixAt(i, m);
-    glass.setMatrixAt(i, m);
-    trim.setMatrixAt(i, m);
-    wheels.setMatrixAt(i, placeOnCar(dummy, c, 0, true));
     if (c.parked) {
       // Dark and quiet: parked cars wear no headlight glow.
       dummy.scale.set(0, 0, 0);

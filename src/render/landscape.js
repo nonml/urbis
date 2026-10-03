@@ -7,7 +7,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from '../sim/rng.js';
-import { heightAt } from '../sim/world.js';
+import { heightAt, DISTRICTS } from '../sim/world.js';
+import { WORLD_PLAN, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
+import { WORLD_VISTAS } from '../sim/vistas.js';
 
 // Lift every vertex of an already-positioned geometry onto the field. A slab's
 // top and bottom move together, so its thickness and its vertical sides survive
@@ -26,6 +28,67 @@ export function displaceToTerrain(geo) {
 // the two surfaces bend together and the plane cannot poke up through a verge.
 const GRASS_CELL = 4;
 
+export const HAND_GRASS = {
+  slabs: [
+    { x: -50.75, z: -5, w: 2.5, d: 280 }, // far-west verge (west of the avenue)
+    // West green strip. It used to be the river bank, cut at 1 m cells to resolve
+    // a trench; with the channel gone it is ordinary verge on the ordinary 4 m
+    // grid, and it stays because without it the west flank is bare ground plane.
+    { x: -32, z: -4, w: 12, d: 284 },
+    { x: 61, z: 5, w: 15, d: 32 }, // pocket park east
+    { x: 22, z: -71.5, w: 60, d: 4 }, // connector verge south
+    { x: 22, z: -56.5, w: 60, d: 4 }, // connector verge north
+  ],
+  tufts: [
+    { x0: -52, x1: -50, z0: -60, z1: 55 }, // far-west verge (west of the avenue)
+    { x0: -37, x1: -28, z0: -60, z1: 55 }, // west green strip (east of the avenue)
+    { x0: 54, x1: 68, z0: -10, z1: 20 }, // park
+    { x0: -7, x1: 51, z0: -73, z1: -70 }, // connector verges
+  ],
+};
+
+// Grass runs out past the last row so the city's edge is not bare ground.
+const VERGE_REACH_X = 24;
+const VERGE_REACH_Z = 8;
+// A tuft never hangs over a verge's edge.
+const TUFT_INSET = 0.5;
+
+const rectAt = (x, z, w, d) => ({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z1: z + d / 2 });
+const touches = (a, b) => Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0) && Math.min(a.z1, b.z1) > Math.max(a.z0, b.z0);
+
+// Lays verges on the 4 m grass grid over the walk box grown by VERGE_REACH_X
+// and VERGE_REACH_Z, on every cell no street, building row, lot or skyline tower
+// touches, one slab per clear run along z, and tufts inset on every slab.
+export function grassFor(district, plan, vistas) {
+  const keepOff = [
+    ...district.avenues.map((a) => rectAt(a.x, (a.z0 + a.z1) / 2, BUILD_LINE * 2, a.z1 - a.z0)),
+    ...district.crossings.map((c) => rectAt((c.x0 + c.x1) / 2, c.z, c.x1 - c.x0, CROSSING_BAND * 2)),
+    ...plan.rows.flatMap((r) => r.runs.map(([z0, z1]) => rectAt(r.ax + r.side * (BUILD_LINE + r.depth / 2), (z0 + z1) / 2, r.depth, z1 - z0))),
+    ...plan.lots.map(([x, z, w, d]) => rectAt(x, z, w, d)),
+    ...[...vistas.caps, ...vistas.ring].map((t) => rectAt(t.x, t.z, t.w, t.d)),
+  ];
+  const { walk } = district;
+  const zFrom = walk.minZ - VERGE_REACH_Z;
+  const rows = Math.floor((walk.maxZ + VERGE_REACH_Z - zFrom) / GRASS_CELL);
+  const slabs = [];
+  for (let x = walk.minX - VERGE_REACH_X; x + GRASS_CELL <= walk.maxX + VERGE_REACH_X; x += GRASS_CELL) {
+    let from = null;
+    for (let k = 0; k <= rows; k++) {
+      const z = zFrom + k * GRASS_CELL;
+      const clear = k < rows && !keepOff.some((r) => touches({ x0: x, x1: x + GRASS_CELL, z0: z, z1: z + GRASS_CELL }, r));
+      if (clear && from === null) from = z;
+      if (!clear && from !== null) {
+        slabs.push({ x: x + GRASS_CELL / 2, z: (from + z) / 2, w: GRASS_CELL, d: z - from });
+        from = null;
+      }
+    }
+  }
+  const tufts = slabs.map((s) => ({ x0: s.x - s.w / 2 + TUFT_INSET, x1: s.x + s.w / 2 - TUFT_INSET, z0: s.z - s.d / 2 + TUFT_INSET, z1: s.z + s.d / 2 - TUFT_INSET }));
+  return { slabs, tufts };
+}
+
+const GRASS = WORLD_PLAN ? grassFor(DISTRICTS[0], WORLD_PLAN, WORLD_VISTAS) : HAND_GRASS;
+
 export function buildGrassGround() {
   const mat = new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1.0, envMapIntensity: 0.2 });
   const geos = [];
@@ -35,14 +98,7 @@ export function buildGrassGround() {
     g.translate(x, -0.1, z);
     geos.push(g);
   };
-  slab(2.5, 280, -50.75, -5); // far-west verge (west of the avenue)
-  // West green strip. It used to be the river bank, cut at 1 m cells to resolve
-  // a trench; with the channel gone it is ordinary verge on the ordinary 4 m
-  // grid, and it stays because without it the west flank is bare ground plane.
-  slab(12, 284, -32, -4);
-  slab(15, 32, 61, 5); // pocket park east
-  slab(60, 4, 22, -71.5); // connector verge south
-  slab(60, 4, 22, -56.5); // connector verge north
+  for (const s of GRASS.slabs) slab(s.w, s.d, s.x, s.z);
   const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos)), mat);
   mesh.receiveShadow = true;
   return mesh;
@@ -73,13 +129,6 @@ function bladeTexture() {
   return tex;
 }
 
-const TUFT_RECTS = [
-  { x0: -52, x1: -50, z0: -60, z1: 55 }, // far-west verge (west of the avenue)
-  { x0: -37, x1: -28, z0: -60, z1: 55 }, // west green strip (east of the avenue)
-  { x0: 54, x1: 68, z0: -10, z1: 20 }, // park
-  { x0: -7, x1: 51, z0: -73, z1: -70 }, // connector verges
-];
-
 export function buildGrassTufts() {
   const rand = mulberry32(9001);
   const blade = new THREE.PlaneGeometry(0.9, 0.7);
@@ -95,7 +144,7 @@ export function buildGrassTufts() {
   let placed = 0;
   let guard = 0;
   while (placed < N && guard++ < N * 20) {
-    const r = TUFT_RECTS[Math.floor(rand() * TUFT_RECTS.length)];
+    const r = GRASS.tufts[Math.floor(rand() * GRASS.tufts.length)];
     const x = r.x0 + rand() * (r.x1 - r.x0);
     const z = r.z0 + rand() * (r.z1 - r.z0);
     const s = 0.7 + rand() * 0.9;

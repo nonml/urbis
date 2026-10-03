@@ -49,6 +49,12 @@ const DECLINE_AT = 0.28;
 // Growth pace at bare GROW_AT demand, as a share of full pace.
 const SLOW_PACE = 0.5;
 
+// The zoning thresholds above, read back by scripts/economy-probe.mjs so its
+// report quotes the shipped numbers instead of hard-coding a second copy.
+export function probeThresholds() {
+  return { breakGroundAt: BREAK_GROUND_AT, growAt: GROW_AT, declineAt: DECLINE_AT, storey: STOREY, freeLots: FREE_LOTS };
+}
+
 export const STOREY = 3.5;
 const LOW_HEIGHT = 3 * STOREY;
 // A lot grows as tall as its footprint carries — this many times its short side

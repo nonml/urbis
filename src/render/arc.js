@@ -7,7 +7,9 @@ import * as THREE from 'three';
 import { heightAt } from '../sim/world.js';
 import { zoneAt } from '../sim/street.js';
 
-const ATLAS = 1024;
+// The story boards stack below the beam, and two of them do not fit under it in a square 1024.
+const ATLAS_W = 1024;
+const ATLAS_H = 2048;
 const CELL_PAD = 8;              // px between cells, so mip levels don't bleed
 // The marker: a column tall enough to clear a tower from a block away, with a
 // ring at its foot. Warm amber, the objective line's colour — not a hologram.
@@ -124,7 +126,7 @@ function packSigns(signs) {
   return signs.map((s) => {
     const w = Math.round(s.w * SIGN_PX_PER_M);
     const h = Math.round(s.h * SIGN_PX_PER_M);
-    if (x + w > ATLAS) {
+    if (x + w > ATLAS_W) {
       x = 0;
       y += rowH + CELL_PAD;
       rowH = 0;
@@ -132,14 +134,15 @@ function packSigns(signs) {
     const cell = [x, y, w, h];
     x += w + CELL_PAD;
     rowH = Math.max(rowH, h);
-    if (y + h > ATLAS) console.error(`[arc] sign ${s.id} does not fit the atlas`);
+    if (y + h > ATLAS_H) console.error(`[arc] sign ${s.id} does not fit the atlas`);
     return cell;
   });
 }
 
 function atlasTexture(signs, cells) {
   const c = document.createElement('canvas');
-  c.width = c.height = ATLAS;
+  c.width = ATLAS_W;
+  c.height = ATLAS_H;
   const g = c.getContext('2d');
   paintBeam(g, BEAM_CELL);
   paintRing(g, RING_CELL);
@@ -151,7 +154,7 @@ function atlasTexture(signs, cells) {
 
 // Canvas row 0 is the top and a CanvasTexture flips Y.
 function uvRect([x, y, w, h]) {
-  return [x / ATLAS, 1 - (y + h) / ATLAS, w / ATLAS, h / ATLAS];
+  return [x / ATLAS_W, 1 - (y + h) / ATLAS_H, w / ATLAS_W, h / ATLAS_H];
 }
 
 function markerMaterial(map) {

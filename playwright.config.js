@@ -1,4 +1,13 @@
+import fs from 'node:fs';
 import { defineConfig } from '@playwright/test';
+
+// The gate is fast: every test that runs in Node, plus one boot of the game
+// (tests/smoke.spec.js), side by side, in under a minute. A browser test boots
+// the whole city and costs seconds a time; GATE_FULL=1 (`npm run gate:full`)
+// runs all of them one by one, and blocks nothing.
+const FULL = process.env.GATE_FULL === '1';
+const FAST_FILES = fs.readdirSync('tests').filter((f) => f.endsWith('.spec.js'))
+    .filter((f) => f === 'smoke.spec.js' || !/\bpage\b/.test(fs.readFileSync(`tests/${f}`, 'utf8')));
 
 // Locally: real GPU via ANGLE — D3D11 on Windows, Metal on macOS (D3D11 does
 // not exist there, and asking for it silently drops Chrome to a fallback).
@@ -24,10 +33,11 @@ const PORT = Number(process.env.GATE_PORT || 4173);
 
 export default defineConfig({
     testDir: './tests',
+    testMatch: FULL ? undefined : FAST_FILES,
     fullyParallel: false,
     forbidOnly: !!process.env.CI,
     retries: 0,
-    workers: 1,
+    workers: FULL ? 1 : 4,
     reporter: [['list']],
     timeout: 90000,
     expect: { timeout: 20000 },
@@ -42,7 +52,10 @@ export default defineConfig({
         launchOptions: { args: GPU_ARGS },
     },
     webServer: {
-        command: `npm run preview -- --port ${PORT} --strictPort`,
+        // Vite directly, never through `npm run`, which forks a grandchild the
+        // kill misses: the wrapper dies, the vite server keeps the port, and the
+        // next gate run meets a busy port. scripts/shot.mjs leads with this.
+        command: `node node_modules/vite/bin/vite.js preview --port ${PORT} --strictPort`,
         port: PORT,
         timeout: 60000,
         reuseExistingServer: false,
