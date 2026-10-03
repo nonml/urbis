@@ -4,11 +4,12 @@ import { createFixedStep, advance, setSpeed, snap, blend, STEP } from './game/lo
 import { createRecorder, bindRecorder, loadReplay, createReplay } from './game/replay.js';
 import { bindProbe } from './game/probe.js';
 import { bindInput } from './game/input.js';
+import { createFollowRig, CAM_PIVOT, ROOF_RAIN_BELOW } from './game/camera.js';
 import * as THREE from 'three';
 import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { WALK_BOUNDS, DISTRICTS, clampToBounds, heightAt } from './sim/world.js';
+import { WALK_BOUNDS, DISTRICTS, clampToBounds } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import {
@@ -21,8 +22,7 @@ import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
 import { chaseIn } from './sim/economy.js';
 import {
-  STREET, createInterior, tickInterior, useDoor, isIndoors, currentPlace, frameCamera,
-  occupiedParcel, doorEnds,
+  STREET, createInterior, tickInterior, useDoor, isIndoors, occupiedParcel, doorEnds,
 } from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
 import { loadSave, writeSave, clearSave } from './savestore.js';
@@ -262,9 +262,11 @@ scene.add(heroKey);
 const { composer, bloom, grade } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, grade));
 
-// Follow cam: lower and closer than before — towers loom, street glow fills
-// the frame (oracle camera note). Drag looks, wheel dollies. WASD moves.
-const cam = { yaw: Math.PI, pitch: 0.18, dist: 4.5, ground: 0 };
+// Follow cam (M3.T3) lives in game/camera.js: the rig, its drag-to-orbit and
+// dolly, the interior rigs and the per-frame placement. Lower and closer than
+// before — towers loom, street glow fills the frame (oracle camera note).
+const camRig = createFollowRig({ camera, interior });
+const cam = camRig.cam;
 
 // City view (Z): the same world from above, where the player zones the lots.
 const cityView = createCityView(city);
@@ -272,22 +274,15 @@ const cityRig = buildCityView(city, cityView);
 scene.add(cityRig.mesh);
 
 // Input (M3.T2) lives in game/input.js: keys, mouse, the city-view binding and
-// the foot/car reads. Drag and wheel deltas come back here, so the follow rig
-// can move to game/camera.js (M3.T3) without the input file changing.
+// the foot/car reads. Its drag and wheel deltas go to the follow rig's own
+// look/dolly (game/camera.js), so this file only wires the two together.
 const clock = restored?.clock ?? createClock();
 // A capture holds the clock so the same seed, pose and hour reproduce: a shot
 // must not drift through the day while the rasteriser crawls.
 if (CAPTURE) clock.rate = 0;
-const look = (dx, dy) => {
-  cam.yaw -= dx * 0.005;
-  cam.pitch = Math.max(0.08, Math.min(1.2, cam.pitch + dy * 0.004));
-};
-const dolly = (dy) => {
-  cam.dist = Math.max(3, Math.min(14, cam.dist * (1 + dy * 0.001)));
-};
 const input = bindInput({
   canvas, cam, camera, city, cityRig, cityView, street, clock, interior, arc, arcUI,
-  look, dolly, fireHack, toggleVehicle, enterDoor, newGame,
+  look: camRig.look, dolly: camRig.dolly, fireHack, toggleVehicle, enterDoor, newGame,
 });
 // Dev spawn presets for scripted verification (?spawn=east). A continued game
 // stands where the save left it, so the preset never overrides a load.
@@ -398,26 +393,15 @@ function nearHero() {
   return interior.space === STREET && Math.hypot(heroCar.x - player.x, heroCar.z - player.z) < 3.4;
 }
 
-// The follow cam's street framing, put back when the player comes out.
-const STREET_RIG = { dist: 4.5, pitch: 0.18 };
-// Where the camera pivots in a space: the player's head.
-const CAM_PIVOT = 1.6;
-// How far the rain box reaches below a player up on a roof.
-const ROOF_RAIN_BELOW = 12;
-
 // E: through the door in reach, if there is one. The cut is immediate; the
-// camera snaps to the new space's rig behind the player and a short fade
-// covers the jump.
+// camera snaps to the new space's rig behind the player (game/camera.js) and a
+// short fade covers the jump.
 function enterDoor() {
   if (player.mode !== 'foot' || !useDoor(interior, player)) return;
   // The door teleports; snap the draw pose to it so no frame blends the walk
   // from the far side of the threshold.
   snap(player);
-  const rig = currentPlace(interior)?.rig ?? STREET_RIG;
-  cam.yaw = player.yaw;
-  cam.dist = rig.dist;
-  cam.pitch = rig.pitch;
-  cam.ground = player.y;
+  camRig.enterSpace(player);
   lockedNpc = null;
   fadeThroughDoor(doorHud);
 }
@@ -427,8 +411,7 @@ function toggleVehicle() {
     player.mode = 'drive';
     avatar.group.visible = false;
     missionOnEnterCar(mission);
-    cam.dist = 7;
-    cam.pitch = 0.22;
+    camRig.enterDrive();
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
     ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z));
@@ -437,8 +420,7 @@ function toggleVehicle() {
     // where it last stood on foot, possibly across the map.
     snap(player);
     avatar.group.visible = true;
-    cam.dist = 4.5;
-    cam.pitch = 0.18;
+    camRig.exitDrive();
   }
 }
 
@@ -491,7 +473,6 @@ let hudTimer = 0;
 let firstFrame = true;
 let bootMs = 0;
 let braking = false;
-const lookAt = new THREE.Vector3();
 
 // M0-1 fixed step: the accumulator, and the reusable poses render() blends the
 // hero between the last two steps into.
@@ -591,13 +572,6 @@ function hackStatus() {
   return 'READY';
 }
 
-function angDiff(a, b) {
-  let d = a - b;
-  while (d > Math.PI) d -= Math.PI * 2;
-  while (d < -Math.PI) d += Math.PI * 2;
-  return d;
-}
-
 // One fixed sim step (M0-1). Everything that advances game state happens here,
 // in the order render() used to run it, with the step for a timestep. The
 // camera's drive easing and the hero's braking ride the step too so a replay of
@@ -615,9 +589,7 @@ function tickSim() {
   tickCityView(cityView, city, STEP, input.keys);
   if (driving) {
     braking = tickPlayerCar(heroCar, input.driveInput(), STEP).braking;
-    if (!input.dragging && clock.elapsed - input.lastDragT > 2) {
-      cam.yaw += angDiff(heroCar.yaw, cam.yaw) * Math.min(1, STEP * 2.2);
-    }
+    camRig.easeDrive(heroCar.yaw, clock.elapsed, input, STEP);
   } else {
     tickPlayer(player, input.footInput(), STEP);
     tickInterior(interior, player);
@@ -781,22 +753,9 @@ function render() {
   updateArcMarker(arcMarker, arcTarget(arc, city.parcels, hx, hz), arcSigns(arc), clock.elapsed, night, glows);
   updateArcUI(arcUI, arc, hx, hz, street.time);
 
-  const ax = hx;
-  const az = hz;
-  const ay = hy;
-  const cp = Math.cos(cam.pitch);
-  const sp = Math.sin(cam.pitch);
-  const cx = ax - Math.sin(cam.yaw) * cam.dist * cp;
-  const cz = az - Math.cos(cam.yaw) * cam.dist * cp;
-  // The camera rides the higher of two grounds — the one under the player and
-  // the one under itself — so a bank standing between them cannot swallow it.
-  // Eased, because a kerb is a step function and the whole frame would jump.
-  cam.ground += (Math.max(ay, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * 6);
-  camera.position.set(cx, sp * cam.dist + 0.6 + cam.ground, cz);
-  if (!driving) camera.position.copy(frameCamera(interior, { x: ax, y: ay + CAM_PIVOT, z: az }, camera.position));
-  const ahead = driving ? carDraw.yaw : playerDraw.yaw;
-  lookAt.set(ax + (driving ? Math.sin(ahead) * 3 : 0), ay + (driving ? 1.2 : 1.7), az + (driving ? Math.cos(ahead) * 3 : 0));
-  camera.lookAt(lookAt);
+  // Follow rig (M3.T3): the eye behind the drawn actor, the interior frame and
+  // the look point the city view aims with; it owns cam.ground's ease.
+  const lookAt = camRig.placeFollowCamera(driving ? carDraw : playerDraw, driving, dt);
 
   const target = driving || interior.space !== STREET ? null : acquireTarget();
   const targetPerson = target && people.list.length > 0
@@ -804,7 +763,7 @@ function render() {
     : null;
   lastProfile = driving ? null : updateProfiler(camera, target, targetPerson, targetPerson ? commuteLabel(targetPerson, clock.hour) : null);
   showLotNote(lotNote, interior.space === STREET
-    ? focusParcel(city.parcels, ax, az, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
+    ? focusParcel(city.parcels, hx, hz, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
   showNews(newsLine, liveNews(news, street.time));
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   if (driving && lockedNpc) lockedNpc = null;
