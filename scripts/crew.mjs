@@ -40,7 +40,8 @@ const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash'];
 const STALL_MIN = 10;
 const POLL_MS = 30_000;
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
-const PORT_BLOCKS = [40, 41, 42, 43, 44, 45, 46, 47];
+// One block per live worker. 51 is skipped: its gate port would be 5173, vite's own.
+const PORT_BLOCKS = [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 52];
 
 // A worker that keeps calling tools without editing is circling, not working: more
 // calls than this since its last edit, or the same call LOOP_REPEATS times, is a
@@ -124,7 +125,9 @@ function freshLane(state, lane, dir) {
 
 function ports(state, name) {
   const used = new Set(Object.entries(state.workers).filter(([n, w]) => n !== name && w.live).map(([, w]) => w.block));
-  const block = state.workers[name]?.block ?? PORT_BLOCKS.find((b) => !used.has(b));
+  // A lane keeps its block across tasks unless a live worker took it in between.
+  const own = state.workers[name]?.block;
+  const block = own !== undefined && !used.has(own) ? own : PORT_BLOCKS.find((b) => !used.has(b));
   return { block, gate: block * 100 + 73, shot: block * 100 + 91, score: block * 100 + 95 };
 }
 
@@ -299,6 +302,9 @@ function bringTest(dir, test) {
 }
 
 async function assign(state, lane, task) {
+  // Every block taken: wait for a lane to finish rather than share a port, which
+  // makes a gate adopt another worktree's server or fail on a busy port.
+  if (ports(state, lane).block === undefined) return null;
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
