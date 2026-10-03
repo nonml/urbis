@@ -1,0 +1,14 @@
+{
+  "milestone": "5: the farmland surrounds the city it belongs to, never under its towers",
+  "tasks": [
+    {
+      "id": "m5-farmland",
+      "lane": "farmland",
+      "goal": "Add bandsFor(district, vistas) to src/render/outskirts.js and lay a generated city's two farmland bands just past its skyline, so tests/outskirts-place.spec.js passes on all 301 seeds.",
+      "files": ["src/render/outskirts.js"],
+      "test": "tests/outskirts-place.spec.js",
+      "commit": "fix(outskirts): the farmland lies past a generated city's skyline",
+      "notes": "Today BANDS is a fixed hand-map table, so on all 300 generated cities skyline towers stand on fields and sheds, and on 80 the fields reach into the streets. Edits, all in src/render/outskirts.js: (1) Rename the table `const BANDS = [...]` to `export const HAND_BANDS = [...]` with exactly the same two entries. (2) Below it add named constants with one-line why comments: `const BAND_GAP = 8;` (fields start this far past the last tower), `const SOUTH_DEPTH = 84;` and `const EAST_WIDTH = 104;` (the hand bands' own depth and width). (3) Add `const onLattice = (v, up) => (up ? Math.ceil((v - 2) / 4) : Math.floor((v - 2) / 4)) * 4 + 2;` with a comment: the nearest bound on the 2 (mod 4) ground lattice, outward. (4) Add and export: `export function bandsFor(district, vistas) { const towers = [...vistas.caps, ...vistas.ring]; const eastFace = Math.max(district.walk.maxX, ...towers.map((t) => t.x + t.w / 2)); const southFace = Math.min(district.walk.minZ, ...towers.map((t) => t.z - t.d / 2)); const x0 = onLattice(eastFace + BAND_GAP, true); const z1 = onLattice(southFace - BAND_GAP, false); const z0 = z1 - SOUTH_DEPTH; return [ { x0: onLattice(district.drive.minX, true), x1: x0, z0, z1, inner: 'z' }, { x0, x1: x0 + EAST_WIDTH, z0, z1: onLattice(district.walk.maxZ, false), inner: 'x' } ]; }` with a comment above it saying what it returns and why (south and east of the skyline, never under it). (5) Then `const BANDS = WORLD_VISTAS ? bandsFor(DISTRICTS[0], WORLD_VISTAS) : HAND_BANDS;` Import WORLD_VISTAS from '../sim/vistas.js' and add DISTRICTS to the existing import from '../sim/world.js'. Every other use of BANDS stays as it is. (6) In the comment block above the table, replace only the first sentence pair (the one starting 'Where the outskirts are allowed to be. The authored district is the rect') with: the outskirts lie in two bands south and east of the city; the hand map keeps HAND_BANDS, a generated city lays them past its skyline with bandsFor. Leave the sentences about the mountain ranges and the river exactly as they are. Do not touch LANES, the lane code or anything else. Draws must not change. tests/gate.spec.js and tests/chunks.spec.js must stay green."
+    }
+  ]
+}
