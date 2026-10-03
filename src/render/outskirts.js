@@ -20,13 +20,14 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { displaceToTerrain } from './landscape.js';
-import { heightAt } from '../sim/world.js';
+import { heightAt, DISTRICTS } from '../sim/world.js';
+import { WORLD_VISTAS } from '../sim/vistas.js';
 import { tileSeed } from './chunks.js';
 import { mulberry32 } from '../sim/rng.js';
 
-// Where the outskirts are allowed to be. The authored district is the rect
-// [7, 2.5, 73, 117.5] in landscape.js — x -66..80, z -115..120 — and these
-// bands start clear of it, so "is this inside the city?" needs no second test.
+// Where the outskirts are allowed to be: two bands south and east of the city.
+// The hand map keeps HAND_BANDS; a generated city lays them past its skyline
+// with bandsFor.
 //
 // They wrap the south and the east only. West and north are the mountain
 // ranges: buildMountains() puts mountain bases as far in as x = -36 on the west
@@ -37,10 +38,34 @@ import { mulberry32 } from '../sim/rng.js';
 // plane's 4 m grid lands on, so the slab below cannot interpenetrate it.
 // `inner` names the edge that faces the city — the only one close enough to be
 // looked at, and so the only one the ground slab bothers to fade out along.
-const BANDS = [
+export const HAND_BANDS = [
   { x0: -22, x1: 86, z0: -206, z1: -122, inner: 'z' },   // south of the district
   { x0: 86, x1: 190, z0: -206, z1: 74, inner: 'x' },     // east of the district
 ];
+
+const BAND_GAP = 8;      // fields start this far past the last tower
+const SOUTH_DEPTH = 84;  // the hand bands' own depth
+const EAST_WIDTH = 104;  // the hand bands' own width
+
+// The nearest bound on the 2 (mod 4) ground lattice, outward.
+const onLattice = (v, up) => (up ? Math.ceil((v - 2) / 4) : Math.floor((v - 2) / 4)) * 4 + 2;
+
+// Returns the two farmland bands — south and east of the skyline, never under
+// it — for the given district and its planned vistas.
+export function bandsFor(district, vistas) {
+  const towers = [...vistas.caps, ...vistas.ring];
+  const eastFace = Math.max(district.walk.maxX, ...towers.map((t) => t.x + t.w / 2));
+  const southFace = Math.min(district.walk.minZ, ...towers.map((t) => t.z - t.d / 2));
+  const x0 = onLattice(eastFace + BAND_GAP, true);
+  const z1 = onLattice(southFace - BAND_GAP, false);
+  const z0 = z1 - SOUTH_DEPTH;
+  return [
+    { x0: onLattice(district.drive.minX, true), x1: x0, z0, z1, inner: 'z' },
+    { x0, x1: x0 + EAST_WIDTH, z0, z1: onLattice(district.walk.maxZ, false), inner: 'x' },
+  ];
+}
+
+const BANDS = WORLD_VISTAS ? bandsFor(DISTRICTS[0], WORLD_VISTAS) : HAND_BANDS;
 
 // Lanes, authored as polylines the way every other placement list in this
 // codebase is authored. They leave town on the lines the city's own roads
