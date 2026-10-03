@@ -8,8 +8,9 @@ import { spawnSync } from 'node:child_process';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { AVENUE_X } from '../src/sim/world.js';
 import { BAND, END_CLEAR, avenueSpots, crossingSpots, rhythm } from '../src/sim/furniture.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const SIM = new URL('../src/sim/', import.meta.url).href;
 const RHYTHMS = [[9, 18], [-80, 16], [6, 12], [20, 40], [-48, 24], [-66, 22]];
 

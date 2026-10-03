@@ -4,6 +4,7 @@
 // in the browser through the capture-only __game.cranes() probe.
 import { test, expect } from '@playwright/test';
 import { craneRig, JIB } from '../src/render/zoning.js';
+import { sweep } from './sweep.js';
 
 // A crane at the origin, boxed in on every heading by a dense ring of small
 // rects at radius R. Ring spacing at R = 18 is ~1.6 m, so the 3 m blockers
@@ -34,7 +35,7 @@ test('every crane in every generated city points its boom into the clear', async
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
   let cranes = 0, shortened = 0, jibless = 0;
-  for (const seed of [...Array.from({ length: 12 }, (_, i) => i + 1), 73]) {
+  for (const seed of [...sweep(12), 73]) {
     await page.goto(`/?capture=1&gen=1&seed=${seed}`);
     await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
     await page.evaluate(() => window.__game.advance(120));

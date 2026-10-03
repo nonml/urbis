@@ -15,8 +15,9 @@ import {
   SHOPS_MAX, SHOP_OUT, SHOP_RUN, VENTS, VENTS_MAX, VENT_BACK, VENT_OUT, VENT_PHASE, WALK_PUDDLE_OUT,
   WALK_PUDDLE_SIZE, WALK_Y, WORLD_DRESSING, planDressing,
 } from '../src/sim/dressing.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const half = (v) => Math.round(v * 2) / 2;
 const sideOf = (s) => (s.ry === Math.PI / 2 ? -1 : 1);
 const meets = (d, a) => d.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);

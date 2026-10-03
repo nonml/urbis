@@ -9,8 +9,9 @@ import { counterpartX } from '../src/sim/anchors.js';
 import { mulberry32 } from '../src/sim/rng.js';
 import { AVENUE_NAMES, CROSSING_NAMES, NAME_SALT, nameStreets, streetName } from '../src/sim/streetnames.js';
 import { address } from '../src/sim/decline.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 
 // The rule, written out a second way.
 function expected(d, seed) {

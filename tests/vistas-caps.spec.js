@@ -4,8 +4,9 @@
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { CAP_D, CAP_GAP, CAP_H, CAP_W, capsFor } from '../src/sim/vistas.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const EPS = 1e-6;
 const within = (v, [lo, hi]) => v >= lo - EPS && v <= hi + EPS;
 const half = (v) => Math.abs(v * 2 - Math.round(v * 2)) < EPS;

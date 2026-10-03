@@ -8,8 +8,9 @@ import { test, expect } from '@playwright/test';
 import { bandsFor, lanesFor, HAND_LANES } from '../src/render/outskirts.js';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { planVistas } from '../src/sim/vistas.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = [...Array.from({ length: 300 }, (_, i) => i + 1), 1234567];
+const SEEDS = [...sweep(300), 1234567];
 const inside = (b, [x, z]) => x >= b.x0 && x <= b.x1 && z >= b.z0 && z <= b.z1;
 
 function world(seed) {

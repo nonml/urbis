@@ -7,8 +7,9 @@ import {
   CAP_D, CAP_GAP, RING_D, RING_EAST, RING_GAP, RING_H, RING_MIN, RING_NORTH, RING_SOUTH, RING_W, RING_WEST,
   WEST_GAP, ringFor,
 } from '../src/sim/vistas.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const EPS = 1e-6;
 
 const box = (r) => [r.x - r.w / 2, r.x + r.w / 2, r.z - r.d / 2, r.z + r.d / 2];

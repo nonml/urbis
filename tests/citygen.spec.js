@@ -3,8 +3,9 @@
 // becomes a cheap invariant. Same runner as the gate — no new tooling.
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 500 }, (_, i) => i + 1);
+const SEEDS = sweep(500);
 const GAP_MIN = 36;
 const GAP_MAX = 56;
 const MEAN_X_LIMIT = 20;

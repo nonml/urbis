@@ -8,8 +8,9 @@ import { parkedFor } from '../src/sim/furniture.js';
 import {
   CAM_ROOM, CAR_OUT, HAND_SPAWN, LANE_EDGE, PLAYER_AHEAD, PLAYER_OUT, SPAWN, SPAWN_CLEAR, SPAWN_STEP, SPAWN_Z, spawnFor,
 } from '../src/sim/spawn.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 
 function fits(d, z) {
   const a = d.avenues[0];

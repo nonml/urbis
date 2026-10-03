@@ -16,8 +16,9 @@ import {
   HAND_MIDBLOCK, MIDBLOCK, SIGN_GAP, SIGN_IN, ZEBRA_CAR, ZEBRA_CLEAR, ZEBRA_END, ZEBRA_STEP,
   placeSigns, ramenBoard, worldSigns, zebrasFor,
 } from '../src/sim/streetscape.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const DEFS = JSON.parse(fs.readFileSync('src/content/signs.json', 'utf8'));
 const meets = (d, a) => d.crossings.filter((c) => c.x0 <= a.x && a.x <= c.x1);
 const world = (seed) => {

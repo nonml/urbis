@@ -9,8 +9,9 @@ import * as THREE from 'three';
 import { buildMountains, MOUNTAIN_CLEAR } from '../src/render/landscape.js';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { DISTRICTS } from '../src/sim/world.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 // Still a backdrop: a range a street-level player cannot see is dead tech.
 const BACKDROP_MIN_H = 40;
 const BACKDROP_MAX_OUT = 200;

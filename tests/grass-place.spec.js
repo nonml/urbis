@@ -10,8 +10,9 @@ import { grassFor, HAND_GRASS } from '../src/render/landscape.js';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { planLayout, CROSSING_BAND, BUILD_LINE } from '../src/sim/layout.js';
 import { planVistas } from '../src/sim/vistas.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = [...Array.from({ length: 300 }, (_, i) => i + 1), 1234567];
+const SEEDS = [...sweep(300), 1234567];
 // Still green: the hand map has 5,068 m2 of verge and park.
 const GRASS_MIN_M2 = 2000;
 

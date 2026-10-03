@@ -11,8 +11,9 @@ import {
   PARK_PHASE, PARK_SHARE, PARK_STEP, POLE_X, WORLD_FURNITURE,
   avenueSpots, boxesFor, crossingSpots, junctionsOf, lampsFor, parkedFor,
 } from '../src/sim/furniture.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 100 }, (_, i) => i + 1);
+const SEEDS = sweep(100);
 const SIM = new URL('../src/sim/', import.meta.url).href;
 const meets = (c, a) => c.x0 <= a.x && a.x <= c.x1;
 const sideOf = (i) => (i % 2 === 0 ? -1 : 1);

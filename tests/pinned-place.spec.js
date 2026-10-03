@@ -4,8 +4,9 @@
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { HAND_PINNED, PINNED_TOWERS, PIN_BAND, PIN_GAP, placePinned } from '../src/sim/landmarks.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 const EPS = 1e-6;
 
 const clearOf = (t, z0, z1) => t.z + t.d / 2 <= z0 + EPS || t.z - t.d / 2 >= z1 - EPS;

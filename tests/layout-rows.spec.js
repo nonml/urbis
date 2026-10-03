@@ -7,8 +7,9 @@ import {
   BACK_GAP, BUILD_LINE, CROSSING_BAND, MIN_RUN, ROW_DEPTH_MAX, ROW_DEPTH_MIN, ROW_END_GAP,
   rowDepth, rowRuns,
 } from '../src/sim/layout.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 const SIDES = [-1, 1];
 const EPS = 1e-9;
 const length = (runs) => runs.reduce((n, [z0, z1]) => n + z1 - z0, 0);

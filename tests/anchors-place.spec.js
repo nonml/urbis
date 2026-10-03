@@ -11,9 +11,10 @@ import {
   HAND_AVENUE_X, HAND_PURSUIT_HOMES, HAND_SUBSTATIONS, PURSUIT_HOMES, SUBSTATIONS, SUBSTATION_PLACES, SUB_CLEAR,
   SUB_OUT, SUB_PLACE_IN, arcFor, counterpartX, placeX, pursuitHomesFor, substationsFor, worldArc,
 } from '../src/sim/anchors.js';
+import { sweep } from './sweep.js';
 
 const ARC = JSON.parse(fs.readFileSync('src/content/arc.json', 'utf8'));
-const SEEDS = Array.from({ length: 200 }, (_, i) => i + 1);
+const SEEDS = sweep(200);
 const meets = (d) => d.crossings.filter((c) => c.x0 <= d.avenues[0].x && d.avenues[0].x <= c.x1);
 
 function expectedCounterpart(ax, d) {

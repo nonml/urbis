@@ -6,8 +6,9 @@ import {
   BUILD_LINE, LOT_CLEAR, LOT_FRONT, LOTS_MAX, LOTS_MIN, MIN_RUN, PIN_CLEAR, PINNED_TOWERS,
   deriveLots, planLayout, rowDepth, rowRuns,
 } from '../src/sim/layout.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 const SIDES = [-1, 1];
 const EPS = 1e-6;
 const length = (runs) => runs.reduce((n, [z0, z1]) => n + z1 - z0, 0);

@@ -95,7 +95,8 @@ Laws 2 and 3 exist so that can never recur. See `docs/CHARTER.md`.
 ```bash
 npm install
 npm run dev          # http://localhost:5173
-npm run gate         # everything below, in order — must be green before you commit
+npm run gate         # everything below, in order, in under a minute — green before you commit
+npm run gate:full    # every browser test and every seed; slow, blocks nothing
 ```
 
 | Command | What it does |
@@ -106,7 +107,7 @@ npm run gate         # everything below, in order — must be green before you c
 | `npm run check:overlap` | no two building footprints intersect; a ratchet down to 0 (VGA-084) |
 | `npm run validate` | `src/content/*.json` schemas |
 | `npm run build` | **mandatory** — lint and tests do not parse the bundle. Syntax and import errors surface only here |
-| `npm test` | boots the built game in GPU headless, asserts **draws ≤ 175**, proves the hack cascade, writes evidence to `docs/shots/gate/` |
+| `npm test` | every Node test on the first 20 seeds, four at a time, plus one boot of the hand map and seed 7 (`tests/smoke.spec.js`): no error, no failed request, **draws ≤ 175**. `GATE_FULL=1` adds every browser test and every seed |
 
 **Controls:** `WASD` move · drag look · `F` enter/exit car · `H` blackout hack · `T` day/night
 

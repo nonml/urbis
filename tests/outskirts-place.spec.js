@@ -7,8 +7,9 @@ import { test, expect } from '@playwright/test';
 import { bandsFor, HAND_BANDS } from '../src/render/outskirts.js';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { planVistas } from '../src/sim/vistas.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = [...Array.from({ length: 300 }, (_, i) => i + 1), 1234567];
+const SEEDS = [...sweep(300), 1234567];
 // A band thinner than this is a strip, not farmland.
 const MIN_SIDE = 60;
 // Fields start this close behind the last tower, or the city ends in a void.

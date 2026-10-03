@@ -4,8 +4,9 @@
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { LOT_CLEAR, MIN_RUN, deriveLots } from '../src/sim/layout.js';
+import { sweep } from './sweep.js';
 
-const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
+const SEEDS = sweep(300);
 // The lots' centres reach across at least this share of the district's drive length.
 const SPREAD = 0.5;
 // Between two lots on one row: a building's MIN_RUN, plus each lot's clear strip.
