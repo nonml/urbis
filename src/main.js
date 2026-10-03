@@ -1,6 +1,7 @@
 // Bootstrap: sim ticks, render reads. HUD shows measured numbers only.
 import { SEED, GENERATE, SAVING } from './boot.js';
-import { createFixedStep, advance, snap, blend, STEP } from './game/loop.js';
+import { createFixedStep, advance, setSpeed, snap, blend, STEP } from './game/loop.js';
+import { createRecorder, bindRecorder, loadReplay, createReplay, hashState } from './game/replay.js';
 import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
@@ -75,6 +76,8 @@ const bootStart = performance.now();
 
 const canvas = document.getElementById('scene');
 const CAPTURE = new URLSearchParams(location.search).has('capture');
+const RECORD = new URLSearchParams(location.search).has('record');
+const REPLAY = new URLSearchParams(location.search).get('replay');
 const renderer = createRenderer(canvas, { preserveDrawingBuffer: CAPTURE });
 const maxAniso = renderer.capabilities.getMaxAnisotropy();
 const texLoader = new THREE.TextureLoader();
@@ -495,6 +498,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.hidden) doSave();
 });
 
+// M0-1 record/replay: the recorder and the loaded replay are assigned with the
+// fixed step below; the probes close over these bindings.
+let recorder = null;
+let replay = null;
+let replayErr = null;
+
 // Minimal probe for scripted verification (screenshots, control checks).
 window.__game = {
   seed: SEED,
@@ -548,6 +557,15 @@ window.__game = {
     })),
   }),
   economy: () => districtReport(city),
+  // M0-1: the fixed-step count, a pause, the ?record=1 log and the state hash a
+  // record/replay comparison reads — player, car, street, city (with its
+  // economy), people and wanted.
+  step: () => fixed.total,
+  pause: () => setSpeed(fixed, 0),
+  stateHash: () => hashState({ player, car: heroCar, street, city, economy: city.economy, people, wanted }),
+  inputLog: () => (recorder ? recorder.log(SEED) : null),
+  replayDone: () => !!replay && fixed.total >= replay.end,
+  replayError: () => replayErr,
   shot: () => {
     composer.render();
     return captureFrame(renderer);
@@ -979,6 +997,20 @@ const HELD_CAR = { throttle: 0, steer: 0 };
 // M0-1 fixed step: the accumulator, and the reusable poses render() blends the
 // hero between the last two steps into.
 const fixed = createFixedStep();
+const bootSpeed = fixed.speed;
+// ?record=1 keeps every input with the step it landed on; ?replay=<name> feeds
+// tests/replays/<name>.json back by step. A replay boots frozen until its log
+// is in, so no step can run without its events.
+if (RECORD) {
+  recorder = createRecorder(() => fixed.total);
+  bindRecorder(recorder, canvas);
+}
+if (REPLAY) {
+  setSpeed(fixed, 0);
+  loadReplay(REPLAY)
+    .then((log) => { replay = createReplay(log, canvas); setSpeed(fixed, bootSpeed); })
+    .catch((e) => { replayErr = String(e); setSpeed(fixed, bootSpeed); });
+}
 const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
 const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
 
@@ -1107,8 +1139,14 @@ function render() {
   const dt = Math.min(frame, 0.05);
   last = now;
   const driving = player.mode === 'drive';
-  advance(fixed, frame);
-  for (let i = 0; i < fixed.steps; i++) tickSim();
+  // A replay's log ends on a step, not a frame: advance caps the batch there
+  // and feed puts each event back just before its step (M0-1).
+  advance(fixed, frame, replay ? replay.end : Infinity);
+  for (let i = 0; i < fixed.steps; i++) {
+    if (replay) replay.feed(fixed.total);
+    tickSim();
+    fixed.total += 1;
+  }
   // Stream against the camera, because the camera is what the frustum belongs
   // to. It is last frame's position; at a 160 m build radius one frame of lag
   // is 0.2 m of a 224 m hysteresis gap and nothing can see it.

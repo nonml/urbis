@@ -11,7 +11,8 @@
 // runs — the sim is never skipped forward.
 //
 // This module is game-side, not sim: it holds no state of its own beyond an
-// accumulator and the poses it snapshots onto movers for the renderer.
+// accumulator, the whole-step count (a replay stops on it), and the poses it
+// snapshots onto movers for the renderer.
 
 export const STEP = 0.05;
 export const MAX_STEPS = 5;
@@ -34,7 +35,7 @@ function readSpeed() {
 }
 
 export function createFixedStep(speed = readSpeed()) {
-  return { acc: 0, alpha: 0, steps: 0, speed: clampSpeed(speed) };
+  return { acc: 0, alpha: 0, steps: 0, speed: clampSpeed(speed), total: 0 };
 }
 
 // The city view's pause (0) and its 1x/2x/4x buttons set speed through here.
@@ -46,12 +47,25 @@ export function setSpeed(step, speed) {
 // Add one frame's elapsed seconds. Sets step.steps to how many whole steps to
 // run now and step.alpha to where this frame sits between the step that just
 // ran and the next one. Returns the step count.
-export function advance(step, dt) {
+//
+// `end` (M0.T2) is the step count a replay stops on: a frame that would run
+// past it runs only the steps left, and a frame at or past it runs none. So a
+// replay and its recording can hold the same world at the same step however
+// the frames fell. Without a replay it is Infinity and nothing changes; the
+// caller sees the cap on the next frame, which is where the sim freezes.
+export function advance(step, dt, end = Infinity) {
+  const left = end - step.total;
+  if (left <= 0) {
+    step.acc = 0;
+    step.alpha = 0;
+    step.steps = 0;
+    return 0;
+  }
   const speed = step.speed ?? 1;
   if (speed > 1) {
     step.acc = 0;
     step.alpha = 0;
-    step.steps = Math.floor(speed);
+    step.steps = Math.min(Math.floor(speed), left);
     return step.steps;
   }
   step.acc += dt * speed;
@@ -61,7 +75,15 @@ export function advance(step, dt) {
     step.steps += 1;
   }
   if (step.acc >= STEP) step.acc %= STEP;
-  step.alpha = step.acc / STEP;
+  if (step.steps >= left) {
+    // The cap bit: drop the leftover accumulator and draw the last whole step,
+    // not half a step toward one that will never run.
+    step.steps = left;
+    step.acc = 0;
+    step.alpha = 0;
+  } else {
+    step.alpha = step.acc / STEP;
+  }
   return step.steps;
 }
 
