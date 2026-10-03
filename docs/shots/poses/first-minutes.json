@@ -1,0 +1,18 @@
+{
+  "name": "first-minutes",
+  "notes": "The first two minutes at the spawn on each of the five seeds: the four headings by day and by night, then the city view both ways (M1.T6). Every pose stands where a new game opens; heading 0 faces north (+z), 90 east (+x).",
+  "prefix": "m1-sweep",
+  "defaults": { "weather": "rain" },
+  "poses": [
+    { "name": "north-day", "heading": 0, "hour": 12 },
+    { "name": "east-day", "heading": 90, "hour": 12 },
+    { "name": "south-day", "heading": 180, "hour": 12 },
+    { "name": "west-day", "heading": 270, "hour": 12 },
+    { "name": "north-night", "heading": 0, "hour": 22 },
+    { "name": "east-night", "heading": 90, "hour": 22 },
+    { "name": "south-night", "heading": 180, "hour": 22 },
+    { "name": "west-night", "heading": 270, "hour": 22 },
+    { "name": "city-day", "city": true, "hour": 12 },
+    { "name": "city-night", "city": true, "hour": 22 }
+  ]
+}
