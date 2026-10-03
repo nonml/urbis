@@ -54,7 +54,7 @@ const PORT_BLOCKS = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 72];
 // calls than this since its last edit, or the same call LOOP_REPEATS times, is a
 // loop. A whole-feature brief reads a lot before its first edit; a task should not.
 const EDIT_TOOLS = new Set(['edit', 'write', 'patch', 'multiedit', 'apply_patch']);
-const LOOP_CALLS = { brief: 60, task: 40 };
+const LOOP_CALLS = { brief: 100, task: 100 };
 const LOOP_REPEATS = 3;
 // Fixes a task's answer gets on one model before it moves up a tier.
 const FIX_TRIES = 2;
@@ -330,11 +330,9 @@ async function assign(state, lane, task) {
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
-  // The lane's next task goes on in the session its last one ran in, when that
-  // was on the same model: the worker has already read the files the two share.
-  const prev = state.workers[lane];
-  const session = prev?.session && prev.dir === dir && prev.model === TIERS[0] ? prev.session : null;
-  const w = { name: lane, dir, task, model: TIERS[0], session, stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
+  // Every task starts a fresh session: a long one fills the model's context, and it
+  // gets worse as it grows. The task's own text says what to read.
+  const w = { name: lane, dir, task, model: TIERS[0], session: null, stalls: 0, tries: 0, live: true, started: Date.now(), ...ports(state, lane) };
   state.workers[lane] = w;
   state.tasks[task.id] = { status: 'working', lane, model: w.model };
   await send(w, prompt(w));
