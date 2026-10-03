@@ -160,7 +160,8 @@ function taskPrompt(w) {
 
 // A queued task with a `brief` instead of a `test` is a whole feature: the brief's
 // finish lines and the gate decide it, and the director reviews the lane branch.
-const prompt = (w) => (w.task && !w.task.brief ? taskPrompt(w) : briefPrompt(w.task ? { ...w, brief: w.task.brief } : w));
+const prompt = (w) => (w.task && !w.task.brief ? taskPrompt(w)
+  : briefPrompt(w.task ? { ...w, brief: w.task.brief, extra: w.task.notes ?? w.extra } : w));
 
 async function send(w, text) {
   const { c } = await client(w.dir);
@@ -315,7 +316,7 @@ async function assign(state, lane, task) {
 // What the answer touched that the task does not own: its test, or files off its list.
 function scopeFault(w) {
   const t = w.task;
-  if (t.brief) return null;
+  if (t.brief) return builtNothing(w);
   const testPath = path.join(w.dir, t.test);
   const original = headFile(w.dir, t.test, todoOf(t.test));
   if (original !== null && (!fs.existsSync(testPath) || fs.readFileSync(testPath, 'utf8') !== original)) {
@@ -326,6 +327,13 @@ function scopeFault(w) {
   const stray = changedPaths(w.dir).filter((f) => !owned.has(f) && !ALWAYS_OWNED.some((re) => re.test(f)));
   if (!stray.length) return null;
   return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
+}
+
+// A brief is a feature: a turn that leaves only shots and notes behind has not
+// built it, however green the gate is on the unchanged code.
+function builtNothing(w) {
+  if (changedPaths(w.dir).some((f) => !f.startsWith('docs/'))) return null;
+  return `Nothing outside docs/ has changed: ${w.task.brief} is not built yet. Build it, measure every finish line, then stop.`;
 }
 
 // A task's check is the gate cut to what the task can break: the static checks, the
@@ -360,11 +368,18 @@ function gateFault(w) {
   }
 }
 
+// A task names its commit; a brief's commit is its title.
+function subjectOf(t) {
+  const title = t.brief && fs.existsSync(path.join(ROOT, t.brief))
+    ? fs.readFileSync(path.join(ROOT, t.brief), 'utf8').match(/^# (.+)$/m)?.[1] : null;
+  return `feat(${t.lane}): ${(title ?? t.goal ?? t.id).replace(/^./, (c) => c.toLowerCase())}`;
+}
+
 function commitTask(w) {
   const t = w.task;
   sh('git', ['add', '-A'], w.dir);
   const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: task checks green, draws ${w.draws ?? 'not printed'}.`;
-  sh('git', ['commit', '-q', '-m', t.commit ?? `feat: ${t.goal}`, '-m', why], w.dir);
+  sh('git', ['commit', '-q', '-m', t.commit ?? subjectOf(t), '-m', why], w.dir);
   return sh('git', ['rev-parse', '--short', 'HEAD'], w.dir).trim();
 }
 
