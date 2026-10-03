@@ -59,11 +59,16 @@ function ringSide(rand, n, start, length, make) {
   return towers;
 }
 
-// A cap tower { x, z, w, d, h, face } at both ends of every avenue, centred on
-// its x. The north cap's near face is CAP_GAP past the avenue's z1 and its front
-// looks back down the avenue (face [0, -1]); the south cap mirrors it past z0
-// (face [0, 1]). w, d and h are drawn from CAP_W, CAP_D and CAP_H with
-// mulberry32(seed ^ VISTA_SALT).
+// One cap as a building in buildingsOf's shape (layout.js). A cap has no
+// district style, so style is null; its id is its own centre, unique among caps.
+function capBuilding(x, z, w, d, h, face) {
+  return { id: `cap:${x}:${z}`, kind: 'cap', style: null, facade: 0, x, z, w, d, h, face };
+}
+
+// A cap tower at both ends of every avenue, centred on its x. The north cap's
+// near face is CAP_GAP past the avenue's z1 and its front looks back down the
+// avenue (face [0, -1]); the south cap mirrors it past z0 (face [0, 1]). w, d
+// and h are drawn from CAP_W, CAP_D and CAP_H with mulberry32(seed ^ VISTA_SALT).
 export function capsFor(district, seed) {
   const rand = mulberry32((seed ^ VISTA_SALT) >>> 0);
   const caps = [];
@@ -71,8 +76,8 @@ export function capsFor(district, seed) {
     const w = Math.round((CAP_W[0] + rand() * (CAP_W[1] - CAP_W[0])) * 2) / 2;
     const d = Math.round((CAP_D[0] + rand() * (CAP_D[1] - CAP_D[0])) * 2) / 2;
     const h = Math.round((CAP_H[0] + rand() * (CAP_H[1] - CAP_H[0])) * 2) / 2;
-    caps.push({ x: a.x, z: a.z1 + CAP_GAP + d / 2, w, d, h, face: [0, -1] });
-    caps.push({ x: a.x, z: a.z0 - CAP_GAP - d / 2, w, d, h, face: [0, 1] });
+    caps.push(capBuilding(a.x, a.z1 + CAP_GAP + d / 2, w, d, h, [0, -1]));
+    caps.push(capBuilding(a.x, a.z0 - CAP_GAP - d / 2, w, d, h, [0, 1]));
   }
   return caps;
 }

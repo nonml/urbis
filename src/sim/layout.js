@@ -13,7 +13,8 @@
 // Pure sim (law 5): no three.js, no DOM.
 import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 import { worldSeed } from './seedstore.js';
-import { BUILD_LINE, PINNED_TOWERS } from './landmarks.js';
+import { BUILD_LINE, PINNED_TOWERS, pinnedBuildings } from './landmarks.js';
+import { capsFor } from './vistas.js';
 import { mulberry32 } from './rng.js';
 
 // A crossing's carriageway and both its walkways, from its centre-line.
@@ -193,11 +194,11 @@ export function deriveLots(district, seed) {
   return districtLots(district, seed).map((p) => p.lot);
 }
 
-// Everything the street wall and zoning need: { lots, rows }. lots is
-// deriveLots. rows has one { ax, side, depth, runs } per avenue side, where runs
-// are that side's rowRuns less each of its lots widened by LOT_CLEAR, less the
-// pinned towers (on the district's first avenue) widened by PIN_CLEAR, with
-// runs shorter than MIN_RUN dropped.
+// Everything the street wall and zoning need: { district, seed, lots, rows },
+// carrying the district and seed it was derived from so buildingsOf(plan) needs
+// nothing else. lots is deriveLots. rows has one { ax, side, depth, runs } per
+// avenue side: rowRuns less each lot widened by LOT_CLEAR and the pinned towers
+// (on the first avenue) widened by PIN_CLEAR, with runs under MIN_RUN dropped.
 export function planLayout(district, seed) {
   const picked = districtLots(district, seed);
   const rows = district.avenues.flatMap((a) => [-1, 1].map((side) => {
@@ -208,13 +209,92 @@ export function planLayout(district, seed) {
       .filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EPS);
     return { ax: a.x, side, depth: rowDepth(district, a.x, side), runs };
   }));
-  return { lots: picked.map((p) => p.lot), rows };
+  return { district, seed, lots: picked.map((p) => p.lot), rows };
+}
+
+// The style of the buildings on one row, read from the district plan: the
+// avenue's place in the district's own order and the building's distance from
+// the district's first crossing. Nothing here knows the hand map's coordinates
+// (ax === 0 && z < 40) — a generated district styles itself from its plan.
+// `kinds` index render/block.js's tower materials; `front` is the frontage
+// range in metres, `h` the height range.
+const CORE_REACH = 45;
+const CORE_STYLE = { name: 'core', kinds: [0, 1, 2, 5], h: [28, 52], front: [12, 20] };
+const TOWER_STYLE = { name: 'tower', kinds: [2, 3, 5], h: [18, 36], front: [9, 16] };
+const GLASS_STYLE = { name: 'glass', kinds: [1, 2, 4, 5], h: [18, 40], front: [9, 16] };
+const BRICK_STYLE = { name: 'brick', kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };
+
+export function rowStyle(district, ax, z) {
+  const order = district.avenues.findIndex((a) => a.x === ax);
+  const first = district.crossings[0];
+  if (order === 0 && first && Math.abs(z - first.z) <= CORE_REACH) return CORE_STYLE;
+  if (order === 0) return TOWER_STYLE;
+  if (order === district.avenues.length - 1) return GLASS_STYLE;
+  return BRICK_STYLE;
+}
+
+// Each row in the plan cut into the buildings the street wall draws:
+// { ax, side, z, d, w, h, kind, style } — d the party-walled front along the
+// row, w the depth back from the building line, h the height, kind a facade
+// architecture, style the district style a use comes from. Same district and
+// seed always give the same wall. `plan` defaults to the district's own;
+// a caller that already holds it (WORLD_BUILDINGS) never derives it twice.
+export function planBuildings(district, seed, plan = planLayout(district, seed)) {
+  const rand = mulberry32(seed);
+  const out = [];
+  for (const row of plan.rows) {
+    for (const [r0, r1] of row.runs) {
+      let at = r0;
+      while (r1 - at >= MIN_RUN) {
+        const st = rowStyle(district, row.ax, at);
+        let front = st.front[0] + rand() * (st.front[1] - st.front[0]);
+        if (r1 - at - front < MIN_RUN) front = r1 - at;
+        const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
+        const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
+        const w = Math.min(10 + rand() * 2, row.depth);
+        out.push({ ax: row.ax, side: row.side, z: at + front / 2, d: front - 1.2, w, h, kind, style: st.name });
+        at += front;
+      }
+    }
+  }
+  return out;
+}
+
+// A row building in buildingsOf's shape: x out from the building line, the front
+// facing the avenue.
+function rowBuilding(b) {
+  return {
+    id: `row:${b.ax}:${b.side}:${b.z}`, kind: 'row', style: b.style, facade: b.kind,
+    x: b.ax + b.side * (BUILD_LINE + b.w / 2), z: b.z, w: b.w, d: b.d, h: b.h, face: [-b.side, 0],
+  };
+}
+
+// Every building the world draws as one list with one shape:
+// { id, kind, style, facade, x, z, w, d, h, face } — kind row | tower | cap,
+// style the district style a use comes from (rows), facade the architecture
+// render/block.js pools, x/z/w/d the footprint, h the height, face the front.
+// `plan` is planLayout's; plan.pinned and plan.caps override the world's own,
+// so a map built for another seed uses that seed's towers and caps.
+export function buildingsOf(plan) {
+  const caps = plan.caps ?? capsFor(plan.district, plan.seed);
+  return [
+    ...pinnedBuildings(plan.district, plan.pinned),
+    ...planBuildings(plan.district, plan.seed, plan).map(rowBuilding),
+    ...caps,
+  ];
 }
 
 // The plan of the world this game booted, which the street wall, zoning and the
 // checker all read so they can never disagree: generated games only, null on the
 // hand preset. Keyed on the world seed, never on a caller's.
 export const WORLD_PLAN = worldSeed().generate ? planLayout(DISTRICTS[0], worldSeed().seed) : null;
+
+// The street wall of the world this game booted: render/block.js draws exactly
+// this, generated games only. Null on the hand preset, which keeps its own
+// tables until stage 7 deletes it (M3.T13).
+export const WORLD_BUILDINGS = WORLD_PLAN
+  ? planBuildings(DISTRICTS[0], worldSeed().seed, WORLD_PLAN)
+  : null;
 
 // Re-exported so tests and the checker reason in the same units as the plan.
 export { BUILD_LINE, PINNED_TOWERS };

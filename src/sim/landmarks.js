@@ -72,8 +72,19 @@ export function placePinned(hand, avenue, crossings) {
 
 export const PINNED_TOWERS = worldSeed().generate ? placePinned(HAND_PINNED, AVENUES[0], CROSSINGS) : HAND_PINNED;
 
-// Where a tower's shaft centre stands: out from the avenue centre-line by the
-// building line plus half the shaft width, on the tower's own side.
-export function towerCentreX(t) {
-  return AVENUE_X[0] + t.side * (BUILD_LINE + t.w / 2);
+// Where a tower's shaft centre stands: out from its avenue centre-line by the
+// building line plus half the shaft width. `ax` lets a generated map use its own.
+export function towerCentreX(t, ax = AVENUE_X[0]) {
+  return ax + t.side * (BUILD_LINE + t.w / 2);
+}
+
+// The pinned towers in buildingsOf's shape (layout.js): id from the interior
+// they carry, x from their avenue, the front facing it. style is null — they
+// have no district style; facade is the architecture block.js draws them at.
+export function pinnedBuildings(district, towers = PINNED_TOWERS) {
+  const ax = district.avenues[0].x;
+  return towers.map((t, i) => ({
+    id: `tower:${t.id}`, kind: 'tower', style: null, facade: i % 6,
+    x: towerCentreX(t, ax), z: t.z, w: t.w, d: t.d, h: t.h, face: [-t.side, 0],
+  }));
 }
