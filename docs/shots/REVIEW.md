@@ -27,6 +27,23 @@ These shipped as "done" without a real review. The operator found the problems.
 Shows the feature: yes, the avenue, crossing and shopfronts are visible where the
 parked car's roof was. `frameCheck(2)` 0.177 → 0 on seeds 7 and 2.
 
+## 2026-10-03 — slice-079, the ranges and the fields fit a generated city
+
+| Shot | Verdict | Defects |
+|---|---|---|
+| slice-079-mountains-s7-west-day | PASS for D6; frame FAIL | D7 |
+| slice-079-farmland-s7-se-day | PASS for the fields; frame FAIL | D7, D13 |
+| slice-079-outskirts-s7-cityview | FAIL | D7, D8 |
+
+Shows the feature: from the west end of the z = 38 street on seed 7, by day, the
+range stands as a hazy ridge with a snow cap past the last block, not in the street;
+5.6% of the frame is mountain. At night it is lost in the haze (mountain luma 0
+against a sky of 4.6), which is what a night range does. Fields, fences and farm
+houses lie past the skyline from the south-east corner, and in city view top right.
+The first set of review poses stood the player at walk-box corners through
+`__game.pose`, which skips collision: a pose inside a block put the camera in a
+building. Review poses now come from walking, not from teleporting.
+
 ## Defects
 
 | Id | Defect | Where | Status |
@@ -36,8 +53,11 @@ parked car's roof was. `frameCheck(2)` 0.177 → 0 on seeds 7 and 2.
 | D3 | A grey box with a yellow band hangs on a facade 10 m up | seed 7 spawn, right side; instanced box near (-11, 10–11.7, 8) | open, not yet identified |
 | D4 | A hard-edged bright rectangle lies on the road under the player at night | seed 7 spawn, night | open |
 | D5 | Puddle reflections break into scattered glass-like shards | 076 tier2, lower left | open |
-| D6 | Mountains stand at fixed hand-map coordinates: a range rises inside the city on 127 of 300 seeds (94 m over the road on seed 73), and 99% of their slope is steeper than 55°, so they read as blue spikes | 077 city view, left; seed 73 street | queued: `m5-mountains` (OpenCode), test `tests/landscape-place.todo.js` |
+| D6 | Mountains stand at fixed hand-map coordinates: a range rises inside the city on 127 of 300 seeds (94 m over the road on seed 73), and 99% of their slope is steeper than 55°, so they read as blue spikes | 077 city view, left; seed 73 street | **fixed** slice-079 (`m5-mountains`); `tests/landscape-place.spec.js`, 300 seeds |
 | D7 | The outer towers are giant boxes with a TV-static window texture | 077 city view, right | open |
 | D8 | Crane jibs reach out over neighbouring roofs and off their lot | 077 city view | open |
 | D9 | The free land the slice added cannot be picked out in its own shot | 077 city view | open |
 | D10 | The player and the hero car are raw boxes | every street shot | open (VGA-084) |
+| D11 | The farmland and farm tracks stood at hand-map coordinates on every generated city | outskirts.js `BANDS`, `LANES` | **fixed** slice-079 (`m5-farmland`, `m5-farm-tracks`); `tests/outskirts-place.spec.js`, `outskirts-lanes.spec.js` |
+| D12 | Two story boards (`lot_arden`, `lot_trust`) overflow the sign atlas and print an error on every boot | src/render/arc.js `packSigns` | open |
+| D13 | Between the last street and the fields the ground is a bare, flat, untextured plane | slice-079-farmland-s7-se-day, foreground | open |

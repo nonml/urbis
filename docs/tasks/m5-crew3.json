@@ -1,0 +1,18 @@
+{
+  "milestone": "5: second passes the review sent back, and a game that boots clean",
+  "tasks": [
+    { "id": "m5-skyline-2", "lane": "skyline", "brief": "docs/handoff/m5-skyline-2.md" },
+    {
+      "id": "m5-boot-clean",
+      "lane": "bootclean",
+      "goal": "Make a new game boot with no console error and no failed request on the hand map and on seeds 7, 73 and 1234567, so tests/boot-clean.spec.js passes.",
+      "files": [
+        "src/render/arc.js",
+        "index.html"
+      ],
+      "test": "tests/boot-clean.spec.js",
+      "commit": "fix(arc): every story board fits its atlas, and a new game boots clean",
+      "notes": "Two errors print on every boot today. (A) '[arc] sign lot_arden does not fit the atlas' and the same for lot_trust: src/render/arc.js packs the story signs into a square 1024 px canvas below the 512 px beam cell; the two 3.2 x 3.6 m boards are 403 px tall at SIGN_PX_PER_M = 112 and their row ends at y = 1054, past the canvas, so they sample garbage. Fix it by making the atlas taller, not by shrinking the signs: (1) replace `const ATLAS = 1024;` with `const ATLAS_W = 1024;` and `const ATLAS_H = 2048;` and a one-line comment above them: the story boards stack below the beam, and two of them do not fit under it in a square 1024. (2) In packSigns use ATLAS_W in the row-wrap test and ATLAS_H in the does-not-fit test. (3) In atlasTexture set `c.width = ATLAS_W;` and `c.height = ATLAS_H;`. (4) In the cell-to-UV function (the line `return [x / ATLAS, 1 - (y + h) / ATLAS, w / ATLAS, h / ATLAS];`) divide x and w by ATLAS_W and y and h by ATLAS_H. There must be no `ATLAS` left that is not ATLAS_W or ATLAS_H. (B) A 404: index.html has no icon link, so the browser asks for /favicon.ico. Add `<link rel=\"icon\" href=\"data:,\">` in the head of index.html. If the spec's response listener names a different URL, fix that one instead and say which in your last message. Change nothing else. Draws must not change. tests/arc.spec.js, tests/arc-game.spec.js and tests/gate.spec.js must stay green."
+    }
+  ]
+}
