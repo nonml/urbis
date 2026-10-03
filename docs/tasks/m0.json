@@ -1,0 +1,150 @@
+{
+  "milestone": "M0 the test harness",
+  "tasks": [
+    {
+      "id": "M0.T6",
+      "lane": "render",
+      "goal": "Shot diff. `node scripts/shotdiff.mjs <dirA> <dirB>` prints, per pose, the share of pixels whose colour differs by more than 8 levels, and exits 1 over a threshold",
+      "files": [
+        "scripts/shotdiff.mjs"
+      ],
+      "needs": [],
+      "commit": "M0.T6 (M0-8): shot diff",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-8: **Shot diff:** two shot folders in, the share of pixels that differ per pose out (checked by `scripts/shotdiff.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T8",
+      "lane": "engine",
+      "goal": "Golden maps. `node scripts/map-golden.mjs` writes, for each of the five seeds, the district, every graph node and edge, every lot, pinned tower, lamp, sign, parked car, story place and the spawn to `tests/golden/map-<seed>.json`; `tests/golden.test.js` fails on any difference. The street wall joins it in M3.T6",
+      "files": [
+        "scripts/map-golden.mjs",
+        "tests/golden.test.js",
+        "tests/golden/"
+      ],
+      "needs": [],
+      "commit": "M0.T8 (M0-7): golden maps",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-7: **Golden maps:** per seed, a JSON of every road, building footprint, lot, lamp, sign and story place; a test fails on any change the commit does not declare (checked by `scripts/map-golden.mjs`; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/golden.test.js"
+    },
+    {
+      "id": "M0.T1",
+      "lane": "tools",
+      "goal": "Fixed step. The frame loop keeps an accumulator and calls the sim ticks in fixed 50 ms steps (at most 5 a frame); the player, car and camera are drawn interpolated between the last two steps. Every `tick*` call that took the frame's `dt` takes the step instead",
+      "files": [
+        "src/main.js",
+        "src/game/loop.js"
+      ],
+      "needs": [],
+      "commit": "M0.T1 (M0-1): fixed step",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-1: **Fixed step:** the sim advances in 50 ms steps in the browser, and the renderer interpolates between them. An input log recorded with `?record=1` and replayed with `?replay=` on the same seed gives the same `__game.stateHash()` at 60 game seconds in 3 runs of 3 (checked by `tests/accept/m0-replay.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T5",
+      "lane": "sim",
+      "goal": "A/B runner. Lift the tick loop out of `scripts/economy-probe.mjs` into `tests/accept/lib/ab.js`: `runAB({ seed, poke, at, secs, sample })` steps A and B in `main.js`'s tick order and returns per-district series and differences; the probe uses it and prints the same tables",
+      "files": [
+        "tests/accept/lib/ab.js",
+        "scripts/economy-probe.mjs"
+      ],
+      "needs": [],
+      "commit": "M0.T5 (M0-4): a/B runner",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-4: **A/B runner:** boots the pure sim in Node from a seed with `main.js`'s tick order, pokes A at a set time, steps both, and returns per-district differences; `scripts/economy-probe.mjs` runs on it and prints the same tables as before (checked by `tests/accept/lib/ab.js`; the probe's output) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T3",
+      "lane": "tools",
+      "goal": "Speed. `?speed=N` (1 to 8) runs N fixed steps per frame",
+      "files": [
+        "src/game/loop.js"
+      ],
+      "needs": [
+        "M0.T1"
+      ],
+      "commit": "M0.T3 (M0-2): speed",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-2: `?speed=4` runs 4 sim steps per frame; a replay at speed 4 ends with the same state hash as at speed 1 (checked by same file) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T2",
+      "lane": "tools",
+      "goal": "Record and replay. `?record=1` keeps every key and mouse event with the sim step it landed on and offers the log through `__game.inputLog()`; `?replay=<name>` loads `tests/replays/<name>.json` and feeds it in by step. `__game.stateHash()` hashes player, car, street, city, economy, people and wanted state; its check first",
+      "files": [
+        "src/game/loop.js",
+        "src/game/replay.js",
+        "src/main.js",
+        "tests/accept/m0-replay.spec.js"
+      ],
+      "needs": [
+        "M0.T1"
+      ],
+      "commit": "M0.T2 (M0-1): record and replay",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-1: **Fixed step:** the sim advances in 50 ms steps in the browser, and the renderer interpolates between them. An input log recorded with `?record=1` and replayed with `?replay=` on the same seed gives the same `__game.stateHash()` at 60 game seconds in 3 runs of 3 (checked by `tests/accept/m0-replay.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m0-replay.spec.js"
+    },
+    {
+      "id": "M0.T4",
+      "lane": "tools",
+      "goal": "Real-input helpers. `__game.screenOf(x, y, z)` projects a world point to canvas pixels; `tests/accept/lib/input.js` gives `hold(page, keys, gameSecs)`, `clickWorld(page, x, y, z)`, `cityView(page, brush)`, `waitGame(page, secs)`; an example check zones a lot by mouse",
+      "files": [
+        "tests/accept/lib/input.js",
+        "tests/accept/m0-input.spec.js",
+        "src/main.js"
+      ],
+      "needs": [
+        "M0.T3"
+      ],
+      "commit": "M0.T4 (M0-3): real-input helpers",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-3: **Real input:** shared helpers hold keys for game seconds, click a world point (projected to the canvas by `__game.screenOf()`), and open the city view and pick a brush; an example check zones a lot by mouse with them (checked by `tests/accept/lib/input.js`; `tests/accept/m0-input.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m0-input.spec.js"
+    },
+    {
+      "id": "M0.T7",
+      "lane": "render",
+      "goal": "The sweep. `node scripts/sweep.mjs --poses docs/shots/poses/<name>.json` boots each of the five seeds once, visits every pose (position, heading, hour, weather, blackout, city view), writes the shot, runs the scene pick (`pickPixel`) on a 16 \u00d7 9 grid and `frameCheck()`, reads draws and the ledger, and writes a draft `REVIEW.md` section listing anything a check flags; four seeds in parallel, under 10 minutes for 50 poses. It runs on the Mac's GPU through ANGLE Metal, as `scripts/shot.mjs` does",
+      "files": [
+        "scripts/sweep.mjs",
+        "docs/shots/poses/first-minutes.json"
+      ],
+      "needs": [
+        "M0.T3"
+      ],
+      "commit": "M0.T7 (M0-5): the sweep",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-5: **The sweep:** `node scripts/sweep.mjs --poses <file>` shoots every pose on the five seeds, writes a `__game.pick()` report per shot and a draft `REVIEW.md` section, in under 10 minutes (checked by `scripts/sweep.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T9",
+      "lane": "sim",
+      "goal": "`npm run accept`. `npm run accept -- M1` runs `tests/accept/m1-*`; with no argument it reads the Done log in `docs/ROADMAP.md` and runs the check of every green criterion; `--speed 1` forces real speed (risk R10)",
+      "files": [
+        "package.json",
+        "scripts/accept.mjs"
+      ],
+      "needs": [
+        "M0.T4",
+        "M0.T5"
+      ],
+      "commit": "M0.T9 (M0-6): `npm run accept`",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-6: `npm run accept -- M1` runs one milestone's checks; `npm run accept` runs every criterion in the Done log (checked by `package.json`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M0.T10",
+      "lane": "tools",
+      "goal": "Draw between steps. Every sim mover keeps its last step's pose; cars, walkers, police and the helicopter are drawn at `lerp(previous, current, alpha)`, as M0.T1 does for the player, car and camera; its check first",
+      "files": [
+        "src/game/loop.js",
+        "src/sim/street.js",
+        "src/sim/wanted.js",
+        "src/render/traffic.js",
+        "src/render/npcs.js",
+        "src/render/police.js",
+        "src/render/heli.js",
+        "tests/accept/m0-smooth.spec.js"
+      ],
+      "needs": [
+        "M0.T1"
+      ],
+      "commit": "M0.T10 (M0-9): draw between steps",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M0-9: **Smooth at any step:** every moving thing drawn (the player, cars, walkers, police, the helicopter) is drawn between its last two sim steps; over 300 frames at 60 fps, nothing whose sim speed is above 0 holds the same screen position for two frames running (checked by `tests/accept/m0-smooth.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m0-smooth.spec.js"
+    }
+  ]
+}

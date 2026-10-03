@@ -1,0 +1,425 @@
+{
+  "milestone": "M3 the city as data (spikes, main.js split, one live map, parcels and edits)",
+  "tasks": [
+    {
+      "id": "M3.S2",
+      "lane": "engine",
+      "goal": "Can traffic run on the graph? A Node prototype: a 6-district grid graph, 60 cars on trips between parcels with A* routes, lanes, signals, a following gap, turns at junctions; every resident's commute as an edge flow. Measures the step cost and finds the failure cases (gridlock at a junction, a car with no route)",
+      "files": [
+        "docs/spikes/m3-traffic.md",
+        "spikes/m3-traffic/"
+      ],
+      "needs": [],
+      "commit": "M3.S2 (M3-9): can traffic run on the graph?",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-9: **Sim cost:** on a test map of 2,000 buildings, 60 visible cars, 150 visible walkers and the commute flow of every resident, one 50 ms sim step takes at most 4 ms on this Mac (checked by `scripts/simbench.mjs`) This is a spike: it decides M3.T29-T35, M3-9 in docs/plan/TASKS.md. Write real measured numbers, never estimates. The prototype stays in spikes/, never in src/. Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.S1",
+      "lane": "engine",
+      "goal": "Can this Mac draw the city? A throwaway page builds 2,000 buildings as unit shells in per-architecture instance pools with the tower materials and zone attribute, plus 300 road pieces, plus shadows; measures draws and the 95th-percentile frame by day and by night at the play camera and the city view, at 1280 \u00d7 720 and at full Retina size; repeats with three.js 0.160's `BatchedMesh`. Writes the numbers and a recommendation",
+      "files": [
+        "docs/spikes/m3-render.md",
+        "spikes/m3-render/"
+      ],
+      "needs": [],
+      "commit": "M3.S1 (spike): can this Mac draw the city?",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. This is a spike: it decides M3.T22-T27, D5 in docs/plan/TASKS.md. Write real measured numbers, never estimates. The prototype stays in spikes/, never in src/. Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T1",
+      "lane": "render",
+      "goal": "Probes out. Everything `window.__game` exposes (`frameCheck`, `pickPixel`, `policeProbe`, `draws`, `ledger`, `cityview` and the rest) moves to `src/game/probe.js`, which takes the game's parts as one object",
+      "files": [
+        "src/main.js",
+        "src/game/probe.js"
+      ],
+      "needs": [
+        "M0.T6",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T1 (M3-1): probes out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T2",
+      "lane": "render",
+      "goal": "Input out. Keys, mouse, pointer lock, `footInput`, `driveInput`, the city-view binding",
+      "files": [
+        "src/main.js",
+        "src/game/input.js"
+      ],
+      "needs": [
+        "M3.T1",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T2 (M3-1): input out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T3",
+      "lane": "render",
+      "goal": "Camera out. The follow rig, `placeFollowCamera`, interior rigs, drag-to-orbit",
+      "files": [
+        "src/main.js",
+        "src/game/camera.js"
+      ],
+      "needs": [
+        "M3.T2",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T3 (M3-1): camera out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T4a",
+      "lane": "render",
+      "goal": "Scene build out. Every `build*` call and `scene.add` into `buildScene(ctx)`",
+      "files": [
+        "src/main.js",
+        "src/game/scene.js"
+      ],
+      "needs": [
+        "M3.T3",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T4a (M3-1): scene build out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T4b",
+      "lane": "render",
+      "goal": "Scene update out. Every `update*` call into `updateScene(ctx, frame)` (the two halves move 89 `build*`, `update*` and `scene.add` calls today)",
+      "files": [
+        "src/main.js",
+        "src/game/scene.js"
+      ],
+      "needs": [
+        "M3.T4a",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T4b (M3-1): scene update out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T5",
+      "lane": "render",
+      "goal": "HUD out. Status lines, door HUD, news, ledger, arc UI wiring; `main.js` at most 300 lines",
+      "files": [
+        "src/main.js",
+        "src/game/hud.js"
+      ],
+      "needs": [
+        "M3.T4b",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M3.T5 (M3-1): hUD out",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-1: **`main.js` only wires:** at most 300 lines; probes, input, camera, HUD and scene assembly live in their own files; no behaviour change: golden maps unchanged and the five-seed sweep differs from before by under 0.5% of pixels per pose (checked by the gate; `scripts/shotdiff.mjs` (M0-8)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T6",
+      "lane": "engine",
+      "goal": "The street wall moves into the sim. `planBuildings(district, seed)` in `layout.js` cuts each row into buildings (front, depth, height, kind) from the world seed, not 2084; styles come from the district plan (distance to the first crossing, avenue order), not from `ax === 0 && z < 40`; `block.js` draws what it returns. Declared golden change: the street wall",
+      "files": [
+        "src/sim/layout.js",
+        "src/render/block.js",
+        "scripts/map-golden.mjs"
+      ],
+      "needs": [
+        "M0.T8"
+      ],
+      "commit": "M3.T6 (M3-3): the street wall moves into the sim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T7",
+      "lane": "engine",
+      "goal": "One list of buildings. Pinned towers, end caps (`WORLD_VISTAS.caps`) and row buildings come out of one `buildingsOf(plan)` with the same fields",
+      "files": [
+        "src/sim/layout.js",
+        "src/sim/vistas.js",
+        "src/sim/landmarks.js"
+      ],
+      "needs": [
+        "M3.T6"
+      ],
+      "commit": "M3.T7 (M3-3): one list of buildings",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T8",
+      "lane": "engine",
+      "goal": "The map. `src/sim/map.js`: `createMap(seed)` returns `{ seed, version, district, graph, buildings, lots, furniture, dressing, anchors, spawn }` built by today's derivations, and queries `nodeAt`, `edgesNear`, `buildingsIn(box)`, `districtAt`; `mapHash(map)`. Nothing reads it yet; a test checks it against the goldens",
+      "files": [
+        "src/sim/map.js",
+        "tests/map.test.js"
+      ],
+      "needs": [
+        "M3.T7"
+      ],
+      "commit": "M3.T8 (M3-2): the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/map.test.js"
+    },
+    {
+      "id": "M3.T9",
+      "lane": "engine",
+      "goal": "Police read the map (32 references). `patrol.js`, `dispatch.js`, `wanted.js`, `vehicle.js`, `player.js` take the map instead of importing constants",
+      "files": [
+        "src/main.js",
+        "src/sim/patrol.js",
+        "src/sim/dispatch.js",
+        "src/sim/wanted.js",
+        "src/sim/vehicle.js",
+        "src/sim/player.js"
+      ],
+      "needs": [
+        "M3.T8",
+        "M3.T5",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4",
+        "M0.T10",
+        "M3.T1",
+        "M3.T2",
+        "M3.T3",
+        "M3.T4a",
+        "M3.T4b"
+      ],
+      "commit": "M3.T9 (M3-2): police read the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T10",
+      "lane": "engine",
+      "goal": "Street life reads the map (31). `street.js`, `furniture.js`, `decline.js`",
+      "files": [
+        "src/sim/street.js",
+        "src/sim/furniture.js",
+        "src/sim/decline.js"
+      ],
+      "needs": [
+        "M3.T9",
+        "M0.T10"
+      ],
+      "commit": "M3.T10 (M3-2): street life reads the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T11",
+      "lane": "engine",
+      "goal": "Lots read the map (15). `zoning.js` (its hand `LOTS` table becomes the preset's map entry), `economy.js`, `cityview.js`, `interior.js`",
+      "files": [
+        "src/sim/zoning.js",
+        "src/sim/economy.js",
+        "src/sim/cityview.js",
+        "src/sim/interior.js"
+      ],
+      "needs": [
+        "M3.T10",
+        "M1.T1",
+        "M1.T2",
+        "M1.T3",
+        "M1.T4",
+        "M1.T5",
+        "M1.T6"
+      ],
+      "commit": "M3.T11 (M3-2): lots read the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T12",
+      "lane": "engine",
+      "goal": "Story places read the map (33). `anchors.js`, `spawn.js`, `streetscape.js`, `dressing.js`, `vistas.js`, `streetnames.js`, `landmarks.js`, `layout.js`; `streetscape.js` loses its \"neon blade\" wording, the last hit of VGA-083's grep for `neon`",
+      "files": [
+        "src/sim/anchors.js",
+        "src/sim/spawn.js",
+        "src/sim/streetscape.js",
+        "src/sim/dressing.js",
+        "src/sim/vistas.js",
+        "src/sim/streetnames.js",
+        "src/sim/landmarks.js",
+        "src/sim/layout.js"
+      ],
+      "needs": [
+        "M3.T11"
+      ],
+      "commit": "M3.T12 (M3-2): story places read the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T13",
+      "lane": "engine",
+      "goal": "The ground and street wall read the map (46). `render/block.js`",
+      "files": [
+        "src/render/block.js"
+      ],
+      "needs": [
+        "M3.T12"
+      ],
+      "commit": "M3.T13 (M3-2): the ground and street wall read the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T14",
+      "lane": "engine",
+      "goal": "Everything else reads the map (33): `render/zoning.js`, `vacant.js`, `lamps.js`, `signs.js`, `landscape.js`, `outskirts.js` and `main.js`'s last 11; the 20 exports are deleted; `check_boundary.mjs` fails on any of their names",
+      "files": [
+        "scripts/check_boundary.mjs",
+        "src/render/zoning.js",
+        "src/render/vacant.js",
+        "src/render/lamps.js",
+        "src/render/signs.js",
+        "src/render/landscape.js",
+        "src/render/outskirts.js",
+        "src/main.js",
+        "src/sim/world.js",
+        "src/sim/layout.js",
+        "src/sim/landmarks.js",
+        "src/sim/furniture.js",
+        "src/sim/vistas.js",
+        "src/sim/dressing.js",
+        "src/sim/streetscape.js",
+        "src/sim/anchors.js",
+        "src/sim/spawn.js",
+        "src/sim/street.js"
+      ],
+      "needs": [
+        "M3.T13",
+        "M0.T1",
+        "M0.T2",
+        "M0.T4",
+        "M0.T10",
+        "M3.T1",
+        "M3.T2",
+        "M3.T3",
+        "M3.T4a",
+        "M3.T4b",
+        "M3.T5"
+      ],
+      "commit": "M3.T14 (M3-2): everything else reads the map",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T15",
+      "lane": "engine",
+      "goal": "Parcels for all. Row buildings, towers and caps join the lots in `city.parcels` with `kind` (`row`, `tower`, `cap`, `lot`), a use from their style, and stage HIGH; only `lot` parcels grow or decline on their own; its check first",
+      "files": [
+        "src/sim/zoning.js",
+        "src/sim/map.js",
+        "tests/accept/m3-parcels.spec.js"
+      ],
+      "needs": [
+        "M3.T14",
+        "M1.T3",
+        "M1.T4"
+      ],
+      "commit": "M3.T15 (M3-3): parcels for all",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-parcels.spec.js"
+    },
+    {
+      "id": "M3.T16",
+      "lane": "engine",
+      "goal": "The economy counts buildings. A district's size is the floor area of its parcels, not lot area times 0.4 (`economy.js:19`); recalibrate until M1's checks are green again (risk R3)",
+      "files": [
+        "src/sim/economy.js",
+        "src/sim/people.js"
+      ],
+      "needs": [
+        "M3.T15",
+        "M1.T1",
+        "M1.T2",
+        "M1.T3",
+        "M1.T4",
+        "M1.T5",
+        "M1.T6"
+      ],
+      "commit": "M3.T16 (M3-3): the economy counts buildings",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T17",
+      "lane": "engine",
+      "goal": "Pick names parcels. Every drawn building carries its parcel id; the scene pick and `__game.pick()` return it",
+      "files": [
+        "src/render/block.js",
+        "src/render/zoning.js",
+        "src/game/probe.js"
+      ],
+      "needs": [
+        "M3.T15",
+        "M3.T1"
+      ],
+      "commit": "M3.T17 (M3-3): pick names parcels",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T18",
+      "lane": "engine",
+      "goal": "Building ops. `zone`, `bulldoze` (any parcel comes down a stage at a time, as `clearLot` does today; its land becomes an empty `lot`), `place(kind, parcel)`, each with an undo; `map.version`; the dirty 64 m tiles",
+      "files": [
+        "src/sim/map.js",
+        "src/sim/ops.js"
+      ],
+      "needs": [
+        "M3.T15"
+      ],
+      "commit": "M3.T18 (M3-4): building ops",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-4: **Edits:** on each of five seeds, 200 random operations and then their undos return the starting golden map; each operation takes at most 2 ms in Node; lots and frontage are recomputed only on touched tiles (checked by `tests/accept/m3-ops.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T19",
+      "lane": "engine",
+      "goal": "Road ops. `addRoad(a, b)` on the grid from an existing node, `removeRoad(edge)`; the graph is cut again at crossings; parcels left with no frontage road get `noRoad`",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/map.js"
+      ],
+      "needs": [
+        "M3.T18"
+      ],
+      "commit": "M3.T19 (M3-4): road ops",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-4: **Edits:** on each of five seeds, 200 random operations and then their undos return the starting golden map; each operation takes at most 2 ms in Node; lots and frontage are recomputed only on touched tiles (checked by `tests/accept/m3-ops.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T20",
+      "lane": "engine",
+      "goal": "New frontage. After a road op, rows and lots are planned again on the dirty tiles only, keeping every untouched parcel's id",
+      "files": [
+        "src/sim/layout.js",
+        "src/sim/ops.js"
+      ],
+      "needs": [
+        "M3.T19"
+      ],
+      "commit": "M3.T20 (M3-4): new frontage",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-4: **Edits:** on each of five seeds, 200 random operations and then their undos return the starting golden map; each operation takes at most 2 ms in Node; lots and frontage are recomputed only on touched tiles (checked by `tests/accept/m3-ops.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T21",
+      "lane": "engine",
+      "goal": "The ops test. 200 random ops then their undos on five seeds give back the golden map hash; each op at most 2 ms",
+      "files": [
+        "tests/accept/m3-ops.test.js"
+      ],
+      "needs": [
+        "M3.T20"
+      ],
+      "commit": "M3.T21 (M3-4): the ops test",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-4: **Edits:** on each of five seeds, 200 random operations and then their undos return the starting golden map; each operation takes at most 2 ms in Node; lots and frontage are recomputed only on touched tiles (checked by `tests/accept/m3-ops.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-ops.test.js"
+    }
+  ]
+}

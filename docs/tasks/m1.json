@@ -1,0 +1,92 @@
+{
+  "milestone": "M1 building pays off",
+  "tasks": [
+    {
+      "id": "M1.T1",
+      "lane": "sim",
+      "goal": "Checks, red. `m1-rezone-ab.test.js` (A zones the 2 free lots for works at minute 1; flats storeys at minute 5, A minus B, five seeds) and `m1-calm.test.js` (pinned and idle shares over 10 minutes, five seeds), both on the A/B runner",
+      "files": [
+        "tests/accept/m1-rezone-ab.test.js",
+        "tests/accept/m1-calm.test.js"
+      ],
+      "needs": [
+        "M0.T5"
+      ],
+      "commit": "M1.T1 (M1-2, M1-4): checks, red",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-2: A/B over 5 game minutes: A zones the district's 2 free lots for works, B touches nothing. A finishes **at least 1 more storey of flats** in that district than B, on **4 of 5** seeds (checked by `tests/accept/m1-rezone-ab.test.js` (Node, M0-4)) The criterion this serves: M1-4: Left alone for 10 game minutes, no district's demand for any use sits pinned (\u2265 `BREAK_GROUND_AT`) or idle (< `DECLINE_AT`) for more than **40%** of samples *(provisional)*, on all five seeds (checked by `tests/accept/m1-calm.test.js` (thresholds from `scripts/economy-probe.mjs`)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m1-rezone-ab.test.js"
+    },
+    {
+      "id": "M1.T2",
+      "lane": "sim",
+      "goal": "Checks, red. `m1-zone-shows.spec.js` (Z, R, click the lot, Z; first floor within 60 game seconds; before and after shots) and `m1-hack-ab.spec.js` (walk to the lit district, H; jobs A against B; the other district bit-identical, through replays)",
+      "files": [
+        "tests/accept/m1-zone-shows.spec.js",
+        "tests/accept/m1-hack-ab.spec.js"
+      ],
+      "needs": [
+        "M0.T2",
+        "M0.T4"
+      ],
+      "commit": "M1.T2 (M1-1, M1-5): checks, red",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-1: On all five seeds: Z, the R brush, click an empty lot with the mouse, Z again. Within **60 game seconds** the lot has its first floor, and a play-camera shot shows it (checked by `tests/accept/m1-zone-shows.spec.js`; `docs/shots/m1-zone-<seed>-before/after.png`) The criterion this serves: M1-5: A/B: the player walks to the lit district and presses H. The dark district loses at least 10% of its jobs against B within 5 game minutes; the other district stays **bit-identical** (checked by `tests/accept/m1-hack-ab.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m1-zone-shows.spec.js"
+    },
+    {
+      "id": "M1.T3",
+      "lane": "sim",
+      "goal": "Calm demand. `GAP_GAIN` toward 1-1.5, a firm 3-7% of its district, a lot use mix where jobs about equal homes; each constant's new value and reason in `ECONOMY.md`. Run the probe before and after",
+      "files": [
+        "src/sim/economy.js",
+        "src/sim/zoning.js",
+        "docs/ECONOMY.md"
+      ],
+      "needs": [
+        "M1.T1"
+      ],
+      "commit": "M1.T3 (M1-4, M1-2): calm demand",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-4: Left alone for 10 game minutes, no district's demand for any use sits pinned (\u2265 `BREAK_GROUND_AT`) or idle (< `DECLINE_AT`) for more than **40%** of samples *(provisional)*, on all five seeds (checked by `tests/accept/m1-calm.test.js` (thresholds from `scripts/economy-probe.mjs`)) The criterion this serves: M1-2: A/B over 5 game minutes: A zones the district's 2 free lots for works, B touches nothing. A finishes **at least 1 more storey of flats** in that district than B, on **4 of 5** seeds (checked by `tests/accept/m1-rezone-ab.test.js` (Node, M0-4)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M1.T4",
+      "lane": "sim",
+      "goal": "Fast first floor. The site and first stages take at most 60 game seconds on a zoned lot with demand in band; the later stages keep their pace",
+      "files": [
+        "src/sim/zoning.js"
+      ],
+      "needs": [
+        "M1.T2"
+      ],
+      "commit": "M1.T4 (M1-1): fast first floor",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-1: On all five seeds: Z, the R brush, click an empty lot with the mouse, Z again. Within **60 game seconds** the lot has its first floor, and a play-camera shot shows it (checked by `tests/accept/m1-zone-shows.spec.js`; `docs/shots/m1-zone-<seed>-before/after.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M1.T5",
+      "lane": "sim",
+      "goal": "Credit line. A demand change carries its cause (a rezone, a firm move, a blackout, a chase); the news names a rezone only when that cause moved the district past a threshold",
+      "files": [
+        "src/sim/economy.js",
+        "src/sim/news.js"
+      ],
+      "needs": [
+        "M1.T3"
+      ],
+      "commit": "M1.T5 (M1-3): credit line",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-3: On every seed where M1-2 passes, A's news line names the rezone as the cause (\"\u2026for the new workshops\") within 5 game minutes; B never shows that line (checked by same file as M1-2) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M1.T6",
+      "lane": "sim",
+      "goal": "First-minutes sweep. Run `first-minutes.json` (spawn, four headings, day and night, the city view, five seeds); fix D3 (the grey box on a facade at seed 7's spawn), D4 (the bright rectangle under the player at night), the HUD panels that overlap each other's text in the city view, and whatever else it finds, one commit per defect",
+      "files": [
+        "src/",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M0.T7"
+      ],
+      "commit": "M1.T6 (M1-6): first-minutes sweep",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M1-6: The sweep of the first 2 minutes (spawn, four headings, day and night, the city view, five seeds: 50 shots) has **0 open defects** other than raw-primitive models, which M2 owns (checked by the sweep; `docs/shots/m1-sweep-*`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    }
+  ]
+}

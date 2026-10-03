@@ -21,8 +21,10 @@
 // `run` is the manager a model could not be. The director writes a milestone as
 // small tasks, each with a test that fails until it is done; the script hands them
 // out lane by lane, runs the gate on every answer, commits a pass to the lane's
-// branch and sends a fail back with the gate's own output. Nothing reaches main
-// here: the director reviews the lane branches and merges. It runs unattended:
+// branch and sends a fail back with the gate's own output. A pass lands on main at
+// once (main merged in, the short gate green, then a fast-forward), so a task in
+// another lane that `needs` it can start; a task that fails for good is parked and
+// its lane moves on. The operator can sleep through it. It runs unattended:
 //   nohup node scripts/crew.mjs run docs/tasks/<milestone>.json >> ../.urbis-crew.log 2>&1 &
 // Run one supervisor (`run` or `watch`) at a time; both own the state file.
 //
@@ -37,6 +39,8 @@ const { ensureServer, createClient, readServerRegistry, isServerRunning } = awai
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
 const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash'];
+// DeepSeek does its best work at max effort; the operator found it capable there.
+const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' } : {});
 const STALL_MIN = 10;
 const POLL_MS = 30_000;
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
@@ -50,7 +54,7 @@ const PORT_BLOCKS = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 72];
 // calls than this since its last edit, or the same call LOOP_REPEATS times, is a
 // loop. A whole-feature brief reads a lot before its first edit; a task should not.
 const EDIT_TOOLS = new Set(['edit', 'write', 'patch', 'multiedit', 'apply_patch']);
-const LOOP_CALLS = { brief: 60, task: 25 };
+const LOOP_CALLS = { brief: 60, task: 40 };
 const LOOP_REPEATS = 3;
 // Fixes a task's answer gets on one model before it moves up a tier.
 const FIX_TRIES = 2;
@@ -163,10 +167,13 @@ function taskPrompt(w) {
   return [
     'You have full read/write access. Make the necessary code changes.',
     `Task ${t.id}: ${t.goal}`,
-    `Edit only: ${t.files.join(', ')}. Do not edit ${t.test}: it is the definition of done.`,
+    `Edit only: ${t.files.join(', ')} (a path ending in / means anything under it).`,
+    t.test && fs.existsSync(path.join(w.dir, t.test))
+      ? `Do not edit ${t.test}: it is the definition of done.`
+      : t.test ? `Write ${t.test} first, as the check the task names, and see it fail; then make it pass. Do not weaken it to pass.` : '',
     t.notes ?? '',
-    'Read the test and the files above first, and little else. Make your first edit within 3 minutes.',
-    `Check with: npm run build && GATE_PORT=${w.gate} npx playwright test ${t.test}`,
+    'Read AGENTS.md, then the files above, and little else. Make your first edit within 5 minutes.',
+    t.test ? `Check with: npm run build && GATE_FULL=1 GATE_PORT=${w.gate} npx playwright test ${t.test}` : 'Check with: npm run build',
     'Do not run npm run gate: the crew runs the checks when you finish.',
     portsLine(w),
     'Do not commit, push, stash or checkout. Do not open or judge PNGs.',
@@ -185,7 +192,7 @@ async function send(w, text) {
     // A session carried over from the lane's last task (assign) may be gone with
     // its server; then the task starts a new one.
     try {
-      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model });
+      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
       w.lastSent = Date.now();
       return;
     } catch {
@@ -193,7 +200,7 @@ async function send(w, text) {
     }
   }
   w.session = (await c.createSession({ title: `crew ${w.name}` })).id;
-  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model });
+  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
   w.lastSent = Date.now();
 }
 
@@ -336,14 +343,22 @@ async function assign(state, lane, task) {
 function scopeFault(w) {
   const t = w.task;
   if (t.brief) return builtNothing(w);
-  const testPath = path.join(w.dir, t.test);
-  const original = headFile(w.dir, t.test, todoOf(t.test));
-  if (original !== null && (!fs.existsSync(testPath) || fs.readFileSync(testPath, 'utf8') !== original)) {
-    fs.writeFileSync(testPath, original);
-    return `You changed ${t.test}. It is the definition of done and has been put back; make the code pass it as written.`;
+  if (!changedPaths(w.dir).length) return `Nothing has changed in the worktree: ${t.id} is not done yet. Do it, then stop.`;
+  if (t.test) {
+    const testPath = path.join(w.dir, t.test);
+    const original = headFile(w.dir, t.test, todoOf(t.test));
+    if (original !== null && (!fs.existsSync(testPath) || fs.readFileSync(testPath, 'utf8') !== original)) {
+      fs.writeFileSync(testPath, original);
+      return `You changed ${t.test}. It is the definition of done and has been put back; make the code pass it as written.`;
+    }
+    if (!fs.existsSync(testPath)) return `${t.test} does not exist. Write it as the task's check, then make it pass.`;
   }
-  const owned = new Set([...t.files, t.test, todoOf(t.test)]);
-  const stray = changedPaths(w.dir).filter((f) => !owned.has(f) && !ALWAYS_OWNED.some((re) => re.test(f)));
+  const missing = t.files.filter((f) => !f.endsWith('/') && !fs.existsSync(path.join(w.dir, f)));
+  if (missing.length) return `These files the task makes do not exist yet: ${missing.join(', ')}.`;
+  const owned = new Set([...t.files, ...(t.test ? [t.test, todoOf(t.test)] : [])]);
+  const prefixes = t.files.filter((f) => f.endsWith('/'));
+  const stray = changedPaths(w.dir).filter((f) => !owned.has(f) && !prefixes.some((pre) => f.startsWith(pre))
+    && !ALWAYS_OWNED.some((re) => re.test(f)));
   if (!stray.length) return null;
   return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
 }
@@ -363,22 +378,23 @@ const STATIC_CHECKS = ['lint', 'check:rng', 'check:boundary', 'check:overlap', '
 
 function specsFor(w) {
   const t = w.task;
-  const names = t.files.map((f) => path.basename(f));
+  const names = t.files.filter((f) => !f.endsWith('/')).map((f) => path.basename(f));
   const dir = path.join(w.dir, 'tests');
   const named = fs.readdirSync(dir).filter((f) => f.endsWith('.spec.js'))
     .filter((f) => names.some((n) => fs.readFileSync(path.join(dir, f), 'utf8').includes(n)))
     .map((f) => `tests/${f}`);
-  return [...new Set([t.test, 'tests/gate.spec.js', ...named])];
+  return [...new Set([t.test, 'tests/gate.spec.js', ...named].filter(Boolean))];
 }
 
 async function gateFault(w) {
   try {
-    const env = { GATE_PORT: String(w.gate) };
+    // GATE_FULL: a task's own check may sit in tests/accept/, outside the fast set.
+    const env = { GATE_PORT: String(w.gate), GATE_FULL: '1' };
     let out;
     if (w.task.brief) out = await shAsync('npm', ['run', 'gate'], w.dir, env);
     else {
       for (const check of STATIC_CHECKS) await shAsync('npm', ['run', check], w.dir, env);
-      out = await shAsync('npx', ['playwright', 'test', ...specsFor(w)], w.dir, env);
+      out = await shAsync('npx', ['playwright', 'test', '--workers', '4', ...specsFor(w)], w.dir, env);
     }
     w.draws = out.match(/draws: (\d+)/)?.[1] ?? null;
     return null;
@@ -402,6 +418,41 @@ function commitTask(w) {
   return sh('git', ['rev-parse', '--short', 'HEAD'], w.dir).trim();
 }
 
+// A task that passed its check lands on main at once, so the tasks that need it can
+// start: main is merged into the lane, the short gate runs on the result, and main
+// fast-forwards to it. The loop waits on it, so main cannot move in between.
+// Returns 'conflict', a fault for the worker, or null once it is on main.
+async function land(w) {
+  try {
+    sh('git', ['merge', '--no-edit', '-q', 'main'], w.dir);
+  } catch {
+    try { sh('git', ['merge', '--abort'], w.dir); } catch { /* nothing to abort */ }
+    return 'conflict';
+  }
+  try {
+    await shAsync('npm', ['run', 'gate'], w.dir, { GATE_PORT: String(w.gate) });
+  } catch (e) {
+    return `Main was merged into your worktree, and then npm run gate failed:\n${`${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n')}`;
+  }
+  sh('git', ['merge', '--ff-only', '-q', `wt/${w.name}`], ROOT);
+  return null;
+}
+
+// A parked task's edits are kept as a patch beside the repo and the lane goes back to
+// main, so the lane's next task starts clean instead of on a failed attempt.
+function setAside(w) {
+  const dir = path.join(ROOT, '..', 'urbis-parked');
+  fs.mkdirSync(dir, { recursive: true });
+  try {
+    sh('git', ['add', '-A'], w.dir);
+    fs.writeFileSync(path.join(dir, `${w.task.id}.patch`), sh('git', ['diff', '--cached', 'main'], w.dir));
+  } catch (e) {
+    log(`${w.name}: could not save ${w.task.id}'s patch: ${e.message}`);
+  }
+  sh('git', ['reset', '-q', '--hard', 'main'], w.dir);
+  sh('git', ['clean', '-fdq'], w.dir);
+}
+
 // A worker finished a turn on its task: commit the answer, send it back with what is
 // wrong, move it up a tier, or park it.
 // The gate runs in the background: the first idle round starts it, a later round
@@ -423,10 +474,19 @@ async function judge(state, w) {
     delete w.verdict;
   }
   if (!fault) {
-    w.live = false;
     const commit = commitTask(w);
-    state.tasks[t.id] = { ...state.tasks[t.id], status: 'done', commit, model: w.model };
-    return `${w.name}: ${t.id} done in ${commit} on ${w.model}`;
+    state.tasks[t.id] = { ...state.tasks[t.id], commit, model: w.model };
+    fault = await land(w);
+    if (fault === 'conflict') {
+      w.live = false;
+      state.tasks[t.id].why = 'conflicts with main';
+      return `${w.name}: ${t.id} conflicts with main, parked`;
+    }
+    if (!fault) {
+      w.live = false;
+      state.tasks[t.id].status = 'merged';
+      return `${w.name}: ${t.id} on main in ${commit} on ${w.model}`;
+    }
   }
   w.tries += 1;
   if (w.tries <= FIX_TRIES) {
@@ -440,7 +500,10 @@ async function tend(state, w) {
   const i = await sessionInfo(w);
   const news = i.busy ? await supervise(w, i) : await judge(state, w);
   state.tasks[w.task.id].model = w.model;
-  if (!w.live && state.tasks[w.task.id].status !== 'done') state.tasks[w.task.id].status = 'stuck';
+  if (!w.live && state.tasks[w.task.id].status !== 'merged') {
+    state.tasks[w.task.id].status = 'stuck';
+    setAside(w);
+  }
   return news;
 }
 
@@ -452,9 +515,12 @@ async function stepLane(state, queue, lane) {
   if (!state.workers[lane]?.live) {
     const mine = queue.tasks.filter((t) => t.lane === lane);
     const status = (t) => state.tasks[t.id]?.status ?? 'pending';
+    // A task starts once everything it needs is on main. A parked task is skipped, not
+    // waited on: the lane moves to its next task, and only what needs the parked one waits.
+    const ready = (t) => (t.needs ?? []).every((id) => state.tasks[id]?.status === 'merged');
     // A task left 'working' with no live worker was cut off (a crash, a reboot): redo it.
-    const next = mine.find((t) => status(t) === 'pending' || status(t) === 'working');
-    if (next && !mine.some((t) => status(t) === 'stuck')) news.push(await assign(state, lane, next));
+    const next = mine.find((t) => (status(t) === 'pending' || status(t) === 'working') && ready(t));
+    if (next) news.push(await assign(state, lane, next));
   }
   return news.filter(Boolean);
 }
@@ -488,7 +554,7 @@ async function runQueue(state, files) {
   const read = () => {
     // A queue not written yet is skipped, so a board can name one the director is still writing.
     const qs = named().filter((f) => fs.existsSync(f)).map((f) => JSON.parse(fs.readFileSync(path.resolve(f), 'utf8')));
-    const open = qs.filter((q) => q.tasks.some((t) => state.tasks?.[t.id]?.status !== 'done'));
+    const open = qs.filter((q) => q.tasks.some((t) => state.tasks?.[t.id]?.status !== 'merged'));
     return { milestone: open.map((q) => q.milestone).join(' + ') || 'the board', tasks: qs.flatMap((q) => q.tasks) };
   };
   let queue = read();
@@ -519,7 +585,7 @@ async function runQueue(state, files) {
     await sleep(POLL_MS);
   }
   const count = (s) => queue.tasks.filter((t) => state.tasks[t.id]?.status === s).length;
-  log(`queue ${queue.milestone} ended: ${count('done')} done, ${count('stuck')} parked, ${queue.tasks.length - count('done') - count('stuck')} waiting`);
+  log(`queue ${queue.milestone} ended: ${count('merged')} on main, ${count('stuck')} parked, ${queue.tasks.length - count('merged') - count('stuck')} waiting`);
 }
 
 // --- commands ------------------------------------------------------------------
