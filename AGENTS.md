@@ -25,11 +25,15 @@ It borrows from four games, and each one lends a specific thing:
 4. **Watch Dogs** — hacking, as **one toolset among several**. Blackout is one hack.
    It is not the theme and not the identity of the game.
 
-The building leg has **started, not finished**. Since slice 046, ten lots grow and
-decline on their own, and a blackout stops their cranes. But the player cannot zone
-anything yet, and demand is a placeholder wave. The plan is `docs/ZONING.md`; the
-roadmap around it is `docs/CHARTER.md`. Do not pretend the rest exists, and do not
-quietly drop it from the vision. It is half the game.
+The building leg works but **does not pay off yet**. The player zones lots from the
+city view (Z), lots grow and decline, and a district economy drives demand; but a
+rezone does not visibly change what grows, and only the lots can change: the roads,
+the row buildings and the towers are fixed when the page loads. **The plan is
+`docs/ROADMAP.md`**: thirteen milestones (M0-M12), each with numbered pass/fail acceptance
+criteria and the check that proves each one, **`docs/plan/TASKS.md`**, every task
+with its files and order, and **`docs/plan/CAPABILITIES.md`**, every capability of the
+four games with what Urbis does about it. Do not pretend the rest exists, and do not quietly drop it
+from the vision. It is half the game.
 
 **Every new game generates a new city.** The operator set this on 2026-10-02: roads,
 blocks, lots and buildings all come from the new-game seed. It is **not built yet**.
@@ -320,27 +324,17 @@ Three rules, each learned the expensive way:
 
 ## How to work
 
-**If the operator just says "start" or "next":** take the first open item in this order
-and run the seven steps below. Do not ask which one — pick it, say which you picked in
-one line, and go.
+**If the operator just says "start" or "next":** take the first task in
+`docs/plan/TASKS.md` whose "Needs" are all merged, on the long pole first: the M3 spikes with M0.T6 and M0.T8 (decision D1),
+then the rest of M0, then M3. Run the seven steps below. Do not ask which one — pick it, say which you picked in one line, and go.
 
-1. ~~**VGA-083 — strip the neon**~~ — done, slice 045. Everything built after it
-   inherits the palette.
-2. **VGA-084 — strip the toy.** The whole frame reads as Lego: buildings that overlap,
-   and boxes for buildings, cars, people and props. Its sub-slices run in the order the
-   item lists, starting with the no-overlap test. **That first sub-slice has a
-   step-by-step brief: `docs/handoff/VGA-084-1.md`. Follow it exactly.**
-3. **The feature slices in `docs/CHARTER.md`, in the order listed** — only Wanted is
-   left, on the `wave2/wanted` branch.
-4. **The rest of `docs/VISUAL-GAP-ACTIONS.md`** — after the feature slices, or sooner
-   only when a visual item blocks the slice in hand.
+That order was set on 2026-10-03 (`docs/ROADMAP.md`, "Order, lanes and what waits for
+what"). Wanted, which the 2026-09-28 order still listed, is built (`docs/WANTED.md`);
+VGA-084 is milestone M2 and runs beside M1 and M3.
 
-The operator can redirect by naming a VGA id or a feature slice. This order was set by
-the operator on 2026-09-28, with VGA-084 placed on 2026-09-29, and is recorded in
-`docs/CHARTER.md`.
-
-1. Read `docs/CHARTER.md` (the roadmap) and `docs/VISUAL-GAP-ACTIONS.md` (the live queue).
-   Structural work on the city itself has its own plan in `docs/ZONING.md`.
+1. Read `docs/ROADMAP.md` (the plan) and your task's row in `docs/plan/TASKS.md`.
+   `docs/CHARTER.md` is the record and `docs/VISUAL-GAP-ACTIONS.md` the polish queue;
+   M2 says which of its items are needed.
 2. Pick the next open item. Write a ≤5-line plan before touching a file.
 3. Build the smallest thing that satisfies it.
 4. `npm run gate`. Green, all of it.

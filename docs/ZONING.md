@@ -18,6 +18,10 @@ when a parcel changes stage while the player stands still.
 
 Read this before proposing anything, because it kills the obvious approach.
 
+> **Superseded 2026-10-03** by `docs/ROADMAP.md` M3: every building becomes a parcel
+> and is drawn from instance pools, because the operator said every building can be
+> deleted. The constraint below held for lots only.
+
 The 68 towers in `src/render/block.js` are **static tables merged into a handful of
 meshes at load** (`TOWERS` × 3 avenues, plus `SOUTH_TOWERS`, `INFILL_TOWERS`,
 `TERMINUS_TOWERS`). Merging is what buys the draw budget: 68 buildings for 8 draws.
