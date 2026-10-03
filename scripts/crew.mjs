@@ -316,7 +316,9 @@ function bringTest(dir, test) {
   const todo = todoOf(test);
   // A task queued after the lane branched has its test on main only: bring it over.
   if (!fs.existsSync(path.join(dir, todo)) && !fs.existsSync(path.join(dir, test))) {
-    sh('git', ['checkout', 'main', '--', todo], dir);
+    try {
+      sh('git', ['checkout', 'main', '--', todo], dir);
+    } catch { /* not on main either: the task writes its own check */ }
   }
   if (fs.existsSync(path.join(dir, todo))) sh('git', ['mv', todo, test], dir);
 }
