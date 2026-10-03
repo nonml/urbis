@@ -15,7 +15,7 @@
     },
     {
       "id": "M3.S1",
-      "lane": "engine",
+      "lane": "render",
       "goal": "Can this Mac draw the city? A throwaway page builds 2,000 buildings as unit shells in per-architecture instance pools with the tower materials and zone attribute, plus 300 road pieces, plus shadows; measures draws and the 95th-percentile frame by day and by night at the play camera and the city view, at 1280 \u00d7 720 and at full Retina size; repeats with three.js 0.160's `BatchedMesh`. Writes the numbers and a recommendation",
       "files": [
         "docs/spikes/m3-render.md",
