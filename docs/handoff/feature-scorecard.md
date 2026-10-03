@@ -19,7 +19,8 @@ Read `AGENTS.md` (all of it, especially the pillars table), `src/main.js`
 
 `npm run scorecard` boots the built game headless (same approach as `shot.mjs`, on
 `SCORE_PORT`, default 4991) for **5 seeds**: 20260916 plus 4 others taken from
-`--seeds` or defaulting to 11, 22, 33, 44, each via `?seed=N`. On each seed it runs
+`--seeds` or defaulting to 11, 22, 33, 44, each via `?gen=1&seed=N` (without `gen=1`
+the old hand map boots whatever the seed; 20260916 runs both ways). On each seed it runs
 the bots below, then writes `docs/scorecard/latest.json` and `docs/scorecard/latest.md`
 (a table with one row per pillar, one column per seed, ✅/❌ plus the measured number),
 plus a contact sheet of fixed-pose screenshots `docs/scorecard/<seed>-<pose>.png`.
@@ -35,7 +36,7 @@ sim time, teleport, read the player's state and parcels. Keep them behind the ex
 | The city lives | snapshot the parcels, economy, NPC and car positions; idle 120 s of sim time; snapshot again | ≥ 1 parcel stage or progress changed, and ≥ 50% of NPCs moved more than 5 m |
 | Every tool is expressive | fire the hack (`__game.hack()`); compare street lamp/blackout state before and after | the zone's lights state changed |
 | Consequence fits the act | the same hack: measure how far its effect reaches | the effect stays inside one zone, not city-wide |
-| The player feels capable | walk the player along every avenue edge in `world.js` `EDGES` (teleport to the start, hold forward toward the end, 20 s cap per edge); drive one loop in a car if a car probe exists | reached ≥ 95% of edge ends; zero frames with the camera inside a building footprint (use the footprints `check_overlap.mjs` reads) |
+| The player feels capable | walk the player along every avenue edge in `world.js` `EDGES` (teleport to the start, hold forward toward the end, 20 s cap per edge); drive one loop in a car if a car probe exists | reached ≥ 95% of edge ends; zero frames with the camera inside a building footprint (use the footprints `check_overlap.mjs` reads); at every sampled frame `__game.frameCheck(2).blocked` ≤ 0.02 (nothing but the player within 2 m of the lens) |
 | Beauty in the system | run `npm run lint` and count warnings; count functions over 60 lines in `src/` | lint errors = 0; report the counts |
 
 Contact-sheet poses: the `street`, `city` and `day` poses that `shot.mjs` docs/shots use,

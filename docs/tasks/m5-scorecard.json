@@ -1,0 +1,6 @@
+{
+  "milestone": "5: bots play the six pillar tests on random cities every round",
+  "tasks": [
+    { "id": "m5-scorecard", "lane": "scorecard", "brief": "docs/handoff/feature-scorecard.md" }
+  ]
+}
