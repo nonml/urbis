@@ -10,7 +10,7 @@
 | GTA-01-004 | Stamina stat | Sprinting drains a stamina bar (hidden); low stamina shortens how long you can sprint. | V, Online, SA |
 | GTA-01-005 | Jumping | Press the jump button (Space / X / A) to hop over kerbs and small gaps. | V, Online, IV, SA, VC |
 | GTA-01-006 | Vaulting obstacles | Running at a low wall, fence or rail makes the character climb or vault over it. | V, Online, IV |
-| GTA-01-007 | Ladder climbing | Walk into a ladder to climb it up or down. | SA, VC |
+| GTA-01-007 | Ladder climbing | Walk into a ladder to climb it up or down. | WRONG: ladders exist in V, Online, IV and VC too, not just SA and VC |
 | GTA-01-008 | Surface swimming | Enter water and swim on the surface; a stamina/oxygen drain applies. | V, Online, IV, SA |
 | GTA-01-009 | Underwater diving | Press the dive button to swim below the surface and explore the seabed. | V, Online, SA |
 | GTA-01-010 | Breath/oxygen meter | A blue air bar drains while submerged and refills at the surface. | V, Online, SA |
@@ -24,6 +24,11 @@
 | GTA-01-018 | Fall damage and limping | Landing from a big drop hurts or kills; after heavy damage the character limps until healed. | V, Online, IV |
 | GTA-01-019 | First-person mode | Toggle first-person view to walk, aim, drive and shoot from the character's eyes. | V (PS4/Xbox One/PC), Online (PS4/Xbox One/PC) |
 | GTA-01-020 | Climbing steep slopes | On rough terrain the character scrambles up inclines that would otherwise block movement. | V, Online, SA |
+| GTA-01-021 | Swim skill stat | In San Andreas the Swimming stat rises with practice, letting the character swim faster and stay afloat longer. | SA |
+| GTA-01-022 | Lung capacity stat | In San Andreas the Lung Capacity stat grows with time spent underwater and slows the air bar drain. | SA |
+| GTA-01-023 | Walking on the seabed | Sink to the bottom in deep water and walk along the seabed instead of swimming. | V, Online |
+| GTA-01-024 | High dive into water | Leap from a height into water and enter with a splash without taking fall damage. | V, Online, IV, SA |
+| GTA-01-025 | Weapons put away while swimming | Enter the water and the equipped weapon is holstered until the character climbs back out. | V, Online, IV, SA |
 
 ## 2. Driving cars and bikes
 
@@ -80,16 +85,24 @@
 | GTA-02-049 | Utility class | Pickups, tow trucks and flatbeds such as the Sadler and Towtruck. | V, Online, SA |
 | GTA-02-050 | Trailers | Hitch trailers to trucks or tow them with a tow truck. | V, Online, SA |
 | GTA-02-051 | Open Wheel class | Formula-style racers such as the Progen PR4 and Ocelot R88. | Online Los Santos Summer Special |
-| GTA-02-052 | Riding the train | Board a freight or passenger train and ride it along the Los Santos tracks. | V, Online |
-| GTA-02-053 | Tram travel | Ride or drive the tram along the Los Santos boulevard loop. | V, Online |
+| GTA-02-052 | Riding the train | Board a freight or passenger train and ride it along the Los Santos tracks. | WRONG: trains in V and Online cannot be boarded or ridden; only in SA can trains be entered and driven |
+| GTA-02-053 | Tram travel | Ride or drive the tram along the Los Santos boulevard loop. | WRONG: the V tram runs on rails but cannot be entered, driven or ridden |
 | GTA-02-054 | Motorcycle wheelies and stoppies | Pull back or push forward at speed to lift the front or rear wheel. | V, Online, IV, SA, VC |
 | GTA-02-055 | Falling off a bike | A crash throws the rider off and ragdolls them across the ground. | V, Online, IV, SA, VC |
 | GTA-02-056 | Taxi passenger ride | Hail a taxi, pick a destination and pay to be driven there. | V, Online, IV, SA, VC |
 | GTA-02-057 | Lowrider hydraulics | Bounce a custom lowrider on its hydraulics with the horn or action button. | Online Lowriders |
 | GTA-02-058 | Horn-boosted vehicles | Some cars have nitro, jump or weapon abilities triggered from the driver seat. | Online (various updates) |
-| GTA-02-059 | Mobile radio while on foot | Listen to the last vehicle's radio through the phone's music player. | V, Online |
+| GTA-02-059 | Mobile radio while on foot | Listen to the last vehicle's radio through the phone's music player. | WRONG: V and Online have no phone radio or music player; the car radio stops when you leave the vehicle |
 | GTA-02-060 | Siren and emergency lights | Toggle the siren and flashing lights in police, ambulance and fire vehicles. | V, Online, IV, SA, VC |
 | GTA-02-061 | Train driving | Take the controls of a freight train and drive it along the rails. | SA |
+| GTA-02-062 | Switching seats inside a vehicle | While stopped, press the enter button to move between driver, passenger and rear seats. | V, Online |
+| GTA-02-063 | Convertible roof | Hold a button to fold the soft top down or up on convertible cars. | V, Online |
+| GTA-02-064 | Windscreen wipers | Watch wipers sweep the windscreen when it rains on the windscreen. | V, Online, IV |
+| GTA-02-065 | Bike helmets | Getting on a motorcycle automatically puts a crash helmet on the rider. | V, Online |
+| GTA-02-066 | Sinking cars | Drive into deep water and the engine floods as the car sinks; get out to swim. | V, Online, IV, SA, VC |
+| GTA-02-067 | Smashing street furniture | Plough through fences, parking meters, hydrants, bins and bus shelters, knocking them over. | V, Online, IV, SA, VC |
+| GTA-02-068 | RC Bandito | Drive a palm-sized remote-controlled car around streets and arenas. | DUPLICATE of GTA-04-047 |
+| GTA-02-069 | Turret vehicles | Ride with a friend firing the roof-mounted machine gun on vehicles such as the Technical or Insurgent Pickup. | V, Online (various) |
 
 ## 3. Air and water
 
@@ -100,7 +113,7 @@
 | GTA-03-003 | Landing gear | Raise and lower wheels with the gear button on retractable-gear planes. | V, Online, SA |
 | GTA-03-004 | Engine and brake | Start, rev and brake aircraft engines on the ground before take-off. | V, Online, IV, SA |
 | GTA-03-005 | Helicopter controls | Collective, cyclic and pedal control to hover, climb and turn. | V, Online, IV, SA, VC |
-| GTA-03-006 | VTOL mode | Tilt engines to hover a jet such as the Hydra or Avenger and switch back to forward flight. | V, Online |
+| GTA-03-006 | VTOL mode | Tilt engines to hover a jet such as the Hydra or Avenger and switch back to forward flight. | WRONG: the Hydra and Avenger are Online-only (Heists, The Doomsday Heist); V story mode has no VTOL jet |
 | GTA-03-007 | Fixed-wing passenger planes | Fly airliners such as the Shamal and Luxor with no weapons and long runways. | V, Online, SA |
 | GTA-03-008 | Fighter jets | Fly the Lazer, Hydra or P-996 with cannons and lock-on missiles. | V, Online, SA |
 | GTA-03-009 | Stunt planes | Loop, roll and smoke-trail in aerobatic planes such as the Mallard and Duster. | V, Online, SA |
@@ -130,7 +143,7 @@
 | GTA-03-033 | Toreador | Drive a sports car that converts to a submersible with a boost and missiles. | Online The Cayo Perico Heist |
 | GTA-03-034 | Stromberg | Drive the amphibious sports car that submerges and fires rockets. | Online The Doomsday Heist |
 | GTA-03-035 | Deluxo flight | Hover and fly the Deluxo as a flying car with machine guns and missiles. | Online The Doomsday Heist |
-| GTA-03-036 | Oppressor Mk II | Fly the hover bike with boost, missiles and countermeasures. | Online After Hours |
+| GTA-03-036 | Oppressor Mk II | Fly the hover bike with boost, missiles and countermeasures. | WRONG: added in The Doomsday Heist update, not After Hours |
 | GTA-03-037 | Ruiner 2000 | Jump, parachute and fire homing missiles from the KITT-style Ruiner 2000. | Online Import/Export |
 | GTA-03-038 | Rocket Voltic | Use the huge rocket booster on the Rocket Voltic to launch over the map. | Online Import/Export |
 | GTA-03-039 | Scramjet | Boost, jump and fire missiles in the Scramjet, which can skip across water. | Online After Hours |
@@ -139,6 +152,9 @@
 | GTA-03-042 | Eject from aircraft | Leave a plane or helicopter in flight by falling or parachuting out. | V, Online, SA |
 | GTA-03-043 | Ambush vehicle drops | Buy air-dropped vehicle deliveries that parachute crates down. | Online Gunrunning |
 | GTA-03-044 | Flying skill stat | A hidden flying stat grows with flight time; low skill causes wobble. | V, Online, SA |
+| GTA-03-045 | San Andreas jetpack | Wear the jetpack stolen from Area 69 and fly freely with thrust and hover. | SA |
+| GTA-03-046 | Hovercraft | Skim over water and flat land in the Vortex hovercraft. | SA |
+| GTA-03-047 | Sailboat | Raise the sails of the Marquis and drift along the coast under wind power. | V, Online |
 
 ## 4. Owning and customising vehicles
 
@@ -199,9 +215,12 @@
 | GTA-04-053 | Pay 'n' Spray | Drive in for an instant respray that also clears the wanted level. | IV, SA, VC |
 | GTA-04-054 | Vehicle registration plates | Plates carry state names such as San Andreas and Liberty City and can be recoloured. | V, Online, IV |
 | GTA-04-055 | Trailer ownership | Store and hitch owned trailers for trucks and tractors. | Online |
-| GTA-04-056 | Bicycle share | Rent a bicycle from a rack in Online. | Online |
+| GTA-04-056 | Bicycle share | Rent a bicycle from a rack in Online. | WRONG: no bicycle-share racks exist in Online; bikes are bought from the Pedal and Metal website |
 | GTA-04-057 | Vehicle delivery services | Buy a car online and a driver or drop-off delivers it to a chosen garage. | Online |
 | GTA-04-058 | Car stereo and bass boost | Fit a better stereo and bass upgrade at a mod garage. | SA |
+| GTA-04-059 | Crew colour paint | Save your crew's colour and spray it onto any car body or rims. | Online |
+| GTA-04-060 | Custom tyre lettering | Pick branded sidewall lettering for your wheels at the mod shop. | Online |
+| GTA-04-061 | Story vehicle respawn | A personal car that is destroyed or lost reappears at its owner's safehouse garage after a time. | V |
 
 ## 5. Combat and weapons
 
@@ -262,6 +281,11 @@
 | GTA-05-053 | Wasted screen | Death shows the Wasted screen over a washed-out shot before respawn. | V, Online, IV, SA, VC |
 | GTA-05-054 | Reloading | Press the reload button to swap magazines when a gun runs dry. | V, Online, IV, SA, VC |
 | GTA-05-055 | Fighting styles | Learn boxing, karate and kung fu moves from gym trainers and switch styles. | SA |
+| GTA-05-056 | Knuckle dusters | Punch with brass knuckles bought at the Ammu-Nation counter. | SA |
+| GTA-05-057 | Steady sniper aim | Hold the breath button to steady the sniper scope for a precise shot. | V, Online |
+| GTA-05-058 | Eating to heal | Buy and eat burgers, hot dogs or vending-machine snacks to restore health. | V, Online, IV, SA |
+| GTA-05-059 | Melee grabs and counters | Grapple a fighter, throw them to the ground and counter incoming punches. | IV |
+| GTA-05-060 | Up-n-Atomizer | Fire a handheld shockwave gun that shoves cars and people away without hurting them. | Online (unsure) |
 
 ## 6. Police and wanted level
 
@@ -300,7 +324,7 @@
 | GTA-06-031 | Hydra and jet pursuit | Military jets strafe the streets at six stars in San Andreas. | SA |
 | GTA-06-032 | Breaking line of sight | Get out of sight of every officer and the wanted level stops growing. | V, Online, IV, SA, VC |
 | GTA-06-033 | Hiding out of the search zone | Stay hidden until the flashing stars fade and the chase ends. | V, Online, IV, SA, VC |
-| GTA-06-034 | Respray to lose the cops | Pay 'n' Spray or a Los Santos Customs respray instantly clears the wanted level. | V, IV, SA, VC |
+| GTA-06-034 | Respray to lose the cops | Pay 'n' Spray or a Los Santos Customs respray instantly clears the wanted level. | WRONG: a Los Santos Customs respray does not clear wanted levels in V (the shop refuses wanted customers); Pay 'n' Spray clears them only in IV, SA and VC |
 | GTA-06-035 | Hiding in tunnels and interiors | Duck into the subway, tunnels or shops where police search passes by. | V, Online, IV |
 | GTA-06-036 | Stealth evasion | Crouch in bushes or shadows to stay invisible while stars wind down. | V, Online |
 | GTA-06-037 | Lester removes wanted level | Call Lester Crest to wipe a wanted level clean once the service is unlocked. | Online |
@@ -316,6 +340,7 @@
 | GTA-06-047 | Police computer | Run plate and suspect searches and browse the Most Wanted list from a police car. | IV |
 | GTA-06-048 | Vigilante justice | Kill a nearby criminal shown on the police radio to earn a cash reward. | IV, SA, VC |
 | GTA-06-049 | Wanted level cleared by missions | Starting a story mission or job resets your wanted level and clears the chase. | V, Online, IV, SA, VC |
+| GTA-06-050 | Lester clears wanted in story | Call Lester from the phone and pay a fee to have him call off the police. | V |
 
 ## 7. The world
 
@@ -387,8 +412,8 @@
 | GTA-07-064 | Stranger: Maude | Track down bail-jumping fugitives listed by Maude. | V |
 | GTA-07-065 | Stranger: Barry | Help Barry campaign for drug legalisation in Grass Roots. | V |
 | GTA-07-066 | Stranger: Epsilon Program | Complete Kifflom tasks, donations and a desert pilgrimage for the cult. | V |
-| GTA-07-067 | Stranger: Josh Bernstein | Chase Vinewood fame and collect celebrity items for a sleazy agent. | V |
-| GTA-07-068 | Stranger: Mary-Ann | Escort and protect a fading Vinewood starlet. | V |
+| GTA-07-067 | Stranger: Josh Bernstein | Chase Vinewood fame and collect celebrity items for a sleazy agent. | WRONG: Josh's missions have Trevor burn down houses for a crooked realtor, not collect celebrity items |
+| GTA-07-068 | Stranger: Mary-Ann | Escort and protect a fading Vinewood starlet. | WRONG: Mary-Ann is an obsessive triathlete; her missions are races against her, not an escort job |
 | GTA-07-069 | Stranger: Nigel and Mrs. Thornhill | Track down celebrity lookalikes and collect memorabilia for an odd couple. | V |
 | GTA-07-070 | Stranger: Omega | Collect spaceship parts for a man who believes in aliens. | V |
 | GTA-07-071 | Stranger: Dreyfuss | Investigate the Leonora Johnson murder case and dig up clues. | V |
@@ -423,6 +448,18 @@
 | GTA-07-100 | Railway network | Freight lines and level crossings run the length of the map. | V, Online, IV, SA, VC |
 | GTA-07-101 | Cayo Perico | A private tropical island with a beach party, jungle and heavily guarded compound. | Online The Cayo Perico Heist |
 | GTA-07-102 | Altruist Cult camp | A fortified camp in the hills where hitchhikers can be delivered for a reward. | V, Online |
+| GTA-07-103 | Maze Bank Tower rooftops | Enter Downtown's tallest tower and stand on its roof or parachute off it. | V, Online |
+| GTA-07-104 | Vespucci Canals | A small Venice-style canal district with footbridges and waterside houses. | V, Online |
+| GTA-07-105 | Trevor's desert airstrip | Sandy Shores airfield with a hangar and runway used as Trevor's base. | V |
+| GTA-07-106 | Humane Labs and Research | A sealed island research facility raided in heist missions. | Online |
+| GTA-07-107 | Wildlife: sea fish and dolphins | Schools of fish, dolphins, stingrays and jellyfish swim offshore and in the Alamo Sea. | V, Online |
+| GTA-07-108 | Peyote plants | Eat a hidden cactus button to play the world as a deer, seagull, dog and other animals. | DUPLICATE of GTA-10-059 |
+| GTA-07-109 | Random event: domestic disturbance | A man attacks his partner on the pavement; step in to stop him. | V, Online |
+| GTA-07-110 | Random event: ATM robbery | A thief robs someone at a cash machine; stop him and return the cash. | V |
+| GTA-07-111 | Random event: kidnap rescue | Chase a car with a kidnapped victim in the boot and free them. | V, Online |
+| GTA-07-112 | Stranger: Abigail Mathers | Dive for her son's sunken submarine parts to solve his death. | V |
+| GTA-07-113 | Gangs: Cubans and Haitians | Two immigrant gangs war across Vice City's bridge districts. | VC |
+| GTA-07-114 | North Yankton prologue | Play the opening heist in the snowy town of Ludendorff nine years before the story. | V |
 
 ## 8. People and street life
 
@@ -437,7 +474,7 @@
 | GTA-08-007 | Armed citizens fight back | Gang members, rednecks and some bystanders pull weapons and return fire. | V, Online, IV, SA |
 | GTA-08-008 | Peds bump and apologise | Walking into someone makes them stumble, apologise or curse at you. | V, Online, IV, SA |
 | GTA-08-009 | Peds call out comments | Peds comment on your vehicle, your clothes or your crimes as you pass. | V, Online, IV, SA |
-| GTA-08-010 | Talking to pedestrians | Respond to a passing ped with a friendly or hostile line. | SA (unsure) |
+| GTA-08-010 | Talking to pedestrians | Respond to a passing ped with a friendly or hostile line. | WRONG: SA has no talk option; greeting or insulting pedestrians is an IV feature |
 | GTA-08-011 | Respect from reputation | In San Andreas peds react differently as your respect and notoriety grow. | SA |
 | GTA-08-012 | Rain behaviour | Peds open umbrellas or run for cover when it rains. | V, Online, IV |
 | GTA-08-013 | Ambient conversations | Peds chat, argue, gossip and take calls in several languages. | V, Online, IV |
@@ -448,7 +485,7 @@
 | GTA-08-018 | Tourists | Camera-carrying tourists crowd Vinewood and the pier. | V, Online |
 | GTA-08-019 | Paparazzi | Photographers chase and snap celebrities around the city. | V, Online |
 | GTA-08-020 | Street vendors | Buy hot dogs, tacos and drinks from carts and stands. | V, Online, IV, SA |
-| GTA-08-021 | Valet service | Hand your car to a valet at a hotel and he drives it to the parking area. | V, Online |
+| GTA-08-021 | Valet service | Hand your car to a valet at a hotel and he drives it to the parking area. | WRONG: V and Online have no valets; valet parking is a San Andreas side activity |
 | GTA-08-022 | Prostitutes | Streetwalkers get into your car and offer services for cash. | V, Online, IV, SA, VC |
 | GTA-08-023 | Strip club staff | Dancers, bouncers and bartenders work the clubs at all hours. | V, Online, IV, SA |
 | GTA-08-024 | Paramedics on scene | Paramedics kneel over injured peds and load them into an ambulance. | V, Online, IV |
@@ -470,6 +507,11 @@
 | GTA-08-040 | Epsilon cultists | Robed Epsilon members hand out leaflets and collect donations. | V, Online |
 | GTA-08-041 | Celebrity sightings | Named celebrities appear in Vinewood and around film sets. | V |
 | GTA-08-042 | Public events and film shoots | Crews film scenes and hold events in the street with crowds watching. | V, Online |
+| GTA-08-043 | Beach crowds | Sunbathers, swimmers, ball games and lifeguards fill Vespucci Beach by day. | V, Online |
+| GTA-08-044 | Drunks at night | After closing time, drunk pedestrians stagger out of bars and clubs. | V, Online, IV |
+| GTA-08-045 | Ambient car accidents | NPC cars occasionally collide, blocking lanes while drivers argue or call for help. | V, Online, IV |
+| GTA-08-046 | Rush hour | Traffic thickens at morning and evening peaks and thins out late at night. | V, Online, IV |
+| GTA-08-047 | Peds in the boot | Drag a knocked-out or dead pedestrian and stow them in a car's boot. | V, Online |
 
 ## 9. Story, missions and characters
 
@@ -538,6 +580,7 @@
 | GTA-09-061 | VC allies | Work with Cortez, Kent Paul, Umberto, Phil Cassidy and Mercedes. | VC |
 | GTA-09-062 | The Lost and Damned | Play Johnny Klebitz and the Lost biker gang in the IV-era story. | IV |
 | GTA-09-063 | The Ballad of Gay Tony | Play Luis Lopez working for nightclub owner Tony Prince. | IV |
+| GTA-09-064 | Martin Madrazo | A Mexican cartel boss who hires the crew for dirty jobs and menaces them. | V |
 
 ## 10. Side activities and minigames
 
@@ -558,7 +601,7 @@
 | GTA-10-013 | Wildlife photography | Photograph listed animals for the Los Santos Tourist Board. | Online The Chop Shop |
 | GTA-10-014 | Bounty hunting | Chase down bail-jumping fugitives marked on the map. | V |
 | GTA-10-015 | Towing jobs | Hook and deliver broken-down cars with a tow truck for Tonya. | V, Online |
-| GTA-10-016 | Taxi work | Pick up passengers and drive them to their destination for a fare. | Online (unsure) |
+| GTA-10-016 | Taxi work | Pick up passengers and drive them to their destination for a fare. | WRONG: Online has no taxi side job; taxi fares are a side job in IV, SA and VC |
 | GTA-10-017 | Taxi fares | Drive the taxi and complete fares as a side job. | SA, VC |
 | GTA-10-018 | Paramedic missions | Drive the ambulance and deliver patients to hospital before time runs out. | SA, VC |
 | GTA-10-019 | Firefighter missions | Drive the fire truck and extinguish burning targets within the time limit. | SA, VC |
@@ -594,7 +637,7 @@
 | GTA-10-049 | Top Fun RC missions | Drive explosive RC vans and planes in remote-control missions. | VC |
 | GTA-10-050 | Collect letters | Gather all 100 letter scraps across Los Santos for a reward. | V |
 | GTA-10-051 | Spaceship parts | Collect all 50 spaceship parts for Omega's reward. | V |
-| GTA-10-052 | Submarine pieces | Recover 30 nuclear waste barrels from the seabed. | V |
+| GTA-10-052 | Submarine pieces | Recover 30 nuclear waste barrels from the seabed. | WRONG: mixes two collectibles — the 30 nuclear waste barrels (Waste Management) and the 10 submarine pieces for Abigail are separate sets |
 | GTA-10-053 | Stunt jumps | Hit all 50 marked ramps with a car or bike. | V, Online, SA, VC |
 | GTA-10-054 | Under the bridge | Fly every aircraft under the marked bridges. | V |
 | GTA-10-055 | Knife flights | Fly a jet through knife-edge gaps under bridges and between towers. | V |
@@ -630,6 +673,10 @@
 | GTA-10-085 | Deliver exotic exports | Steal and deliver listed export vehicles from the docks list. | Online Los Santos Drug Wars |
 | GTA-10-086 | Tow truck service | Tow abandoned and wanted cars to the salvage yard. | Online The Chop Shop |
 | GTA-10-087 | Assassination missions | Take contracts from Lester to kill financial targets and shift share prices. | V |
+| GTA-10-088 | Trevor's rampages | Trigger one of five rage spots, take a fixed weapon and kill a target count of a chosen group before time ends. | V |
+| GTA-10-089 | Nuclear waste barrels | Dive for 30 sunken waste barrels around the coast and Alamo Sea for the dock attendant. | V |
+| GTA-10-090 | Taxi fares in Liberty City | Steal or borrow a cab and work fares against the clock. | IV |
+| GTA-10-091 | Darts in Los Santos bars | Throw 301 and Around the Clock games at bar dartboards. | V |
 
 ## 11. Money, property and businesses
 
@@ -686,6 +733,7 @@
 | GTA-11-049 | Epsilon donations | Donate cash to the Epsilon Program and buy their robes and medallions. | V |
 | GTA-11-050 | Payphone hit rewards | Complete Franklin's payphone assassination contracts for large payouts. | Online The Contract |
 | GTA-11-051 | Freemode business battles | Fight other players for stock crates that feed your businesses. | Online |
+| GTA-11-052 | Picking up dropped cash | Grab the wads of cash dropped by killed pedestrians or smashed tills. | V, Online, IV, SA, VC |
 
 ## 12. Character and customisation
 
@@ -731,6 +779,8 @@
 | GTA-12-038 | Heist outfits | Change into boiler suits, disguises and flight suits during heist setups. | V, Online |
 | GTA-12-039 | Parachute bag styles | Choose the colour and pattern of a parachute bag on your back. | V, Online |
 | GTA-12-040 | Body armour look | Worn armour changes the character's silhouette while it protects. | V, Online |
+| GTA-12-041 | Hair growth | CJ's hair and beard grow over in-game days and need a barber trim. | SA |
+| GTA-12-042 | Face paints | Paint combat face paints onto the character at a clothing or gun shop. | Online (unsure) |
 
 ## 13. Phone, internet and in-game media
 
@@ -828,6 +878,8 @@
 | GTA-14-045 | Phone HUD | The phone screen overlays apps and contacts on the play view. | V, Online |
 | GTA-14-046 | Collectible counters | Menus track how many of each collectible set you have found. | V, Online, SA, VC |
 | GTA-14-047 | Wasted and Busted overlays | Full-screen overlays interrupt play on death or arrest. | V, IV, SA, VC |
+| GTA-14-048 | Police search zone display | A flashing red-and-blue zone on the radar shows where police are hunting you. | V, Online, IV |
+| GTA-14-049 | Crew-coloured blips | Online map blips take your crew's colour so members stand out. | Online |
 
 ## 15. Friends, dating and family
 
@@ -858,6 +910,7 @@
 | GTA-15-023 | Friend spectating | Watch friends' jobs and switch sessions to join them. | Online |
 | GTA-15-024 | Hangout invitation texts | Friends text invitations to activities and venues while you roam. | IV |
 | GTA-15-025 | Dating website contacts | Arrange meetings through the LoveMeet dating site. | IV (unsure) |
+| GTA-15-026 | IV internet girlfriends | Arrange dates with women met on Love-meet and Craplist and earn perks such as police clearance. | IV |
 
 ## 16. GTA Online
 
@@ -995,6 +1048,7 @@
 | GTA-16-130 | Garment Factory and sabotage | Run sabotage contracts against corrupt officials from the Darnell Bros factory. | Online Agents of Sabotage (unsure) |
 | GTA-16-131 | Money laundering fronts | Manage car wash, water and helitour businesses as fronts. | Online Money Fronts (unsure) |
 | GTA-16-132 | Career Progress | Complete per-update challenge tiers for exclusive rewards. | Online Expanded & Enhanced |
+| GTA-16-133 | Cross-play sessions | PS5 and Xbox Series players share lobbies and jobs, with a toggle to turn it off. | Online (PS5/Xbox Series) |
 
 ## 17. Audio and radio
 
@@ -1045,6 +1099,10 @@
 | GTA-17-043 | Pause menu music | A looping score plays while the game is paused. | V, Online, IV, SA |
 | GTA-17-044 | Loading screen music | Music plays over the loading and splash screens. | V, Online, IV, SA, VC |
 | GTA-17-045 | Volume sliders | Set separate levels for music, speech, SFX and radio. | V, Online, IV, SA, VC |
+| GTA-17-046 | Liberty City radio stations | Stations such as Liberty Rock Radio, The Vibe 98.8, The Beat 102.7 and Jazz Nation Radio play across the city. | IV |
+| GTA-17-047 | San Andreas radio stations | Stations such as K-DST, Radio X, SF-UR, Bounce FM, K-Rose and CSR play across the state. | SA |
+| GTA-17-048 | Vice City radio stations | Stations such as Flash FM, Wave 103, V-Rock, Fever 105 and Espantoso play across the city. | VC |
+| GTA-17-049 | Talk radio shows | Listen to phone-in talk stations such as WCTR in San Andreas, WKTT and PLR in Liberty City and VCPR in Vice City. | SA, IV, VC |
 
 ## 18. Settings, saves, accessibility, Rockstar Editor, Director Mode, photo modes
 
@@ -1066,7 +1124,7 @@
 | GTA-18-014 | Vibration | Turn controller rumble on or off. | V, Online, IV, SA |
 | GTA-18-015 | Steering sensitivity | Adjust how sharply vehicles react to steering input. | V, Online |
 | GTA-18-016 | Toggle or hold aim | Choose whether aiming stays on or needs the button held. | V, Online |
-| GTA-18-017 | Toggle or hold aim and crouch | Choose whether aiming and crouching stay on or need the button held. | V, Online |
+| GTA-18-017 | Toggle or hold aim and crouch | Choose whether aiming and crouching stay on or need the button held. | DUPLICATE of GTA-18-016 |
 | GTA-18-018 | Auto-aim mode | Pick assisted aim, partial aim or free aim for shooting and cover. | V, Online |
 | GTA-18-019 | First or third person | Set the default camera to first or third person. | V, Online |
 | GTA-18-020 | First-person vehicle options | Toggle the hood view and independent camera while driving or flying. | V, Online |
@@ -1140,6 +1198,7 @@
 | GTA-19-033 | VC-MP | A multiplayer mod for Vice City. | VC (mod) |
 | GTA-19-034 | CLEO library | A San Andreas plugin system for running script mods. | SA (mod) |
 | GTA-19-035 | Online mod menus | Injecting mods into Online sessions is bannable and unsupported. | Online |
+| GTA-19-036 | Slow motion cheat | SLOWMO slows time to a crawl while you act at normal speed. | V |
 
 ## 20. Other
 

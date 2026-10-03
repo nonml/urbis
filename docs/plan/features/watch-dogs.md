@@ -4,34 +4,40 @@
 
 | ID | Feature | What the player does or sees | Where |
 |---|---|---|---|
-| WD-01-001 | Traffic light control | Hold X/Square on a junction to turn lights green or red and redirect traffic. | WD1 |
-| WD-01-002 | Timed traffic light takedown | Press X/Square as the blue diamond flashes to send a chosen vehicle into cross traffic. | WD1 |
-| WD-01-003 | Bollard (blocker) control | Hold X/Square to raise or lower retractable street bollards. | WD1 |
+| WD-01-001 | Traffic light control | Hold X/Square on a junction to turn lights green or red and redirect traffic. | WD1, WD2, Legion |
+| WD-01-002 | Timed traffic light takedown | Press X/Square as the blue diamond flashes to send a chosen vehicle into cross traffic. | WD1, WD2 |
+| WD-01-003 | Bollard (blocker) control | Hold X/Square to raise or lower retractable street bollards. | WD1, WD2, Legion |
 | WD-01-004 | Timed bollard takedown | Press X/Square as the diamond flashes to flip a passing vehicle on the bollards. | WD1 |
 | WD-01-005 | Road spike control | Hold X/Square to raise or lower city road spikes. | WD1 |
 | WD-01-006 | Timed road spike takedown | Press X/Square as the diamond flashes to burst a vehicle's tires on the spikes. | WD1 |
 | WD-01-007 | Drawbridge control | Hold X/Square to open or close the city drawbridges. | WD1 |
-| WD-01-008 | Steam pipe explosion | Overload a street steam pipe to launch cars and knock enemies down. | WD1 |
-| WD-01-009 | Timed steam pipe takedown | Press X/Square as the diamond flashes to time the burst against a vehicle. | WD1 |
-| WD-01-010 | Transformer overload | Overload a transformer for a large electrical explosion that also blacks out the block at night. | WD1 |
-| WD-01-011 | Gate and garage control | Hold X/Square to open or close gates and garage doors. | WD1 |
+| WD-01-008 | Steam pipe explosion | Overload a street steam pipe to launch cars and knock enemies down. | WD1, WD2, Legion |
+| WD-01-009 | Timed steam pipe takedown | Press X/Square as the diamond flashes to time the burst against a vehicle. | WD1, WD2 |
+| WD-01-010 | Transformer overload | Overload a transformer for a large electrical explosion that also blacks out the block at night. | WD1, WD2 |
+| WD-01-011 | Gate and garage control | Hold X/Square to open or close gates and garage doors. | WD1, WD2 |
 | WD-01-012 | L-Train control | Press X/Square to stop or start an elevated train and block a street with it. | WD1 |
-| WD-01-013 | Junction box overload | Overload a junction box to electrocute enemies standing near it. | WD1 (unsure) |
-| WD-01-014 | ctOS box | Hack a ctOS box in a mission area to disable local security. | WD1 (unsure) |
-| WD-01-015 | Traffic light control (ctOS 2.0) | Trigger the traffic system from the phone to create accidents that stop pursuers. | WD2 |
+| WD-01-013 | Junction box overload | Overload a junction box to electrocute enemies standing near it. | WD1, WD2, Legion |
+| WD-01-014 | ctOS box | Hack a ctOS box in a mission area to disable local security. | WD1 |
+| WD-01-015 | Traffic light control (ctOS 2.0) | Trigger the traffic system from the phone to create accidents that stop pursuers. | DUPLICATE of WD-01-001 |
 | WD-01-016 | Auto takedown: gates | Trigger a gate with the shown timing so it hits a passing enemy vehicle. | WD2 |
-| WD-01-017 | Auto takedown: steam pipes | Trigger a steam pipe with the shown timing so it launches an enemy vehicle. | WD2 |
+| WD-01-017 | Auto takedown: steam pipes | Trigger a steam pipe with the shown timing so it launches an enemy vehicle. | DUPLICATE of WD-01-009 |
 | WD-01-018 | Massive System Crash | Shut down all city infrastructure in the area for 30 seconds. | WD2 |
 | WD-01-019 | Blackout upgrade | Upgrade the System Crash so all area lights also switch off and sight lines shrink. | WD2 |
 | WD-01-020 | Security system shutdown | Shut down a building's security system, alarms and cameras. | WD2 |
 | WD-01-021 | Forklift remote control | Remote-control a forklift with X/Square through the Environmental RC skill. | WD2 |
 | WD-01-022 | Scissor lift remote control | Remote-control a scissor lift with X/Square. | WD2 |
 | WD-01-023 | Crane remote control | Remote-control a construction crane with X/Square. | WD2 |
-| WD-01-024 | Traffic light control (Legion) | Hack a junction to change the lights and cause a crash. | Legion (unsure) |
-| WD-01-025 | Bollard control (Legion) | Raise or lower retractable bollards to stop vehicles. | Legion (unsure) |
-| WD-01-026 | Steam pipe explosion (Legion) | Burst a street steam pipe to knock people down and throw cars. | Legion (unsure) |
-| WD-01-027 | Junction box shock | Overload an electrical box to shock enemies standing in the puddle or beside it. | Legion |
-| WD-01-028 | Blackout | Cut the power of a block through its junction box or power point. | Legion (unsure) |
+| WD-01-024 | Traffic light control (Legion) | Hack a junction to change the lights and cause a crash. | DUPLICATE of WD-01-001 |
+| WD-01-025 | Bollard control (Legion) | Raise or lower retractable bollards to stop vehicles. | DUPLICATE of WD-01-003 |
+| WD-01-026 | Steam pipe explosion (Legion) | Burst a street steam pipe to knock people down and throw cars. | DUPLICATE of WD-01-008 |
+| WD-01-027 | Junction box shock | Overload an electrical box to shock enemies standing in the puddle or beside it. | DUPLICATE of WD-01-013 |
+| WD-01-028 | Blackout | Cut the power of a block through its junction box or power point. | Legion |
+| WD-01-029 | Auto takedown: traffic lights | Trigger a junction with the shown timing so cross traffic rams an enemy vehicle. | DUPLICATE of WD-01-002 |
+| WD-01-030 | Transformer overload (WD2) | Overload a street transformer to blast enemies back and cut the lights on the block. | DUPLICATE of WD-01-010 |
+| WD-01-031 | Video billboard hack | Hack a street video billboard to change the advert it shows. | WD1 (unsure) |
+| WD-01-032 | Advertising screen propaganda | Hack a street advertising screen to blast a DedSec propaganda clip that distracts people. | Legion |
+| WD-01-033 | Triangular road blockers | Hack the angled blocker slabs in Pawnee and Brandon Docks; from the wrong side they act as a ramp. | WD1 |
+| WD-01-034 | City hack lure mode | Hold the hack button on a panel or pipe so it calls enemies over, then trigger it on the crowd. | WD2 |
 
 
 ## 2. Hacking people
@@ -43,7 +49,7 @@
 | WD-02-003 | ATM hack | Hack bank accounts while the target uses an ATM; the take can be increased by a skill. | WD1 |
 | WD-02-004 | Call eavesdropping | Tap a person's live phone call and listen to the conversation. | WD1, WD2 |
 | WD-02-005 | Text message snooping | Read the SMS on a person's phone. | WD1, WD2 |
-| WD-02-006 | Music download | Hack a person listening to music and add the track to the phone playlist. | WD1, WD2 |
+| WD-02-006 | Music download | Hack a person listening to music and add the track to the phone playlist. | WRONG: in WD2 songs are captured with the SongSneak app from nearby music, not by hacking a person. |
 | WD-02-007 | Report a criminal | Use the profiler to call the police on a citizen with a criminal record. | WD1 (unsure) |
 | WD-02-008 | High value target flag | Profiler Optimization marks people carrying system keys, big accounts or car unlocks with a blue locator. | WD1 |
 | WD-02-009 | System key hack | Hack a flagged person to take a system key that opens secure doors or network points. | WD1 |
@@ -57,10 +63,15 @@
 | WD-02-017 | False APB: suspect | Put a false APB on a target and let the police come and arrest him. | WD2 |
 | WD-02-018 | False APB: wanted criminal | Upgrade the APB with a dangerous criminal advisory that brings a heavier response. | WD2 |
 | WD-02-019 | Deep profiler | Reveal a person's full daily schedule, relationships and dislikes. | Legion |
-| WD-02-020 | ETO hack | Hack a person's phone or account to take their ETO. | Legion |
+| WD-02-020 | ETO hack | Hack a person's phone or account to take their ETO. | WRONG: Legion has no bank hack on people; ETO is earned from tech points and activities, not siphoned from citizens. |
 | WD-02-021 | Shock hack | Hack an enemy's cyberware to stun him in place. | Legion |
 | WD-02-022 | Key steal | Hack a target to take his vehicle keys without touching him. | Legion |
 | WD-02-023 | Viral hacking | Spread a hack to nearby devices or people from the first target. | Legion (unsure) |
+| WD-02-024 | Phone distraction (WD1) | Hack a person to ring or buzz his phone and pull him out of position. | WD1 |
+| WD-02-025 | Cancel 911 call | Hack the person who is phoning the police to cancel the report before it lands. | WD1 |
+| WD-02-026 | Disrupt enemy comms | Hack an enemy's headset to stun him with feedback. | DUPLICATE of WD-10-035 |
+| WD-02-027 | Disable reinforcement calls | Hack enemy phones so they cannot call in reinforcements. | DUPLICATE of WD-10-036 |
+| WD-02-028 | Botnet refill | Hack a passer-by's phone just to refill botnet units. | WD2 |
 
 
 ## 3. Hacking vehicles, drones and robots
@@ -103,6 +114,9 @@
 | WD-03-034 | Enemy drone hijack | Hack a hostile drone and take it over. | Legion (unsure) |
 | WD-03-035 | Turret hack | Hack a fixed turret so it fires at enemies instead of you. | Legion (unsure) |
 | WD-03-036 | Car movement hack | Force a car to drive forward or swerve without getting in. | Legion (unsure) |
+| WD-03-037 | Delivery drone | Courier drones carry packages over London; shooting one down drops its parcel. | Legion |
+| WD-03-038 | Disable helicopter | Hack a police helicopter to shut it down for 5 seconds, upgraded to 10 with a skill. | DUPLICATE of WD-10-037 |
+| WD-03-039 | RC remote hacking | Hack people and city objects through the jumper's or quadcopter's NetHack view. | WD2 |
 
 
 ## 4. Cameras, networks and hacking puzzles
@@ -116,18 +130,21 @@
 | WD-04-005 | ctOS Breach | Find and hack hidden ctOS boxes to pull data from the network. | WD1 (unsure) |
 | WD-04-006 | NetHack view | While in a camera or drone, see hackable objects and tagged people highlighted as a network. | WD2 |
 | WD-04-007 | ctOS box | Hack the box to expose nearby activities on the map. | WD2 (unsure) |
-| WD-04-008 | Network Bypass minigame | Rotate and connect the routing tiles so the signal reaches the other side before hacking. | WD2, Legion |
+| WD-04-008 | Network Bypass minigame | Rotate and connect the routing tiles so the signal reaches the other side before hacking. | WD1, WD2, Legion |
 | WD-04-009 | ctOS node | Hack a network node to open doors, data or security in the area. | Legion (unsure) |
 | WD-04-010 | Data centre | Enter a server site and hack its core for story or side objectives. | Legion |
 | WD-04-011 | Nethack upgrade | Unlock a view that picks out hackable objects through walls. | Legion (unsure) |
 | WD-04-012 | Armed camera | Take over an armed security camera and fire it at enemies. | WD1 Bad Blood |
+| WD-04-013 | Hacker vision | Hold the profiler to highlight every hackable device and person in range. | WD1, WD2, Legion |
+| WD-04-014 | Camera tagging | Mark people and vehicles spotted through a camera; they stay tagged on the map. | WD1, WD2, Legion |
+| WD-04-015 | Hack from camera view | Trigger city objects and other hacks while the view is inside a hacked camera. | WD1, WD2, Legion |
 
 
 ## 5. Gadgets and tools
 
 | ID | Feature | What the player does or sees | Where |
 |---|---|---|---|
-| WD-05-001 | Lure | Throw a small electronic noisemaker that pulls enemies toward the sound. | WD1 |
+| WD-05-001 | Lure | Throw a small electronic noisemaker that pulls enemies toward the sound. | WRONG: WD2 has no throwable Lure; there distractions are sent to phones. |
 | WD-05-002 | Jam Coms | Interrupt phone calls, block police scans and stop enemies calling reinforcements. | WD1 |
 | WD-05-003 | Blackout | Cut the power across the city block for a short time. | WD1 |
 | WD-05-004 | ctOS Scan | Use a one-shot scan that detects and tags enemies in the area. | WD1 |
@@ -139,7 +156,7 @@
 | WD-05-010 | 3D printer | Use the hackerspace printer to build and equip weapons, gadgets, the jumper and the quadcopter. | WD2 |
 | WD-05-011 | Electro shock device | Throw a shock device that knocks people out, then detonate all placed units together. | WD2 |
 | WD-05-012 | Explosive device | Throw a lethal explosive device, then detonate all placed units together. | WD2 |
-| WD-05-013 | Shock zapper | A small remote shock charge dropped from the jumper or quadcopter. | WD2 (unsure) |
+| WD-05-013 | Shock zapper | A small remote shock charge dropped from the jumper or quadcopter. | WD2 |
 | WD-05-014 | AR Cloak | Turn an operative nearly invisible to guards for a short time. | Legion |
 | WD-05-015 | Gun Jam | Jam an enemy's weapon so it cannot fire. | Legion |
 | WD-05-016 | Uniformed Access | Wear a faction uniform to walk through guarded areas without being stopped. | Legion |
@@ -158,6 +175,7 @@
 | WD-05-029 | AR medical shield | Project a medical shield that protects and heals the user. | Legion |
 | WD-05-030 | Aiden's blackout | As Aiden, cut power in a building or block to move unseen. | Legion Bloodline |
 | WD-05-031 | Wrench Jr. | Wrench's small companion drone that can be sent to do a job. | Legion Bloodline (unsure) |
+| WD-05-032 | Hologram clone | Project a holographic decoy of the operative that walks off and draws enemy fire. | Legion |
 
 
 ## 6. Moving on foot
@@ -179,6 +197,10 @@
 | WD-06-013 | Ledge drop | Hang from a ledge and drop to the ground below. | WD1, WD2 (unsure) |
 | WD-06-014 | Slide into cover | Sprint into cover to slide behind it. | WD2 (unsure) |
 | WD-06-015 | Crowd push | Shove through pedestrians when running. | WD2, Legion (unsure) |
+| WD-06-016 | Jump | Press the jump button to hop gaps and grab ledges. | WD1, WD2, Legion |
+| WD-06-017 | Fall damage | Landing from a high drop hurts or kills the character. | WD1 |
+| WD-06-018 | Operative movement differences | Operatives run at different speeds depending on their age and build. | Legion |
+| WD-06-019 | Building entry | Open a door and walk into a shop, cafe or lobby in the open world. | WD1, WD2, Legion |
 
 
 ## 7. Driving and vehicles
@@ -202,7 +224,7 @@
 | WD-07-015 | Car dealership | Buy a car and keep it for later delivery. | WD1, WD2 |
 | WD-07-016 | Ramming | Drive into other cars to damage and push them. | WD1, WD2, Legion |
 | WD-07-017 | Auto-drive | Switch a car to self-driving so it follows the roads by itself. | Legion |
-| WD-07-018 | Driver SF | Take driving jobs, pick up passengers and deliver cars for pay. | WD2 |
+| WD-07-018 | Driver SF | Take driving jobs, pick up passengers and deliver cars for pay. | DUPLICATE of WD-12-029 |
 | WD-07-019 | Bertha | Drive T-Bone's armored school bus. | WD2 T-Bone Content Bundle |
 | WD-07-020 | CyruX | The self-driving biometric car added in the DLC. | WD2 Human Conditions |
 | WD-07-021 | Getaway car | Summon your personal getaway car anywhere. | Legion |
@@ -210,6 +232,10 @@
 | WD-07-023 | Boat driving on the Thames | Use boats in London's river. | Legion (unsure) |
 | WD-07-024 | Vehicle paint jobs | Take a car to be resprayed in a chosen color. | WD2 (unsure) |
 | WD-07-025 | Auto-taxis | Ride in or take over self-driving taxis around London. | Legion (unsure) |
+| WD-07-026 | Vehicle damage states | Cars smoke, catch fire and explode after hits; tires can burst. | WD1, WD2, Legion |
+| WD-07-027 | Drive-by shooting | Fire a pistol or rifle from the driver's seat while moving. | WD2, Legion |
+| WD-07-028 | Carjacking | Stop an occupied car and pull the driver out to steal it. | WD1, WD2, Legion |
+| WD-07-029 | Parked car theft | Walk up to an empty car, break in and drive it away. | WD1, WD2, Legion |
 
 
 ## 8. Combat, stealth and non-lethal play
@@ -219,7 +245,7 @@
 | WD-08-001 | Focus | Press R3/Alt to slow time while aiming, driving or hacking. | WD1 |
 | WD-08-002 | Melee takedown | Close in and take down an enemy with the baton. | WD1, WD2 |
 | WD-08-003 | Cover takedown | Pull an enemy over his cover for a quiet takedown. | WD1 |
-| WD-08-004 | Stealth takedown | Take an enemy down from behind without raising the alarm. | WD2, Legion |
+| WD-08-004 | Stealth takedown | Take an enemy down from behind without raising the alarm. | WD1, WD2, Legion |
 | WD-08-005 | Pistols | Fight with the game's handguns. | WD1, WD2, Legion |
 | WD-08-006 | Submachine guns | Fight with compact automatic weapons. | WD1, WD2 (unsure) |
 | WD-08-007 | Assault rifles | Fight with full automatic rifles. | WD1, WD2, Legion |
@@ -250,6 +276,12 @@
 | WD-08-032 | Shockwave punch | Bare-knuckle special that knocks down several enemies at once. | Legion |
 | WD-08-033 | Silent pistol | Spy's suppressed P9 for quiet kills. | Legion |
 | WD-08-034 | Non-lethal takedown from cover | Pull a guard over cover and knock him out. | WD2 (unsure) |
+| WD-08-035 | Health regeneration | Break contact with attackers and the health bar refills itself. | WD1, WD2, Legion |
+| WD-08-036 | Alarm states | Enemies move from unaware to suspicious to alert, with icons over their heads. | WD1, WD2, Legion |
+| WD-08-037 | Weapon selection | Pick guns from a quick radial menu or cycle them with the d-pad. | WD1, WD2, Legion |
+| WD-08-038 | Drop takedown | Jump down onto an enemy from above and take him out. | WD2, Legion |
+| WD-08-039 | Enforcer combat takedown | As Aiden, take down a heavy Enforcer with a combat move. | DUPLICATE of WD-10-017 |
+| WD-08-040 | Stealth sprint | Sprint with a smaller detection radius. | DUPLICATE of WD-10-008 |
 
 
 ## 9. Police, heat and response
@@ -273,7 +305,7 @@
 | WD-09-015 | Chicago South Club | Organized crime gang holding territory and running convoys. | WD1 |
 | WD-09-016 | Fixers | Criminal contractors who take kidnapping and killing jobs. | WD1, WD1 Bad Blood |
 | WD-09-017 | Pawnee Militia | Armed militia based in the rural Pawnee area. | WD1 |
-| WD-09-018 | Witness calls | A passer-by who sees a crime calls 911 and brings the police. | WD2, Legion (unsure) |
+| WD-09-018 | Witness calls | A passer-by who sees a crime calls 911 and brings the police. | WD1, WD2, Legion |
 | WD-09-019 | Tezcas | San Francisco gang that patrols its turf and fights back. | WD2 |
 | WD-09-020 | Bratva | Russian mob faction fought in the Human Conditions missions. | WD2 Human Conditions |
 | WD-09-021 | Prime_Eight | A rival hacker group in the story whose members guard key sites. | WD2 |
@@ -293,6 +325,10 @@
 | WD-09-035 | Albion Vendetta | A trait that makes Albion open fire on sight. | Legion |
 | WD-09-036 | Rempart security | Armed corporate guards and robots in the Bloodline expansion. | Legion Bloodline |
 | WD-09-037 | Police scanner audio | Radio chatter announces units and what they are doing during a chase. | WD1, WD2 (unsure) |
+| WD-09-038 | Black Viceroys | The hacker-terrorist gang behind the story's attacks. | WD1 |
+| WD-09-039 | Umeni | A terrorist cell fought during the story's drone attacks. | WD2 |
+| WD-09-040 | Aggression level | Attacks on Albion and civilians raise an aggression meter that brings heavier units and drones. | Legion |
+| WD-09-041 | Enforcers | Armored private security that guard sites and fight with heavy weapons. | WD1 |
 
 
 ## 10. Skills, progression and unlocks
@@ -466,6 +502,8 @@
 | WD-11-076 | Helen Dashwood | Recruit the unique elderly operative from a DedSec story. | Legion (unsure) |
 | WD-11-077 | Lynx | Play the parkour operative from the Deluxe Edition. | Legion |
 | WD-11-078 | Stormzy | Play the musician in a special mission. | Legion |
+| WD-11-079 | Unique recruits | Named premade recruits with fixed looks and rare perks can be found around London. | Legion |
+| WD-11-080 | T-Bone | Play Raymond "T-Bone" Kenney as the fixed protagonist of the expansion. | WD1 Bad Blood |
 
 
 ## 12. Story, missions and side activities
@@ -533,6 +571,7 @@
 | WD-12-059 | Rempart robot fights | Fight the robot army on Rempart's barge in the finale. | Legion Bloodline |
 | WD-12-060 | Project THEMIS | Investigate Albion's drone project that targets people before they commit crimes. | Legion |
 | WD-12-061 | Slave auction raid | Infiltrate Clan Kelley's auction and free the trafficked people. | Legion |
+| WD-12-062 | Darts | Play a game of darts at a pub board against a local. | Legion (unsure) |
 
 
 ## 13. The city and world
@@ -594,6 +633,11 @@
 | WD-13-053 | Weather | Rain, thunder storms and fog roll through the city. | WD1, WD2, Legion |
 | WD-13-054 | ctOS surveillance grid | Cameras, drones and profiles cover the streets and are run by the city network. | WD1, WD2, Legion |
 | WD-13-055 | Borough change after uprising | A liberated borough shows less Albion presence and different locals. | Legion |
+| WD-13-056 | Navy Pier | The lakeshore pier with the big wheel. | WD1 (unsure) |
+| WD-13-057 | Nudle campus | The search giant's campus in Silicon Valley. | WD2 |
+| WD-13-058 | Hackney | East London borough of markets, canals and terraces. | Legion |
+| WD-13-059 | Sutro Tower | The hilltop radio tower landmark overlooking the city. | WD2 |
+| WD-13-060 | Wrigley Field | The old ballpark used in a story mission. | WD1 (unsure) |
 
 
 ## 14. People and street life
@@ -622,6 +666,7 @@
 | WD-14-020 | Fame reaction | A famous operative is recognised in the street and draws a crowd. | Legion |
 | WD-14-021 | Traffic behaviour | Drivers stop at lights, honk and react when their car is hacked. | WD1, WD2, Legion |
 | WD-14-022 | Citizens help or hinder | Some bystanders step in or cheer when you fight locally. | WD1 (unsure) |
+| WD-14-023 | Armed threat reaction | People raise their hands, run or cower when a gun is pointed at them. | WD1, WD2, Legion |
 
 
 ## 15. Money and economy
@@ -648,6 +693,7 @@
 | WD-15-018 | Bloodline payments | Fixer contracts and missions pay ETO in the expansion. | Legion Bloodline |
 | WD-15-019 | VIP status | Deluxe Edition grants a week of VIP status. | Legion |
 | WD-15-020 | No in-game purchases of power | The games do not sell stat upgrades for real money. | WD1, WD2, Legion (unsure) |
+| WD-15-021 | Crime prevention reward | Stopping a predicted crime pays cash along with reputation. | WD1 (unsure) |
 
 
 ## 16. Character customisation
@@ -676,6 +722,7 @@
 | WD-16-020 | Wrench's masks | Switch between Wrench's LED face masks. | Legion Bloodline |
 | WD-16-021 | DedSec car skin | Apply the DedSec paint scheme from the season pass to a vehicle. | Legion |
 | WD-16-022 | Mask collectibles | Find and wear themed masks hidden around London. | Legion (unsure) |
+| WD-16-023 | DedSec mask | Wear the DedSec face mask on any operative. | Legion |
 
 
 ## 17. Phone, apps, HUD and interface
@@ -689,7 +736,7 @@
 | WD-17-005 | Digital Trips app | Launch the dream minigames from the phone. | WD1 |
 | WD-17-006 | QR scanner | Use the phone camera to read QR code stickers. | WD1 |
 | WD-17-007 | Map app | Set waypoints and follow the GPS route line. | WD1, WD2, Legion |
-| WD-17-008 | Health bar | A meter shows Aiden's condition and refills out of combat. | WD1 |
+| WD-17-008 | Health bar | A meter shows the character's condition and refills out of combat. | WD1, WD2, Legion |
 | WD-17-009 | Ammo counter | Shows the rounds left in the weapon. | WD1, WD2, Legion |
 | WD-17-010 | Battery meter | Shows how many hacks can be used before the battery recharges. | WD1 |
 | WD-17-011 | Focus meter | Shows how much Focus time is left. | WD1 |
@@ -725,6 +772,9 @@
 | WD-17-041 | Underground fast travel map | Pick a Tube station on the map to travel there instantly. | Legion |
 | WD-17-042 | Weapon wheel | Hold the weapon button to pick a gun from the carried set. | WD1, WD2, Legion |
 | WD-17-043 | Gadget wheel | Hold the gadget button to pick a throwable or tool. | WD1, WD2, Legion |
+| WD-17-044 | Hack battery (Legion) | A ring meter drains as you hack and recharges over time. | Legion |
+| WD-17-045 | Map legend | The map lists icons for shops, activities, collectibles and services. | WD1, WD2, Legion |
+| WD-17-046 | SongSneak app | The phone names the song playing nearby and saves it to the playlist. | WD2 |
 
 
 ## 18. Online and multiplayer
@@ -751,6 +801,8 @@
 | WD-18-018 | Online event pop-ups | The game notifies you when another player is invading or a mode is starting. | WD1, WD2 |
 | WD-18-019 | Friendly fire off | Player weapons do not hurt co-op partners. | WD2, Legion Online (unsure) |
 | WD-18-020 | No online in Bloodline | The expansion is single-player only. | Legion Bloodline |
+| WD-18-021 | Online Decryption | Two teams fight over an encrypted file in an arena. | WD1 |
+| WD-18-022 | Invasion (Legion) | Invade another player's London and hack data while they hunt you. | Legion Online (unsure) |
 
 
 ## 19. Audio and music
@@ -772,6 +824,7 @@
 | WD-19-013 | Bagley voice | The AI assistant speaks to you through the phone and safehouse. | Legion |
 | WD-19-014 | Protest soundscape | Chants, megaphones and sirens layer over protest areas. | Legion |
 | WD-19-015 | Subtitle sound cues | Subtitles also describe important off-screen sounds. | WD1, WD2, Legion (unsure) |
+| WD-19-016 | Hack audio cues | Distinct sounds play for scans, successful hacks and failed attempts. | WD1, WD2, Legion |
 
 
 ## 20. Settings, saves, accessibility, photo mode
@@ -808,6 +861,7 @@
 | WD-20-028 | Performance and quality modes | Choose frame rate or resolution priority on the newer consoles. | Legion (unsure) |
 | WD-20-029 | Cross-generation upgrade | Upgrade the game to the newer console version with save transfer. | Legion (unsure) |
 | WD-20-030 | Tutorial prompts | Toggle tutorial hints on or off. | WD1, WD2, Legion (unsure) |
+| WD-20-031 | PC graphics options | Set resolution, vsync and quality levels on PC. | WD1, WD2, Legion |
 
 
 ## 21. Other
@@ -828,10 +882,11 @@
 | WD-21-012 | Fallen operative memorial | Dead operatives are remembered on a wall in the safehouse. | Legion (unsure) |
 | WD-21-013 | Skye Larsen choice | Decide whether to finish or stop Larsen's mind upload in the campaign. | Legion |
 | WD-21-014 | Dog in a spiderbot | The story beat where a dog's mind is found inside a spiderbot. | Legion |
-| WD-21-015 | Wrench's news drone argument | Story scene where Marcus and Wrench argue about the movie ending. | Legion Bloodline |
+| WD-21-015 | Wrench's news drone argument | Story scene where Marcus and Wrench argue about the movie ending. | WRONG: Marcus does not appear in Bloodline; this scene is in WD2. |
 | WD-21-016 | Ubisoft Connect challenges | Extra challenges and rewards tied to the Ubisoft account. | WD2, Legion (unsure) |
 | WD-21-017 | In-game credits | A credits roll after finishing each campaign. | WD1, WD2, Legion |
 | WD-21-018 | Watch Dogs 2 season pass | Bundles T-Bone, Human Conditions, No Compromise and other content. | WD2 |
 | WD-21-019 | Root Access Bundle | A bundle with the Zodiac Killer mission and themed items. | WD2 (unsure) |
 | WD-21-020 | DedSec stories bundles | Three separate story packs sold with the season pass. | Legion |
+| WD-21-021 | Single-player DLC packs | Small packs add outfits, weapons and cars, such as the Untouchables, Palace and Signature Shot packs. | WD1 (unsure) |
 

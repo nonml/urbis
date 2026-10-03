@@ -6,7 +6,7 @@
 |---|---|---|---|
 | CP-01-001 | Walking | Move without sprinting; slowest speed, steadiest aim and quietest on foot. | 1.0 |
 | CP-01-002 | Sprinting | Hold Sprint (Shift / left stick click) to run faster; burns stamina while held. | 1.0 |
-| CP-01-003 | Movement stamina | Yellow stamina bar drains from sprinting, jumping, dashing and blocking; empty forces slower movement. | 1.0 |
+| CP-01-003 | Movement stamina | Yellow stamina bar drains from sprinting, jumping, dashing and blocking; empty forces slower movement. | WRONG: there is no stamina bar; sprinting and jumping cost nothing, stamina only matters for melee attacks |
 | CP-01-004 | Crouching | Press the crouch key to duck; smaller profile, slower steps, quieter footsteps. | 1.0 |
 | CP-01-005 | Sliding | Press crouch while sprinting to slide low along the ground, under gaps and around corners. | 1.0 |
 | CP-01-006 | Jumping | Press Jump to hop; vaults low fences and crates automatically when running at them. | 1.0 |
@@ -14,7 +14,7 @@
 | CP-01-008 | Climbing ladders | Interact at a ladder to climb up or down between levels. | 1.0 |
 | CP-01-009 | Dodge | Tap the dodge/evade key with a direction to lunge sideways or back out of fire. | 1.0 |
 | CP-01-010 | Dash | Double-tap a direction or use the evade key to burst forward; works as a free combat move. | 2.0 |
-| CP-01-011 | Air dash | Maneuvering System leg cyberware lets V dash while airborne to cross gaps. | 2.0 (unsure) |
+| CP-01-011 | Air dash | Maneuvering System leg cyberware lets V dash while airborne to cross gaps. | WRONG: Cyberpunk 2077 has no air dash or "Maneuvering System" leg cyberware |
 | CP-01-012 | Double jump | Reinforced Tendons leg cyberware adds a second jump in mid-air. | 1.x |
 | CP-01-013 | Charged jump | Fortified Ankles leg cyberware; hold Jump to charge a higher, longer leap. | 1.x |
 | CP-01-014 | Quiet footsteps (Lynx Paws) | Lynx Paws leg cyberware muffles footstep noise for sneaking. | 1.x |
@@ -23,9 +23,9 @@
 | CP-01-018 | Diving underwater | Press crouch while swimming to go under the surface and swim submerged. | 1.0 |
 | CP-01-019 | Fast travel dataterms | Interact with a blue dataterm to travel instantly to any discovered dataterm. | 1.0 |
 | CP-01-020 | Dataterm discovery | Walking up to a dataterm unlocks it as a fast travel destination on the map. | 1.0 |
-| CP-01-021 | Fast travel from map | Select a discovered dataterm icon on the map to travel there. | 1.0 (unsure) |
+| CP-01-021 | Fast travel from map | Select a discovered dataterm icon on the map to travel there. | 1.0 |
 | CP-01-022 | Sitting down | Interact prompts let V sit on benches, chairs, bar stools and ledges. | 1.0 |
-| CP-01-023 | Passing time | Some interactions and menus let V wait and skip hours to change time of day. | 1.0 (unsure) |
+| CP-01-023 | Passing time | Some interactions and menus let V wait and skip hours to change time of day. | WRONG: there is no generic wait feature; time skips only by sleeping or riding the metro (2.1) |
 | CP-01-024 | Elevators | Call and ride elevators inside megabuildings and towers. | 1.0 |
 | CP-01-025 | Body doors | High Body lets V rip open jammed doors and lift heavy barriers. | 1.0 |
 | CP-01-026 | Technical doors | Technical Ability lets V open sealed electronic doors and shutters. | 1.0 |
@@ -38,6 +38,9 @@
 | CP-01-035 | Fence and railing hops | V can jump over railings, fences and boxes without stopping. | 1.0 |
 | CP-01-036 | Water edge climbing | V climbs out of water at marked dock edges and ladders. | 1.0 |
 | CP-01-038 | Rooftop routes | Ladders, fire escapes and scaffolds create walking routes above street level. | 1.0 |
+| CP-01-039 | Sandevistan slow time | A Sandevistan (Militech "Apogee", Dynalar "Sandevistan" and others) slows the world to a crawl while V moves at normal speed. | DUPLICATE of CP-04-035 |
+| CP-01-040 | Kerenzikov | A Kerenzikov implant slows time briefly while V blocks or dodges. | DUPLICATE of CP-04-076 |
+| CP-01-041 | Charge + double jump stack | With both Fortified Ankles and Reinforced Tendons, the charged leap also counts as the first of two jumps. | 1.x |
 
 ## 2. Driving and vehicles
 
@@ -51,7 +54,7 @@
 | CP-02-006 | Vehicle headlights | Lights come on at night; some vehicles let V toggle them. | 1.0 |
 | CP-02-007 | Cockpit camera | Switch to a first-person view from inside the car or on the bike. | 1.0 |
 | CP-02-008 | Chase camera | Third-person camera follows the vehicle; three distances can be chosen in settings. | 1.0 |
-| CP-02-009 | Vehicle camera options | Settings configure camera style and distance for driving. | 2.0 |
+| CP-02-009 | Vehicle camera options | Settings configure camera style and distance for driving. | DUPLICATE of CP-02-008 |
 | CP-02-010 | Free look while driving | Move the look stick/camera to check side streets while driving. | 1.0 |
 | CP-02-011 | Exit moving vehicle | V can bail out of a rolling vehicle and roll on landing. | 1.0 |
 | CP-02-012 | Quick vehicle exit perk | A perk lets V leave a moving vehicle faster and with a flourish. | 2.0 |
@@ -70,7 +73,7 @@
 | CP-02-025 | Mounted machine guns | Some cars carry built-in machine guns that fire with infinite ammo but must reload. | 2.0 |
 | CP-02-026 | Mounted rockets | Some armed vehicles fire rockets at targets ahead. | 2.0 |
 | CP-02-027 | Tire damage | Tires can be shot or slashed, making vehicles swerve and stop. | 2.0 |
-| CP-02-028 | Vehicle durability | Vehicles take damage and vary in toughness; CrystalDome models resist more. | 2.0 |
+| CP-02-028 | Vehicle durability | Vehicles take damage and vary in toughness; CrystalDome models resist more. | WRONG: CrystalDome is Rayfield lore, not a game toughness stat; vehicles just vary in hit points |
 | CP-02-029 | Vehicle destruction | Wrecked vehicles burn and explode, damaging anyone nearby. | 1.0 |
 | CP-02-030 | Health items while driving | Use healing items from behind the wheel during vehicle combat. | 2.0 |
 | CP-02-031 | Passenger shooting | Passengers can use sidearms as well, not just the driver. | 2.0 |
@@ -78,7 +81,7 @@
 | CP-02-034 | Vehicle collision perks | Perks raise ramming damage and vehicle weapon damage. | 2.0 |
 | CP-02-035 | Off-road vs street tires | Grip and top speed change off-road; street cars lose traction on dirt. | 1.0 |
 | CP-02-036 | Speed-sensitive steering | Steering sharpness adapts to speed on most vehicles. | 2.0 |
-| CP-02-037 | Torque curve handling | Each engine accelerates differently (turbo, supercharger, hybrid). | 2.0 |
+| CP-02-037 | Torque curve handling | Each engine accelerates differently (turbo, supercharger, hybrid). | WRONG: not a vehicle feature of Cyberpunk 2077 |
 | CP-02-038 | Buying vehicles at AUTOFIXER | Buy cars and bikes from the AUTOFIXER netpage on V's computer. | 2.0 |
 | CP-02-039 | AUTOFIXER gas station terminals | Use in-world terminals at gas stations and repair shops to open AUTOFIXER. | 2.0 |
 | CP-02-040 | AUTOFIXER map filter | Turn on the Autofixer filter on the world map to find purchase terminals. | 2.0 |
@@ -88,10 +91,10 @@
 | CP-02-047 | Ambient faction chases | Random AI chases between factions can be met while driving around. | 2.0 |
 | CP-02-048 | Traffic lane switching | NPC cars change lanes to avoid obstacles and stopped vehicles. | 2.0 |
 | CP-02-049 | Pedestrian avoidance | Walking pedestrians dodge out of the way of moving vehicles. | 2.0 |
-| CP-02-050 | Traffic density by time | Busier streets at rush hours, thinner traffic late at night. | 2.0 |
+| CP-02-050 | Traffic density by time | Busier streets at rush hours, thinner traffic late at night. | WRONG: ambient traffic density does not change with the time of day |
 | CP-02-051 | Hit-and-run gore | Running people over injures or kills them and can raise NCPD heat. | 1.0 |
 | CP-02-053 | Motorcycle leaning | Bikes lean far over in corners and look heavier at speed. | 2.1 |
-| CP-02-054 | Motorcycle wheelies and flips | Pull wheelies and even flips on a bike. | 2.1 |
+| CP-02-054 | Motorcycle wheelies and flips | Pull wheelies and even flips on a bike. | WRONG: no player-controlled wheelies or flips; only physics lift under acceleration |
 | CP-02-055 | Knife throwing while riding | Throw knives while riding a motorcycle. | 2.1 |
 | CP-02-056 | CrystalCoat paint | Repaint supported Herrera, Mizutani, Quadra and Villefort cars. | 2.2 |
 | CP-02-057 | CrystalCoat and NCPD heat | Changing paint helps fool the police and lower the wanted level. | 2.2 |
@@ -100,11 +103,18 @@
 | CP-02-060 | Johnny as passenger | After Act 1 Johnny sometimes sits in the passenger seat and comments while V drives. | 2.2 |
 | CP-02-061 | New highway | An additional highway route was opened for driving. | 2.1 |
 | CP-02-063 | Quest reward vehicles | Jobs give unique rides such as Jackie's Arch, Johnny's Porsche 911 and Delamain No. 21. | 1.0 |
-| CP-02-064 | Hidden free supercar | A free Rayfield Caliburn waits in a cave in the Badlands. | 1.0 (unsure) |
+| CP-02-064 | Hidden free supercar | A free Rayfield Caliburn waits in a cave in the Badlands. | 1.0 |
 | CP-02-065 | Vehicle manufacturers | Around 14 makers supply vehicles, from Archer compacts to Rayfield hypercars. | 1.0 |
 | CP-02-066 | Vehicle classes | Vehicles range from compacts, sedans, sports and muscle cars to hypercars, SUVs, vans and trucks. | 1.0 |
 | CP-02-067 | 2.2 Autofixer additions | Ten street-requested models were added to AUTOFIXER, two of them Phantom Liberty only. | 2.2 |
 | CP-02-068 | Vehicle radio | The car radio plays stations and can be switched while driving. | 1.0 |
+| CP-02-069 | Entering stolen traffic cars | Some moving NPC cars can be stopped and taken, then kept only as a not-for-sale ride. | DUPLICATE of CP-02-019 |
+| CP-02-070 | Summon range | Called vehicles arrive only if V is on a drivable road network; no car appears on a plaza or rooftop. | 1.0 |
+| CP-02-071 | Delamain cab AI | Delamain's cab AI talks to V, gives rides and later splits into rogue cabs in the "Epistrophy" quest. | 1.0 |
+| CP-02-072 | Mandatory driving missions | Story jobs put V behind the wheel, like chasing the flathead or escorting the kang tao transport. | 1.0 |
+| CP-02-073 | Delivery timer contracts | Paid delivery jobs timed by navigation points; failing means reduced pay. | WRONG: Cyberpunk 2077 has no timed delivery contracts |
+| CP-02-074 | Carhacker vehicle hacks | The Carhacker Intelligence perk unlocks Self-Destruct, Take Control, Floor It and Emergency Brake against other vehicles. | 2.0 |
+| CP-02-075 | Trivial tow hack | Use the dedicated DAEMON EMP quickhack to make an occupied car stop or swerve. | WRONG: no such quickhack; the real vehicle hacks are Self-Destruct, Take Control, Floor It and Emergency Brake |
 
 ## 3. Combat and weapons
 
@@ -116,8 +126,8 @@
 | CP-03-004 | Precision rifles | Semi-auto rifles built for aimed single shots. | 1.0 |
 | CP-03-005 | Submachine guns | Small automatic weapons that fire fast at close range. | 1.0 |
 | CP-03-006 | Shotguns | Spread pellets at close range with heavy stagger. | 1.0 |
-| CP-03-007 | Light machine guns | Belt-fed heavy automatics with big magazines and heavy recoil. | 1.0 |
-| CP-03-091 | Heavy machine guns | Turret HMGs can be ripped off their mounts by high-Body V and used as weapons. | 1.0 |
+| CP-03-007 | Light machine guns | Belt-fed heavy automatics with big magazines and heavy recoil. | WRONG: Cyberpunk 2077 has no LMG weapon class |
+| CP-03-091 | Heavy machine guns | Turret HMGs can be ripped off their mounts by high-Body V and used as weapons. | WRONG: mounted turrets cannot be removed or carried as weapons |
 | CP-03-008 | Sniper rifles | Bolt-action or scoped rifles with the longest range and scope zoom. | 1.0 |
 | CP-03-009 | Bladed melee | Katanas, machetes and knives swung in light and heavy attacks. | 1.0 |
 | CP-03-010 | Blunt melee | Bats, pipes and hammers that stagger and knock enemies down. | 1.0 |
@@ -147,8 +157,8 @@
 | CP-03-034 | Suppressor mods | Fit a suppressor to quiet shots and hide the muzzle flash. | 1.0 |
 | CP-03-035 | Muzzle mods | Muzzle brakes and compensators cut recoil and spread. | 1.0 |
 | CP-03-036 | Permanent mods | Once installed, a weapon mod cannot be removed or replaced. | 2.0 |
-| CP-03-037 | Mod slot removals | Revolvers lost their silencer slot and LMGs lost their scope slot. | 2.0 |
-| CP-03-038 | Weapon mod crafting | Craft a mod by combining two mods of lower quality. | 2.0 |
+| CP-03-037 | Mod slot removals | Revolvers lost their silencer slot and LMGs lost their scope slot. | WRONG: names a nonexistent LMG class; there was no such slot change |
+| CP-03-038 | Weapon mod crafting | Craft a mod by combining two mods of lower quality. | WRONG: mods are crafted from components using specs, not by combining mods |
 | CP-03-039 | Two-slot crafted weapons | Crafted weapons can roll up to two mod slots. | 2.1 |
 | CP-03-040 | Mod drops | Enemies and containers drop weapon mods more often, and vendors stock more. | 2.1 |
 | CP-03-041 | Pax mod | The non-lethal Pax mod is always available from weapon vendors. | 2.1 |
@@ -159,7 +169,7 @@
 | CP-03-046 | Melee blocking | Hold block with a melee weapon to absorb hits and drain less stamina. | 2.0 |
 | CP-03-047 | Melee parry | Time a block against an incoming attack to open enemies up. | 2.0 |
 | CP-03-048 | Melee combos | Chain light attacks into combo strings with finisher swings. | 2.0 |
-| CP-03-049 | Heavy melee attacks | Charged, slower swings that stagger or knock enemies down. | 2.0 |
+| CP-03-049 | Heavy melee attacks | Charged, slower swings that stagger or knock enemies down. | WRONG: heavy melee attacks existed since 1.0 (hold the attack button) |
 | CP-03-050 | Sprint attacks | Attack out of a sprint for extra impact. | 2.0 |
 | CP-03-051 | Melee finishers | Brutal finishing animations trigger on staggered enemies. | 2.0 |
 | CP-03-052 | Frag grenades | Throw for explosion damage in a radius. | 1.0 |
@@ -178,10 +188,10 @@
 | CP-03-065 | Divided We Stand | Iconic assault rifle that fires tracking rounds. | 1.0 |
 | CP-03-066 | Psalm 11:6 | Iconic assault rifle found in a side job. | 1.0 |
 | CP-03-067 | Yinglong | Iconic submachine gun from a main-job heist. | 1.0 |
-| CP-03-068 | Ba Xing Chong | Iconic smart shotgun found in Phantom Liberty. | PL |
+| CP-03-068 | Ba Xing Chong | Iconic smart shotgun found in Phantom Liberty. | WRONG: base-game weapon; crafting spec is in Adam Smasher's vault on the Ebunike, not Phantom Liberty |
 | CP-03-069 | Malorian Arms 3516 | Johnny Silverhand's iconic heavy pistol, obtained through his questline. | 1.0 |
 | CP-03-070 | Archangel | Kerry Eurodyne's iconic revolver. | 1.0 |
-| CP-03-071 | Amnesty | Iconic revolver tied to Badlands gigs. | 1.0 (unsure) |
+| CP-03-071 | Amnesty | Iconic revolver tied to Badlands gigs. | 1.0 |
 | CP-03-072 | Crash | Iconic revolver tied to River Ward's questline. | 1.0 |
 | CP-03-073 | Lizzie | Iconic tech pistol from Lizzie's Bar. | 1.0 |
 | CP-03-074 | Genjiroh | Iconic smart pistol from a fixer job. | 1.0 |
@@ -189,18 +199,30 @@
 | CP-03-076 | Satori | Iconic katana found during the Arasaka heist. | 1.0 |
 | CP-03-077 | Scalpel | Iconic katana tied to Wakako's gigs. | 1.0 |
 | CP-03-078 | Byakko | Iconic katana from a Wakako gig chain. | 1.0 |
-| CP-03-079 | Thermal katana | A glowing thermal katana was added as an iconic blade. | 2.0 |
+| CP-03-079 | Thermal katana | A glowing thermal katana was added as an iconic blade. | WRONG: the glowing thermal katana (Errata) existed since 1.0; 2.0 added none |
 | CP-03-080 | Fenrir | Iconic submachine gun from the Maelstrom storyline. | 1.0 |
 | CP-03-081 | Buzzsaw | Iconic submachine gun with a unique firing effect. | 1.0 |
-| CP-03-082 | Hypercritical | Iconic tech rifle from a side job. | 1.0 (unsure) |
-| CP-03-083 | The Headsman | Iconic shotgun from the early main story. | 1.0 (unsure) |
+| CP-03-082 | Hypercritical | Iconic tech rifle from a side job. | 1.0 |
+| CP-03-083 | The Headsman | Iconic shotgun from the early main story. | 1.0 |
 | CP-03-084 | La Chingona Dorada | Jackie's iconic pistols, kept during the Heroes side job. | 1.0 |
-| CP-03-085 | Sovereign | Iconic revolver sold by the Dogtown black market. | PL |
-| CP-03-086 | Osprey | Iconic rifle from Phantom Liberty content. | PL (unsure) |
+| CP-03-085 | Sovereign | Iconic revolver sold by the Dogtown black market. | WRONG: Sovereign is a power double-barrel shotgun from a crafting spec, not a revolver |
+| CP-03-086 | Osprey | Iconic rifle from Phantom Liberty content. | PL |
 | CP-03-087 | Iconic stash wall | The apartment stash wall displays every collected Iconic weapon. | 2.0 |
 | CP-03-088 | Weapon vendor scaling | Vendor weapon stock grows with V's tier and level. | 2.0 |
 | CP-03-089 | Tier damage scaling | Weapon damage scales with the weapon's tier rather than mods. | 2.0 |
 | CP-03-090 | Smart weapon rebalance | Smart weapons do less base damage but gain dedicated perks. | 2.0 |
+| CP-03-092 | Kongou | Power pistol from The Heist; ricochets even without cyberware and has very low recoil. | 1.0 |
+| CP-03-093 | Chaos | Tech pistol from The Pickup; stats and crit behavior reroll after every reload. | 1.0 |
+| CP-03-094 | Cottonmouth | Iconic pistol whose shots can poison enemies, found in a Watson gig. | 1.0 (unsure) |
+| CP-03-095 | Dying Night | Iconic pistol with electric effects won from Wilson's shooting-range side job. | 1.0 (unsure) |
+| CP-03-096 | Breakthrough | Iconic tech precision rifle whose shots punch through cover even uncharged. | 1.0 |
+| CP-03-097 | Sir John Phallustiff | Novelty blunt weapon marked with a heart, obtained from a Clouds-related gig. | 1.0 (unsure) |
+| CP-03-098 | Tsumetogi | Iconic katana that deals shock damage, found in the Voodoo Boys arc. | 1.0 (unsure) |
+| CP-03-099 | Gold-Plated Baseball Bat | Gold-painted blunt weapon found during a gig in the city. | 1.0 (unsure) |
+| CP-03-100 | Plan B | Iconic pistol whose every shot costs eddies to fire. | 1.0 (unsure) |
+| CP-03-101 | Guts | Iconic shotgun prized for raw close-range damage, hidden at a fixed spot in the city. | 1.0 (unsure) |
+| CP-03-102 | Errata | Iconic thermal katana with a glowing burning blade, found during the Second Conflict job. | 1.0 |
+| CP-03-103 | Throwing knife class | Patch 2.1 added throwing knives as a full weapon class with its own mods and perks. | 2.1 |
 
 ## 4. Cyberware
 
@@ -284,15 +306,17 @@
 | CP-04-082 | Biomonitor | Circulatory implant that automatically uses a healing item at low health. | 1.0 |
 | CP-04-083 | Second Heart | Circulatory implant that revives V once when killed. | 1.0 |
 | CP-04-084 | Subdermal Armor | Integumentary implant that adds flat armor. | 1.0 |
-| CP-04-085 | Optical Camo | Integumentary implant that makes V nearly invisible for a short time. | 1.5 |
+| CP-04-085 | Optical Camo | Integumentary implant that makes V nearly invisible for a short time. | WRONG: Optical Camo existed at launch (1.0), not patch 1.5 |
 | CP-04-086 | Nano-Plating | Integumentary implant that adds armor and crit chance. | 1.0 |
 | CP-04-087 | Cogito Lattice | Integumentary implant whose armor scales up when RAM is low. | 2.1 |
 | CP-04-088 | Shock-N-Awe | Integumentary implant that discharges electricity at attackers. | 1.0 |
 | CP-04-093 | Leeroy Ligament System | Skeleton implant that adds armor. | 2.1 |
-| CP-04-094 | Rara Avis | Cyberware reducing cyberware capacity cost of other implants. | 2.1 (unsure) |
+| CP-04-094 | Rara Avis | Cyberware reducing cyberware capacity cost of other implants. | 2.1 |
 | CP-04-095 | Universal Booster | Cyberware that lets health item effects stack. | 2.1 |
-| CP-04-096 | Cellular Adapter | Cyberware that resists status effects. | 2.1 (unsure) |
+| CP-04-096 | Cellular Adapter | Cyberware that resists status effects. | 2.1 |
 | CP-04-097 | Cyberpsychosis (fiction) | Losing control from too much chrome is world fiction; cyberpsychos appear in Regina's sighting jobs, and no player meter exists. | 1.0 |
+| CP-04-098 | Capacity from Technical Ability | Technical Ability points add Cyberware Capacity on top of the level gains. | 2.0 |
+| CP-04-099 | Implant capacity costs | Every implant lists how much capacity it consumes before installation. | 2.0 |
 
 ## 5. Quickhacks and netrunning
 
@@ -314,8 +338,8 @@
 | CP-05-014 | Control quickhacks | Disabling quickhacks: Reboot Optics, Cyberware Malfunction, Cripple Movement and Weapon Glitch. | 1.0 |
 | CP-05-015 | Covert quickhacks | Stealth quickhacks: Ping, Bait, Request Backup, Memory Wipe and Sonic Shock. | 1.0 |
 | CP-05-016 | Ultimate quickhacks | High-cost finishers: Cyberpsychosis, Suicide, System Collapse and Detonate Grenade. | 1.0 |
-| CP-05-017 | Device quickhacks | Object hacks: Distract Enemies, Initiate Overload, Friendly Mode, Assist Mode, Take Control and Remote Deactivation. | 2.0 |
-| CP-05-018 | Vehicle quickhacks | With the Carhacker perk, vehicles can be hacked to crash, stop or explode. | PL |
+| CP-05-017 | Device quickhacks | Object hacks: Distract Enemies, Initiate Overload, Friendly Mode, Assist Mode, Take Control and Remote Deactivation. | WRONG: device quickhacks existed since 1.0; 2.0 only reorganized them |
+| CP-05-018 | Vehicle quickhacks | With the Carhacker perk, vehicles can be hacked to crash, stop or explode. | 2.0 |
 | CP-05-019 | Overheat | Sets the target on fire, dealing damage over time and melting armor at high tiers. | 1.0 |
 | CP-05-020 | Short Circuit | Deals electrical damage, extra against drones, mechs and turrets. | 1.0 |
 | CP-05-021 | Contagion | Poison virus that spreads between close enemies and explodes when they burn. | 1.0 |
@@ -331,7 +355,7 @@
 | CP-05-031 | Sonic Shock | Deafens and scrambles the target's comms; combos can knock them out. | 1.0 |
 | CP-05-032 | Cyberpsychosis | Ultimate that turns a target against everyone nearby, or makes them end themselves. | 2.0 |
 | CP-05-033 | Suicide | Ultimate that makes the target shoot themselves. | 1.0 |
-| CP-05-034 | System Collapse | Silent non-lethal knockout and the cleanest trace remover. | 1.0 |
+| CP-05-034 | System Collapse | Silent non-lethal knockout and the cleanest trace remover. | WRONG: System Collapse is a lethal damage-dealing ultimate, not a knockout |
 | CP-05-035 | Detonate Grenade | Forces the target to blow up the grenade in their hands. | 1.0 |
 | CP-05-036 | Blackwall Gateway | Iconic ultimate that spreads lethal Blackwall damage between enemies. | PL |
 | CP-05-037 | Distract Enemies | Device hack that makes a machine act up and pull attention. | 1.0 |
@@ -348,11 +372,12 @@
 | CP-05-049 | Access points | Hack access points to farm eddies, components and quickhacks. | 1.0 |
 | CP-05-050 | Breach on enemies removed | Breach Protocol can no longer be used directly on enemies. | 2.0 |
 | CP-05-051 | Netrunner enemies | Enemy netrunners hack V, lock abilities and trace the source. | 1.0 |
-| CP-05-052 | Self-ICE defense | A Frontal Cortex implant cancels one incoming enemy quickhack. | 1.0 |
+| CP-05-052 | Self-ICE defense | A Frontal Cortex implant cancels one incoming enemy quickhack. | DUPLICATE of CP-04-059 |
 | CP-05-053 | Hacking through cameras | Upload quickhacks through security cameras while staying hidden. | 1.0 |
 | CP-05-054 | Monowire quickhacks | A Relic perk lets the Monowire upload Control quickhacks. | PL |
 | CP-05-055 | Quickhack RAM cost scaling | Higher quickhack tiers cost more or less RAM depending on the hack. | 2.0 |
 | CP-05-056 | Cyberdeck requirement | Without a cyberdeck in the Operating System slot, only device and scanner actions remain. | 1.0 |
+| CP-05-057 | Trace completes | If the trace finishes, the enemy netrunner lands a heavy hit on V through cover. | 2.0 |
 
 ## 6. Stealth and non-lethal play
 
@@ -380,6 +405,7 @@
 | CP-06-030 | System Reset | Old non-lethal ultimate quickhack, replaced by System Collapse. | removed in 2.0 |
 | CP-06-031 | Hacking from cover | Quickhacks can be uploaded while hidden behind cover. | 1.0 |
 | CP-06-032 | Non-lethal job bonuses | Some gigs and sightings pay more when nobody is killed. | 1.0 |
+| CP-06-033 | Body discovery | Enemies who find a downed body go on alert and search. | 1.0 |
 
 ## 7. Police and heat
 
@@ -389,12 +415,12 @@
 | CP-07-002 | Unit escalation | The kind of police unit chasing V changes with the star level, from patrol officers to MaxTac. | 2.0 |
 | CP-07-003 | NCPD patrol officers | Beat cops walk and drive the streets and respond to nearby crimes. | 2.0 |
 | CP-07-004 | NCPD Enforcers | Heavier armored officers with shotguns and rifles join at higher heat. | 2.0 |
-| CP-07-005 | NCPD drones | Police drones spot crimes from the air and follow V. | 2.0 (unsure) |
+| CP-07-005 | NCPD drones | Police drones spot crimes from the air and follow V. | 2.0 |
 | CP-07-006 | Police vehicles | NCPD cars and vans chase V in traffic and box the vehicle in. | 2.0 |
-| CP-07-007 | Roadblocks | Officers set roadblocks and spike strips to stop a fleeing vehicle. | 2.0 |
+| CP-07-007 | Roadblocks | Officers set roadblocks and spike strips to stop a fleeing vehicle. | WRONG: NCPD does not set up roadblocks or spike strips in Cyberpunk 2077 |
 | CP-07-008 | MaxTac | At the top wanted level MaxTac hitsquads arrive to kill V. | 2.0 |
 | CP-07-009 | MaxTac AV insertion | MaxTac drops out of an AV to join the fight. | 2.0 |
-| CP-07-010 | MaxTac composition | MaxTac squads mix gunner, melee cyberware and netrunner members. | 2.0 (unsure) |
+| CP-07-010 | MaxTac composition | MaxTac squads mix gunner, melee cyberware and netrunner members. | 2.0 |
 | CP-07-011 | On-foot chases | Officers sprint and vault after V on foot, not only in vehicles. | 2.0 |
 | CP-07-012 | Vehicle chases | Police vehicles pursue through traffic and shoot from windows. | 2.0 |
 | CP-07-013 | Crime scene responders | Officers guarding a crime scene join the pursuit when they see V act. | 2.0 |
@@ -419,6 +445,7 @@
 | CP-07-033 | MaxTac cyberpsycho response | Cyberpsychos in the world are contained by MaxTac in the sighting jobs. | 1.0 |
 | CP-07-034 | Trauma Team response | Trauma Team AVs and medics can be seen responding to injuries in the world. | 1.0 |
 | CP-07-035 | No arrest mechanic | Losing to the police means dying, not being jailed. | 1.0 |
+| CP-07-036 | Flashing wanted stars | The stars flash while NCPD is still searching for V and steady once the search gives up. | 2.0 |
 
 ## 8. Character, attributes and perks
 
@@ -431,7 +458,7 @@
 | CP-08-005 | Attribute cap | Each attribute can be raised to 20. | 1.0 |
 | CP-08-006 | Attribute checks | Locked doors, objects and dialogue need a minimum attribute to pass. | 1.0 |
 | CP-08-007 | Body level checks | Body checks from 5 to 20 appear in jobs and open doors, turrets and extra options. | 1.0 |
-| CP-08-008 | Body effects | Body raises health by 2 per point and governs shotguns, LMGs, HMGs and blunt weapons. | 2.0 |
+| CP-08-008 | Body effects | Body raises health by 2 per point and governs shotguns, LMGs, HMGs and blunt weapons. | WRONG: there are no LMG or HMG classes; Body governs shotguns and blunt weapons |
 | CP-08-009 | Reflexes effects | Reflexes governs rifles, handguns, blades and mobility perks. | 2.0 |
 | CP-08-010 | Technical Ability effects | Technical Ability governs armor, engineering perks and cyberware support perks. | 2.0 |
 | CP-08-011 | Intelligence effects | Intelligence raises RAM and quickhack damage for netrunning. | 2.0 |
@@ -452,11 +479,11 @@
 | CP-08-026 | Quake | Body blunt capstone that slams the ground to stagger enemies. | 2.0 |
 | CP-08-027 | Superhero Landing | Performing Quake from mid-air scales its damage with the fall. | 2.0 |
 | CP-08-028 | Savage Sling finisher | Blunt-weapon finisher that can throw the enemy instead. | 2.0 |
-| CP-08-029 | Obliterate | Shotgun/LMG/HMG perk chance to instantly dismember low-health enemies. | 2.0 |
+| CP-08-029 | Obliterate | Shotgun/LMG/HMG perk chance to instantly dismember low-health enemies. | WRONG: names nonexistent LMG/HMG classes; the perk applies to shotguns |
 | CP-08-030 | Bullet Ballet | Body perk that cuts spread while moving with heavy weapons. | 2.0 |
 | CP-08-031 | Overclock perk | Intelligence perk that unlocks casting with health instead of RAM. | 2.0 |
 | CP-08-032 | Bolt perk | Technical Ability perk that turns Tech weapon charges into ricocheting bolts. | 2.0 |
-| CP-08-033 | Carhacker perk | Technical Ability perk that unlocks quickhacks against vehicles. | PL |
+| CP-08-033 | Carhacker perk | Technical Ability perk that unlocks quickhacks against vehicles. | 2.0 |
 | CP-08-034 | Cyberware perks | License To Chrome, Ambidextrous, Driver Update and Chipware Connoisseur expand implants. | 2.0 |
 | CP-08-035 | Edgerunner perk | Raises Cyberware Capacity by 50. | 2.0 |
 | CP-08-036 | Renaissance Punk perk | Raises capacity for each attribute above 9. | 2.0 |
@@ -468,8 +495,8 @@
 | CP-08-042 | Street Cred discounts | Some vendors cut prices as Street Cred rises. | 1.0 (unsure) |
 | CP-08-043 | Health | Red bar that depletes from damage; at zero V dies and reloads a save. | 1.0 |
 | CP-08-044 | Health regen | Health regenerates out of combat; Painkiller and perks add slow in-combat regen. | 1.0 |
-| CP-08-045 | Stamina | Used by gunfire, melee attacks and blocking; it recovers quickly. | 1.0 |
-| CP-08-046 | Out-of-combat stamina | Sprinting, sliding and jumping stopped draining stamina outside combat. | 2.0 |
+| CP-08-045 | Stamina | Used by gunfire, melee attacks and blocking; it recovers quickly. | WRONG: gunfire costs no stamina; stamina is only spent on melee attacks and blocking |
+| CP-08-046 | Out-of-combat stamina | Sprinting, sliding and jumping stopped draining stamina outside combat. | WRONG: movement never costs stamina in or out of combat; there is no such change |
 | CP-08-047 | Adrenaline | Yellow extra-health layer from Adrenaline Rush that decays over time. | 2.0 |
 | CP-08-048 | Status effects on V | Burning, bleeding, poisoned, shocked, blinded, crippled and cyberware malfunction can hit V. | 1.0 |
 | CP-08-050 | Level scaling NPCs | Enemy and loot levels follow V instead of districts. | 2.0 |
@@ -481,6 +508,7 @@
 | CP-08-056 | Emergency Cloaking | Relic node that triggers camouflage automatically in danger. | PL (unsure) |
 | CP-08-057 | Jailbreak nodes | Relic nodes unlock extra effects for arm cyberware such as Monowire quickhacks. | PL |
 | CP-08-058 | Death and reload | Dying reloads the last checkpoint, autosave or manual save. | 1.0 |
+| CP-08-059 | Lifepath bonuses | Each lifepath gives V different starting gear and eddies plus lifepath-only dialogue options. | 1.0 |
 
 ## 9. Story, quests and choices
 
@@ -552,7 +580,7 @@
 | CP-09-065 | Padre | Heywood fixer with Valentinos gigs. | 1.0 |
 | CP-09-066 | Dakota Smith | Badlands fixer with Nomad and Wraith gigs. | 1.0 |
 | CP-09-067 | Muamar "El Capitán" Reyes | Santo Domingo fixer for gigs and vehicle contracts. | 1.0 |
-| CP-09-068 | Mr. Hands | Dogtown fixer for Phantom Liberty gigs. | PL |
+| CP-09-068 | Mr. Hands | Dogtown fixer for Phantom Liberty gigs. | WRONG: Mr. Hands was already a base-game Pacifica fixer; PL only expands his role |
 | CP-09-069 | Gig ratings and pay | Quicker, quieter, non-lethal completions raise the pay and fixer approval. | 1.0 |
 | CP-09-070 | Gig types | Gigs cover theft, assassination, rescue, protection, sabotage and data extraction. | 1.0 |
 | CP-09-071 | Phantom Liberty start | A new game can start directly in Phantom Liberty with a leveled V. | PL |
@@ -580,6 +608,9 @@
 | CP-09-093 | BD quests | Story braindances are edited in The Information, Disasterpiece, Double Life and I Walk the Line. | 1.0 |
 | CP-09-094 | Endings montage | Each ending plays its own epilogue and returns to the menu with messages from contacts. | 1.0 |
 | CP-09-095 | Post-ending messages | After an ending, texts and calls from characters wrap up their threads. | 1.0 |
+| CP-09-096 | Down on the Street | Takemura contacts V and they arrange to meet after the heist fallout. | 1.0 |
+| CP-09-097 | Point of no return | The game warns that starting the final main job locks all other open quests. | 1.0 |
+| CP-09-098 | Endings from side jobs | Completing Panam's, Rogue's and Johnny's chains unlocks extra rooftop ending choices. | 1.0 |
 
 ## 10. Dialogue and talking
 
@@ -613,6 +644,8 @@
 | CP-10-027 | Fixer briefings | Each gig starts with a call or text briefing and optional questions. | 1.0 |
 | CP-10-028 | Subtitled ambient talk | Crowd chatter, vendors and guards talk with or without subtitles. | 1.0 |
 | CP-10-029 | Choice memory | Dialogue can reference choices made earlier, including who lived or died. | 1.0 |
+| CP-10-030 | Joytoy services | Joytoys can be hired for an intimacy scene. | 1.0 |
+| CP-10-031 | Shorthand romance texts | Romanced partners text V during the story and after key jobs. | 1.0 |
 
 ## 11. Money, shops, crafting and loot
 
@@ -641,7 +674,7 @@
 | CP-11-023 | Crafting menu | A crafting screen turns components and specs into gear. | 1.0 |
 | CP-11-024 | Weapon crafting specs | Specs bought or found let V build specific weapons in 1.x. | 1.0 |
 | CP-11-025 | Iconic upgrading | In 2.0 only Iconic weapons and cyberware can be upgraded to higher tiers. | 2.0 |
-| CP-11-026 | Mod crafting | Craft a weapon mod by combining two lower-quality mods. | 2.0 |
+| CP-11-026 | Mod crafting | Craft a weapon mod by combining two lower-quality mods. | WRONG: mods are crafted from components using specs, not by combining mods |
 | CP-11-027 | Quickhack crafting specs | Quickhack specs are sold by netrunner vendors for crafting. | 1.0 |
 | CP-11-028 | Loot containers | Crates, lockers, safes and corpses hold weapons, components and eddies. | 1.0 |
 | CP-11-029 | Loot tiers | Loot is colour-coded by tier from Tier 1 to Tier 5++. | 2.0 |
@@ -658,6 +691,8 @@
 | CP-11-042 | Treasure hunts | Map-found loot stashes and locked containers reward exploration. | 1.0 |
 | CP-11-043 | Eddie counter | Eddies are shown on the HUD inventory bar and in shops. | 1.0 |
 | CP-11-044 | Free fast travel | Dataterm travel costs nothing. | 1.0 |
+| CP-11-045 | Crafting ammo | Spend components at the crafting screen to make more ammo. | 1.0 |
+| CP-11-046 | Loot rarity names | In 2.0 loot tiers kept the color coding (white to orange) but switched to Tier names. | DUPLICATE of CP-11-029 |
 
 ## 12. Night City
 
@@ -711,6 +746,9 @@
 | CP-12-046 | Map districts | The world map names every district and sub-district and shows territory borders. | 1.0 |
 | CP-12-047 | Weather and quests | Some jobs script specific weather or time for their scenes. | 1.0 |
 | CP-12-048 | Badlands camps | Nomad camps, gas stations and motels dot the desert highways. | 1.0 |
+| CP-12-049 | Waterside locations | The bay, piers and the Arasaka Waterfront give the city its coastline. | 1.0 |
+| CP-12-050 | NCART network | The old metro system's stations and rails cross the city; it reopened to passengers in 2.1. | DUPLICATE of CP-01-028 |
+| CP-12-051 | Konpeki Plaza | Luxury Japantown hotel that hosts the heist in the story. | 1.0 |
 
 ## 13. People and street life
 
@@ -742,6 +780,7 @@
 | CP-13-025 | Corporate security | Arasaka, Militech, Kang Tao and Biotechnica guards patrol their sites. | 1.0 |
 | CP-13-026 | Trauma Team | Corporate medics in AVs extract paying clients from danger. | 1.0 |
 | CP-13-027 | NetWatch | The Net watchdog that appears in Voodoo Boys and DLC storylines. | 1.0 |
+| CP-13-028 | Scav hideout raids | Scavs run chop-shop dens that can be raided as gigs. | 1.0 |
 | CP-13-029 | Gang ambushes | Gangs V crossed may send squads after V in the open world. | 2.1 |
 | CP-13-030 | Cats | Stray cats started appearing around Night City. | 2.1 |
 | CP-13-031 | Iguana pet | An iguana egg taken from Konpeki Plaza can hatch in V's apartment. | 1.0 |
@@ -792,6 +831,8 @@
 | CP-14-036 | Phantom Liberty clothing | The expansion adds new clothing sets and Dogtown styles. | PL |
 | CP-14-037 | Outfit colour variety | Clothing comes in fixed colour variants, not dyeable. | 1.0 |
 | CP-14-038 | Mirror | Mirrors in apartments and bathrooms let V look at themselves. | 1.0 |
+| CP-14-039 | Phantom Liberty creator items | The expansion adds new creator options for hairstyles, piercings and cyberware looks. | PL (unsure) |
+| CP-14-040 | Starting outfits | Each lifepath starts V in its own outfit style. | 1.0 |
 
 ## 15. Interface
 
@@ -844,6 +885,9 @@
 | CP-15-045 | Tutorial pop-ups | Contextual tutorials explain actions the first time they matter. | 1.0 |
 | CP-15-046 | Interaction prompts | A prompt shows the button and action for doors, loot, vehicles and NPCs. | 1.0 |
 | CP-15-047 | Quest banners | Job names appear on screen when a job starts or updates. | 1.0 |
+| CP-15-048 | Notification queue | XP, loot and job updates stack as compact toasts on the right edge. | 1.0 |
+| CP-15-049 | Photo mode filters and poses | Photo mode offers poses, filters and borders for shots. | DUPLICATE of CP-15-052 |
+| CP-15-050 | Subtitle settings in game | Subtitle size and speaker labels adjust on the fly from settings. | DUPLICATE of CP-18-019 |
 | CP-15-051 | Main menu | The main menu offers continue, load, new game, Phantom Liberty start and settings. | 1.0 |
 | CP-15-052 | Photo mode | Pause and pose the game to take framed shots with filters and poses. | 1.3 |
 | CP-15-053 | Photo mode camera | Free drone camera with adjustable range, collision, lock and precise modes. | 2.2 |
@@ -884,8 +928,9 @@
 | CP-16-026 | Vehicle contracts | El Capitán texts car-stealing jobs: steal a marked vehicle and deliver it for eddies and AUTOFIXER discounts. | 2.0 |
 | CP-16-031 | Just Another Story repeat job | Repeated car deliveries for Muamar Reyes count toward unlocking premium vehicles. | 2.0 |
 | CP-16-032 | Contract chases | Some vehicle deliveries turn into chases or ambushes while driving the car. | 2.1 |
-| CP-16-027 | Dogtown data terminals | Militech data terminals in Dogtown are scavenger hunts for Relic points. | PL |
+| CP-16-027 | Dogtown data terminals | Militech data terminals in Dogtown are scavenger hunts for Relic points. | DUPLICATE of CP-08-054 |
 | CP-16-028 | Stadium fights | Dogtown's arena hosts fight content in the expansion's storyline. | PL (unsure) |
+| CP-16-029 | Shooting range challenge | Wilson's side job contests V's marksmanship at the range for a reward. | 1.0 |
 
 ## 17. Audio and radio
 
@@ -916,6 +961,8 @@
 | CP-17-023 | City ambience | Traffic, crowds, construction, sirens and rain form the background soundscape. | 1.0 |
 | CP-17-024 | Streamer mode | A setting disables copyrighted music for streaming. | 1.0 |
 | CP-17-025 | Radio off switch | The radio can be turned off entirely while driving. | 1.0 |
+| CP-17-026 | Radio in Phantom Liberty | Dogtown gets its own extra station content with the expansion. | WRONG: PL adds no separate Dogtown stations; 2.0's new stations play citywide |
+| CP-17-027 | Phantom Liberty soundtrack | Quests and scenes in the expansion use their own score. | PL |
 
 ## 18. Settings, accessibility, difficulty, saves
 
@@ -989,7 +1036,7 @@
 | CP-19-018 | SSD requirement | Update 2.0 made an SSD a requirement on PC and Steam Deck. | 2.0 |
 | CP-19-019 | Photo mode screenshots | Photo mode writes .png files used by the Gallery and SmartFrames. | 2.2 |
 | CP-19-020 | Ultimate Edition | The game and Phantom Liberty ship together as the Ultimate Edition. | 2.1 |
-| CP-19-021 | Database lore entries | The Database collects lore on characters, gangs and systems. | 1.0 |
+| CP-19-021 | Database lore entries | The Database collects lore on characters, gangs and systems. | DUPLICATE of CP-15-034 |
 | CP-19-022 | Credits | A full credits sequence plays after the story and DLC endings. | 1.0 |
 | CP-19-023 | Third-party overlays | Steam, GOG, Epic and console friends/screenshot systems work over the game. | 1.0 |
 

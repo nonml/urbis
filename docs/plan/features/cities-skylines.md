@@ -42,13 +42,16 @@
 | CS-01-036 | Underground view | Switch to an underground view to see and work with pipes, cables and metro tunnels | CS1, CS2 |
 | CS-01-037 | Bulldoze trees and props | Demolish individual trees and placed props with the bulldozer | CS1, CS2 |
 | CS-01-038 | CS2 cinematic camera | A smooth cinematic camera mode for filming the city | CS2 (unsure) |
+| CS-01-039 | Move tool | Drag an existing placed building or prop to a new location without demolishing it | CS2 |
+| CS-01-040 | Drag-bulldoze trees | Hold the bulldozer and drag across a stretch of trees to remove them all at once | CS1 |
+| CS-01-041 | Speed hotkeys | Press 1, 2 or 3 to switch between normal, fast and fastest speed | CS1, CS2 |
 
 ## 2. Roads and road tools
 
 | ID | Feature | What the player does or sees | Where |
 |---|---|---|---|
 | CS-02-001 | Two-lane road | The basic two-way road, 2 lanes, with parking and sidewalks; the first road available in a new city | CS1, CS2 |
-| CS-02-002 | Two-lane one-way road | A two-lane road that carries traffic in one direction only | CS1 |
+| CS-02-002 | Two-lane one-way road | A two-lane road that carries traffic in one direction only | CS1, CS2 |
 | CS-02-003 | One-lane one-way road | A single-lane road that carries traffic one way | CS2 |
 | CS-02-004 | Gravel road | Cheap unpaved two-way road, slower, no sidewalks; can be built steeper than other roads and turns into a wooden bridge when elevated | CS1, CS2 |
 | CS-02-005 | Gravel one-way road | A one-way unpaved road for rural edges and cheap connections | CS2 (1.2.0) |
@@ -105,9 +108,9 @@
 | CS-02-056 | Junction settings panel | Select an intersection to open its toggle panel for signals and signs | CS1, CS2 |
 | CS-02-057 | Traffic lights toggle | Add or remove traffic lights at a junction from its panel | CS1 (Mass Transit update), CS2 |
 | CS-02-058 | Stop signs | Put stop signs on the approaches of an intersection to set right-of-way | CS1 (Mass Transit update) |
-| CS-02-059 | Turn restrictions | Disable selected turns at a junction so vehicles cannot turn that way | CS1 (Mass Transit update) |
+| CS-02-059 | Turn restrictions | Disable selected turns at a junction so vehicles cannot turn that way | WRONG: no vanilla turn restrictions in CS1; that needs a traffic mod |
 | CS-02-060 | Crosswalk tool | Place or remove pedestrian crossings on road segments | CS1 |
-| CS-02-061 | Roundabout tool | Draw a roundabout in one action with a chosen size and decoration | CS2 (unsure) |
+| CS-02-061 | Roundabout tool | Draw a roundabout in one action with a chosen size and decoration | WRONG: roundabouts are placed as pre-built assets; there is no drawing tool |
 | CS-02-062 | Roundabout decorations | Seven decorative roundabout centre styles in four sizes, from striped flower beds to mosaics | CS2 (1.2.0) |
 | CS-02-063 | Cul-de-sac tool | Place ready-made dead-end street endings in asphalt, grass or tree variants | CS2 (1.2.0) |
 | CS-02-064 | Quay tool | Build vertical quay walls along water edges to create waterfront building land | CS2 (1.3.3 Quays & Piers) |
@@ -116,6 +119,25 @@
 | CS-02-067 | Elevated and tunnel connectors | Roads can pass over and under existing roads and railways by changing elevation mid-draw | CS1, CS2 |
 | CS-02-068 | Slope limits | Roads cannot be built on slopes steeper than their limit; gravel roads allow steeper slopes | CS1, CS2 |
 | CS-02-069 | Bridges & Ports bridge types | Additional bridge designs and port structures added with the expansion | CS2 (Bridges & Ports) |
+| CS-02-070 | Freeform road drawing | Draw one continuous road that mixes straight and curved segments | CS1, CS2 |
+| CS-02-071 | Pre-built road assets | Place ready-made roundabouts and highway intersections from the roads menu | CS1 (two roundabouts, two interchanges) |
+| CS-02-072 | Toll booths | Place one of four toll-booth types across a road so passing vehicles pay a toll | CS1 (patch 1.11.0) |
+| CS-02-073 | Upgrade keeps zoning | Upgrading a road keeps the buildings and zoning along it | CS1, CS2 |
+| CS-02-074 | Rail level crossings | Roads crossing railway tracks create level crossings automatically | CS1, CS2 |
+| CS-02-075 | Asymmetric roads | Asymmetrical five-lane and seven-lane roads plus a three-lane asymmetric highway | CS1 (Mass Transit, patch 1.16.1) |
+| CS-02-076 | Two-way highways | Four-lane two-way highway with or without barriers | CS1 (Mass Transit, patch 1.16.1) |
+| CS-02-077 | Small two-way highway | Two-lane two-way highway, with or without sound barriers | CS1 (Snowfall, patch 1.16.1) |
+| CS-02-078 | Wide-sidewalk roads | Four-lane roads with wide sidewalks in plain, grass and tree versions | CS1 (patch 1.16.1) |
+| CS-02-079 | Industry road | Cheap no-parking two-lane one-way road for industrial districts, noisier than normal roads | CS1 (Industries) |
+| CS-02-080 | Bridge road assets | Pre-built two-lane truss and stone bridge roads | CS1 (Bridges & Piers CCP) |
+| CS-02-081 | Roads with tram tracks | Two-, four- and six-lane roads with embedded tram tracks | CS2 |
+| CS-02-082 | Roads with tram stops | Wide roads with tram platforms built into the median | CS2 |
+| CS-02-083 | Drawbridges and lift bridges | Moveable bridges in road, highway, train, tram, subway and pedestrian versions | CS2 (Bridges & Ports) |
+| CS-02-084 | Signature bridges | Fixed suspension, extradosed, truss arch and double-decked bridge assets | CS2 (Bridges & Ports) |
+| CS-02-085 | Quays with driving lanes | Quay walls that carry a road along the water edge | CS2 (Bridges & Ports) |
+| CS-02-086 | Roadside tree selector | Choose the tree species placed along tree-lined roads | DUPLICATE of CS-13-013 |
+| CS-02-087 | Stop signs and give-way | Remove lights to get an all-way stop, or automatic give-way signs on the smaller road at a T-junction | CS2 |
+| CS-02-088 | Driving side | Maps are built for right-hand or left-hand traffic, flipping lanes and vehicle doors | CS1, CS2 (unsure) |
 
 ## 3. Zoning and growth
 
@@ -147,6 +169,12 @@
 | CS-03-031 | No zoning on large roads | Highways and some large roads cannot have zones built along them | CS1, CS2 |
 | CS-03-032 | Under-construction state | New buildings are shown as a construction site before they finish | CS1, CS2 |
 | CS-03-033 | Unlocking density through growth | Residential, commercial and office density choices expand as population milestones are passed | CS1, CS2 |
+| CS-03-034 | Self-sufficient residential buildings | Eco houses that need little electricity, water and garbage service, at a cost to comfort | CS1 (Green Cities) |
+| CS-03-035 | Organic commercial buildings | Shops certified organic that draw fewer customers but sell eco goods | CS1 (Green Cities) |
+| CS-03-036 | IT cluster offices | Tech office buildings that need highly educated workers and pay high taxes | CS1 (Green Cities) |
+| CS-03-037 | Construction deliveries | Buildings under construction receive materials delivered by trucks | CS2 |
+| CS-03-038 | Waterfront business zone | Low-density commercial zone that grows only along the waterfront | CS2 (Bridges & Ports) |
+| CS-03-039 | Beach houses | Low-density residential that grows only on the coast | CS2 (Beach Properties) |
 
 ## 4. Utilities
 
@@ -161,8 +189,8 @@
 | CS-04-007 | Wind turbine | Cheap clean power whose output rises with the local wind speed | CS1, CS2 |
 | CS-04-008 | Coal power plant | Large cheap power plant that produces ground and noise pollution | CS1, CS2 |
 | CS-04-009 | Solar power plant | Clean power plant that produces less at night and in winter | CS1, CS2 |
-| CS-04-010 | Hydro power plant | Power plant placed on water; output depends on the water flow | CS1 |
-| CS-04-011 | Hydroelectric dam | A dam built across water that generates power and holds back the water | CS2 (unsure) |
+| CS-04-010 | Hydro power plant | Power plant placed on water; output depends on the water flow | CS1, CS2 |
+| CS-04-011 | Hydroelectric dam | A dam built across water that generates power and holds back the water | WRONG: no player-built dam in either game; hydropower is the hydro power plant placed in a river |
 | CS-04-012 | Nuclear power plant | Very large power plant with high output and low pollution | CS1, CS2 |
 | CS-04-013 | Gas power plant | Power plant burning gas, cheaper to run than coal but still polluting | CS2 |
 | CS-04-014 | Geothermal power plant | Power plant drawing heat from the ground | CS2 (unsure) |
@@ -170,7 +198,7 @@
 | CS-04-016 | Turbine siting | Turbine output depends on the wind strength at the spot where it is placed | CS1, CS2 |
 | CS-04-017 | Power plant pollution | Power plants spread ground pollution and noise around their site | CS1, CS2 |
 | CS-04-018 | Water pumping station | A pump placed on a river or lake supplies the city with fresh water | CS1, CS2 |
-| CS-04-019 | Water tower | A small building that supplies water without needing to sit on open water | CS1 |
+| CS-04-019 | Water tower | A small building that supplies water without needing to sit on open water | CS1, CS2 |
 | CS-04-020 | Larger water tower | A high-capacity water tower with a larger footprint | CS1 (Sunset Harbor) |
 | CS-04-021 | Groundwater pumping station | A pump that draws water from underground groundwater reserves | CS2 |
 | CS-04-022 | Water pipes tool | Draw underground water pipes that must connect buildings and pumps | CS1 |
@@ -198,6 +226,18 @@
 | CS-04-044 | Cell tower | A mast that spreads telecom coverage over a neighbourhood | CS2 |
 | CS-04-045 | Network capacity | Telecom buildings add data capacity; overloading the network slows connections | CS2 (unsure) |
 | CS-04-046 | Utility building upgrades | Utility buildings can be extended with add-on modules from their panel | CS2 |
+| CS-04-047 | Oil power plant | Big oil-burning plant with 120 MW output and pollution | CS1 |
+| CS-04-048 | Advanced wind turbine | Larger wind turbine with up to 20 MW output | CS1 |
+| CS-04-049 | Advanced coal power plant | Cleaner coal plant upgrade with 56 MW output | CS1 (Green Cities) |
+| CS-04-050 | Solar updraft tower | Tall tower plant producing 240 MW without fuel | CS1 (Green Cities) |
+| CS-04-051 | Ocean thermal energy plant | Floating sea power plant that uses the temperature difference in the water | CS1 (Sunset Harbor) |
+| CS-04-052 | Small coal power plant | Early coal plant that cannot be upgraded | CS2 |
+| CS-04-053 | Transformer station | Connects power grids and steps the voltage down | CS2 |
+| CS-04-054 | Battery facility | Stores surplus electricity and covers peak demand; charge shows in the info view | CS2 |
+| CS-04-055 | Utility trade | Buy electricity or water from outside connections and sell the surplus | CS1, CS2 |
+| CS-04-056 | Snow dump | Site where snowplows pile collected road snow until it melts | CS1 (Snowfall) |
+| CS-04-057 | Snow plows | Trucks clear snow off roads and carry it to the dump | CS1 (Snowfall) |
+| CS-04-058 | Sewage export | Export sewage to outside connections instead of dumping it locally | CS2 |
 
 ## 5. City services
 
@@ -230,14 +270,14 @@
 | CS-05-025 | High school | Educates teen citizens and raises their education level | CS1, CS2 |
 | CS-05-026 | University | Educates adults to the highest education level | CS1, CS2 |
 | CS-05-027 | College | A middle education building between high school and university | CS2 |
-| CS-05-028 | Library | A building that raises literacy and education in its area | CS1 (unsure) |
+| CS-05-028 | Library | A building that raises literacy and education in its area | CS1 (Parklife update) |
 | CS-05-029 | Education coverage | The education info view shows which streets have school coverage for each school type | CS1, CS2 |
 | CS-05-030 | Post office | Collects and delivers mail to homes and businesses | CS1, CS2 |
 | CS-05-031 | Post sorting facility | Sorts mail into routes before delivery vans take it out | CS1, CS2 |
 | CS-05-032 | Mail delivery | Postal vans deliver mail; uncollected mail lowers happiness | CS1, CS2 |
 | CS-05-033 | Road maintenance depot | Sends out maintenance trucks and snowplows to keep roads in condition | CS1 (Snowfall), CS2 |
-| CS-05-034 | Snow dump | Stores snow cleared from the streets until it melts | CS1 (Snowfall) |
-| CS-05-035 | Snowplows | Depots dispatch plows that clear snow and slush from roads | CS1 (Snowfall) |
+| CS-05-034 | Snow dump | Stores snow cleared from the streets until it melts | DUPLICATE of CS-04-056 |
+| CS-05-035 | Snowplows | Depots dispatch plows that clear snow and slush from roads | DUPLICATE of CS-04-057 |
 | CS-05-036 | Disaster Response Unit | A dispatch building that sends out disaster response cars and helicopters | CS1 (Natural Disasters) |
 | CS-05-037 | Emergency shelter | A bunker where citizens take refuge during a disaster | CS1 (Natural Disasters) |
 | CS-05-038 | Weather radar | An early-warning building that predicts thunderstorms and tornadoes | CS1 (Natural Disasters) |
@@ -254,6 +294,10 @@
 | CS-05-049 | Hospital capacity | Hospitals treat a limited number of patients, and overload shows as untreated sickness | CS1, CS2 |
 | CS-05-050 | Pedestrian zone services | Larger schools, emergency stations and transit stops designed for Plazas & Promenades areas | CS1 (Plazas & Promenades, unsure) |
 | CS-05-051 | Shelter capacity | Shelters hold a limited number of citizens during an evacuation | CS1 (Natural Disasters) |
+| CS-05-052 | Service building upgrades | Service buildings get add-on modules, like a helipad gate on a fire station | CS2 |
+| CS-05-053 | Service buildings need staff | Services underperform when there are not enough educated workers to staff them | CS1, CS2 |
+| CS-05-054 | Police helicopter | A helicopter patrols high-crime areas and chases criminals | CS1 (unsure) |
+| CS-05-055 | Evacuation buses | Buses carry citizens to shelters when a disaster warning is issued | CS1 (Natural Disasters) |
 
 ## 6. Public transport
 
@@ -330,8 +374,13 @@
 | CS-06-069 | Cargo stations and harbours | Freight terminals move goods between trucks, trains and ships | CS2 |
 | CS-06-070 | City Stations pack | A content pack adding new stations for existing modes, including a new tram station | CS2 (2026 update) |
 | CS-06-071 | Cargo ships | Freighters carry goods between cargo harbours and the outside world | CS1, CS2 |
-| CS-06-072 | Passenger ferries | Draw water routes and place ferry stops for passenger boats | CS2 (unsure) |
+| CS-06-072 | Passenger ferries | Draw water routes and place ferry stops for passenger boats | CS2 (Bridges & Ports) |
 | CS-06-073 | Taxi depot | A depot that provides taxis for the city's taxi service | CS2 (1.2.0) |
+| CS-06-074 | Metro without depot | Metro trains spawn automatically, so a metro line needs no depot building | CS1 |
+| CS-06-075 | Taxi depot | Buy taxis and let them wait for passengers at taxi stands | CS1 (After Dark) |
+| CS-06-076 | Sightseeing bus line | A tourist bus line drives visitors past the city's attractions | CS1 (Parklife) |
+| CS-06-077 | Airport concourse pieces | Extend the airport terminal with gate and walkway pieces | CS1 (Airports) |
+| CS-06-078 | School buses | Buses that bring children to school and run like regular city buses | CS1 (Parklife update) |
 
 ## 7. Traffic and movement
 
@@ -359,7 +408,7 @@
 | CS-07-022 | Pedestrian walking | Citizens walk along sidewalks and pedestrian paths to reach destinations | CS1, CS2 |
 | CS-07-023 | Pedestrian crossings | Walkers cross roads at crossings and bridges rather than anywhere they like | CS1, CS2 |
 | CS-07-024 | Walking shortcuts | Pedestrian paths let citizens walk through parks and between streets | CS1, CS2 |
-| CS-07-025 | Traffic accidents | Vehicles can crash, block lanes and require emergency response | CS2 (unsure) |
+| CS-07-025 | Traffic accidents | Vehicles can crash, block lanes and require emergency response | CS2 |
 | CS-07-026 | Road wear | Heavy traffic wears roads down; worn roads slow vehicles until maintenance repairs them | CS2 |
 | CS-07-027 | Snow and slush | Snow on roads slows traffic until plows clear it | CS1 (Snowfall) |
 | CS-07-028 | One-way flow rules | Vehicles, including service vehicles, cannot drive against a one-way road and must take the legal route | CS1, CS2 |
@@ -369,9 +418,11 @@
 | CS-07-033 | Route to school and work | Children route to schools and adults to their workplaces every day | CS1, CS2 |
 | CS-07-034 | Pathfinding by time and cost | Routes weigh travel time, ticket cost and comfort when citizens choose how to travel | CS2 |
 | CS-07-035 | Parking search traffic | Drivers looking for parking add traffic on streets with full parking | CS2 (unsure) |
-| CS-07-036 | Rail level crossings | Trains and road traffic cross at level crossings, and the barriers close when a train passes | CS1, CS2 |
+| CS-07-036 | Rail level crossings | Trains and road traffic cross at level crossings, and the barriers close when a train passes | DUPLICATE of CS-02-074 |
 | CS-07-037 | Vehicle loading | Trucks, buses, trams and trains carry a set number of passengers or units of cargo per trip | CS1, CS2 |
 | CS-07-038 | Walking speed by path | Citizens walk faster on proper paths and streets than across open ground | CS1, CS2 |
+| CS-07-039 | Parking fees | Parking buildings charge a fee for each car, shown as income | CS2 |
+| CS-07-040 | Accident aftermath cleanup | Road maintenance crews clear accident debris so traffic can resume | CS2 |
 
 ## 8. Citizens and households
 
@@ -419,6 +470,7 @@
 | CS-08-042 | Citizen needs | Each citizen tracks needs for goods, leisure, education and services that the city must meet | CS1, CS2 |
 | CS-08-043 | Jobs match education | Educated citizens take the educated jobs available and may leave if there are none | CS1, CS2 |
 | CS-08-044 | Citizens give feedback | Citizens show mood bubbles over their heads that hint at what they like or lack | CS1, CS2 |
+| CS-08-045 | Criminal citizens | Citizens with no work and little money turn to crime and become wanted by the police | CS1, CS2 |
 
 ## 9. Economy and budget
 
@@ -432,7 +484,7 @@
 | CS-09-006 | Commercial tax slider | Set the tax rate for commercial zones | CS1, CS2 |
 | CS-09-007 | Industrial tax slider | Set the tax rate for industry | CS1, CS2 |
 | CS-09-008 | Office tax slider | Set the tax rate for office zones | CS1, CS2 |
-| CS-09-009 | Taxes by education | Each zone tax can be tuned separately for each education level of its workers or residents | CS1, CS2 (unsure) |
+| CS-09-009 | Taxes by education | Each zone tax can be tuned separately for each education level of its workers or residents | WRONG: tax rates are set per zone type only, not by education level |
 | CS-09-010 | Tax effects | High taxes lower happiness and demand; low taxes attract growth but earn less | CS1, CS2 |
 | CS-09-011 | Over-taxed abandonment | Buildings in heavily taxed cities are abandoned and left empty | CS1, CS2 |
 | CS-09-012 | Loans | Take out loans in several sizes, each with its own interest and term | CS1, CS2 |
@@ -459,6 +511,8 @@
 | CS-09-034 | Budget roadmap | The budget panel forecasts the effect of a change before it is applied | CS1, CS2 (unsure) |
 | CS-09-035 | Demolition refund | Bulldozing an existing building or road returns part of what it cost | CS1 |
 | CS-09-036 | Service fees | Adjustable fees and prices for city services feed the budget | CS2 (unsure) |
+| CS-09-037 | Toll income | Toll booths collect money from every vehicle that passes | CS1 |
+| CS-09-038 | Company rent | Companies pay rent for the land and buildings they occupy | CS2 |
 
 ## 10. Industry, offices, commerce and specialisations
 
@@ -483,7 +537,7 @@
 | CS-10-017 | High-density commerce | Large stores and shopping streets serve the whole city | CS1, CS2 |
 | CS-10-018 | Tourism commercial specialisation | Commercial zones specialise in tourist-facing beach and souvenir businesses | CS1 (After Dark) |
 | CS-10-019 | Leisure commercial specialisation | Commercial zones specialise in nightlife and entertainment | CS1 (After Dark) |
-| CS-10-020 | Organic produce | A commercial specialisation selling organic and local goods | CS1 (Green Cities, unsure) |
+| CS-10-020 | Organic produce | A commercial specialisation selling organic and local goods | DUPLICATE of CS-03-035 |
 | CS-10-021 | Industry area tool | Paint an industry area and place its main building to start a managed industrial estate | CS1 (Industries) |
 | CS-10-022 | Industry area main building | Each industry area has a main building that defines and governs it | CS1 (Industries) |
 | CS-10-023 | Industry area levels | Industry areas and their buildings level up as the area produces and grows | CS1 (Industries) |
@@ -506,9 +560,12 @@
 | CS-10-040 | Extractors and processors | Resource buildings pull raw materials and turn them into processed goods | CS2 |
 | CS-10-041 | Industrial companies | Each factory is a company that buys inputs, sells outputs and can go bankrupt | CS2 |
 | CS-10-042 | Commercial companies | Each shop is a company that buys goods, hires staff and serves customers | CS2 |
-| CS-10-043 | Central bank and stock exchange | Financial district buildings including a stock exchange that boost the economy | CS1 (Financial Districts, unsure) |
+| CS-10-043 | Central bank and stock exchange | Financial district buildings including a stock exchange that boost the economy | CS1 (Financial Districts) |
 | CS-10-044 | Refined and unique goods names | Processed and luxury goods such as planks, plastics, furniture and electronics move through the chain | CS1 (Industries) |
 | CS-10-045 | Office workers by education | Offices need educated and highly educated citizens to fill their jobs | CS1, CS2 |
+| CS-10-046 | Night-time leisure | Leisure buildings open and earn most of their income after dark | CS1 (After Dark) |
+| CS-10-047 | Fishing industry | Fishing areas, fish farms and a fish processing chain | CS2 (Bridges & Ports) |
+| CS-10-048 | Offshore oil | Oil rigs extract oil from beneath the sea | CS2 (Bridges & Ports) |
 
 ## 11. Districts, areas and policies
 
@@ -532,9 +589,9 @@
 | CS-11-016 | Free Public Transport | Makes buses, trams, metro, local trains and monorails free, raising ridership but removing fares | CS1 |
 | CS-11-017 | School's Out | Closes schools so citizens prefer work; fewer citizens become highly educated | CS1 |
 | CS-11-018 | Education Boost | Citizens prioritise education, raising school attendance at a cost | CS1 |
-| CS-11-019 | Heavy Traffic Ban | Cargo trucks cannot drive through the district; highways are unaffected | CS1 |
+| CS-11-019 | Heavy Traffic Ban | Cargo trucks cannot drive through the district; highways are unaffected | CS1, CS2 |
 | CS-11-020 | Highrise Ban | Stops buildings in the district from reaching their tallest levels | CS1 |
-| CS-11-021 | Old Town | Only residents and local businesses may drive in the area; through traffic is banned | CS1 |
+| CS-11-021 | Old Town | Only residents and local businesses may drive in the area; through traffic is banned | CS1 (After Dark), CS2 |
 | CS-11-022 | Industry 4.0 | Industry needs only well and highly educated workers but produces more, with fewer workplaces | CS1 |
 | CS-11-023 | Smoke Detector Distribution | Fits smoke detectors in district buildings, cutting fire risk for a small fee | CS1 |
 | CS-11-024 | Smoking Ban | Bans smoking in the district, improving health but lowering happiness | CS1 |
@@ -543,16 +600,44 @@
 | CS-11-027 | Electric Cars | Encourages citizens to drive electric cars, reducing air and noise pollution | CS1 (Green Cities) |
 | CS-11-028 | Energy Saving | Citizens and businesses use less electricity | CS1 (Green Cities) |
 | CS-11-029 | Green policy set | Green Cities adds four new policy options including eco-focused rules | CS1 (Green Cities) |
-| CS-11-030 | Only Electricity for Heating | Citizens heat their homes only with electricity, ignoring district heating | CS1 (Snowfall) |
+| CS-11-030 | Only Electricity for Heating | Citizens heat their homes only with electricity, ignoring district heating | WRONG: no such policy; the real Snowfall policy (No Electricity for Heat) does the opposite |
 | CS-11-031 | Ban Electricity for Heating | Citizens may only use the district heating network for heat | CS1 (Snowfall) |
 | CS-11-032 | Park city policies | Parklife adds three new city policies covering recreation | CS1 (Parklife) |
 | CS-11-033 | Animal Ethics | A park policy that changes how animals are treated in parks | CS1 (Parklife) |
-| CS-11-034 | Fireworks | A park policy controlling fireworks displays and their hazards | CS1 (Parklife) |
-| CS-11-035 | Mass Transit policy set | Mass Transit adds three new policies, including the car-restricting Old Town rule | CS1 (Mass Transit, unsure) |
+| CS-11-034 | Fireworks | A park policy controlling fireworks displays and their hazards | WRONG: Parklife's park policies are Animal Ethics, Even More Fun and Boost Connections; there is no Fireworks policy |
+| CS-11-035 | Mass Transit policy set | Mass Transit adds three new policies, including the car-restricting Old Town rule | WRONG: Mass Transit added no policies; Old Town came with After Dark |
 | CS-11-036 | Sunset Harbor policy set | Sunset Harbor adds six new city-wide policies | CS1 (Sunset Harbor, unsure) |
 | CS-11-037 | Policies panel | A single panel lists every policy with its name, cost and effects | CS2 |
 | CS-11-038 | Cycling policies | Policies that encourage or restrict bicycle use in parts of the city | CS2 (1.4.2 Bike Patch) |
 | CS-11-039 | District-scoped rules | Policies can be toggled for one district or for the whole city depending on the policy | CS1, CS2 |
+| CS-11-040 | High Tech Housing | Policy that slightly raises land value in an area for a per-house fee | CS1 |
+| CS-11-041 | Industrial Space Planning | Policy that doubles goods output from industrial buildings | CS1 |
+| CS-11-042 | Small Business Enthusiast | Policy that doubles sales of low-density shops | CS1 |
+| CS-11-043 | Filter Industrial Waste | Industry filters its waste, cutting ground pollution for a fee | CS1 (Green Cities) |
+| CS-11-044 | Studded Tires | Cars wear studded tires in winter and handle light snow better, at higher road upkeep | CS1 (Snowfall) |
+| CS-11-045 | VIP shelters | Shelters in a district serve only citizens living in that district | CS1 (Natural Disasters) |
+| CS-11-046 | Fast Recovery | Rescuers stop searching for survivors so the city rebuilds sooner, losing more citizens | CS1 (Natural Disasters) |
+| CS-11-047 | Encourage Biking | Most citizens choose bicycles over motor vehicles | CS1 (After Dark) |
+| CS-11-048 | Educational Blimps | Blimps carry educational posters that boost schooling slightly | CS1 |
+| CS-11-049 | For-Profit Education | Schools charge tuition and cost the city half as much to run | CS1 |
+| CS-11-050 | Airplane Tours | Sightseeing planes raise attractiveness and noise | CS1 (Sunset Harbor) |
+| CS-11-051 | Dolphin-Safe Fishing | Tuna boats fish without harming dolphins; fish yield falls | CS1 (Sunset Harbor) |
+| CS-11-052 | Sustainable Fishing | Fishing raises happiness and shop income but yields less fish | CS1 (Sunset Harbor) |
+| CS-11-053 | Boost Connections | Outside connections carry 20 percent more traffic for a weekly fee | CS1 (Parklife) |
+| CS-11-054 | Even More Fun | Amusement park buildings entertain 20 percent better for a fee | CS1 (Parklife) |
+| CS-11-055 | Come One Come All | Stadium policy that runs a match event drawing big crowds | CS1 (Match Day) |
+| CS-11-056 | Festival policies | Rules for festival areas such as ticket pricing and line-up | CS1 (Concerts, unsure) |
+| CS-11-057 | Campus and varsity policies | Campus areas have their own policy options | CS1 (Campus, unsure) |
+| CS-11-058 | Import City Services | Buy police, healthcare, deathcare, garbage and fire coverage from neighbouring cities | CS2 |
+| CS-11-059 | Pre-Release Programs | Prisoners take classes before they are released | CS2 |
+| CS-11-060 | City Promotion | Advertising raises attractiveness, drawing tourists and crime | CS2 |
+| CS-11-061 | High-Speed Highways | Remove highway speed limits; more noise and more accidents | CS2 |
+| CS-11-062 | Energy Consumption Awareness | Citizens cut electricity use by five percent | CS2 |
+| CS-11-063 | Recycling policy | Citizens recycle, cutting waste but also free time | CS2 |
+| CS-11-064 | Roadside Parking Fee | Charge for parking on the street with an adjustable fee | CS2 |
+| CS-11-065 | Speed Bumps | Vehicles drive slower in the district, lowering noise and accidents | CS2 |
+| CS-11-066 | Gated Community | Only people living or working in the district may enter | CS2 |
+| CS-11-067 | Building policies | Policies can be set on individual buildings, like a per-lot parking fee | CS2 |
 
 ## 12. Parks, plazas, landmarks, monuments and tourism
 
@@ -572,13 +657,13 @@
 | CS-12-012 | Park props anywhere | Place benches, fences, props and buildings anywhere inside a park area without a road | CS1 (Parklife) |
 | CS-12-013 | Buildings beside paths | In park areas, buildings can be placed along pedestrian paths, not only roads | CS1 (Parklife) |
 | CS-12-014 | Park levels | Park areas gain levels from visitors and investment and unlock more pieces | CS1 (Parklife) |
-| CS-12-015 | Sightseeing bus | A special bus line that takes tourists past the city's sights | CS1 (Parklife) |
+| CS-12-015 | Sightseeing bus | A special bus line that takes tourists past the city's sights | DUPLICATE of CS-06-076 |
 | CS-12-016 | Walking tours | Draw custom walking tour routes through the city for tourists | CS1 (Parklife) |
 | CS-12-017 | Sightseeing tours | Vehicles carry tourists along customised sightseeing routes | CS1 (Parklife) |
 | CS-12-018 | Amusement rides | Rides and attractions placed inside an amusement park area | CS1 (Parklife) |
 | CS-12-019 | Castle of Lord Chirpwick | A monument added with Parklife that attracts tourists | CS1 (Parklife) |
 | CS-12-020 | Unique buildings | Special buildings unlocked by meeting conditions such as population or service targets | CS1 |
-| CS-12-021 | Eden Project | A monument that greatly reduces pollution across the city | CS1 (unsure) |
+| CS-12-021 | Eden Project | A monument that greatly reduces pollution across the city | CS1 |
 | CS-12-022 | Hadron Collider | A monument that boosts education and technology in the city | CS1 |
 | CS-12-024 | Space Elevator | A monument that draws huge numbers of tourists | CS1 |
 | CS-12-025 | Doomsday Vault | A monument that helps the city survive and recover from disasters | CS1 (Natural Disasters) |
@@ -598,6 +683,9 @@
 | CS-12-042 | Decals | Paint ground decals such as road markings and stains | CS2 (1.1.8) |
 | CS-12-043 | Surface painting | Paint surfaces such as paving, gravel and grass over the ground | CS2 (1.1.6) |
 | CS-12-044 | Statues and fountains | Ploppable ornamental pieces that add beauty and attract visitors | CS1, CS2 |
+| CS-12-045 | Leisure piers | Pier structures built out over water for visitors | CS2 (Bridges & Ports) |
+| CS-12-046 | Lighthouses | Four coastal lighthouses, one of them a tourist landmark | CS2 (Bridges & Ports) |
+| CS-12-047 | City attractiveness | Landmarks, parks and sights raise the city's attractiveness, which draws more tourists | CS1, CS2 |
 
 ## 13. Environment and nature
 
@@ -636,13 +724,15 @@
 | CS-13-031 | Water current pollution spread | Pollution in water spreads in the direction the current flows | CS1 |
 | CS-13-032 | Resource deposits | Oil, ore, forest and fertile land sit on the map as depletable or renewable deposits for specialised industry | CS1, CS2 |
 | CS-13-033 | Wind | Wind strength varies across the map and drives turbine output | CS1, CS2 |
-| CS-13-034 | Water flow | Rivers and the sea have a current direction and strength shown in the water view | CS1 |
-| CS-13-035 | Climate zones | Maps have climates such as temperate, boreal, tropical and arid that set the weather | CS1 |
+| CS-13-034 | Water flow | Rivers and the sea have a current direction and strength shown in the water view | CS1, CS2 |
+| CS-13-035 | Climate zones | Maps have climates such as temperate, boreal, tropical and arid that set the weather | CS1, CS2 |
 | CS-13-036 | Tree-lined roads | Decorative trees along a road reduce the noise it produces | CS1 |
 | CS-13-037 | Groundwater | Underground water reserves feed groundwater pumps and can be drawn down | CS2 |
 | CS-13-038 | Water simulation | Water flows, waves and flooding are simulated over the terrain | CS2 |
 | CS-13-039 | Remove trees | Erase trees with the tree tool or bulldozer | CS1, CS2 |
 | CS-13-040 | Weather effects on power | Solar and wind output rise and fall with the weather and season | CS1, CS2 |
+| CS-13-041 | Thunderstorms | Storms with lightning that can strike and set fires | CS1 (Natural Disasters) |
+| CS-13-042 | Groundwater pollution | Pollution seeps into groundwater and sickens anyone pumping it | CS2 |
 
 ## 14. Disasters and emergencies
 
@@ -673,6 +763,9 @@
 | CS-14-023 | Rubble and ruin | Destroyed buildings leave rubble that must be bulldozed and rebuilt | CS1 (Natural Disasters) |
 | CS-14-024 | Blocked roads | Disaster debris and flooding close roads until they are cleared | CS1 (Natural Disasters) |
 | CS-14-028 | Chirper disaster posts | Chirper posts warnings and reactions while a disaster unfolds | CS1 (Natural Disasters) |
+| CS-14-029 | Lightning rod | Building that protects nearby structures from lightning strikes | CS1 (Natural Disasters) |
+| CS-14-030 | Collapsed roads | Roads that lose their support collapse into pits and must be repaired with the upgrade tool | CS1 |
+| CS-14-031 | Disasters off | Turn natural disasters off in the game options | CS1 (Natural Disasters) |
 
 ## 15. Information views, overlays and statistics
 
@@ -700,7 +793,7 @@
 | CS-15-021 | Building levels info view | Colours buildings by their current level from one to five | CS1, CS2 |
 | CS-15-022 | District info view | Colours and outlines districts and shows their names | CS1, CS2 |
 | CS-15-023 | Happiness info view | Shows where citizens are happy or unhappy | CS1, CS2 |
-| CS-15-024 | Recreation info view | Shows how well parks and leisure buildings cover the city | CS1 |
+| CS-15-024 | Recreation info view | Shows how well parks and leisure buildings cover the city | CS1, CS2 |
 | CS-15-025 | Commodities info view | Shows what goods businesses need and what the city is importing | CS1 |
 | CS-15-026 | Weather info view | Shows current weather across the map | CS1 (Snowfall) |
 | CS-15-027 | Heating info view | Shows heat coverage and which buildings are warm or cold | CS1 (Snowfall) |
@@ -711,7 +804,7 @@
 | CS-15-032 | Campus area view | Colours campus areas and their reputation and student numbers | CS1 (Campus) |
 | CS-15-033 | Airport area view | Shows the airport area, level and traveller numbers | CS1 (Airports) |
 | CS-15-034 | Pedestrian zone view | Outlines pedestrian zones and their service points | CS1 (Plazas & Promenades) |
-| CS-15-035 | Tourism view | Shows tourist numbers and where visitors gather | CS1 (unsure) |
+| CS-15-035 | Tourism view | Shows tourist numbers and where visitors gather | CS1 |
 | CS-15-036 | Telecom info view | Shows internet coverage and network capacity across the map | CS2 |
 | CS-15-037 | Parking info view | Shows parking demand, use and shortages on streets and in lots | CS2 |
 | CS-15-038 | Postal info view | Shows mail coverage and delivery status | CS2 |
@@ -727,12 +820,13 @@
 | CS-15-048 | Traffic jam alert | A notification warns when congestion is heavy somewhere in the city | CS1, CS2 |
 | CS-15-049 | Statistics panel | Graphs of population, happiness, employment, education, income and expenses over time | CS2 |
 | CS-15-050 | Notification history | Scroll through and clear past notifications | CS1, CS2 |
+| CS-15-051 | Roads info view | Colours roads by their wear and shows maintenance vehicles at work | CS2 |
 
 ## 16. Progression and unlocks
 
 | ID | Feature | What the player does or sees | Where |
 |---|---|---|---|
-| CS-16-001 | Milestones | The city grows through named milestones such as Little Hamlet, Tiny Town and Megalopolis | CS1 |
+| CS-16-001 | Milestones | The city grows through named milestones such as Little Hamlet, Tiny Town and Megalopolis | CS1, CS2 |
 | CS-16-002 | Population requirements | Each milestone needs a set population before it is reached | CS1, CS2 |
 | CS-16-003 | Milestone rewards | Reaching a milestone pays a cash reward that grows with the size of the city | CS1, CS2 |
 | CS-16-004 | Building unlocks | New roads, zones, services and policies unlock as milestones are passed | CS1, CS2 |
@@ -742,13 +836,14 @@
 | CS-16-008 | Tile purchase | Buy one tile at a time with city funds from the tile map | CS1 |
 | CS-16-009 | Tile cost | Each new tile costs more the further it is from the city centre | CS1 |
 | CS-16-010 | Buildable area limit | Only part of the map is buildable in the base game without the tile expansion | CS1 |
-| CS-16-011 | Tile unlocking | New map tiles become available as milestones are reached | CS2 (unsure) |
+| CS-16-011 | Tile unlocking | New map tiles become available as milestones are reached | CS2 |
 | CS-16-012 | First road unlock | At the start only the two-lane road is available; more road types unlock once the first road is built | CS1 |
 | CS-16-013 | Service unlocks by milestone | Larger services such as incinerators and high-capacity buildings appear at set milestones | CS1, CS2 |
 | CS-16-014 | Development points | Earning progression points that are spent to unlock new service buildings | CS2 |
 | CS-16-015 | Progression trees | Unlocking buildings is done along service branches in the development tree | CS2 |
 | CS-16-016 | Signature building unlocks | Signature buildings are awarded for reaching milestones and city achievements | CS2 |
 | CS-16-017 | Achievements | Steam achievements unlock with an on-screen notice for feats such as population targets and disasters survived | CS1, CS2 |
+| CS-16-018 | Building XP | Constructing buildings earns XP that advances the city's progression | CS2 |
 
 ## 17. Maps, scenarios, game modes and options
 
@@ -776,6 +871,7 @@
 | CS-17-021 | Disaster frequency | A slider sets how often random disasters occur | CS1 (Natural Disasters) |
 | CS-17-022 | Sandbox start | New cities can be started without money or progression pressure | CS2 (unsure) |
 | CS-17-023 | Scenario editor sharing | Custom scenarios can be built and shared, see the editors category | CS1 (Natural Disasters) |
+| CS-17-024 | Bridges & Ports maps | Five new maps with waterfronts, a peninsula, a bay and great lakes | CS2 (Bridges & Ports) |
 
 ## 18. Editors, assets and modding
 
@@ -813,6 +909,7 @@
 | CS-18-030 | CS2 creator packs | Paid creator packs such as Beach Properties, Urban Promenades and Modern Architecture | CS2 |
 | CS-18-031 | Map packs | Creator pack map collections that add new maps | CS1 |
 | CS-18-032 | Vehicles of the World | A creator pack adding regional vehicle models | CS1 |
+| CS-18-033 | Road editor | Build custom road networks with lane and prop settings | CS1 (patch 1.9.0) |
 
 ## 19. Interface, saves and options
 
@@ -850,6 +947,9 @@
 | CS-19-030 | Save compatibility warning | The game warns when a save uses missing mods or assets | CS1, CS2 |
 | CS-19-031 | Delete or overwrite saves | Manage save slots, deleting or replacing old cities | CS1, CS2 |
 | CS-19-032 | Notification settings | Filter or turn off categories of notifications and Chirper posts | CS2 (unsure) |
+| CS-19-033 | Build menu search | Type into the build menu search box to find a tool or building by name | CS1 (patch 1.16.1) |
+| CS-19-034 | Build menu filters | Filter the road list by one-way, decorations or public transport lanes | CS1 (patch 1.16.1) |
+| CS-19-035 | What's New panel | A panel showing what the newest update and DLC added | CS2 (Bridges & Ports) |
 
 ## 20. Audio and radio
 
@@ -891,6 +991,9 @@
 | CS-20-034 | Sirens and effects | Emergency sirens, construction and building sounds play as the city works | CS1, CS2 |
 | CS-20-035 | Custom music | Import personal music tracks through the content manager so they play in game | CS1 (unsure) |
 | CS-20-036 | Music packs | Optional radio and music packs sold separately from the expansions | CS1, CS2 |
+| CS-20-037 | Harvest Harmony Radio | A countryside-themed music station | CS1 (music pack) |
+| CS-20-038 | 8 Gear Radio | A modern electronic station | CS1 (music pack) |
+| CS-20-039 | Harumi Nights FM | A station added with a 2026 content pack | CS1 (music pack, unsure) |
 
 ## 21. Other
 
@@ -909,5 +1012,6 @@
 | CS-21-011 | Region packs | Free packs of regional building styles shared through Paradox Mods | CS2 (unsure) |
 | CS-21-012 | Controllers | Console and controller play with a radial menu interface | CS1 |
 | CS-21-013 | Save sharing | Save games, maps and scenarios can be shared and subscribed to | CS1 |
-| CS-21-014 | Anniversary content | Free content patches marking the game's anniversaries | CS2 (unsure) |
+| CS-21-014 | Anniversary content | Free content patches marking the game's anniversaries | CS2 (1.2.5 Anniversary patch) |
 | CS-21-015 | Bundle editions | Bundled collections of expansions and creator packs sold together | CS1, CS2 |
+| CS-21-016 | Waterfronts Expansion Pass | A season pass bundling the Waterfronts wave of CS2 expansions | CS2 |
