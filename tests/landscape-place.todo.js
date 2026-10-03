@@ -30,26 +30,32 @@ function outside(walk, x, z) {
   return Math.hypot(dx, dz);
 }
 
+// The nearest above-ground mountain vertex to the city: { out, y }. One expect
+// per seed, not per vertex: 300 seeds of a few thousand vertices each is
+// millions of expect calls, past the test timeout.
+function nearestMountain(district) {
+  const pos = mountainPositions(district);
+  let near = { out: Infinity, y: 0 };
+  for (let i = 0; i < pos.count; i++) {
+    if (pos.getY(i) <= 0) continue;
+    const out = outside(district.walk, pos.getX(i), pos.getZ(i));
+    if (out < near.out) near = { out, y: pos.getY(i) };
+  }
+  return near;
+}
+
 test('no mountain rises within MOUNTAIN_CLEAR of a generated city', () => {
   expect(MOUNTAIN_CLEAR).toBeGreaterThanOrEqual(60);
   for (const seed of [...SEEDS, 1234567]) {
-    const { walk } = generateDistrict(seed);
-    const pos = mountainPositions(generateDistrict(seed));
-    for (let i = 0; i < pos.count; i++) {
-      if (pos.getY(i) <= 0) continue;
-      const out = outside(walk, pos.getX(i), pos.getZ(i));
-      expect(out, `seed ${seed}: ${pos.getY(i).toFixed(1)} m of mountain ${out.toFixed(1)} m from the city`)
-        .toBeGreaterThanOrEqual(MOUNTAIN_CLEAR);
-    }
+    const { out, y } = nearestMountain(generateDistrict(seed));
+    expect(out, `seed ${seed}: ${y.toFixed(1)} m of mountain ${out.toFixed(1)} m from the city`)
+      .toBeGreaterThanOrEqual(MOUNTAIN_CLEAR);
   }
 });
 
 test('the hand map keeps its mountains clear too', () => {
-  const { walk } = DISTRICTS[0];
-  const pos = mountainPositions(DISTRICTS[0]);
-  for (let i = 0; i < pos.count; i++) {
-    if (pos.getY(i) > 0) expect(outside(walk, pos.getX(i), pos.getZ(i))).toBeGreaterThanOrEqual(MOUNTAIN_CLEAR);
-  }
+  const { out, y } = nearestMountain(DISTRICTS[0]);
+  expect(out, `${y.toFixed(1)} m of mountain ${out.toFixed(1)} m from the city`).toBeGreaterThanOrEqual(MOUNTAIN_CLEAR);
 });
 
 test('the mountains still stand where the street can see them', () => {
