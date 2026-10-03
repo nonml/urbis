@@ -211,10 +211,65 @@ export function planLayout(district, seed) {
   return { lots: picked.map((p) => p.lot), rows };
 }
 
+// The style of the buildings on one row, read from the district plan: the
+// avenue's place in the district's own order and the building's distance from
+// the district's first crossing. Nothing here knows the hand map's coordinates
+// (ax === 0 && z < 40) — a generated district styles itself from its plan.
+// `kinds` index render/block.js's tower materials; `front` is the frontage
+// range in metres, `h` the height range.
+const CORE_REACH = 45;
+const CORE_STYLE = { kinds: [0, 1, 2, 5], h: [28, 52], front: [12, 20] };
+const TOWER_STYLE = { kinds: [2, 3, 5], h: [18, 36], front: [9, 16] };
+const GLASS_STYLE = { kinds: [1, 2, 4, 5], h: [18, 40], front: [9, 16] };
+const BRICK_STYLE = { kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };
+
+export function rowStyle(district, ax, z) {
+  const order = district.avenues.findIndex((a) => a.x === ax);
+  const first = district.crossings[0];
+  if (order === 0 && first && Math.abs(z - first.z) <= CORE_REACH) return CORE_STYLE;
+  if (order === 0) return TOWER_STYLE;
+  if (order === district.avenues.length - 1) return GLASS_STYLE;
+  return BRICK_STYLE;
+}
+
+// Each row in the plan cut into the buildings the street wall draws:
+// { ax, side, z, d, w, h, kind }, where d is the party-walled front along the
+// row, w the depth back from the building line, h the height and kind a facade
+// architecture. Every building comes from the world seed, so the same district
+// and seed always give the same wall. `plan` defaults to the district's own
+// plan; a caller that already holds it (WORLD_BUILDINGS) never derives it twice.
+export function planBuildings(district, seed, plan = planLayout(district, seed)) {
+  const rand = mulberry32(seed);
+  const out = [];
+  for (const row of plan.rows) {
+    for (const [r0, r1] of row.runs) {
+      let at = r0;
+      while (r1 - at >= MIN_RUN) {
+        const st = rowStyle(district, row.ax, at);
+        let front = st.front[0] + rand() * (st.front[1] - st.front[0]);
+        if (r1 - at - front < MIN_RUN) front = r1 - at;
+        const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
+        const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
+        const w = Math.min(10 + rand() * 2, row.depth);
+        out.push({ ax: row.ax, side: row.side, z: at + front / 2, d: front - 1.2, w, h, kind });
+        at += front;
+      }
+    }
+  }
+  return out;
+}
+
 // The plan of the world this game booted, which the street wall, zoning and the
 // checker all read so they can never disagree: generated games only, null on the
 // hand preset. Keyed on the world seed, never on a caller's.
 export const WORLD_PLAN = worldSeed().generate ? planLayout(DISTRICTS[0], worldSeed().seed) : null;
+
+// The street wall of the world this game booted: render/block.js draws exactly
+// this, generated games only. Null on the hand preset, which keeps its own
+// tables until stage 7 deletes it (M3.T13).
+export const WORLD_BUILDINGS = WORLD_PLAN
+  ? planBuildings(DISTRICTS[0], worldSeed().seed, WORLD_PLAN)
+  : null;
 
 // Re-exported so tests and the checker reason in the same units as the plan.
 export { BUILD_LINE, PINNED_TOWERS };
