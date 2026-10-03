@@ -29,7 +29,7 @@
 // Not game code: it lives in scripts/ and touches nothing in src/.
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 
 const PLUGIN = path.join(process.env.HOME, '.claude/plugins/cache/naicud-opencode-plugin-cc/opencode/1.22.0/scripts/lib/opencode-server.mjs');
 const { ensureServer, createClient, readServerRegistry, isServerRunning } = await import(PLUGIN);
@@ -40,8 +40,11 @@ const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash'];
 const STALL_MIN = 10;
 const POLL_MS = 30_000;
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
-// One block per live worker. 51 is skipped: its gate port would be 5173, vite's own.
-const PORT_BLOCKS = [40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 52];
+// One block per live worker, gate block*100+73, shot +91, score +95. Clear of
+// 4100-4499, where the OpenCode plugin derives each worktree's server port
+// (DERIVED_PORT_BASE + SPAN): blocks 41-44 sat inside it, and a worker's server
+// on another lane's gate port failed that lane's gate for nothing it did.
+const PORT_BLOCKS = [60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 71, 72];
 
 // A worker that keeps calling tools without editing is circling, not working: more
 // calls than this since its last edit, or the same call LOOP_REPEATS times, is a
@@ -61,6 +64,16 @@ const save = (s) => fs.writeFileSync(STATE, JSON.stringify(s, null, 2));
 const sh = (cmd, args, cwd = ROOT, env = {}) => execFileSync(cmd, args, {
   cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env, ...env }, maxBuffer: 64 << 20,
 });
+// The same, without stopping the loop: a gate takes up to twenty minutes, and every
+// other lane would wait on it. Rejects like execFileSync, stdout and stderr attached.
+const shAsync = (cmd, args, cwd = ROOT, env = {}) => new Promise((resolve, reject) => {
+  execFile(cmd, args, { cwd, encoding: 'utf8', env: { ...process.env, ...env }, maxBuffer: 64 << 20 }, (e, stdout, stderr) => {
+    if (e) reject(Object.assign(e, { stdout, stderr }));
+    else resolve(stdout);
+  });
+});
+// Gates running at once, across all lanes: each is a vite build and a browser.
+const MAX_CHECKS = 2;
 const log = (msg) => console.log(`${new Date().toISOString().slice(11, 19)} ${msg}`);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -127,7 +140,7 @@ function ports(state, name) {
   const used = new Set(Object.entries(state.workers).filter(([n, w]) => n !== name && w.live).map(([, w]) => w.block));
   // A lane keeps its block across tasks unless a live worker took it in between.
   const own = state.workers[name]?.block;
-  const block = own !== undefined && !used.has(own) ? own : PORT_BLOCKS.find((b) => !used.has(b));
+  const block = PORT_BLOCKS.includes(own) && !used.has(own) ? own : PORT_BLOCKS.find((b) => !used.has(b));
   return { block, gate: block * 100 + 73, shot: block * 100 + 91, score: block * 100 + 95 };
 }
 
@@ -358,14 +371,14 @@ function specsFor(w) {
   return [...new Set([t.test, 'tests/gate.spec.js', ...named])];
 }
 
-function gateFault(w) {
+async function gateFault(w) {
   try {
     const env = { GATE_PORT: String(w.gate) };
     let out;
-    if (w.task.brief) out = sh('npm', ['run', 'gate'], w.dir, env);
+    if (w.task.brief) out = await shAsync('npm', ['run', 'gate'], w.dir, env);
     else {
-      for (const check of STATIC_CHECKS) sh('npm', ['run', check], w.dir, env);
-      out = sh('npx', ['playwright', 'test', ...specsFor(w)], w.dir, env);
+      for (const check of STATIC_CHECKS) await shAsync('npm', ['run', check], w.dir, env);
+      out = await shAsync('npx', ['playwright', 'test', ...specsFor(w)], w.dir, env);
     }
     w.draws = out.match(/draws: (\d+)/)?.[1] ?? null;
     return null;
@@ -391,9 +404,24 @@ function commitTask(w) {
 
 // A worker finished a turn on its task: commit the answer, send it back with what is
 // wrong, move it up a tier, or park it.
+// The gate runs in the background: the first idle round starts it, a later round
+// reads its verdict. 'verdict' in w means it has come back (null is a pass).
 async function judge(state, w) {
   const t = w.task;
-  const fault = scopeFault(w) ?? gateFault(w);
+  let fault = scopeFault(w);
+  if (!fault) {
+    if (!('verdict' in w)) {
+      if (w.checking) return null;
+      const running = Object.values(state.workers).filter((v) => v.checking).length;
+      if (running >= MAX_CHECKS) return null;
+      w.checking = true;
+      gateFault(w).then((f) => { w.verdict = f; }, (e) => { w.verdict = `The check crashed: ${e.message}`; })
+        .finally(() => { w.checking = false; });
+      return `${w.name}: ${t.id} checking`;
+    }
+    fault = w.verdict;
+    delete w.verdict;
+  }
   if (!fault) {
     w.live = false;
     const commit = commitTask(w);
@@ -402,7 +430,7 @@ async function judge(state, w) {
   }
   w.tries += 1;
   if (w.tries <= FIX_TRIES) {
-    await send(w, `Not done yet. ${fault}\nFix it, then check again.`);
+    await send(w, `Not done yet. ${fault}\n${portsLine(w)}\nFix it, then check again.`);
     return `${w.name}: ${t.id} sent back (${w.tries}/${FIX_TRIES})`;
   }
   return escalate(w, `failed its check ${w.tries} times`);
@@ -465,6 +493,8 @@ async function runQueue(state, files) {
   };
   let queue = read();
   state.tasks ??= {};
+  // A check belongs to the process that started it; a restart starts it again.
+  for (const w of Object.values(state.workers)) { delete w.checking; delete w.verdict; }
   log(`queue ${queue.milestone}: ${queue.tasks.length} tasks`);
   let idle = 0;
   for (;;) {
