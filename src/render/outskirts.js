@@ -29,9 +29,9 @@ import { mulberry32 } from '../sim/rng.js';
 // bands start clear of it, so "is this inside the city?" needs no second test.
 //
 // They wrap the south and the east only. West and north are the mountain
-// ranges: buildMountains() puts mountain bases as far in as x = -36 on the west
-// ridge and z = 88 on the north one, and a shed inside a mountain is worse
-// than no shed. The west edge also stops short of the river strip (x -38..-26).
+// ranges: they stand MOUNTAIN_CLEAR outside the walk box to the west and north
+// (render/landscape.js), and a shed inside a mountain is worse than no shed.
+// The west edge also stops short of the river strip (x -38..-26).
 //
 // Every bound sits on x,z = 2 (mod 4), which is the lattice the 700 m ground
 // plane's 4 m grid lands on, so the slab below cannot interpenetrate it.

@@ -4,7 +4,7 @@ import * as THREE from 'three';
 import { createClock, tickClock, toggleDay } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { WALK_BOUNDS, clampToBounds, heightAt } from './sim/world.js';
+import { WALK_BOUNDS, DISTRICTS, clampToBounds, heightAt } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import {
@@ -94,7 +94,7 @@ const stars = buildStars();
 scene.add(stars);
 scene.add(buildGrassGround());
 scene.add(buildGrassTufts());
-scene.add(buildMountains());
+scene.add(buildMountains(DISTRICTS[0]));
 // Streamed world. The outskirts own their meshes for the whole game — a tile
 // borrows instance slots in them, so residency changes cost zero draws — and
 // the manager only decides which tiles have claimed any. Two tiles a frame and

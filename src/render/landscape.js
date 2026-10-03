@@ -113,6 +113,11 @@ export function buildGrassTufts() {
 // Smooth terrain, not cones. One displaced grid per range, merged, so the
 // ranges read as rounded massifs instead of the pale spikes they replaced.
 const MOUNTAIN_CELL = 3;
+// A range stands this far outside the district's walk box, which also clears the
+// vista ring, so a peak can never rise over a street.
+export const MOUNTAIN_CLEAR = 60;
+// The farthest a peak reaches from its centre: largest r plus half the jitter.
+const PEAK_REACH = 140 + 12;
 const MOUNTAIN_FLOOR = -4; // the cones sat 4 m sunk; keep their bases hidden
 const NOISE_SEED = 0x9e37;
 const ROCK_HEX = 0x232c3a;
@@ -151,13 +156,14 @@ function mountainNoise(x, z) {
 }
 
 // The max over peaks, never the sum: overlapping cones used to bury each other,
-// and a sum would stand a wall wherever two ranges meet.
+// and a sum would stand a wall wherever two ranges meet. Each peak falls off as
+// (1 - t^2)^2, so every face is a rounded massif rather than a spike.
 function makeMountainHeight(peaks) {
   return (x, z) => {
     let base = 0;
     for (const p of peaks) {
       const t = Math.hypot(x - p.px, z - p.pz) / p.r;
-      if (t < 1) base = Math.max(base, p.h * (1 - t) ** 1.6);
+      if (t < 1) base = Math.max(base, p.h * (1 - t * t) ** 2);
     }
     return base + 7 * mountainNoise(x, z) * (base / 110) - 4;
   };
@@ -214,26 +220,33 @@ function paintMountains(geo) {
   geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
 }
 
-export function buildMountains() {
+// How far the two ridges run past the walk box's south and west ends: the same
+// leads the hand map used, so their ridges start where they always did.
+const RIDGE_SOUTH_LEAD = 82;
+const RIDGE_WEST_LEAD = 18;
+
+export function buildMountains(district) {
   const rand = mulberry32(133);
   const peaks = [];
   const ridge = (cx, cz, n, alongX) => {
     const from = peaks.length;
     for (let i = 0; i < n; i++) {
-      const r = 24 + rand() * 16;
-      const h = 60 + rand() * 50;
+      const r = 90 + rand() * 50;
+      const h = 45 + rand() * 35;
       const px = alongX ? cx + i * 26 + rand() * 10 : cx + (rand() - 0.5) * 24;
       const pz = alongX ? cz + (rand() - 0.5) * 24 : cz + i * 26 + rand() * 10;
       peaks.push({ px, pz, r, h });
     }
     return peaks.slice(from);
   };
-  const west = ridge(-88, -150, 12, false); // west range
-  const north = ridge(-70, 140, 9, true); // north range
+  const westEdge = district.walk.minX - MOUNTAIN_CLEAR;
+  const northEdge = district.walk.maxZ + MOUNTAIN_CLEAR;
+  const west = ridge(westEdge - PEAK_REACH, district.walk.minZ - RIDGE_SOUTH_LEAD, 12, false);
+  const north = ridge(district.walk.minX - RIDGE_WEST_LEAD, northEdge + PEAK_REACH, 9, true);
   const height = makeMountainHeight(peaks);
   const geo = mergeGeometries([
-    mountainGrid(west, height, { maxX: -36 }),
-    mountainGrid(north, height, { minZ: 88 }),
+    mountainGrid(west, height, { maxX: westEdge }),
+    mountainGrid(north, height, { minZ: northEdge }),
   ]);
   geo.computeVertexNormals();
   paintMountains(geo);
