@@ -59,5 +59,7 @@ building. Review poses now come from walking, not from teleporting.
 | D9 | The free land the slice added cannot be picked out in its own shot | 077 city view | open |
 | D10 | The player and the hero car are raw boxes | every street shot | open (VGA-084) |
 | D11 | The farmland and farm tracks stood at hand-map coordinates on every generated city | outskirts.js `BANDS`, `LANES` | **fixed** slice-079 (`m5-farmland`, `m5-farm-tracks`); `tests/outskirts-place.spec.js`, `outskirts-lanes.spec.js` |
-| D12 | Two story boards (`lot_arden`, `lot_trust`) overflow the sign atlas and print an error on every boot | src/render/arc.js `packSigns` | open |
-| D13 | Between the last street and the fields the ground is a bare, flat, untextured plane | slice-079-farmland-s7-se-day, foreground | open |
+| D12 | Two story boards (`lot_arden`, `lot_trust`) overflow the sign atlas and print an error on every boot, beside a 404 | src/render/arc.js `packSigns`; no favicon | queued: `m5-boot-clean`, test `tests/boot-clean.todo.js` |
+| D13 | Between the last street and the fields the ground is a bare, flat, untextured plane | slice-079-farmland-s7-se-day, foreground | open; `m5-grass` greens the first 24 m |
+| D14 | The verges, pocket park and tufts stand at hand-map coordinates: on all 300 seeds grass lies across a street (826 m² on seed 73, where the z = 9 crossing runs into a lawn) | landscape.js `buildGrassGround`, `TUFT_RECTS` | queued: `m5-grass`, test `tests/grass-place.todo.js` |
+| D15 | By day, looking down a street toward the sun, the wet road reads as brushed steel | seed 73, (46, 9) facing east | open |
