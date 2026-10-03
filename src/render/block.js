@@ -8,7 +8,7 @@ import {
 } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
 import { mulberry32 } from '../sim/rng.js';
-import { WORLD_PLAN } from '../sim/layout.js';
+import { WORLD_PLAN, WORLD_BUILDINGS } from '../sim/layout.js';
 import {
   ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
   isAvenue, wayCenter, wayLength,
@@ -311,33 +311,34 @@ function styleFor(ax, z) {
   return { kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };                             // west: older brick
 }
 
-function streetWall(ax, side, rand) {
-  // A generated world carries its own plan: the runs already have the lots and
-  // pinned towers cut out, and the row's depth is the back-of-building limit.
-  // The hand preset keeps its tables so the gate's numbers do not move.
-  const planRow = WORLD_PLAN?.rows.find((r) => r.ax === ax && r.side === side);
-  let runs = planRow ? planRow.runs : ROW_RUNS;
-  if (!planRow) {
-    for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
-    if (ax === AVENUE_X[0]) {
-      for (const t of PINNED_TOWERS) {
-        if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
-      }
-    }
-  }
-  const depthCap = planRow ? planRow.depth : Infinity;
+// The hand preset's wall, in planBuildings' shape. A generated world draws
+// WORLD_BUILDINGS instead; this path goes when stage 7 deletes the preset
+// (M3.T13). Its rand order is fixed: avenues in AVENUE_X order, sides -1 then 1.
+function handBuildings() {
+  const rand = mulberry32(STREET_WALL_SEED);
   const out = [];
-  for (const [r0, r1] of runs) {
-    let at = r0;
-    while (r1 - at >= MIN_RUN) {
-      const st = styleFor(ax, at);
-      let p = st.front[0] + rand() * (st.front[1] - st.front[0]);
-      if (r1 - at - p < MIN_RUN) p = r1 - at;
-      const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
-      const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
-      const w = Math.min(10 + rand() * 2, depthCap);
-      out.push({ z: at + p / 2, d: p - 1.2, w, h, kind });
-      at += p;
+  for (const ax of AVENUE_X) {
+    for (const side of [-1, 1]) {
+      let runs = ROW_RUNS;
+      for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
+      if (ax === AVENUE_X[0]) {
+        for (const t of PINNED_TOWERS) {
+          if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
+        }
+      }
+      for (const [r0, r1] of runs) {
+        let at = r0;
+        while (r1 - at >= MIN_RUN) {
+          const st = styleFor(ax, at);
+          let p = st.front[0] + rand() * (st.front[1] - st.front[0]);
+          if (r1 - at - p < MIN_RUN) p = r1 - at;
+          const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
+          const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
+          const w = 10 + rand() * 2;
+          out.push({ ax, side, z: at + p / 2, d: p - 1.2, w, h, kind });
+          at += p;
+        }
+      }
     }
   }
   return out;
@@ -886,14 +887,16 @@ export function buildTowers(texLoader, maxAniso) {
   PINNED_TOWERS.forEach((t, i) => {
     emitTower(towerCentreX(t), t.z, t.w, t.h, t.d, idx++, [-t.side, 0], `PINNED_TOWERS[${i}]`);
   });
-  const rand = mulberry32(STREET_WALL_SEED);
-  for (const ax of AVENUE_X) {
-    for (const side of [-1, 1]) {
-      streetWall(ax, side, rand).forEach((b, i) => {
-        emitTower(ax + side * (BUILD_LINE + b.w / 2), b.z, b.w, b.h, b.d, idx++, [-side, 0],
-          `ROW[x=${ax} side ${side}][${i}]`, b.kind, false);
-      });
-    }
+  // The wall comes from the sim: planBuildings cut it from the world seed for a
+  // generated city; the hand preset builds its own until M3.T13. One loop draws
+  // either, so the renderer never cuts a row itself.
+  const perRow = new Map();
+  for (const b of WORLD_BUILDINGS ?? handBuildings()) {
+    const key = `${b.ax}|${b.side}`;
+    const i = perRow.get(key) ?? 0;
+    perRow.set(key, i + 1);
+    emitTower(b.ax + b.side * (BUILD_LINE + b.w / 2), b.z, b.w, b.h, b.d, idx++, [-b.side, 0],
+      `ROW[x=${b.ax} side ${b.side}][${i}]`, b.kind, false);
   }
   if (WORLD_VISTAS) {
     WORLD_VISTAS.caps.forEach((c, i) => {
