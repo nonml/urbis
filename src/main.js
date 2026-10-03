@@ -510,6 +510,16 @@ window.__game = {
   generated: GENERATE,
   saveNow: doSave,
   cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
+  // Canvas pixels for a world point (M0.T4): a test clicks what the game drew
+  // instead of hand-tuned coordinates. The raw projection, so a point behind
+  // the camera comes back outside the canvas rather than clamped onto it.
+  screenOf: (x, y, z) => {
+    const p = new THREE.Vector3(x, y, z).project(camera);
+    return {
+      x: (p.x * 0.5 + 0.5) * window.innerWidth,
+      y: (0.5 - p.y * 0.5) * window.innerHeight,
+    };
+  },
   draws: () => renderer.info.render.calls,
   hack: () => fireHack(),
   dark: () => [...DARK],
