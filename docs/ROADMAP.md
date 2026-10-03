@@ -1,13 +1,15 @@
 # Urbis plan
 
 Owner: Claude, game director. Written 2026-10-03 at the operator's request, on top of
-the design docs, not instead of them. Any change to a milestone's acceptance criteria,
-its order or the "after the sell check" list needs the operator's yes. Every worker
-reads this before `docs/plan/TASKS.md`, `docs/handoff/` or `docs/tasks/`.
+the design docs, not instead of them. Any change to a milestone's acceptance criteria
+or its order needs the operator's yes. Every worker reads this before
+`docs/plan/TASKS.md`, `docs/plan/milestones/`, `docs/handoff/` or `docs/tasks/`.
 
 This file says **what** gets built, in what order, and how each piece is proven done.
-`docs/plan/TASKS.md` says **how**: every task, its files, what it needs first, and its
-check.
+`docs/plan/TASKS.md` says **how** for M0 to M12: every task, its files, what it needs
+first, and its check. M13 to M34 are one file each in `docs/plan/milestones/`, with their
+criteria and tasks together. Everything Cities: Skylines, GTA, Watch Dogs and Cyberpunk
+2077 have is in one of them (D15).
 
 ## The game, and where each part of it comes from
 
@@ -120,7 +122,7 @@ graph LR
   M5 --> M11[M11 something to play for]
   M6 --> M11
   M10 --> M11
-  M1 --> M8[M8 sell check]
+  M1 --> M8[M8 sell check: the slice]
   M2 --> M8
   M5 --> M8
   M6 --> M8
@@ -128,32 +130,65 @@ graph LR
   M11 --> M8
   M5 --> M12[M12 the city runs on something]
   M12 --> M8
-  M8 --> M9[M9 Steam]
+  M8 --> FULL[M13 to M34 the whole game]
+  FULL --> M9[M9 Steam]
 ```
 
 | Milestone | Needs first | Lane | Tasks |
 |---|---|---|---|
 | M0 The test harness | nothing | tools | 10 |
 | M1 Building pays off | M0-4 (A/B runner), M0-3 (real input) | sim | 6 |
-| M2 Strip the toy | M0-5 (sweep); M2-3 also needs M3-5 | assets | 15 |
+| M2 Strip the toy | M0-5 (sweep); M2-3 also needs M3-5 | assets | 17 |
 | M3 The city as data | M0 | engine (sim and render) | 41, plus 2 spikes |
 | M4 A city, not a street | M3 | engine | 18 |
-| M5 The building toolset | M4 | sim, UI | 33 |
+| M5 The building toolset | M4 | sim, UI | 36 |
 | M6 The hacking toolset | M4; the fire-alarm hack also needs M5-5 | sim, render | 23 |
-| M7 Sound and the front door | M3-1 (main.js split) | front door | 17 |
-| M10 Living in it | M3-6 (routed traffic); the water criterion waits for M4-2 | street | 14 |
-| M11 Something to play for | M5, M6 and M10 (its gigs use their tools); the gig board can start after M4 | depth | 14 |
+| M7 Sound and the front door | M3-1 (main.js split) | front door | 19 |
+| M10 Living in it | M3-6 (routed traffic); the water criterion waits for M4-2 | street | 22 |
+| M11 Something to play for | M5, M6 and M10 (its gigs use their tools); the gig board can start after M4 | depth | 15 |
 | M12 The city runs on something | M5 | city | 14 |
-| M8 The sell check | M1, M2, M5, M6, M7, M10, M11, M12 | operator | 4 |
-| M9 Ship on Steam | M8-2 says sell | ship | 9 |
+| M8 The sell check: the vertical slice | M1, M2, M5, M6, M7, M10, M11, M12 | operator | 4 |
+| M13 Combat | M8-2; tasks named in M19, M23, M24 | combat | 55 |
+| M14 The whole city builder | M8-2; tasks named in M15, M16 | city | 43 |
+| M15 Every city service | M8-2; tasks named in M13, M14, M26, M27 | city | 35 |
+| M16 Transport | M8-2; tasks named in M13, M14 | city | 29 |
+| M17 On foot | M8-2; tasks named in M13, M18, M27, M33 | street | 19 |
+| M18 Every vehicle | M8-2; tasks named in M13, M16, M17, M21, M24, M27 | street | 36 |
+| M19 Police, crime and gangs | M8-2; tasks named in M13, M15, M18, M21, M27, M33 | street | 19 |
+| M20 All of hacking | M8-2; tasks named in M13, M15, M16, M19, M21, M33 | hack | 22 |
+| M21 People, friends and the crew | M8-2; tasks named in M13, M15, M19, M20, M25, M27 | street | 23 |
+| M22 Money, shops and business | M8-2; tasks named in M13, M15, M16, M23, M24, M27, M33 | city | 16 |
+| M23 Progression | M8-2; tasks named in M13, M17, M19, M21, M24, M25 | street | 17 |
+| M24 The story, missions and things to do | M8-2; tasks named in M14, M18, M19, M20, M21, M26, M27, M33 | story | 28 |
+| M25 The character, clothes, gear and inventory | M8-2; tasks named in M20, M21, M22, M23, M24, M33 | street | 21 |
+| M26 Weather, seasons, land and animals | M8-2; tasks named in M13, M14, M15, M17, M27 | city | 16 |
+| M27 The phone, the screens and the interface | M8-2; tasks named in M14, M20 | street | 19 |
+| M28 Radio, music, voices and sound | M8-2; tasks named in M24, M27 | front door | 11 |
+| M29 Settings, accessibility, saves and platforms | M8-2; tasks named in M9, M13, M27 | front door | 18 |
+| M30 Online | M8-2; tasks named in M9, M13, M20, M22, M24, M25, M29 | online | 30 |
+| M31 Editors, mods and director mode | M8-2; tasks named in M9, M14, M26, M27 | tools | 14 |
+| M32 Cheats | M8-2; tasks named in M13, M17, M29 | street | 4 |
+| M33 The city's places, people, story and packs | M8-2; tasks named in M16, M21, M23, M24, M25, M26, M29 | story | 16 |
+| M34 The look, finished | M8-2; tasks named in M18, M19, M20, M25, M26, M27, M33 | look | 18 |
+| M9 Ship on Steam | M13 to M34; M9.T2, M9.T4, M9.T7 and M9.T8 run ahead once M8-2 says sell | ship | 9 |
 
-**The long pole is M0 → M3 → M4 → M5 and M6 → M11 → M8.** M1, M2, M7, M10 and M12
-run beside it. A milestone's number is its name, not its place in the order: M10 to M12
-were added after M9 and come before M8.
+**The long pole is M0 → M3 → M4 → M5 and M6 → M11 → M8**, then **M13 → M22 → M25 → M21 →
+M24 → M33** (weapons, shops, clothes, playing as one of the crew, the acts, the set
+pieces: 19 tasks deep), then M9. M1, M2, M7, M10 and M12 run beside the first half. A
+milestone's number is its name, not its place in the order: M10 to M12 were added after
+M9 and come before M8, and M13 to M34 come after M8 and before M9.
+
+M0 to M12 are the **vertical slice**: every leg of the game, its first 20 minutes, built
+to ship quality (D10). Nothing in M13 to M34 starts before M8-2 says sell. After that
+they overlap: a task there waits only for the exact tasks its Needs names, never a whole
+milestone, so "Needs first" above lists whose tasks it uses, and two milestones may each
+use some of the other's.
+
 At most **four lanes run at once**: Claude reviews every merge, and a fifth lane only
-queues at review. 220 tasks in all. Every task is written out in
-`docs/plan/TASKS.md` now; tasks after M3 are re-checked against the spikes' findings
-when M3 is half done, and any change to them is logged there.
+queues at review. 745 tasks in all: 236 for M0 to M12 in `docs/plan/TASKS.md` and 509
+for M13 to M34 in `docs/plan/milestones/`. Every task is written out now; tasks after M3
+are re-checked against the spikes' findings when M3 is half done, and any change to them
+is logged there.
 
 *Operator, optional:* a 10-minute play after M1 and M2 close. Does zoning pay off, and
 does it stop looking like a toy? Not a sell decision, a direction check.
@@ -304,6 +339,11 @@ memory, 16 GB free disk). Researched 2026-10-03:
 | M2-4 | **Landscape:** trees render from a model; no icosahedron or cone in any tree or mountain | `tests/accept/m2-landscape.spec.js` | red: icosahedron trees |
 | M2-5 | **Street kit and rooms:** `street_lamp_01` is the street lamp; benches, bins and bus stops are models; the grown-lot rooms use models, not `box()`; no street prop over 5,000 triangles, and the frame's triangles at the spawn drop under 600 k | `tests/accept/m2-kit.spec.js` | red: `box()` everywhere but the hydrant and bin; the hydrant model is 86 k triangles; 1.14 M triangles a frame |
 | M2-6 | **VGA-084's done-when:** the sweep finds no building, car, person, mountain or tree in the play frame made of a raw box, cone, sphere, cylinder or icosahedron, at night, by day and in a blackout, on all five seeds | the sweep, which lists every picked building, car, person, tree or prop mesh without `userData.model` (set by the pool loader, M2.T2); `docs/shots/m2-real-<seed>-night/day/blackout.png` | red |
+| M2-7 | **Weather changes:** each game day has at least two weather states out of clear, overcast and rain, drawn from the seed; the roads are dry in clear weather, wet in rain, and dry over 2 game minutes once it stops (VGA-005's wet grade becomes a 0-1 wetness that the rain, the puddle mirrors and the road gloss all read); no new draws; the sweep shoots every state | `tests/accept/m2-weather.test.js` (the schedule and the wetness, in Node); `tests/accept/m2-weather.spec.js` (shots) | red: it rains in every outdoor frame (`main.js:1102` hides the rain only indoors), so rain is the signature `AGENTS.md` says weather must not be |
+
+**Weather (M2-7)** is the one M2 criterion that is not a model. It is here because it is
+a look: the visual target says weather is variety, not a signature, and today it never
+stops raining. Storms, lightning, fog and wind are M26-1, and their look (VGA-051) is M34-9.
 
 *Operator, 2026-10-03:* asked for agent-made models on this Mac. M2-0 proves it can be
 done before M2-1 to M2-5 start. If a script-built person still reads as a toy, the
@@ -335,7 +375,7 @@ reads each instance's size and scales its texture.
   it touched. Lots and frontage are worked out again for those tiles only.
 - **Roads stay on the grid:** straight, at right angles, snapped to half-metres. The
   code assumes it everywhere (`axis: 'x' | 'z'`), and it keeps lots simple. Curved
-  roads wait for the sell check (decision D2).
+  roads are M14-1, after the sell check (decision D2).
 - **The renderer follows the map:** every building and road piece is a slot in
   fixed-size instance pools, the way lots and the outskirts are drawn now. A bulldoze is
   a slot freed; draws do not change with the size of the city. Spike M3.S1 measures
@@ -393,7 +433,7 @@ by M3-9's sim cost and M3-5's draws, both of which are flat in city size by desi
 | M4-9 | **A road in from outside:** on all five seeds one regional road enters at an edge of the map and joins the arterials; through-traffic and commuters from outside drive it, appearing and leaving at its far end out of sight | `tests/accept/m4-outside.test.js` | red: the town is an island |
 
 Overpasses, the subway and sewers are the same feature at other heights (world-scale
-plank 2) and come after the sell check. The reason is the ground: every mover asks the
+plank 2) and are M14-4, M16-7 and M33-10, after the sell check. The reason is the ground: every mover asks the
 terrain for one height at a point (M4.T10), and an overpass puts two walkable levels at
 one point, which changes the player, cars, walkers and police at once. M4's bridges do
 not, because nothing walks under them but water.
@@ -412,7 +452,7 @@ the city view (Z). What the player builds at city scale is a place they can stan
 street scale (pillar 1): every new road can be driven, and every service is a building
 with a door. Each tool is an M3 operation with a cost, a cursor and a rule.
 
-**The tools.** M5 builds the ones marked M5. The rest wait for the sell check.
+**The tools.** M5 builds the ones marked M5. The rest are in the criterion named.
 
 | Tool | The player does | The city does | When |
 |---|---|---|---|
@@ -430,28 +470,30 @@ with a door. Each tool is an M3 operation with a cost, a cursor and a rule.
 | Undo | Ctrl+Z within 10 game seconds of an act | The act is undone and its cost refunded | M5 |
 | Pollution | Sees it on its overlay | Works pollute within 60 m, more as they grow; home demand and land value fall there, and the news says why | M5 |
 | Milestones | Grows the city | Tools unlock in population tiers; the city view shows the next tier and what it brings | M5 |
-| Bus lines | Places stops along roads; a bus runs the line | Commuters near stops ride it; traffic on that road thins; shops at the stops gain trade | later |
-| Curved roads | — | — | later (D2) |
-| Metro, highways, bridges the player builds | — | — | later (needs world-scale plank 2) |
-| District policies (no heavy traffic, rent control …) | — | — | later |
+| Bus lines | Places stops along roads; a bus runs the line | Commuters near stops ride it; traffic on that road thins; shops at the stops gain trade | M16-5 |
+| Curved roads | — | — | M14-1 (D2) |
+| Metro, highways, bridges the player builds | — | — | M16-7, M14-4, M14-6 |
+| District policies (no heavy traffic, rent control …) | — | — | M14-18 |
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
 | M5-1 | **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides | `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png` | red |
 | M5-2 | **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it | `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png` | red: X clears the 16-28 lots only |
 | M5-3 | **Bulldoze a road:** A/B, removing a generated road: no car uses it within 10 game seconds, commuters who used it arrive later than in B, and a building with no other road declines with the reason "no road" | `tests/accept/m5-noroad.test.js` | red |
-| M5-4 | A new lot zoned R shows its first floor within 60 game seconds (M1-1's bar); a lot capped at low-rise stops at LOW | `tests/accept/m5-newland.spec.js` | red |
+| M5-4 | A new lot zoned R shows its first floor within 60 game seconds (M1-1's bar); a lot capped at low-rise stops at LOW; a brush dragged across the map zones every empty lot the stroke crosses, and one undo takes the stroke back | `tests/accept/m5-newland.spec.js` | red: a brush zones one lot per click |
 | M5-5 | **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost | `tests/accept/m5-<service>.spec.js` | red: none built |
 | M5-6 | **Budget:** income and upkeep match their stated formula each game minute; raising the homes tax by 10 points lowers home demand against B; in debt, the farthest police station shuts within 60 game seconds and the news says so | `tests/accept/m5-budget.test.js` | red |
-| M5-7 | Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full | `tests/accept/m5-cost.spec.js` | red |
+| M5-7 | Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down | `tests/accept/m5-cost.spec.js` | red |
 | M5-8 | **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values | `tests/accept/m5-overlays.spec.js` | red |
 | M5-9 | A game with built and bulldozed roads, services, caps and tax rates saves and continues with the same roads, buildings, lots, services and money | `tests/accept/m5-save.spec.js` | red |
 | M5-10 | **Road types:** the player lays a 2-lane street, a 4-lane avenue and a one-way, and upgrades a street to an avenue in place for the difference in cost; A/B in M3's traffic: at the same lights, an avenue carries at least 1.8 times *(provisional: twice the lanes, less what the junction's turns take)* the cars of a street through one junction in the evening rush hour | `tests/accept/m5-roadtypes.test.js` | red: one road type |
 | M5-11 | **Pollution:** A/B, a works lot grown to HIGH: a home lot 40 m from it grows slower and has a lower land value than in B; a home lot 200 m away is within 1% of B *(provisional)*; the news names the cause; a busy road (its edge load in M3's commute flow) makes noise that does the same | `tests/accept/m5-pollution.test.js` | red: no pollution |
-| M5-12 | **Milestones:** a new game starts with roads, zoning, bulldoze, substation and park; police station and clinic unlock at the first population tier, fire station, school and road types at the second (tiers in `ZONING.md`); a scripted player who zones every free lot reaches the first tier within 20 game minutes on all five seeds; a locked tool refuses with "unlocks at N people" | `tests/accept/m5-milestones.test.js` | red |
+| M5-12 | **Milestones:** a new game starts with roads, zoning, bulldoze, substation and park; police station and clinic unlock at the first population tier, fire station, school and road types at the second (tiers in `ZONING.md`); a scripted player who zones every free lot reaches the first tier within 20 game minutes on all five seeds; a locked tool refuses with "unlocks at N people"; the city view always shows the population and the next tier, and reaching a tier says on screen what it unlocked | `tests/accept/m5-milestones.test.js` | red |
 | M5-13 | The sweep of the city view and the street at every new road, bulldozed gap and service has 0 open defects | the sweep | — |
 | M5-14 | **Junctions:** the player sets any junction to lights, stop signs or yield; cars in M3's traffic obey it (no car passes a stop line without stopping); A/B, the mean wait at that junction differs from B | `tests/accept/m5-junctions.test.js` | red: M3 lights every junction |
-| M5-15 | **History:** a panel shows population, jobs, the city's money and demand per use over the last 5 game days, equal to the sim's own series | `tests/accept/m5-history.spec.js` | red: only the latest value is shown |
+| M5-15 | **History:** a panel shows population, jobs, the jobless, the city's money and demand per use over the last 5 game days, equal to the sim's own series | `tests/accept/m5-history.spec.js` | red: only the latest value is shown |
+| M5-16 | **Problems show:** in the city view, every building held back from growing shows an icon over it for its first cause (no road, no demand, no power, no service in reach; M12 adds no water and no collection), and a click on it opens the reason card; all the icons together cost at most 1 draw and match `decline.js`'s causes on 5 sampled buildings | `tests/accept/m5-problems.spec.js` | red: the reason shows only for the lot under the cursor |
+| M5-17 | **Speed:** in the city view, Space pauses and resumes, and three buttons run the sim at 1, 2 and 4 times (M0-2's steps); a paused city keeps the same state hash for 10 s; leaving the city view always sets the street back to 1 | `tests/accept/m5-speed.spec.js` | red: `?speed` is a test flag only (M0-2) |
 
 ## M6 — The hacking toolset
 
@@ -478,7 +520,7 @@ routed traffic and commute flow; that is why M6 comes after M3.
 - **Battery.** One meter refills over time; each hack spends from it, and the HUD shows
   it. A hack the battery cannot pay for does not fire, and says why.
 
-**The hacks.** M6 builds the ones marked M6. The rest wait for the sell check.
+**The hacks.** M6 builds the ones marked M6. The rest are in the criterion named.
 
 | Hack | The player sees, within 2 s | The city does (the A/B) | Reach | Needs | When |
 |---|---|---|---|---|---|
@@ -496,11 +538,11 @@ routed traffic and commute flow; that is why M6 comes after M3.
 | Crane | The crane stops, or drops its load | Stop: the site stalls. Drop: the lot loses a stage and the site shuts for a minute | one lot | — | M6 |
 | Fire alarm | A building empties onto the pavement | Its shop shuts for 2 minutes and loses that trade; a fire station nearby (M5) clears it faster | one building | M3-3 | M6 |
 | Planning office | At the district's planning office: a lot's permit, fast-tracked or frozen | Fast-track: the lot grows at full pace for a minute. Freeze: no progress for 2 minutes | one lot | M4-1 | M6 |
-| Mass vehicle hack | Every car within 30 m lurches and stops | Gridlock; heavy heat | 30 m | M3-6 | later |
-| Call it in | A cruiser turns toward a person you reported | The police chase them, not you | one person | — | later |
-| Distract | A phone rings; the person stops to look | — | one person | — | later |
-| Billboard | An ad changes to one you chose | The advertised shop's trade moves | one block | — | later |
-| Lifts, garage doors, rooftop nodes | Vertical hacking (`BACKLOG.md`) | — | one building | — | later |
+| Mass vehicle hack | Every car within 30 m lurches and stops | Gridlock; heavy heat | 30 m | M3-6 | M20-5 |
+| Call it in | A cruiser turns toward a person you reported | The police chase them, not you | one person | — | M20-6 |
+| Distract | A phone rings; the person stops to look | — | one person | — | M20-6 |
+| Billboard | An ad changes to one you chose | The advertised shop's trade moves | one block | — | M20-6 |
+| Lifts, garage doors, rooftop nodes | Vertical hacking (`BACKLOG.md`) | — | one building | — | M20-2 |
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
@@ -517,19 +559,23 @@ is a city-wide event.
 ## M10 — Living in it
 
 From: `AGENTS.md` (GTA: "freedom on foot and in cars, pursuit, street-level chaos";
-pillar 5, the player feels capable); `docs/plan/CAPABILITIES.md` G3, G6, G7, G12, G16. A GTA player misses every one of these in the first minutes. It starts once M3's
+pillar 5, the player feels capable); `docs/plan/CAPABILITIES.md` G2, G3, G6, G7, G12, G16, G34, G36-G38, G40, and the feature lists' check
+(D14). A GTA player misses every one of these in the first minutes. It starts once M3's
 traffic runs on the graph (M3-6), because taking a car means taking one of the sim's
 cars; the water criterion waits for M4's river. Lane: street.
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
 | M10-1 | **Any car:** on all five seeds the player walks to a parked car and presses F (the car key today): they are in within 2 s and drive it. At a traffic car stopped at a light, F pulls the driver out, who runs off on foot, and the player drives it. The hero car stays where it was left. A police unit that sees either raises heat with the cause "theft" | `tests/accept/m10-cars.spec.js` | red: only the hero car (`main.js` `nearHero()`) |
-| M10-2 | **Map and route:** a minimap shows the roads within 150 m, the player's heading, the mission marker and the police units in sight, drawn on a 2D canvas over the game (0 draws). M opens a map of the whole town; a click sets a waypoint, and the minimap shows the route along the road graph, worked out again within 1 s when the player leaves it | `tests/accept/m10-map.spec.js` | red: a mission marker only |
-| M10-3 | **Collision and damage:** the player's car hits other cars, buildings and street furniture and stops or glances off by the angle. Every car (the player's, traffic, police) takes damage from a hit above 5 m/s. Smoke shows from 60%. At 100% it is a wreck that cannot be driven and blocks its lane until it is towed out of sight; a chase ends when the pursuing cruiser is wrecked. At most 1 more draw | `tests/accept/m10-collide.spec.js`, `tests/accept/m10-damage.spec.js`; shots | red: no car collision (`vehicle.js:1`, "No collision yet"), no damage |
-| M10-4 | **People react:** A/B, a car driven onto a pavement: walkers within 20 m run from it and come back 10 s after it has gone. A walker who saw a crime calls it in after 5 s unless the player is out of their sight by then, and heat rises with the cause "witness" | `tests/accept/m10-react.spec.js` | red: walkers never react |
+| M10-2 | **Map and route:** a minimap shows the roads within 150 m, the player's heading, the mission marker and the police units in sight, drawn on a 2D canvas over the game (0 draws). M opens a map of the whole town; a click sets a waypoint, and the minimap shows the route along the road graph, worked out again within 1 s when the player leaves it; the map has a legend for every icon; crossing into a district shows its name for 3 s | `tests/accept/m10-map.spec.js` | red: a mission marker only |
+| M10-3 | **Collision and damage:** the player's car hits other cars, buildings and street furniture and stops or glances off by the angle. Every car (the player's, traffic, police) takes damage from a hit above 5 m/s. Smoke shows from 60%. At 100% it is a wreck that cannot be driven and blocks its lane until it is towed out of sight; a chase ends when the pursuing cruiser is wrecked. At most 1 more draw; a pursuing cruiser alongside the player's car rams it; a car stopped behind a wreck or a parked car passes it by the other lane within 10 s, or waits where there is no other lane | `tests/accept/m10-collide.spec.js`, `tests/accept/m10-damage.spec.js`; shots | red: no car collision (`vehicle.js:1`, "No collision yet"), no damage |
+| M10-4 | **People react:** A/B, a car driven onto a pavement: walkers within 20 m run from it and come back 10 s after it has gone. A walker who saw a crime calls it in after 5 s unless the player is out of their sight by then, and heat rises with the cause "witness"; nobody passes through anybody: the player on foot stops against a walker, or shoulders past at a run, and the walker turns to look; walkers in a car's path dive clear, and one the car still reaches is knocked down, gets up after 5 s, and raises heat with the cause "hit" if police or a witness saw it (at combat speeds a hit wounds or kills, with health, M13) | `tests/accept/m10-react.spec.js` | red: walkers never react |
 | M10-5 | **Water:** a car driven into the river sinks within 3 s and is gone; the player swims at 1 m/s to the nearest bank and climbs out; no walker or car is ever routed into water | `tests/accept/m10-water.spec.js` | no river until M4 |
 | M10-6 | A saved game keeps the car the player took and where they left it | `tests/accept/m10-save.spec.js` | red |
 | M10-7 | The sweep of every M10 shot has 0 open defects | the sweep | — |
+| M10-8 | **Handling:** in a car, Space is the handbrake: the rear wheels lock and the car slides; at 15 m/s it takes a 90° junction corner with the handbrake that it cannot take without it; steering eases with speed across the whole speed range | `tests/accept/m10-handling.spec.js` | red: no handbrake; the turn rate is the same at every speed over 4 m/s (`vehicle.js:33-34`) |
+| M10-9 | **Jump:** on foot, Space jumps 0.6 m *(provisional)*; the player lands on kerbs, benches, car roofs and walls under 1 m and stands on them, never inside them. Climbing and vaulting wait (G2) | `tests/accept/m10-jump.spec.js` | red: Space does nothing |
+| M10-10 | **Police on foot:** when the player is on foot more than 10 m from any road a cruiser can drive, the nearest unit's officers get out and run after them at 5.5 m/s *(provisional)*, slower than the player's run (6 m/s); an officer within 1.5 m for 2.5 s busts the player, as a cruiser's reach does today; officers search where they last saw the player and go back to the cruiser when the search ends; from ★3 they draw weapons (M13) | `tests/accept/m10-foot.spec.js` | red: police are cruisers only (`WANTED.md`) |
 
 ## M11 — Something to play for
 
@@ -556,10 +602,10 @@ instead: the target pays, the act does not happen, and the client remembers.
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
-| M11-1 | **Gigs come from the sim:** on all five seeds over 10 game hours, at least 3 gigs *(feel)* are on offer at any time, across all 6 kinds; each names its client, place, ask, pay and deadline; when it is offered, the state it was made from is true in the sim | `tests/accept/m11-gigs.test.js` | red: no gigs |
+| M11-1 | **Gigs come from the sim:** on all five seeds over 10 game hours, at least 3 gigs *(feel)* are on offer at any time, across all 6 kinds; each names its client, place, ask, pay and deadline; when it is offered, the state it was made from is true in the sim; a taken gig's time left shows on the HUD | `tests/accept/m11-gigs.test.js` | red: no gigs |
 | M11-2 | **Gigs land:** each kind, played by real input on two seeds, completes when its state is reached, pays its ₡, and its effect shows by A/B. One left past its deadline pays nothing, and its client offers nothing for 30 game minutes | `tests/accept/m11-<kind>.spec.js` | red |
 | M11-3 | **The second way:** a gig with a target, sold to the target: the target pays, the act does not happen, and the client offers nothing for the rest of the game day | `tests/accept/m11-sell.spec.js` | red |
-| M11-4 | **Money buys a place:** at any grown building's door, holding E for 1 s buys it at a price from its stage and its district's wealth (formula in `ECONOMY.md`). It pays the player its share of the lot's trade every game hour, within 1 ₡ of the economy's figure; A/B, a blackout of its district cuts that pay. Its room is a safehouse: a game saved there continues there | `tests/accept/m11-own.spec.js` | red: ₡ buys nothing |
+| M11-4 | **Money buys a place:** at any grown building's door, holding E for 1 s buys it at a price from its stage and its district's wealth (formula in `ECONOMY.md`). It pays the player its share of the lot's trade every game hour, within 1 ₡ of the economy's figure; A/B, a blackout of its district cuts that pay. Its room is a safehouse: a game saved there continues there. A bust takes 10% of the ₡ the player holds *(provisional)*, and the news line says how much | `tests/accept/m11-own.spec.js` | red: ₡ buys nothing |
 | M11-5 | **Cred:** gigs and missions give cred; at least 3 tiers, each unlocking what `docs/GIGS.md` says (a bigger battery, a hack range of 60 m instead of 40, a faster break-in, better-paid gig kinds); the HUD shows cred and the next unlock | `tests/accept/m11-cred.test.js` | red |
 | M11-6 | A saved game keeps the gigs on offer, what each client remembers, cred and owned buildings | `tests/accept/m11-save.spec.js` | red |
 | M11-7 | The sweep of every M11 shot has 0 open defects | the sweep | — |
@@ -579,9 +625,9 @@ services and budget it uses.
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
-| M12-1 | **Power:** supply and demand in MW per district show in the city view (formula in `ECONOMY.md`). A/B: a district whose demand passes supply goes dark a block at a time, with the cause "short of power" in the news; a new plant ends it within 2 game minutes. H still blacks out a district through the same code | `tests/accept/m12-power.test.js` | red: power is a hack deadline |
-| M12-2 | **Water:** a pumping station on a river bank and a treatment plant are placed by mouse; every parcel on a road joined to both has water. A/B: a district with none stops its lots at LOW with the reason "no water"; the treatment plant's outflow shows downstream on the pollution overlay | `tests/accept/m12-water.test.js` | red |
-| M12-3 | **Garbage:** every building makes garbage by stage; a depot's trucks collect along the roads up to its capacity. A/B: in a district with no depot, bags pile on the pavement and land value falls; a depot clears them | `tests/accept/m12-garbage.test.js` | red |
+| M12-1 | **Power:** supply and demand in MW per district show in the city view (formula in `ECONOMY.md`). A/B: a district whose demand passes supply goes dark a block at a time, with the cause "short of power" in the news; a new plant ends it within 2 game minutes. H still blacks out a district through the same code; the dark blocks show M5-16's icon "no power" | `tests/accept/m12-power.test.js` | red: power is a hack deadline |
+| M12-2 | **Water:** a pumping station on a river bank and a treatment plant are placed by mouse; every parcel on a road joined to both has water. A/B: a district with none stops its lots at LOW with the reason "no water"; the treatment plant's outflow shows downstream on the pollution overlay; M5-16's icon shows "no water" | `tests/accept/m12-water.test.js` | red |
+| M12-3 | **Garbage:** every building makes garbage by stage; a depot's trucks collect along the roads up to its capacity. A/B: in a district with no depot, bags pile on the pavement and land value falls; a depot clears them; M5-16's icon shows "no collection" | `tests/accept/m12-garbage.test.js` | red |
 | M12-4 | **Fire:** buildings catch fire at a rate in `ECONOMY.md` *(provisional)*; flames and smoke show at the play camera; a truck drives from the nearest station and puts it out; with none in reach, the building loses a stage each minute | `tests/accept/m12-fire.spec.js` | red: no fires |
 | M12-5 | **Fleets:** fire trucks, garbage trucks and ambulances drive M3's road graph from their buildings and stop at lights; together at most 3 more draws, and the busiest pose stays at or under 175 | the M12 checks; the ledger | red |
 | M12-6 | Plants, pumps, treatment plants and depots appear in the budget with their upkeep; in debt they shut farthest first (M5-6) | `tests/accept/m5-budget.test.js`, extended | red |
@@ -596,23 +642,28 @@ M3's; mostly new files under `src/audio/` and `src/ui/`.
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
-| M7-1 | An audio system plays: street ambience, an engine whose pitch rises with speed, a crane at a working site, police sirens, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` | `tests/accept/m7-sound.spec.js` (lists playing sounds per pose) | red: no audio code |
-| M7-2 | A title screen (New Game, Continue disabled with no save, Settings) works by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed | `tests/accept/m7-title.spec.js` | red |
+| M7-1 | An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` | `tests/accept/m7-sound.spec.js` (lists playing sounds per pose) | red: no audio code |
+| M7-2 | A title screen (New Game, Continue disabled with no save, Settings) works by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed; it also shows a city name made from the seed, which the player can change, and the HUD and the save slot show that name | `tests/accept/m7-title.spec.js` | red |
 | M7-3 | Esc pauses: game time holds for 5 s and a menu shows; Esc resumes | `tests/accept/m7-pause.spec.js` | red |
-| M7-4 | Settings for mouse, volume, quality, key bindings and subtitle size survive a reload (the first slice of `BACKLOG.md` accessibility) | `tests/accept/m7-settings.spec.js` | red |
+| M7-4 | Settings for mouse, volume, quality, field of view, full screen, key bindings and subtitle size survive a reload (the first slice of `BACKLOG.md` accessibility) | `tests/accept/m7-settings.spec.js` | red |
 | M7-5 | A fresh game teaches every key with one hint each (Z, E, F and H when M7 closes; each later milestone adds its own), and each goes away once the player has done it | `tests/accept/m7-hints.spec.js` | red |
 | M7-6 | The busiest pose holds **60 fps** (95th-percentile frame under 16.7 ms) on this Mac's GPU, at 1280 × 720 and at the window's full Retina size | `scripts/fps.mjs` | red: 16.8-17.6 ms at the spawn at 1280 × 720; Retina not measured |
-| M7-7 | **Saves are safe:** three slots, each named by its city's seed, population and save time; New Game and N never replace a save without asking first, in the page | `tests/accept/m7-slots.spec.js` | red: one slot (`savestore.js` `KEY`), and N wipes it at once (`main.js` `newGame`) |
+| M7-7 | **Saves are safe:** three slots, each named by its city's name, seed, population and save time; the pause menu saves to the slot at once; New Game and N never replace a save without asking first, in the page | `tests/accept/m7-slots.spec.js` | red: one slot (`savestore.js` `KEY`), and N wipes it at once (`main.js` `newGame`) |
 | M7-8 | **Gamepad:** a standard pad plays the street (move, look, run, drive, enter, hack, journal), and the bindings screen shows it (the city view stays mouse and keys: D13) | `tests/accept/m7-gamepad.spec.js` | red: no gamepad code |
 | M7-9 | **When the GPU fails:** with no WebGL, or when the context is lost, the page says so in words and what to try; a context that comes back restores the game | `tests/accept/m7-webgl.spec.js` | red: a black page |
+| M7-10 | **Music and the radio:** a title theme; a score under the arc's missions that turns urgent when a chase starts and settles when it ends; in a car, B cycles two radio stations of instrumental music and off, and the station holds when the player gets out and back in. Every track is CC0 (`ASSETS.md`: CC0 first) and in `CREDITS.md`; one station if CC0 cannot fill two. DJs, talk and news voices wait (G23) | `tests/accept/m7-music.spec.js` (lists the playing tracks per pose) | red: no audio code |
 
 The radio (`ARC.md`) needs music and voices. The music generator in `ASSETS.md`
 (AceStep) will not run on this Mac; CC0 music libraries will. A small local voice
 model for dispatch and DJ lines may run here, and gets proven the way M2-0 proves the
-model pipeline before anything depends on it. Until then the radio waits for the sell
-check, and dispatch stays as subtitles.
+model pipeline before anything depends on it. Until then the radio is music only
+(M7-10), its DJs and news are M28-2, and dispatch stays as subtitles until M28-4's voices.
 
-## M8 — The sell check
+## M8 — The sell check: the vertical slice
+
+M0 to M12 are the slice: every leg of the game, its first 20 minutes, at ship quality.
+M8 asks whether the whole game is worth building on it. **Sell** starts M13 to M34 and
+then M9; **rework** is one more round on the weakest milestone; **stop** stops.
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
@@ -620,7 +671,7 @@ check, and dispatch stays as subtitles.
 | M8-2 | *Operator:* plays 20 minutes and says **sell**, **rework** (one more round on the weakest milestone) or **stop** | the operator | — |
 | M8-3 | Optional, *operator's* choice: 2-3 people play 15 minutes with no help. Written down: did they zone something without being told, and did they play past 10 minutes (`BACKLOG.md`, "Playtest") | `docs/playtest/` notes | — |
 
-## M9 — Ship on Steam (only if M8-2 says sell)
+## M9 — Ship on Steam (after M8-2 says sell and M13 to M34 close)
 
 From: `BACKLOG.md` (Steam, saves).
 
@@ -630,15 +681,15 @@ From: `BACKLOG.md` (Steam, saves).
 | M9-2 | The packaged build (`electron.cjs`) starts from a clean download on Windows and macOS; on the operator's Windows PC it holds 175 draws and M7-6's frame | `scripts/ship-check.mjs` | old scaffolding, never run |
 | M9-3 | A save written by the M8 build loads in the ship build (a versioned save schema, `BACKLOG.md`) | `tests/accept/m9-old-save.test.js` | — |
 | M9-4 | The store page has 5 screenshots and a 30-60 second trailer captured from the game, and the sweep finds 0 defects in them | the sweep | — |
-| M9-5 | Feature freeze: nothing but fixes has landed since M8-2 | `git log` | — |
-| M9-6 | At least 10 Steam achievements unlock in the packaged build; saves sync through Steam Cloud between the Mac and Windows; one script uploads both builds to the Steam depot (`BACKLOG.md`, "Steam") | `docs/STEAM.md`; the operator checks Steamworks | — |
+| M9-5 | Feature freeze: nothing but fixes has landed since the last of M13 to M34 closed | `git log` | — |
+| M9-6 | M29-13's 60 achievements unlock as Steam achievements in the packaged build; saves sync through Steam Cloud between the Mac and Windows; one script uploads both builds to the Steam depot (`BACKLOG.md`, "Steam") | `docs/STEAM.md`; the operator checks Steamworks | — |
 
 ## One key, one meaning
 
 Today: Z the city view, E a door, F in or out of the hero car, H the blackout, J the
-journal, 1 and 2 the arc's choices, T day or night, N a new game, Shift to run
-(`main.js:442-451`, `sim/cityview.js:84`). The plan gives more things to keys that
-already mean something, so:
+journal, 1 and 2 the arc's choices, T day or night, N a new game, Shift to run, and
+R, C, I and X the city view's brushes (`main.js:439-452`, `sim/cityview.js:30, 83-91`).
+The plan gives more things to keys that already mean something, so:
 
 - **Tap** a key for a thing's first action; **hold** it, with a ring that fills, for
   the second. Tap E at a door goes in; hold E for 1 s buys the building (M11-4); hold E
@@ -647,7 +698,12 @@ already mean something, so:
 - **F is the car key** for every car (M10-1), as it is for the hero car today.
 - **Esc closes the innermost thing first** (a menu, the map, a camera view, the city
   view); only in plain play does it pause (M7-3).
-- **Q is Focus** (M6-3); **M is the map** (M10-2).
+- **Q is Focus** (M6-3); **M is the map** (M10-2); **B is the radio** in a car (M7-10).
+- **Space is the mode's own action,** as each of the four games has it: jump on foot
+  (M10-9), the handbrake in a car (M10-8), pause in the city view (M5-17). The modes
+  never overlap, so it is one meaning at a time. The speed buttons have no keys,
+  because 1 and 2 are the arc's choices.
+- **E in a car is the horn** (M7-1): the thing in front of a driver is the road.
 - **N never replaces a save without asking** (M7-7).
 
 Every task that adds a key follows this, and M7.T11's bindings screen lists them all.
@@ -667,7 +723,7 @@ checks this table at the end of every milestone.
 | R6 | Commuting across districts breaks "the act stays its size" | M4-5 | The rule is already restated: only districts linked by a commute may differ, and only through commute times |
 | R7 | Saves outgrow the browser's store (about 5 MB) | M3-8's size check | The op log is compacted; then IndexedDB, which is built into the browser and needs no package |
 | R8 | Too many lanes wait on one reviewer | More than 4 passed tasks waiting for merge | No new lane starts until the queue is under 4 |
-| R9 | The game never gets finished (the operator's worry) | Work outside this file, or a "later" row creeping into a milestone | Nothing enters a milestone without the operator's yes; "later" rows stay out until M8 |
+| R9 | The game never gets finished (the operator's worry) | Work outside this file and `docs/plan/milestones/`; a milestone that runs past its task count | Everything is planned (D15), so nothing new enters without the operator's yes. Order answers the worry, not cutting: the slice proves the game at M8 before M13 to M34 start, and every milestone closes with a sweep |
 | R10 | `?speed=4` hides bugs that only happen at speed 1 | A check passes at 4 and fails at 1 | Every milestone's last `npm run accept` runs at speed 1 |
 
 ## Decisions Claude made as director
@@ -678,10 +734,11 @@ Engineering order is the director's call, not the operator's (operator, 2026-10-
 | # | Decision | Why |
 |---|---|---|
 | D1 | **The two M3 spikes go first**, beside M0.T6 (shot diff) and M0.T8 (golden maps); then the rest of M0, then M3 on the long pole, with M1 and M2 in their own lanes | The spikes are 2 tasks, need nothing, and answer the biggest unknown in the plan: whether this Mac can draw a 2,000-building city in pools at 60 fps, and whether traffic can run on the graph. If S1 fails, M3's render tasks and M4's city size change before 40 tasks are spent. M0.T6 and M0.T8 come with them because M3's moves need them to prove nothing changed |
-| D2 | Roads stay on the grid (straight, right angles) through M5; curves after the sell check | Curves change lots, traffic and rendering at once; the code assumes the grid everywhere (`axis: 'x' \| 'z'`) |
-| D10 | **What goes in before the sell check:** what a player of Skylines, GTA, Watch Dogs or Cyberpunk misses in their first 20 minutes and that passes a pillar's test. The rest is later or out, line by line, in `docs/plan/CAPABILITIES.md` | The plan did not cover the four games (the operator asked, 2026-10-03); adding every capability is the never-finished worry (R9). The 20-minute bar is the length of the operator's own sell-check play (M8-2) |
-| D12 | **The Skylines layer before the sell check (M12):** power with supply and demand, water, garbage, fire and the fleets that serve them. Telecom, post, deathcare, education levels, goods, tourism, seasons, crime rates and the rest wait (`docs/plan/CAPABILITIES.md`) | D10's rule: a Skylines player meets power and water in the first minutes, and garbage and fire soon after. The rest arrive later in a Skylines game too |
-| D13 | **The gamepad plays the street; the city view is mouse and keys** until after the sell check | Building with a pad needs a cursor and menus designed for it, a project of its own (Skylines' console edition was a redesign); the street is where a pad matters |
+| D2 | Roads stay on the grid (straight, right angles) through M12; free and curved roads are M14-1, after the sell check | Curves change lots, traffic and rendering at once; the code assumes the grid everywhere (`axis: 'x' \| 'z'`) |
+| D10 | **What goes in the vertical slice (M0 to M12):** what a player of Skylines, GTA, Watch Dogs or Cyberpunk misses in their first 20 minutes and that passes a pillar's test. Everything else is M13 to M34 (D15) | The 20-minute bar is the length of the operator's own sell-check play (M8-2): a slice that holds 20 minutes on every leg proves the game; the rest makes it whole |
+| D12 | **The Skylines layer before the sell check (M12):** power with supply and demand, water, garbage, fire and the fleets that serve them. Telecom, post, deathcare, education levels, goods, tourism, seasons, crime rates and the rest are M14, M15 and M26 | D10's rule: a Skylines player meets power and water in the first minutes, and garbage and fire soon after. The rest arrive later in a Skylines game too |
+| D13 | **The gamepad plays the street; the city view is mouse and keys** through M12; the city view on a pad is M29-6 | Building with a pad needs a cursor and menus designed for it, a project of its own (Skylines' console edition was a redesign); the street is where a pad matters |
+| D14 | **The four games' feature lists were checked line by line** (`docs/plan/features/`, 2026-10-04: 3,754 features, 809 distinct mechanics Urbis lacks). 37 of them, and jumping, which G2 had left for later, are a player's first 20 minutes and went into M2, M5, M7, M10 and M11 as 20 changes (`docs/plan/CAPABILITIES.md`, "Checked against the feature lists"). The other 772 are in M13 to M34 (D15), each in one criterion, listed in `docs/plan/milestones/` | D10, applied to every feature the games have and not only to the plan's own list. Two earlier "later" lines failed it: a GTA player presses Space in the first seconds (G2), and all four games have music from the title screen on (G23) |
 
 ## Decisions the operator owns
 
@@ -693,24 +750,46 @@ Engineering order is the director's call, not the operator's (operator, 2026-10-
 | D6 | A 10-minute direction check after M1 and M2 | when they close | Worth it: the first time zoning should pay off on screen |
 | D7 | Sell, rework or stop | M8-2 | — |
 | D8 | Register on Steamworks ($100) | M9-1 | Only after "sell" |
-| D9 | **Combat:** none before the sell check (the player answers the police by driving, hacking and hiding), or fists and guns | now | None before the sell check. Fighting is not among the tools the pillars name ("driving, building, hacking, talking"); it needs enemies, aiming, damage, death, animations, weapon models and sounds, a milestone of its own of about 20 tasks; and it turns the police loop lethal. If yes, it is a milestone after M11, and W15, W27, G9's ★4-5 and "wasted" come with it |
-| D11 | **Licence:** `package.json` says MIT and there is no LICENSE file; MIT lets anyone copy and sell the code. Keep it, or make the game proprietary (`"license": "UNLICENSED"`, `"private": true`) | before M8 | Proprietary, since the plan is to sell it. The asset credits stay in `public/assets/CREDITS.md` |
+| D9 | **Combat: yes, as in GTA, Watch Dogs and Cyberpunk** (decided 2026-10-04). Fists, melee and guns, cover, health, death and "wasted", armed police from ★3, enemies who fight back | decided | M13. Combat is a tool beside driving, building, hacking and talking (`AGENTS.md`, pillar 3); the grounded look holds: real-world weapons, no neon, no cyberware look |
+| D11 | **Licence: private, no licence** (decided 2026-10-04): `"license": "UNLICENSED"`, `"private": true` in `package.json`, and no LICENSE file; nobody may copy or sell the code | decided | M8.T4. The asset credits stay in `public/assets/CREDITS.md` |
+| D15 | **Everything the four games have is planned** (decided 2026-10-04): every one of the 772 mechanics Urbis lacked (`docs/plan/features/mechanics.md`), the 1,851 features first marked later or out, and the 261 content rows is in exactly one criterion of M13 to M34; nothing is later or out. What breaks the grounded look takes a grounded form (cyberware is worn gear, quickhacks are programs on a rig, ripperdocs are fitters, no neon or holograms) or becomes an easter egg or a cheat | decided | The operator: plan the way Rockstar plans GTA 6. Order, not cutting, answers R9 |
+| D17 | The 16 decisions in the files of M13 to M34, under "Decisions for the operator": the animation source and the age rating (M13); voices (M24); where the music comes from and music packs (M28); languages, the path-traced still's package, consoles and prices (M29); servers, the `ws` and WebRTC packages, paid items and moderation (M30); paid creator packs (M31); a celebrity cameo (M33); the grade (M34) | when that milestone starts | Each file gives the options. Until one is decided, the free one holds: CC0 music, subtitles, an invented cameo, no paid items |
 
-## After the sell check — waiting, not cut
+## After the sell check: M13 to M34, the whole game
 
-- The next nine interiors (`INTERIORS.md`, `BACKLOG.md`): three shops, two offices, a
-  corporate floor, a club, a warehouse, a subway station, a safehouse. People inside
-  who move.
-- New missions after the six-mission arc. The arc stays as it is and is played on every
-  generated city.
-- Overpasses, underpasses, the subway, sewers and skybridges (world-scale plank 2).
-- Bus lines, curved roads, the metro, player-built highways and bridges, district
-  policies (M5's "later" rows).
-- The "later" hacks (M6), and vertical hacking: cameras looking down, rooftop nodes,
-  elevators (`BACKLOG.md`).
-- Every `docs/VISUAL-GAP-ACTIONS.md` item M2 does not need.
-- Localization, modding, photo mode, the rest of accessibility (`BACKLOG.md`).
-- Every "later" line in `docs/plan/CAPABILITIES.md`.
+Each is one file in `docs/plan/milestones/`: its criteria, its tasks, the operator's
+decisions (D17), and, criterion by criterion, the features of the four games it
+delivers. What used to wait here is in them: the next interiors (M33-9), new missions
+(M24), overpasses, the subway, sewers and skybridges (M14-4, M16-7, M33-10), bus lines,
+curves, highways, bridges and policies (M16-5, M14-1, M14-4, M14-6, M14-18), the later
+hacks and vertical hacking (M20), every open visual gap (M34), languages, mods, photo
+mode and accessibility (M29-4, M31, M27-4, M29-3).
+
+| Milestone | What it adds | Criteria | Tasks |
+|---|---|---|---|
+| [M13](plan/milestones/M13-combat.md) Combat | Fists, melee and guns, cover, stealth and takedowns, armed police, hideouts, rampages | 28 | 55 |
+| [M14](plan/milestones/M14-city-builder.md) The whole city builder | Free and curved roads, highways, bridges, densities, offices, industry, parks, tourism, terraforming, climates, scenarios | 28 | 43 |
+| [M15](plan/milestones/M15-services.md) Every city service | Utilities in full, health, deathcare, education, budget and loans, happiness, post, telecom, heating, disasters, eleven views | 28 | 35 |
+| [M16](plan/milestones/M16-transport.md) Transport | Lanes and trips, the line tool, freight, buses, trams, metro, trains, ferries, planes, taxis, riding, bikes and trails | 23 | 29 |
+| [M17](plan/milestones/M17-on-foot.md) On foot | First person, climbing, free running, roofs, falls, parachutes, diving, stamina, sitting | 15 | 19 |
+| [M18](plan/milestones/M18-vehicles.md) Every vehicle | Every class of car, bikes, off-road, boats, helicopters and planes, owning, the mod shop, the workshop | 24 | 36 |
+| [M19](plan/milestones/M19-police-crime-gangs.md) Police, crime and gangs | ★4 and ★5, every police force, the city's crime, robberies, gangs and turf, guarded places | 16 | 19 |
+| [M20](plan/milestones/M20-hacking.md) All of hacking | Devices, building security, profiles, mass hacks, drones, remote cars, enemy hackers, the puzzle, the city crash, gadgets, footage | 17 | 22 |
+| [M21](plan/milestones/M21-people.md) People, friends and the crew | Daily needs, street characters, reactions, friends, allies, partners, calls, the crew, playing as one of them | 18 | 23 |
+| [M22](plan/milestones/M22-money.md) Money, shops and business | Shops, vendors, the bank, businesses, firms' books, the stock market, gambling, fishing and oil | 13 | 16 |
+| [M23](plan/milestones/M23-progression.md) Progression | Levels, attributes, perks, skills, the body, upgrades, streaks, uprisings, completion, new game plus | 13 | 17 |
+| [M24](plan/milestones/M24-missions.md) The story, missions and things to do | The 60-mission campaign, scenes, endings, three starts, heists, fixers, random events, races, sports, shows, investigations, collectibles | 20 | 28 |
+| [M25](plan/milestones/M25-character-gear.md) The character, clothes, gear and inventory | The creator, barbers, clothes, disguises, emotes, worn gear, the rig, fitters, loot, crafting, the inventory | 18 | 21 |
+| [M26](plan/milestones/M26-world.md) Weather, seasons, land and animals | Nine weathers, seasons and snow, land of many shapes, flowing water, wildlife, pets, hunting, the calendar, mysteries | 13 | 16 |
+| [M27](plan/milestones/M27-interface.md) The phone, the screens and the interface | The phone, sites, TV, photo mode, the HUD, marks, the map, the journal, the assistant, city-view panels and cameras | 14 | 19 |
+| [M28](plan/milestones/M28-audio.md) Radio, music, voices and sound | Sixteen stations, DJs and news, the score, voices, places that sound like places, every sound, the mix | 10 | 11 |
+| [M29](plan/milestones/M29-settings-platforms.md) Settings, accessibility, saves and platforms | Graphics, accessibility, languages, difficulty, pads, saves, clips and the editor, platforms, editions, 60 achievements | 14 | 18 |
+| [M30](plan/milestones/M30-online.md) Online | Characters, sessions, building one city together, co-op, heists, races, fights, hacker modes, organisations, businesses, crews, the creator | 24 | 30 |
+| [M31](plan/milestones/M31-mods-editors.md) Editors, mods and director mode | Map, asset, theme, road and scenario editors; code and file mods; Workshop; packs; director mode | 12 | 14 |
+| [M32](plan/milestones/M32-cheats.md) Cheats | Typed, pad and phone cheats; eight player cheats; the rule | 4 | 4 |
+| [M33](plan/milestones/M33-content.md) The city's places, people, story and packs | Forty-eight kinds of place, the region, the cast, set pieces, side stories, story packs, brands, interiors, under and above | 13 | 16 |
+| [M34](plan/milestones/M34-the-look.md) The look, finished | The 73 open visual-gap items closed at the play camera | 19 | 18 |
+| **M13 to M34** | | **384** | **509** |
 
 ## Done log
 

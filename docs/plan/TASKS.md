@@ -12,8 +12,11 @@ commit. A queue file in `docs/tasks/` is made from these rows when a milestone s
 files of the old plan (`m1-interiors.json` to `m5-scorecard.json`) move to
 `docs/tasks/old/` in the commit that settles this plan, so no old name is run as a new
 milestone.
-220 tasks in all. `docs/plan/CAPABILITIES.md` is where M10, M11, M12 and
-M5's additions come from.
+236 tasks for M0 to M12 are here. `docs/plan/CAPABILITIES.md` is where M10, M11, M12 and
+M5's additions come from, and the feature lists' check (D14) added 16 tasks. M13 to M34's
+509 tasks are in `docs/plan/milestones/`, one file a milestone, under the same rules: 745
+in all. A task there names the exact task it needs from another milestone of M13 to M34,
+never the whole milestone, so they can overlap without waiting in a circle.
 
 ## Rules for a task
 
@@ -97,6 +100,8 @@ too heavy:** the hydrant model is 86 k triangles. Every model gets a triangle bu
 | M2.T13 | **Building kit** (after the building pools). The six facade materials, rooflines and cornices already built (`render/block.js:476-486`, `05daf90`) move into the pools with the buildings (M3.T22-T25); this adds what is not built: window reveals at least 0.15 m deep, window frames, shopfronts and roof plant as pooled parts on every building parcel; at most 12 more draws; its check first | `src/render/buildings.js` (made in M3.T22), new `tests/accept/m2-streetwall.spec.js` | M3.T25 | M2-3 (part) | M |
 | M2.T14 | **Frontage on generated seeds.** `check:overlap` measures the hand map's rows only (98.3% worst row today, ratchet 98.2%); it runs on the five seeds too, and if a row falls under the ratchet, the row cut in `planBuildings` closes the gaps | `scripts/check_overlap.mjs`, `src/sim/layout.js` | M3.T6 | M2-3 (part) | S |
 | M2.T15 | **VGA-084 sweep.** Night, day and blackout poses on five seeds; one commit per defect found; the sweep lists every picked building, car, person, tree or prop mesh with no `userData.model` | the sweep; whatever each defect names | M2.T7, M2.T9, M2.T10, M2.T12, M2.T14 | M2-6 | M |
+| M2.T16 | **Weather, sim.** New `sim/weather.js`: each game day's states (clear, overcast, rain) from a stream of their own (`createStreams` gains `weather`, so no existing replay shifts); a wetness 0-1 that rises in rain and falls over 2 game minutes after; `?weather=` pins a state for the sweep; its check first | new `src/sim/weather.js`, `src/sim/rng.js`, `src/game/loop.js`, new `tests/accept/m2-weather.test.js` | M0.T1, M3.T5 | M2-7 (part) | S |
+| M2.T17 | **Weather, drawn.** The rain falls only in rain; VGA-005's wet grade, the puddle mirrors and the road gloss read the wetness; overcast greys the sky and dims the sun; no new draws; each state shot at the spawn by day and night and judged in `REVIEW.md` | `src/render/rain.js`, `src/render/materials.js`, `src/render/setdress.js`, `src/render/atmosphere.js`, new `tests/accept/m2-weather.spec.js` | M2.T16 | M2-7 | M |
 
 ## M3 — The city as data (lanes: engine-sim, engine-render)
 
@@ -248,7 +253,7 @@ and the journal says so; nothing is protected from the player.
 
 | ID | Task | Files | Needs | Proves | Size |
 |---|---|---|---|---|---|
-| M5.T1 | **The tool frame.** A tool is `{ op, cost(map, at), preview(at), refuse(map, at) → reason }`; the R C I X brushes become tools; the city-view panel lists tools with their keys and costs | `src/sim/cityview.js`, `src/ui/cityview.js` | M4 done | M5-7 (part) | M |
+| M5.T1 | **The tool frame.** A tool is `{ op, cost(map, at), preview(at), refuse(map, at) → reason }`; the R C I X brushes become tools; the city-view panel lists tools with their keys and costs; hovering a tool names what it does and its cost; a right click or Esc puts it down | `src/sim/cityview.js`, `src/ui/cityview.js` | M4 done | M5-7 (part) | M |
 | M5.T2 | **Checks, red.** `m5-roads.spec.js`, `m5-bulldoze.spec.js`, `m5-noroad.test.js` | new files in `tests/accept/` | M5.T1 | M5-1, M5-2, M5-3 red | M |
 | M5.T3 | **Road drag.** Press on a road node, drag: a grid-snapped preview with its length and cost; release lays it with `addRoad`; it refuses over water, through buildings or up too steep, saying which | `src/sim/cityview.js`, `src/render/cityview.js`, `src/ui/cityview.js` | M5.T2 | M5-1 (part) | M |
 | M5.T4 | **A new road is a street.** Lamps, signals and furniture planned along it; lots planned on both sides (M3.T20); the outskirts gone from its path (M3.T27) | `src/sim/furniture.js`, `src/sim/ops.js` | M5.T3 | M5-1 | M |
@@ -277,10 +282,13 @@ and the journal says so; nothing is protected from the player.
 | M5.T27 | **Demand bars.** Three bars for the district under the cursor, read from the economy | `src/ui/cityview.js` | M5.T1 | M5-8 (part) | S |
 | M5.T28 | **Pollution.** Works lots pollute by stage, and busy roads make noise by their edge load in M3's commute flow; home demand and land value (M5.T21's formula) fall within 60 m; the news names the cause; A/B check first | new `src/sim/pollution.js`, `src/sim/economy.js`, `src/sim/news.js`, new `tests/accept/m5-pollution.test.js` | M5.T21 | M5-11 | M |
 | M5.T29 | **Pollution overlay,** the sixth | `src/render/overlays.js` | M5.T28 | M5-8 | S |
-| M5.T30 | **Milestones.** Population tiers written in `ZONING.md`; a locked tool refuses with "unlocks at N people"; the panel shows the next tier; the scripted-player test | new `src/sim/milestones.js`, `src/sim/cityview.js`, `src/ui/cityview.js`, `docs/ZONING.md`, new `tests/accept/m5-milestones.test.js` | M5.T19 | M5-12 | M |
+| M5.T30 | **Milestones.** Population tiers written in `ZONING.md`; a locked tool refuses with "unlocks at N people"; the city view always shows the population and the next tier, and reaching a tier says on screen what it unlocked; the scripted-player test | new `src/sim/milestones.js`, `src/sim/cityview.js`, `src/ui/cityview.js`, `docs/ZONING.md`, new `tests/accept/m5-milestones.test.js` | M5.T19 | M5-12 | M |
 | M5.T31 | **Junction control.** Click a junction in the city view: lights, stop signs or yield; cars in M3's traffic obey; A/B check first | `src/sim/traffic.js`, `src/sim/cityview.js`, `src/ui/cityview.js`, new `tests/accept/m5-junctions.test.js` | M5.T1 | M5-14 | M |
-| M5.T32 | **History.** A panel of population, jobs, the city's money and demand per use over the last 5 game days, on a 2D canvas; the economy keeps the series; its check first | new `src/ui/history.js`, `src/sim/economy.js`, new `tests/accept/m5-history.spec.js` | M5.T17 | M5-15 | S |
-| M5.T33 | **Close.** The sweep of the city view and the street at every new road, gap and service; one commit per defect; the M5 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M5-13 | M |
+| M5.T32 | **History.** A panel of population, jobs, the jobless, the city's money and demand per use over the last 5 game days, on a 2D canvas; the economy keeps the series; its check first | new `src/ui/history.js`, `src/sim/economy.js`, new `tests/accept/m5-history.spec.js` | M5.T17 | M5-15 | S |
+| M5.T33 | **Drag zoning.** Hold the mouse with a brush and drag: every empty lot the stroke crosses is zoned, its total cost shown before release; one undo takes the stroke back; checked in `m5-newland.spec.js` | `src/sim/cityview.js`, `src/ui/cityview.js`, `tests/accept/m5-newland.spec.js` | M5.T9, M5.T26 | M5-4 | S |
+| M5.T34 | **Problem icons.** One pooled icon layer in the city view (1 draw): every building held back shows its first cause, from `decline.js` and the services' reach; a click opens today's reason card; M12's causes join the same table; its check first | new `src/render/problems.js`, `src/sim/decline.js`, `src/ui/cityview.js`, new `tests/accept/m5-problems.spec.js` | M5.T11 | M5-16 | M |
+| M5.T35 | **Pause and speed.** In the city view Space pauses and resumes; three buttons run 1, 2 or 4 sim steps a frame through M0's speed; leaving the city view sets 1; its check first | `src/sim/cityview.js`, `src/ui/cityview.js`, `src/game/loop.js`, new `tests/accept/m5-speed.spec.js` | M5.T1, M0.T3 | M5-17 | S |
+| M5.T36 | **Close.** The sweep of the city view and the street at every new road, gap and service; one commit per defect; the M5 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M5-13 | M |
 
 ## M6 — The hacking toolset (lanes: sim, render)
 
@@ -336,7 +344,15 @@ car key for every car; E stays the door key.
 | M10.T11 | **Witnesses.** A walker who saw a crime calls it in after 5 s unless the player is out of their sight by then; heat rises with the cause "witness"; a dispatch line for it | `src/sim/walkers.js`, `src/sim/wanted.js`, `src/sim/dispatch.js`, `content/dispatch.json` | M10.T10 | M10-4 | M |
 | M10.T12 | **Water.** Past the bank a car sinks over 3 s and is gone; the player swims at 1 m/s to the nearest bank and climbs out; no route crosses water; its check first | `src/sim/player.js`, `src/sim/vehicle.js`, `src/sim/terrain.js`, `src/render/player.js`, new `tests/accept/m10-water.spec.js` | M10.T2, M4.T8 | M10-5 | M |
 | M10.T13 | **Save** keeps the taken car and where it was left; its check first | `src/sim/save.js`, new `tests/accept/m10-save.spec.js` | M10.T2 | M10-6 | S |
-| M10.T14 | **Close.** The sweep of every M10 shot; one commit per defect; the M10 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M10-7 | M |
+| M10.T14 | **Handbrake and steering.** Space in a car locks the rear: grip drops and the car slides; steering eases with speed across the whole range, not only to 4 m/s (`vehicle.js:33`); its check first | `src/sim/vehicle.js`, `src/game/input.js`, new `tests/accept/m10-handling.spec.js` | M10.T7 | M10-8 | S |
+| M10.T15 | **Jump.** Space on foot jumps 0.6 m under gravity; M10.T7's collision boxes get heights, so the player lands on kerbs, benches, car roofs and walls under 1 m and never inside them; the rigged player's jump comes through M2's pipeline; its check first | `src/sim/player.js`, `src/sim/collide.js`, `src/render/player.js`, new `tests/accept/m10-jump.spec.js` | M10.T7, M2.T4 | M10-9 | M |
+| M10.T16 | **Nobody passes through anybody.** The player on foot stops against a walker, or shoulders past at a run; a bumped walker turns to look; walkers keep apart from each other; checked in `m10-react.spec.js` | `src/sim/player.js`, `src/sim/walkers.js`, `tests/accept/m10-react.spec.js` | M10.T10 | M10-4 (part) | M |
+| M10.T17 | **Knocked down.** Walkers in a car's path dive clear; one the car still reaches falls and gets up after 5 s (a fall and a get-up baked into M2's walker pool); heat rises with the cause "hit" if police or a witness saw it | `src/sim/walkers.js`, `src/sim/wanted.js`, `tools/models/bake_vat.py`, `src/render/npcs.js` | M10.T11, M10.T16, M2.T9 | M10-4 | M |
+| M10.T18 | **Going round, and the ram.** A car stopped 5 s behind a wreck or a parked car passes it by the other lane, or waits where there is none; a pursuing cruiser alongside the player's car steers into it; checked in `m10-collide.spec.js` | `src/sim/traffic.js`, `src/sim/wanted.js`, `tests/accept/m10-collide.spec.js` | M10.T8 | M10-3 | M |
+| M10.T19 | **Police on foot, sim.** Off the road beyond a cruiser's reach, the nearest unit's two officers get out and run after the player at 5.5 m/s along the walkways; within 1.5 m for 2.5 s they bust; they search where they last saw the player and go back when the search ends; its check first | `src/sim/wanted.js`, `src/sim/walkers.js`, new `tests/accept/m10-foot.spec.js` | M10.T16 | M10-10 (part) | M |
+| M10.T20 | **Police on foot, drawn.** Officers are walkers from M2's pool in a uniform tint, with a run; their cruiser's doors open | `src/render/npcs.js`, `src/render/police.js` | M10.T19, M2.T9 | M10-10 | S |
+| M10.T21 | **Legend and place names.** The map screen's legend lists every icon; crossing into a district shows its name for 3 s; checked in `m10-map.spec.js` | `src/ui/mapscreen.js`, `src/game/hud.js`, `tests/accept/m10-map.spec.js` | M10.T6 | M10-2 | S |
+| M10.T22 | **Close.** The sweep of every M10 shot; one commit per defect; the M10 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M10-7 | M |
 
 ## M11 — Something to play for (lane: depth)
 
@@ -346,7 +362,7 @@ it uses.
 | ID | Task | Files | Needs | Proves | Size |
 |---|---|---|---|---|---|
 | M11.T1 | **Checks, red.** `m11-gigs.test.js` (Node, five seeds, 10 game hours) and `m11-own.spec.js` | new files in `tests/accept/` | M4 done | M11-1, M11-4 red | M |
-| M11.T2 | **Gig board.** `sim/gigs.js`: a gig is `{ kind, client, place, ask, pay, deadline, madeFrom }`, offered from the sim's state and checked against it every tick; shown in the journal with a marker; `docs/GIGS.md` writes down the kinds, the pay and the cred table | new `src/sim/gigs.js`, `src/render/arcui.js`, new `docs/GIGS.md` | M11.T1 | M11-1 (part) | M |
+| M11.T2 | **Gig board.** `sim/gigs.js`: a gig is `{ kind, client, place, ask, pay, deadline, madeFrom }`, offered from the sim's state and checked against it every tick; shown in the journal with a marker; `docs/GIGS.md` writes down the kinds, the pay and the cred table; a taken gig's time left shows on the HUD | new `src/sim/gigs.js`, `src/render/arcui.js`, new `docs/GIGS.md`, `src/game/hud.js` | M11.T1 | M11-1 (part) | M |
 | M11.T3 | **Stall a site, and Tail.** Made from rival sites and the economy's queued firm moves; done when the site has stood frozen 2 minutes, or when the move's destination is learned | `src/sim/gigs.js`, new `tests/accept/m11-stall.spec.js`, new `tests/accept/m11-tail.spec.js` | M11.T2, M6.T16, M6.T20 | M11-2 (part) | M |
 | M11.T4 | **Lights out, and Delivery.** Made from rival shops and residents' jobs across the town | `src/sim/gigs.js`, new `tests/accept/m11-lights.spec.js`, new `tests/accept/m11-delivery.spec.js` | M11.T2, M10.T2 | M11-2 (part) | M |
 | M11.T5 | **Clear the way, and Build to order.** Made from late commuters at a junction and residents in poor districts | `src/sim/gigs.js`, new `tests/accept/m11-clear.spec.js`, new `tests/accept/m11-build.spec.js` | M11.T2, M6.T7, M5.T15, M5.T16 | M11-1, M11-2 | M |
@@ -358,7 +374,8 @@ it uses.
 | M11.T11 | **Save** keeps the gigs on offer, what each client remembers, cred and owned buildings | `src/sim/save.js`, new `tests/accept/m11-save.spec.js` | M11.T6, M11.T8, M11.T10 | M11-6 | S |
 | M11.T12 | **Talk, the sim.** New `sim/talk.js` makes a walker's lines from their sim state: their job and home (`people.js`), their district's last news, sometimes a gig lead (`gigs.js`); short answers in a district the player has hurt (blackouts, stalls, theft); its check first | new `src/sim/talk.js`, new `tests/accept/m11-talk.spec.js` | M11.T2 | M11-8 (part) | M |
 | M11.T13 | **Talk, shown.** Tap E at a walker within 2 m with no door nearer: they stop and face the player, and up to three lines show as subtitles in the arc's style; a lead opens on the gig board | `src/game/input.js`, `src/render/arcui.js`, `src/sim/walkers.js` | M11.T12 | M11-8 | M |
-| M11.T14 | **Close.** The sweep of every M11 shot; one commit per defect; the M11 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M11-7 | M |
+| M11.T14 | **A bust costs money.** A bust takes 10% of the ₡ held *(provisional)* from the wallet the arc pays into; the news line says how much; checked in `m11-own.spec.js` | `src/sim/arc.js`, `src/sim/news.js`, `tests/accept/m11-own.spec.js` | M11.T9 | M11-4 | S |
+| M11.T15 | **Close.** The sweep of every M11 shot; one commit per defect; the M11 keys' hints (M7.T12) | the sweep, `content/hints.json` | all of the above, M7.T12 | M11-7 | M |
 
 ## M12 — The city runs on something (lane: city; T11 in assets)
 
@@ -369,11 +386,11 @@ cables are not drawn: they are taken to run under every road.
 | ID | Task | Files | Needs | Proves | Size |
 |---|---|---|---|---|---|
 | M12.T1 | **Checks, red.** `m12-power.test.js`, `m12-water.test.js`, `m12-garbage.test.js`, `m12-fire.spec.js` (A/B, Node where they can be) | new files in `tests/accept/` | M5 done | M12-1 to M12-4 red | M |
-| M12.T2 | **Power, sim.** Plants make MW; districts use MW by floor area (formula in `ECONOMY.md`); substations carry a district's share; when demand passes supply, blocks go dark in turn through the blackout's own `darkUntil`, cause "short of power"; H still works through the same code | new `src/sim/power.js`, `src/sim/street.js`, `src/sim/economy.js`, `docs/ECONOMY.md` | M12.T1 | M12-1 (part) | M |
+| M12.T2 | **Power, sim.** Plants make MW; districts use MW by floor area (formula in `ECONOMY.md`); substations carry a district's share; when demand passes supply, blocks go dark in turn through the blackout's own `darkUntil`, cause "short of power"; H still works through the same code; the dark blocks show M5-16's icon "no power" | new `src/sim/power.js`, `src/sim/street.js`, `src/sim/economy.js`, `docs/ECONOMY.md`, `src/sim/decline.js` | M12.T1 | M12-1 (part) | M |
 | M12.T3 | **Power, tools.** Place a plant; the power overlay shows supply against demand per district; the news names a shortfall | `src/sim/cityview.js`, `src/ui/cityview.js`, `src/render/overlays.js`, `src/sim/news.js` | M12.T2 | M12-1 | M |
-| M12.T4 | **Water, sim.** A pumping station on a river bank and a treatment plant; a parcel on a road joined to both has water; a lot without it stops at LOW with the reason "no water" | new `src/sim/water.js`, `src/sim/zoning.js`, `src/sim/decline.js` | M12.T1 | M12-2 (part) | M |
+| M12.T4 | **Water, sim.** A pumping station on a river bank and a treatment plant; a parcel on a road joined to both has water; a lot without it stops at LOW with the reason "no water"; M5-16's icon shows it | new `src/sim/water.js`, `src/sim/zoning.js`, `src/sim/decline.js` | M12.T1 | M12-2 (part) | M |
 | M12.T5 | **Water, tools and river.** Place both; the treatment plant's outflow shows downstream on the pollution overlay | `src/sim/cityview.js`, `src/render/overlays.js`, `src/sim/pollution.js` | M12.T4 | M12-2 | S |
-| M12.T6 | **Garbage, sim.** Buildings make garbage by stage; a depot's trucks collect along the roads up to its capacity; uncollected garbage lowers land value, reason "no collection" | new `src/sim/garbage.js`, `src/sim/economy.js` | M12.T1 | M12-3 (part) | M |
+| M12.T6 | **Garbage, sim.** Buildings make garbage by stage; a depot's trucks collect along the roads up to its capacity; uncollected garbage lowers land value, reason "no collection"; M5-16's icon shows it | new `src/sim/garbage.js`, `src/sim/economy.js`, `src/sim/decline.js` | M12.T1 | M12-3 (part) | M |
 | M12.T7 | **Garbage, drawn.** Bags pile on the pavement in front of an uncollected building, one pooled draw | new `src/render/litter.js` | M12.T6 | M12-3 | S |
 | M12.T8 | **Fire, sim.** Buildings catch fire at a rate in `ECONOMY.md` *(provisional)*, by use and stage; with no truck in reach, a stage is lost each minute; M5's alarm becomes a fire's first minute | new `src/sim/fire.js`, `src/sim/alarms.js`, `src/sim/zoning.js` | M12.T1 | M12-4 (part) | M |
 | M12.T9 | **Fire, drawn.** Flames and smoke on the burning building, pooled with M10's smoke | `src/render/smoke.js`, new `src/render/flames.js` | M12.T8, M10.T9 | M12-4 | M |
@@ -392,22 +409,24 @@ CC0 are not used without the operator's yes.
 | ID | Task | Files | Needs | Proves | Size |
 |---|---|---|---|---|---|
 | M7.T1 | **Audio engine.** Web Audio context started on the first input; the listener follows the camera; pooled positional sources; master, effects and ambience buses; silent under `?capture=1` unless asked; `__game.sounds()` lists what plays | new `src/audio/engine.js`, `src/game/scene.js` | M3.T5 | M7-1 (part) | M |
-| M7.T2 | **The sound set.** A fetch script with checksums for each CC0 sound, each in `CREDITS.md`; `m7-sound.spec.js` first | new `tools/sounds/fetch.sh`, `public/assets/sounds/`, `public/assets/CREDITS.md`, new `tests/accept/m7-sound.spec.js` | M7.T1 | M7-1 (part) | S |
+| M7.T2 | **The sound set.** A fetch script with checksums for each CC0 sound, the horn and a completion sting among them, each in `CREDITS.md`; `m7-sound.spec.js` first | new `tools/sounds/fetch.sh`, `public/assets/sounds/`, `public/assets/CREDITS.md`, new `tests/accept/m7-sound.spec.js` | M7.T1 | M7-1 (part) | S |
 | M7.T3 | **Street ambience** by hour and district kind; traffic hum from the commute flow; crowd from walkers nearby | new `src/audio/ambience.js` | M7.T2 | M7-1 (part) | M |
-| M7.T4 | **Engines.** The hero car's pitch rises with speed; traffic passes by | new `src/audio/vehicles.js` | M7.T2 | M7-1 (part) | M |
+| M7.T4 | **Engines and the horn.** The hero car's pitch rises with speed; traffic passes by; E in a car sounds the horn | new `src/audio/vehicles.js` | M7.T2 | M7-1 (part) | M |
 | M7.T5 | **Police.** Sirens on active units; dispatch crackle under the subtitles | `src/audio/vehicles.js`, `src/ui/dispatch.js` | M7.T4 | M7-1 (part) | S |
 | M7.T6 | **Sites.** Crane and site sounds at working lots | new `src/audio/sites.js` | M7.T2 | M7-1 (part) | S |
 | M7.T7 | **Blackout.** The district's hum dies and comes back with the lights | `src/audio/ambience.js` | M7.T3 | M7-1 | S |
-| M7.T8 | **Title screen.** New Game, Continue (disabled with no save), Settings, by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed; `m7-title.spec.js` first | new `src/ui/title.js`, `src/boot.js` | M3.T5 | M7-2 | M |
+| M7.T8 | **Title screen.** New Game, Continue (disabled with no save), Settings, by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed; `m7-title.spec.js` first; a city name made from the seed, which the player can change, shown on the HUD and the save slot | new `src/ui/title.js`, `src/boot.js` | M3.T5 | M7-2 | M |
 | M7.T9 | **Pause.** Esc holds the fixed-step loop and shows a menu; Esc resumes; its check first | new `src/ui/pause.js`, `src/game/loop.js`, new `tests/accept/m7-pause.spec.js` | M7.T8 | M7-3 | S |
-| M7.T10 | **Settings.** Mouse speed and invert, volumes, quality (shadow distance, resolution scale), subtitle size; stored the way `savestore.js` stores the save; its check first | new `src/ui/settings.js`, new `src/settingsstore.js`, new `tests/accept/m7-settings.spec.js` | M7.T8 | M7-4 (part) | M |
+| M7.T10 | **Settings.** Mouse speed and invert, volumes, quality (shadow distance, resolution scale), field of view, full screen, subtitle size; stored the way `savestore.js` stores the save; its check first | new `src/ui/settings.js`, new `src/settingsstore.js`, new `tests/accept/m7-settings.spec.js` | M7.T8 | M7-4 (part) | M |
 | M7.T11 | **Key bindings.** A rebinding screen; `input.js` reads the bindings | `src/ui/settings.js`, `src/game/input.js` | M7.T10 | M7-4 | M |
 | M7.T12 | **First hints.** One hint per key, gone once done, read from `content/hints.json`: Z, E, F and H now; each later milestone's close adds its own keys; its check first | new `src/ui/hints.js`, new `content/hints.json`, new `tests/accept/m7-hints.spec.js` | M7.T8 | M7-5 | S |
 | M7.T13 | **60 fps.** `scripts/fps.mjs` reads the 95th-percentile frame at the busiest pose at 1280 × 720 and full Retina size; quality defaults set until it is under 16.7 ms (16.8-17.6 ms at the spawn today) | new `scripts/fps.mjs`, `src/render/atmosphere.js` | M7.T10 | M7-6 | M |
-| M7.T14 | **Save slots.** Three slots, each named by its city's seed, population and save time; New Game takes an empty slot or asks before it replaces one; N in play asks first, in the page; today's single save moves into slot 1; its check first | `src/savestore.js`, `src/ui/title.js`, `src/game/input.js`, new `tests/accept/m7-slots.spec.js` | M7.T8 | M7-7 | M |
+| M7.T14 | **Save slots.** Three slots, each named by its city's name, seed, population and save time; the pause menu saves to the slot at once; New Game takes an empty slot or asks before it replaces one; N in play asks first, in the page; today's single save moves into slot 1; its check first | `src/savestore.js`, `src/ui/title.js`, `src/game/input.js`, new `tests/accept/m7-slots.spec.js` | M7.T8 | M7-7 | M |
 | M7.T15 | **Gamepad.** The browser's Gamepad API, standard mapping: move, look, run, drive, enter, hack, journal; the city view stays mouse and keys; the bindings screen shows the pad; its check first (a fake pad behind `navigator.getGamepads`) | `src/game/input.js`, `src/ui/settings.js`, new `tests/accept/m7-gamepad.spec.js` | M7.T11 | M7-8 | M |
 | M7.T16 | **When the GPU fails.** With no WebGL, or when the context is lost, the page says so in words and what to try; a context that comes back restores the game; its check first (the test forces a lost context with `WEBGL_lose_context`) | `src/boot.js`, new `src/ui/gpufail.js`, new `tests/accept/m7-webgl.spec.js` | M7.T8 | M7-9 | S |
-| M7.T17 | **Close.** The sweep of the title, pause, settings, slots, hints and the GPU message; one commit per defect | the sweep | all of the above | M7 | M |
+| M7.T17 | **Music.** CC0 tracks fetched with checksums the way the sounds are, each in `CREDITS.md`; a title theme; a score under the arc's missions that turns urgent when `wanted.js` starts a chase and settles when it ends; `m7-music.spec.js` first | new `src/audio/music.js`, `tools/sounds/fetch.sh`, `public/assets/CREDITS.md`, new `tests/accept/m7-music.spec.js` | M7.T2 | M7-10 (part) | M |
+| M7.T18 | **Car radio.** In a car, B cycles two stations and off; getting back in, a station plays on from where it would have been; one station if CC0 cannot fill two | `src/audio/music.js`, `src/game/input.js` | M7.T17 | M7-10 | S |
+| M7.T19 | **Close.** The sweep of the title, pause, settings, slots, hints and the GPU message; one commit per defect | the sweep | all of the above | M7 | M |
 
 ## M8 — The sell check
 
@@ -416,9 +435,13 @@ CC0 are not used without the operator's yes.
 | M8.T1 | **Ready.** `npm run accept` at speed 1 on every criterion; the full sweep of every milestone's poses; one commit per defect | the sweep | M1-M7, M10, M11 done, M8.T4 | M8-1 | M |
 | M8.T2 | *Operator* plays 20 minutes and says sell, rework or stop | — | M8.T1 | M8-2 | — |
 | M8.T3 | *Operator's choice:* 2-3 players, 15 minutes each, notes in `docs/playtest/` | new `docs/playtest/` | M8.T1 | M8-3 | — |
-| M8.T4 | **Licence,** as the operator decides D11: `package.json`'s `license` and `private`, a LICENSE file, and a gate check that the two agree | `package.json`, new `LICENSE`, `scripts/check_licence.mjs` (new) | D11 | M8-1 | S |
+| M8.T4 | **Licence,** as the operator decided (D11): `package.json` gets `"license": "UNLICENSED"` and `"private": true`, there is no LICENSE file, and a gate check fails if either changes or a LICENSE file appears | `package.json`, `scripts/check_licence.mjs` (new) | D11 | M8-1 | S |
 
 ## M9 — Ship on Steam (lane: ship)
+
+M9 closes last, after M13 to M34. M9.T2 (the Steam binding), M9.T4 (the Windows
+package), M9.T7 (the event tape and achievements) and M9.T8 (cloud saves) run as soon as
+M8-2 says sell, because M29, M30 and M31 build on them.
 
 | ID | Task | Files | Needs | Proves | Size |
 |---|---|---|---|---|---|
@@ -426,8 +449,8 @@ CC0 are not used without the operator's yes.
 | M9.T2 | **The Steam binding.** Check whether `greenworks` (the old code's choice) still builds against today's Electron; if it does not, the alternative is an npm package, so the *operator* decides | `electron.cjs`, `greenworks.json`, new `docs/spikes/m9-steam.md` | M9.T1 | M9-2 (part) | S |
 | M9.T3 | **macOS package.** `npm run electron:build` from a clean clone starts the game; `scripts/ship-check.mjs` boots the packaged app and reads the first frame | new `scripts/ship-check.mjs`, `package.json` | M9.T2 | M9-2 (part) | M |
 | M9.T4 | **Windows package,** built and started on the operator's Windows PC with the same script, which also reads the draws and the 95th-percentile frame at the busiest pose | `scripts/ship-check.mjs` | M9.T3 | M9-2 | S |
-| M9.T5 | **Old saves.** A save from the M8 build loads in the ship build; every save version has a migration and a test | `src/sim/save.js`, new `tests/accept/m9-old-save.test.js` | M8.T1 | M9-3 | S |
-| M9.T6 | **The store page.** 5 screenshots and a 30-60 s trailer recorded from the game with the browser's own `MediaRecorder`; the sweep checks them; `git log` shows only fixes since M8-2 | new `scripts/trailer.mjs` | M9.T3 | M9-4, M9-5 | M |
+| M9.T5 | **Old saves.** A save from the M8 build loads in the ship build; every save version has a migration and a test | `src/sim/save.js`, new `tests/accept/m9-old-save.test.js` | M8.T1, M13 to M34 closed | M9-3 | S |
+| M9.T6 | **The store page.** 5 screenshots and a 30-60 s trailer recorded from the game with the browser's own `MediaRecorder`; the sweep checks them; `git log` shows only fixes since M8-2 | new `scripts/trailer.mjs` | M9.T3, M13 to M34 closed | M9-4, M9-5 | M |
 | M9.T7 | **Achievements.** At least 10, each from an event on a new event tape (`src/sim/events.js`) that the news, the journal and the arc write to; nothing logs events today, `news.js` keeps only the live line (the first building grown, the first gig, a chase escaped, a district opened…), through the Steam binding; listed in `docs/STEAM.md` | `electron.cjs`, new `src/steam.js`, new `docs/STEAM.md`, new `src/sim/events.js`, `src/sim/news.js` | M9.T2 | M9-6 (part) | M |
 | M9.T8 | **Cloud saves.** The save slots sync through Steam Cloud; a game saved on the Mac continues on Windows | `electron.cjs`, `src/savestore.js` | M9.T2, M7.T14 | M9-6 (part) | S |
 | M9.T9 | **Depot upload.** One script builds both packages and uploads them to the Steam depot with SteamCMD; the operator types their own login | new `scripts/steam-upload.sh` | M9.T4 | M9-6 | S |

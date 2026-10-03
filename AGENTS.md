@@ -29,10 +29,13 @@ The building leg works but **does not pay off yet**. The player zones lots from 
 city view (Z), lots grow and decline, and a district economy drives demand; but a
 rezone does not visibly change what grows, and only the lots can change: the roads,
 the row buildings and the towers are fixed when the page loads. **The plan is
-`docs/ROADMAP.md`**: thirteen milestones (M0-M12), each with numbered pass/fail acceptance
-criteria and the check that proves each one, **`docs/plan/TASKS.md`**, every task
-with its files and order, and **`docs/plan/CAPABILITIES.md`**, every capability of the
-four games with what Urbis does about it. Do not pretend the rest exists, and do not quietly drop it
+`docs/ROADMAP.md`**: thirty-five milestones (M0-M34), each with numbered pass/fail
+acceptance criteria and the check that proves each one. M0-M12 are the vertical slice,
+M8 is the sell check, M13-M34 are the whole game and M9 ships it. **`docs/plan/TASKS.md`**
+has every slice task with its files and order, **`docs/plan/milestones/`** one file for
+each of M13-M34, and **`docs/plan/CAPABILITIES.md`** every capability of the four games
+with the criterion that builds it: everything they have is planned, nothing is later or
+out (D15). Do not pretend the rest exists, and do not quietly drop it
 from the vision. It is half the game.
 
 **Every new game generates a new city.** The operator set this on 2026-10-02: roads,
@@ -62,7 +65,7 @@ primitive does not fix this; replacing it does. Tracked as **VGA-084**.
 |--------|---------------|------|
 | **Build it, live in it** | What the player builds at city scale is a place they can stand in at street scale | Can you walk into something you zoned? |
 | **The city lives** | Schedules, traffic, growth, economy shift without the player touching anything | Sit idle 2 minutes. Did the world change? |
-| **Every tool is expressive** | Driving, building, hacking, talking — each has a visible cause-and-effect chain | Did the world visibly change, in an interesting way? |
+| **Every tool is expressive** | Driving, building, hacking, talking, fighting — each has a visible cause-and-effect chain | Did the world visibly change, in an interesting way? |
 | **Consequence fits the act** | Impact scales with the action. A small act stays local; a big one spreads. Nothing is inflated into a city-wide event | Does the world *remember* what you did, at the right size? |
 | **The player feels capable** | Tight controls, immediate feedback. The player always knows what happened and why | Zero ambiguity. Every input has a clear output. |
 | **Beauty in the system** | Clean code, consistent patterns, no magic numbers, no hacks | Can a stranger read it and get the intent in 30 seconds? |

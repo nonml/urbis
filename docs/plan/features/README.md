@@ -22,7 +22,11 @@ is checked against them.
 reviews caught 53 invented or misplaced rows, and more will remain. A script checked
 that every row is marked exactly once, that every cited file exists, and that every merged
 ID is accounted for; 10 cited lines were read by hand and matched. Whether a mechanic
-belongs in Urbis is decided in the plan (`docs/plan/CAPABILITIES.md`, decision D10), not here.
+belongs in Urbis is decided in the plan, not here: `docs/plan/CAPABILITIES.md`, "Checked
+against the feature lists", gives every row of `mechanics.md` its verdict (decision D14). Since D15 (2026-10-04)
+nothing is later or out: every mechanic, every feature marked later or out here and every
+`content` row of `triage-*.md` is in exactly one criterion of M13 to M34
+(`docs/plan/milestones/`); the "Later" and "Out" columns above are the first pass's marks.
 
 ## What the reviews caught
 

@@ -7,7 +7,7 @@
 // KEEP_OUT, LOTS) until stage 7 deletes it, so the gate's numbers do not move.
 //
 // Milestone 2 skeleton: the constants are final, the bodies are stubs that each
-// fail their test. tests/layout-*.spec.js define done; docs/tasks/m2-layout.json
+// fail their test. tests/layout-*.spec.js define done; docs/tasks/old/m2-layout.json
 // hands them out.
 //
 // Pure sim (law 5): no three.js, no DOM.
