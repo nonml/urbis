@@ -1,0 +1,14 @@
+{
+  "milestone": "5: the mountains frame the city they stand beside, as slopes, not spikes",
+  "tasks": [
+    {
+      "id": "m5-mountains",
+      "lane": "mountains",
+      "goal": "Make buildMountains(district) in src/render/landscape.js place both ranges MOUNTAIN_CLEAR outside the district's walk box and shape every peak as a wide slope, so tests/landscape-place.spec.js passes on all 300 seeds.",
+      "files": ["src/render/landscape.js", "src/main.js", "src/render/outskirts.js"],
+      "test": "tests/landscape-place.spec.js",
+      "commit": "fix(landscape): the mountains stand clear of the city, as slopes",
+      "notes": "Today the ranges sit at fixed hand-map coordinates (west ridge cx -88, north ridge cz 140, clamps maxX -36 and minZ 88), so on 127 of 300 generated cities a range rises inside the streets, and the peaks are needles (r 24-40, h 60-110, profile (1 - t) ** 1.6). Edits, all in src/render/landscape.js unless named: (1) Next to MOUNTAIN_CELL add `export const MOUNTAIN_CLEAR = 60;` with a one-line why comment: a range stands this far outside the district's walk box, which also clears the vista ring. (2) Peak shape in buildMountains' ridge(): `const r = 90 + rand() * 50;` and `const h = 45 + rand() * 35;`. Keep the jitter `(rand() - 0.5) * 24` and the spacing `i * 26 + rand() * 10` exactly. Add a named constant `PEAK_REACH = 140 + 12` (largest r plus the half jitter) with a why comment. (3) In makeMountainHeight replace `p.h * (1 - t) ** 1.6` with `p.h * (1 - t * t) ** 2` and fix the comment above it (rounded massifs, not spikes). (4) buildMountains takes `district` and derives everything from `district.walk`: `const westEdge = district.walk.minX - MOUNTAIN_CLEAR; const northEdge = district.walk.maxZ + MOUNTAIN_CLEAR;` then `ridge(westEdge - PEAK_REACH, district.walk.minZ - 82, 12, false)` and `ridge(district.walk.minX - 18, northEdge + PEAK_REACH, 9, true)` (82 and 18 keep the hand map's ridge starts: name them RIDGE_SOUTH_LEAD and RIDGE_WEST_LEAD), and clamps `{ maxX: westEdge }` and `{ minZ: northEdge }`. Draw the same number of rand() values in the same order as today. (5) src/main.js: import DISTRICTS from './sim/world.js' (add it to the existing import on the WALK_BOUNDS line) and call `buildMountains(DISTRICTS[0])`. (6) src/render/outskirts.js lines 31-34: the sentence about x = -36 and z = 88 is now wrong; replace it with: the mountain ranges stand MOUNTAIN_CLEAR outside the walk box to the west and north (render/landscape.js). Draws must not change: it is still one merged mesh. Do not touch paintMountains, the snow, the rock colour, MOUNTAIN_CELL or the noise. tests/gate.spec.js must stay green."
+    }
+  ]
+}
