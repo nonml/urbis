@@ -1,0 +1,12 @@
+{
+  "milestone": "5: the defects the shot review found, each a whole feature for one worker",
+  "tasks": [
+    { "id": "m5-cranes", "lane": "cranes", "brief": "docs/handoff/m5-cranes.md" },
+    { "id": "m5-chase-seen", "lane": "chase-seen", "brief": "docs/handoff/m5-chase-seen.md" },
+    { "id": "m5-night-road", "lane": "nightroad", "brief": "docs/handoff/m5-night-road.md" },
+    { "id": "m5-car-body", "lane": "carbody", "brief": "docs/handoff/m5-car-body.md" },
+    { "id": "m5-vacant-land", "lane": "vacant", "brief": "docs/handoff/m5-vacant-land.md" },
+    { "id": "m5-economy-probe", "lane": "econprobe", "brief": "docs/handoff/m5-economy-probe.md" },
+    { "id": "m5-skyline", "lane": "skyline", "brief": "docs/handoff/m5-skyline.md" }
+  ]
+}
