@@ -4,23 +4,57 @@
 // backlog past that is dropped rather than queued, so a stalled tab resumes at
 // the present instead of fast-forwarding through the time it was away.
 //
+// `?speed=N` (M0.T3, 1 to 8) is a test flag: above 1 the frame is pinned to
+// exactly N fixed steps and dt is ignored, so a replay fed in by step ends in a
+// frame count a check can predict; 1 is the real-time accumulator M0-1 built,
+// and the value a game sets when it is not testing (M5.T35). Every step still
+// runs — the sim is never skipped forward.
+//
 // This module is game-side, not sim: it holds no state of its own beyond an
 // accumulator and the poses it snapshots onto movers for the renderer.
 
 export const STEP = 0.05;
 export const MAX_STEPS = 5;
+export const MAX_SPEED = 8;
 
 const TAU = Math.PI * 2;
 
-export function createFixedStep() {
-  return { acc: 0, alpha: 0, steps: 0 };
+function clampSpeed(speed) {
+  if (!Number.isFinite(speed)) return 1;
+  return Math.min(MAX_SPEED, Math.max(0, speed));
+}
+
+// Read once at boot. 1 when absent, unreadable, or below the flag's 1-8 range.
+function readSpeed() {
+  const search = globalThis.location?.search;
+  if (!search) return 1;
+  const raw = new URLSearchParams(search).get('speed');
+  if (raw === null) return 1;
+  return Math.min(MAX_SPEED, Math.max(1, Math.floor(Number(raw) || 0)));
+}
+
+export function createFixedStep(speed = readSpeed()) {
+  return { acc: 0, alpha: 0, steps: 0, speed: clampSpeed(speed) };
+}
+
+// The city view's pause (0) and its 1x/2x/4x buttons set speed through here.
+export function setSpeed(step, speed) {
+  step.speed = clampSpeed(speed);
+  return step.speed;
 }
 
 // Add one frame's elapsed seconds. Sets step.steps to how many whole steps to
 // run now and step.alpha to where this frame sits between the step that just
 // ran and the next one. Returns the step count.
 export function advance(step, dt) {
-  step.acc += dt;
+  const speed = step.speed ?? 1;
+  if (speed > 1) {
+    step.acc = 0;
+    step.alpha = 0;
+    step.steps = Math.floor(speed);
+    return step.steps;
+  }
+  step.acc += dt * speed;
   step.steps = 0;
   while (step.acc >= STEP && step.steps < MAX_STEPS) {
     step.acc -= STEP;
