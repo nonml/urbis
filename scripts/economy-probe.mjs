@@ -2,11 +2,12 @@
 //
 //   node scripts/economy-probe.mjs --seeds 1-12 --minutes 10
 //
-// It measures the market before anyone rebalances it. For each seed it builds a
-// generated city the way a new game does (src/boot.js -> setWorldSeed(seed, true)
-// before src/sim/ is evaluated), ticks it in the frame loop's own 50 ms steps
-// (tickStreet then tickZoning, like window.__game.advance), and reports demand
-// states, A/B gains for a blackout, a chase and a rezone, and growth speed.
+// It measures the market before anyone rebalances it. For each seed the A/B
+// runner (tests/accept/lib/ab.js) boots a generated city the way a new game does
+// and steps an untouched A and a poked B in main.js's tick order (tickClock,
+// tickStreet, tickZoning, tickPeople) in the frame loop's own 50 ms steps. The
+// probe reports demand states, A/B gains for a blackout, a chase and a rezone,
+// and growth speed.
 //
 // The world seed is fixed at module evaluation, so one process plays one seed.
 // This file is both the aggregator and the per-seed worker (`--worker`), spawned
@@ -18,12 +19,10 @@ import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { setWorldSeed } from '../src/sim/seedstore.js';
+import { runAB } from '../tests/accept/lib/ab.js';
 
 const FILE = fileURLToPath(import.meta.url);
 const OUT = 'docs/ECONOMY-PROBE.md';
-const DT = 0.05;
-const TICKS = Math.round(1 / DT);
 const USES = ['res', 'com', 'ind'];
 const STATES = ['idle', 'band', 'pinned'];
 const CHECKPOINTS = [120, 300, 600];      // seconds: minutes 2, 5 and 10
@@ -34,31 +33,6 @@ const CHASE_TIER = 2;
 // ---------------------------------------------------------------------------
 // The worker: one seed, in its own process.
 // ---------------------------------------------------------------------------
-
-const api = {};
-async function loadSim() {
-  if (api.zoning) return api;
-  api.street = await import('../src/sim/street.js');
-  api.zoning = await import('../src/sim/zoning.js');
-  api.economy = await import('../src/sim/economy.js');
-  api.Z = api.zoning.probeThresholds();
-  api.E = api.economy.probeConstants();
-  return api;
-}
-
-function snapshot(city, zoning, storey) {
-  return city.economy.districts.map((d, z) => ({
-    floors: floorsIn(city, z, zoning, storey),
-    jobs: Math.round(d.jobs),
-    homes: Math.round(d.homes),
-  }));
-}
-
-function floorsIn(city, zone, zoning, storey) {
-  return city.parcels
-    .filter((p) => p.powerZone === zone)
-    .reduce((sum, p) => sum + Math.floor(zoning.builtHeight(p) / storey + 1e-6), 0);
-}
 
 function classify(city, counts, Z) {
   for (const d of city.economy.districts) {
@@ -73,9 +47,9 @@ function classify(city, counts, Z) {
 
 // The busiest zone (most built height) is the one every poke lands on, so the
 // gain is measurable whatever the seed's layout does with z = 0.
-function pickZone(city, zoning) {
+function pickZone(city, heightOf) {
   const weight = city.economy.districts.map((_, z) =>
-    city.parcels.filter((p) => p.powerZone === z).reduce((s, p) => s + zoning.builtHeight(p), 0));
+    city.parcels.filter((p) => p.powerZone === z).reduce((s, p) => s + heightOf(p), 0));
   return weight[1] > weight[0] ? 1 : 0;
 }
 
@@ -83,68 +57,23 @@ const freeLots = (city, zone) => city.parcels
   .map((p, i) => (p.powerZone === zone && p.zoned === null ? i : -1))
   .filter((i) => i >= 0);
 
-function recordSpeed(city, ids, age, speed, zoning) {
+function recordSpeed(world, ids, age, speed) {
   for (const idx of ids) {
-    const p = city.parcels[idx];
+    const p = world.city.parcels[idx];
     const s = (speed[idx] ??= {});
-    if (s.first === undefined && zoning.builtHeight(p) > 0) s.first = age;
-    if (s.low === undefined && p.stage >= zoning.STAGE.LOW) s.low = age;
+    if (s.first === undefined && world.heightOf(p) > 0) s.first = age;
+    if (s.low === undefined && world.isLow(p)) s.low = age;
   }
 }
 
-// One world, ticked the way main.js ticks it. `opts.poke` is null for the
-// baseline. Returns snapshots at 2/5/10 minutes, optional demand counts, the
-// zone and free lots it picked at minute 1, and the rezoned lots' speeds.
-function runWorld(seed, opts) {
-  const { street, zoning, Z } = api;
-  const city = zoning.createCity(seed);
-  const state = street.createStreet(seed);
-  const counts = {};
-  const snaps = {};
-  const speed = {};
-  let zone = opts.zone ?? 0;
-  let freeIndex = opts.freeIndex ?? null;
-  let poked = false;
-  const cpAt = new Map(CHECKPOINTS.map((secs) => [secs * TICKS, secs]));
-  for (let i = 0; i < opts.totalTicks; i++) {
-    street.tickStreet(state, DT);
-    zoning.tickZoning(city, DT, state);
-    const t = (i + 1) * DT;
-    if (opts.sample) classify(city, counts, Z);
-    if (!opts.poke && freeIndex === null && t >= POKE_AT) {
-      zone = pickZone(city, zoning);
-      freeIndex = freeLots(city, zone);
-    }
-    if (opts.poke === 'chase' && t >= POKE_AT && t < POKE_AT + CHASE_SECS) {
-      api.economy.chaseIn(city.economy, zone, CHASE_TIER);
-    }
-    if (opts.poke === 'hack' && !poked && t >= POKE_AT) {
-      street.hackBlackout(state, zone);
-      poked = true;
-    }
-    if (opts.poke === 'zone' && !poked && t >= POKE_AT) {
-      for (const idx of freeIndex) zoning.zoneParcel(city, idx, 'ind');
-      poked = true;
-    }
-    if (opts.poke === 'zone' && poked) recordSpeed(city, freeIndex, t - POKE_AT, speed, zoning);
-    const cp = cpAt.get(i + 1);
-    if (cp !== undefined) snaps[cp] = snapshot(city, zoning, Z.storey);
-  }
-  return { counts, snaps, speed, zone, freeIndex, ticks: opts.totalTicks };
-}
+const makeShare = () => ({ zone: 0, freeIndex: [], picked: false, done: false, speed: {} });
 
-function gain(base, poked) {
-  const out = {};
-  for (const min of [2, 5, 10]) {
-    const b = base.snaps[min * 60];
-    const p = poked.snaps[min * 60];
-    out[min] = p.map((d, z) => ({
-      floors: d.floors - b[z].floors,
-      jobs: d.jobs - b[z].jobs,
-      homes: d.homes - b[z].homes,
-    }));
-  }
-  return out;
+// Pick the busiest district and its free lots from the untouched A the moment
+// the poke lands. A is deterministic, so all three pokes pick the same share.
+function pick(share, base) {
+  share.zone = pickZone(base.city, base.heightOf);
+  share.freeIndex = freeLots(base.city, share.zone);
+  share.picked = true;
 }
 
 function demandShares(counts) {
@@ -162,26 +91,61 @@ function speedSummary(speed, freeIndex) {
   return { first: median(firsts), low: median(lows), lots: freeIndex.length };
 }
 
+// The runner's per-district differences at the three checkpoints, in the shape
+// the gain tables read: gains[min][zone] = { floors, jobs, homes }, B minus A.
+function gains(result) {
+  return Object.fromEntries(CHECKPOINTS.map((t) => [
+    t / 60,
+    result.diff.map((series) => {
+      const point = series.find((q) => q.t === t);
+      return { floors: point.floors, jobs: point.jobs, homes: point.homes };
+    }),
+  ]));
+}
+
 async function worker(seed, minutes) {
-  const sim = await loadSim();
-  const totalTicks = minutes * 60 * TICKS;
-  const base = runWorld(seed, { totalTicks, sample: true });
-  const share = { zone: base.zone, freeIndex: base.freeIndex };
-  const pokes = {
-    hack: runWorld(seed, { totalTicks, poke: 'hack', ...share }),
-    chase: runWorld(seed, { totalTicks, poke: 'chase', ...share }),
-    zone: runWorld(seed, { totalTicks, poke: 'zone', ...share }),
-  };
+  const secs = minutes * 60;
+  const counts = {};
+  const hack = makeShare();
+  const chase = makeShare();
+  const zone = makeShare();
+  const opts = { seed, at: POKE_AT, secs, checkpoints: CHECKPOINTS };
+  const hackRun = await runAB({
+    ...opts,
+    sample: ({ base }) => classify(base.city, counts, base.thresholds),
+    poke: (b, a) => {
+      if (!hack.picked) pick(hack, a);
+      if (!hack.done) { b.hack(hack.zone); hack.done = true; }
+    },
+  });
+  const chaseRun = await runAB({
+    ...opts,
+    poke: (b, a, t) => {
+      if (!chase.picked) pick(chase, a);
+      if (t < POKE_AT + CHASE_SECS) b.chase(chase.zone, CHASE_TIER);
+    },
+  });
+  const zoneRun = await runAB({
+    ...opts,
+    poke: (b, a, t) => {
+      if (!zone.picked) pick(zone, a);
+      if (!zone.done) {
+        for (const i of zone.freeIndex) b.zone(i, 'ind');
+        zone.done = true;
+      }
+      recordSpeed(b, zone.freeIndex, t - POKE_AT, zone.speed);
+    },
+  });
   return {
     seed,
     minutes,
-    thresholds: sim.Z,
-    market: sim.E,
-    demand: { perUse: demandShares(base.counts), samples: base.ticks * 2 },
-    zone: base.zone,
-    freeLots: base.freeIndex.length,
-    gains: Object.fromEntries(Object.entries(pokes).map(([k, w]) => [k, gain(base, w)])),
-    speed: speedSummary(pokes.zone.speed, base.freeIndex),
+    thresholds: hackRun.thresholds,
+    market: hackRun.market,
+    demand: { perUse: demandShares(counts), samples: hackRun.ticks * 2 },
+    zone: hack.zone,
+    freeLots: hack.freeIndex.length,
+    gains: { hack: gains(hackRun), chase: gains(chaseRun), zone: gains(zoneRun) },
+    speed: speedSummary(zone.speed, zone.freeIndex),
   };
 }
 
@@ -349,7 +313,6 @@ async function main() {
   if (process.argv[2] === '--worker') {
     const seed = Number(process.argv[3]);
     const minutes = Number(process.argv[4]);
-    setWorldSeed(seed, true);
     const result = await worker(seed, minutes);
     // A single line so the aggregator can parse it without a shared module.
     process.stdout.write(`PROBE\t${JSON.stringify(result)}\n`);
