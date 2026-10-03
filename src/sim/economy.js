@@ -16,36 +16,52 @@ export const M3_PER_PERSON = 25 * 3.5;
 // residents per m² of its lot land, about what the lots hold at full build. It
 // is balanced — as many jobs as homes, shops for its spending, workshops for its
 // shops — so everything the lots add is the margin that moves.
-const ESTABLISHED_PER_LOT_M2 = 0.4;
+export const ESTABLISHED_PER_LOT_M2 = 0.4;
 
 // What the district needs of each use, per unit of what drives it. Every job
 // on the lots wants a home; residents' spending keeps about a third as many
 // people busy in shops; trading shops keep two in five of theirs again in
 // workshops supplying them.
-const COMMERCE_PER_HOME = 0.35;
-const INDUSTRY_PER_COMMERCE = 0.4;
+export const COMMERCE_PER_HOME = 0.35;
+export const INDUSTRY_PER_COMMERCE = 0.4;
 
 // Firms from beyond the map looking for floor in the district — offices want
 // commercial floor, works want industrial — in the jobs they would bring. One
 // moves in or out every half-minute to minute and a bit, lot-sized, and the odds
 // lean back toward the usual level, so the district wanders but never drifts.
 // This is the market the city cannot control, and why it never settles.
-const FIRMS_USUAL = 0.12;
-const FIRM_MIN = 0.06;
-const FIRM_MAX = 0.15;
-const FIRMS_PULL = 4;
+// A generated new game gets the calm market (docs/ECONOMY.md, M1.T3): a firm
+// 3-7% of the district, pull 8, the opening queue served off. The hand preset
+// keeps the market it shipped with.
+export const FIRMS_USUAL = 0.12;
+const FIRM_MIN = 0.03;
+const FIRM_MAX = 0.07;
+const FIRM_MIN_HAND = 0.06;
+const FIRM_MAX_HAND = 0.15;
+const FIRMS_PULL = 8;
+const FIRMS_PULL_HAND = 4;
 const MOVE_MIN_SECS = 25;
 const MOVE_MAX_SECS = 70;
 const MOVE_ODDS_FLOOR = 0.15;
+// Two kinds this close to equally out of line: the draw picks between them.
+const FIRM_TIE = 0.02;
 // The district arrives with this many times the usual firms queuing for floor:
-// the boom the city starts building into.
+// the boom the city starts building into. As the market works, the surplus
+// above the usual level thins with a BOOT_THIN_SECS time constant — a queue
+// being served, not a position held — so the kick-off build-out never leaves
+// one use's demand pinned. Only a surplus thins; lower firms stay.
 const BOOT_FIRMS = 2;
+const BOOT_THIN_SECS = 240;
+// What one move serves off the opening surplus. Stateless: a saved game restores exactly.
+const BOOT_THIN = 1 - Math.exp(-(MOVE_MIN_SECS + MOVE_MAX_SECS) / (2 * BOOT_THIN_SECS));
 
 // Demand is the balance plus the unmet need, as a share of the district. At
-// BALANCED a lot neither starts nor sheds work (zoning's hold band); GAP_GAIN is
-// how hard a shortage or a glut of one tenth of the district pushes off it.
+// BALANCED a lot neither starts nor sheds work (zoning's hold band); GAP_GAIN
+// is how hard a shortage or glut pushes off it — at 1.5 a nudge across a band
+// edge, where gain 3 slammed uses pinned or idle (docs/ECONOMY.md).
 const BALANCED = 0.36;
-const GAP_GAIN = 3;
+const GAP_GAIN = 1.5;
+const GAP_GAIN_HAND = 3;
 // The market reads the district late: developers build on the last twenty
 // seconds' numbers, not today's. So a boom overshoots into a glut and a glut
 // into a shortage, and the district cycles instead of parking at a balance.
@@ -95,13 +111,14 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const perUse = (fn) => Object.fromEntries(USES.map((use) => [use, fn(use)]));
 
-function makeDistrict(id, lots, rand) {
+function makeDistrict(id, lots, rand, calm) {
   const size = lots.reduce((sum, p) => sum + p.w * p.d, 0) * ESTABLISHED_PER_LOT_M2;
   const shops = size * COMMERCE_PER_HOME;
   const firms = size * FIRMS_USUAL * BOOT_FIRMS;
   return {
     id,
     name: DISTRICTS[id],
+    calm,
     size,
     // The established district. Its jobs match its homes.
     base: { res: size, com: shops, ind: shops * INDUSTRY_PER_COMMERCE },
@@ -161,14 +178,16 @@ function price(d) {
   d.need.res = d.jobs;
   d.need.com = d.homes * d.wealth * COMMERCE_PER_HOME + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
-  for (const use of USES) d.price[use] = clamp01(BALANCED + (GAP_GAIN * (d.need[use] - d.have[use])) / d.size);
+  const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
+  for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
 }
 
-export function createEconomy(parcels, heightOf, rand) {
+export function createEconomy(parcels, heightOf, rand, calm = false) {
   const economy = {
     time: 0,
     rand,
-    districts: DISTRICTS.map((_, id) => makeDistrict(id, parcels.filter((p) => p.powerZone === id), rand)),
+    calm,
+    districts: DISTRICTS.map((_, id) => makeDistrict(id, parcels.filter((p) => p.powerZone === id), rand, calm)),
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
@@ -182,10 +201,23 @@ export function createEconomy(parcels, heightOf, rand) {
 // stream stays in step and one district's fortunes never reach the other's.
 function moveFirm(economy, d) {
   const [kind, roll, share, wait] = [economy.rand(), economy.rand(), economy.rand(), economy.rand()];
-  const use = kind < 0.5 ? 'com' : 'ind';
+  let use = kind < 0.5 ? 'com' : 'ind';
+  if (d.calm) {
+    // The serving of the opening queue: every move, the surplus above the usual
+    // level loses a serving's worth (a frozen market never acts, so its firms stay).
+    for (const u of ['com', 'ind']) {
+      const usual = d.size * FIRMS_USUAL;
+      if (d.firms[u] > usual) d.firms[u] -= (d.firms[u] - usual) * BOOT_THIN;
+    }
+    // The kind furthest from its usual level takes the move.
+    const short = perUse((u) => (d.size * FIRMS_USUAL - d.firms[u]) / d.size);
+    const far = Math.abs(short.com) - Math.abs(short.ind);
+    use = far > FIRM_TIE ? 'com' : far < -FIRM_TIE ? 'ind' : use;
+  }
   const short = (d.size * FIRMS_USUAL - d.firms[use]) / d.size;
-  const odds = Math.max(MOVE_ODDS_FLOOR, Math.min(1 - MOVE_ODDS_FLOOR, 0.5 + FIRMS_PULL * short));
-  const firm = d.size * lerp(FIRM_MIN, FIRM_MAX, share);
+  const pull = d.calm ? FIRMS_PULL : FIRMS_PULL_HAND;
+  const odds = Math.max(MOVE_ODDS_FLOOR, Math.min(1 - MOVE_ODDS_FLOOR, 0.5 + pull * short));
+  const firm = d.size * lerp(d.calm ? FIRM_MIN : FIRM_MIN_HAND, d.calm ? FIRM_MAX : FIRM_MAX_HAND, share);
   const jobs = roll < odds ? firm : -Math.min(firm, d.firms[use]);
   d.firms[use] += jobs;
   if (jobs !== 0) d.last = { at: economy.time, use, jobs };
