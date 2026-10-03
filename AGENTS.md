@@ -347,6 +347,25 @@ the operator on 2026-09-28, with VGA-084 placed on 2026-09-29, and is recorded i
    nothing — that rule exists because an audit caught lab-only proofs passing as done.
    Save to `docs/shots/`. `node scripts/shot.mjs` does it on Windows or macOS and
    prints the per-frame draw peak; usage is in its header.
+   **Then review every shot like a player seeing it cold, and log it in
+   `docs/shots/REVIEW.md` before it counts as evidence.** A shot nobody judged is
+   not evidence: slices 074–077 shipped a parked car filling the opening frame,
+   chase shots with no police in them, and a "free land" shot with no visible free
+   land, and the operator had to point it out. Answer for each shot:
+   - **Does it show the feature?** Say where in the frame. A pose reused from an
+     earlier slice must still show this slice's change.
+   - **Is the view clear?** `__game.frameCheck()` ≤ 2%: nothing but the player
+     within 2 m of the lens.
+   - **Is anything broken?** Floating objects, things passing through each other,
+     hard-edged light quads, glitter or z-fighting, parts poking over roofs or
+     through walls. `__game.pick(x, y)` names what is under a pixel: measure, don't
+     guess.
+   - **Toy or neon?** Raw boxes, cones and spheres; magenta or cyan glow.
+   - **Can you read it?** Could a player tell what is happening without a caption?
+
+   Any defect: fix it, or log it in REVIEW.md as open. A slice whose shot fails a
+   question it introduced is not ticked. **If the operator finds a defect before
+   you do, the review missed it: add the check that would have caught it.**
 6. Commit: `<type>(<area>): <title>`, plus `Why:` and the measured draw cost.
 7. Tick the item with its commit hash and evidence filename.
 

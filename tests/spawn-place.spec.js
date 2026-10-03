@@ -4,8 +4,9 @@
 // wall. The hand preset keeps the start it has always had.
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
+import { parkedFor } from '../src/sim/furniture.js';
 import {
-  CAR_OUT, HAND_SPAWN, LANE_EDGE, PLAYER_AHEAD, PLAYER_OUT, SPAWN, SPAWN_CLEAR, SPAWN_STEP, SPAWN_Z, spawnFor,
+  CAM_ROOM, CAR_OUT, HAND_SPAWN, LANE_EDGE, PLAYER_AHEAD, PLAYER_OUT, SPAWN, SPAWN_CLEAR, SPAWN_STEP, SPAWN_Z, spawnFor,
 } from '../src/sim/spawn.js';
 
 const SEEDS = Array.from({ length: 300 }, (_, i) => i + 1);
@@ -49,4 +50,15 @@ test('the car stands between parking slots on a plain stretch the player can wal
     if (car.z !== SPAWN_Z) moved += 1;
   }
   expect(moved, 'some seed has a crossing at the hand start').toBeGreaterThan(0);
+});
+
+test('no parked car stands where the follow cam opens a new game', () => {
+  for (const seed of SEEDS) {
+    const d = generateDistrict(seed);
+    const a = d.avenues[0];
+    const { player, car } = spawnFor(d);
+    const behind = parkedFor(d, seed).filter(([x, side, z]) => x === a.x && side === 1
+      && z > car.z && z <= player.z + CAM_ROOM);
+    expect(behind, `seed ${seed}`).toEqual([]);
+  }
 });

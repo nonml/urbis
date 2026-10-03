@@ -673,6 +673,71 @@ if (CAPTURE) {
   };
   window.__game.arcSkip = () => arcSkipStep(arc);
   window.__game.police = policeProbe();
+  window.__game.frameCheck = frameCheck;
+  window.__game.pick = pickPixel;
+}
+
+// Shot QC: what share of the frame is something closer than `near` metres to
+// the lens. A follow cam parked behind a car roof or inside a wall passes every
+// draw and fps check and still shows the player a slab; this puts a number on
+// it. Rays go through a grid of screen points; the avatar is the subject, so it
+// is not counted as blocking its own shot.
+const FRAME_GRID = { cols: 32, rows: 18 };
+function frameCheck(near = 2) {
+  const ray = new THREE.Raycaster();
+  ray.far = near;
+  const ndc = new THREE.Vector2();
+  const blockers = new Map();
+  let blocked = 0;
+  for (let r = 0; r < FRAME_GRID.rows; r++) {
+    for (let c = 0; c < FRAME_GRID.cols; c++) {
+      ndc.set(((c + 0.5) / FRAME_GRID.cols) * 2 - 1, 1 - ((r + 0.5) / FRAME_GRID.rows) * 2);
+      ray.setFromCamera(ndc, camera);
+      const hit = ray.intersectObjects(scene.children, true)
+        .find((h) => h.object.visible && !isAvatar(h.object) && !seeThrough(h.object));
+      if (!hit) continue;
+      blocked += 1;
+      const mat = Array.isArray(hit.object.material) ? hit.object.material[0] : hit.object.material;
+      const key = `${hit.object.type} #${mat?.color?.getHexString() ?? '-'} ${hit.object.name}`.trim();
+      const seen = blockers.get(key) ?? { n: 0, at: hit.point.toArray().map((v) => +v.toFixed(1)) };
+      seen.n += 1;
+      blockers.set(key, seen);
+    }
+  }
+  const cells = FRAME_GRID.cols * FRAME_GRID.rows;
+  return {
+    blocked: +(blocked / cells).toFixed(3),
+    blockers: [...blockers].sort((a, b) => b[1].n - a[1].n)
+      .map(([k, { n, at }]) => `${k} ${(n / cells * 100).toFixed(1)}% at ${at}`),
+  };
+}
+
+// Shot QC: what is under one pixel of a 1280x720 shot, so a reviewer can name
+// the thing a screenshot shows instead of guessing at it.
+function pickPixel(px, py, w = 1280, h = 720) {
+  const ray = new THREE.Raycaster();
+  ray.setFromCamera(new THREE.Vector2((px / w) * 2 - 1, 1 - (py / h) * 2), camera);
+  return ray.intersectObjects(scene.children, true).filter((hit) => hit.object.visible).slice(0, 3).map((hit) => {
+    const mat = Array.isArray(hit.object.material) ? hit.object.material[0] : hit.object.material;
+    const path = [];
+    for (let o = hit.object; o.parent; o = o.parent) path.unshift(o.name || o.type);
+    return {
+      path: path.join('/'), mat: mat?.type, color: mat?.color?.getHexString(), see: seeThrough(hit.object),
+      dist: +hit.distance.toFixed(1), at: hit.point.toArray().map((v) => +v.toFixed(1)),
+      geo: hit.object.geometry?.type, inst: hit.object.isInstancedMesh ? hit.instanceId : undefined,
+    };
+  });
+}
+
+// Glows, light pools and rain are drawn see-through; they never hide the street.
+function seeThrough(object) {
+  const mat = Array.isArray(object.material) ? object.material[0] : object.material;
+  return object.isPoints || !mat || (mat.transparent && mat.opacity < 0.9) || mat.blending === THREE.AdditiveBlending;
+}
+
+function isAvatar(object) {
+  for (let o = object; o; o = o.parent) if (o === avatar.group) return true;
+  return false;
 }
 
 chunks.warm(player.x, player.z);

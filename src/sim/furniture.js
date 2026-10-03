@@ -10,6 +10,7 @@
 import { AVENUES, CROSSINGS, DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { mulberry32 } from './rng.js';
+import { CAM_ROOM, spawnFor } from './spawn.js';
 
 // Its own random stream, so furniture never moves a lot, a vista or a person.
 export const FURN_SALT = 0xf00d;
@@ -120,17 +121,25 @@ export function lampsFor(district) {
 // order, its west side (-1) then its east (1), at avenueSpots(a, crossings,
 // PARK_PHASE, PARK_STEP): one draw of mulberry32((seed ^ FURN_SALT) >>> 0) per
 // spot in that order, and the spot holds a car when the draw is < PARK_SHARE.
+// The spawn kerb stays empty from the hero car back to CAM_ROOM behind the
+// player, where the follow cam stands; the draw is still taken, so every other
+// car parks where it always has.
 export function parkedFor(district, seed) {
   const rand = mulberry32((seed ^ FURN_SALT) >>> 0);
   const parked = [];
   for (const a of district.avenues) {
     for (const side of [-1, 1]) {
       for (const z of avenueSpots(a, district.crossings, PARK_PHASE, PARK_STEP)) {
-        if (rand() < PARK_SHARE) parked.push([a.x, side, z]);
+        if (rand() < PARK_SHARE && !behindSpawn(district, a, side, z)) parked.push([a.x, side, z]);
       }
     }
   }
   return parked;
+}
+
+function behindSpawn(district, a, side, z) {
+  const { player, car } = spawnFor(district);
+  return a === district.avenues[0] && side === 1 && car.z < z && z <= player.z + CAM_ROOM;
 }
 
 // Utility boxes [x, z]. Every avenue in order, at avenueSpots(a, crossings,

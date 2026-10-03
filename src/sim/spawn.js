@@ -28,6 +28,10 @@ export const SPAWN_Z = 24;
 // meets the main avenue, and this far inside the walk box's north and south
 // edges, so the player starts on a plain stretch of street they can walk.
 export const SPAWN_CLEAR = 12;
+// The kerb behind the player is kept free of parked cars this far back, so the
+// street follow cam (4.5 m behind, main.js STREET_RIG) never opens a new game
+// on a parked car's roof.
+export const CAM_ROOM = 6;
 // The player stands in the kerb lane, never on the pavement or past it.
 export const LANE_EDGE = ROAD_HALF_WIDTH;
 

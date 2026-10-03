@@ -46,6 +46,21 @@ test('the generated world boots from its seed', async ({ page }) => {
     expect(errors).toEqual([]);
 });
 
+// The first frame of a new game is the player's first look at the city. Slices
+// 074-076 shipped one with a parked car's roof filling a sixth of it, and every
+// draw and fps check passed. Nothing but the avatar may stand this close.
+const OPENING_NEAR = 2;
+const OPENING_BLOCKED_MAX = 0.02;
+for (const query of ['', '&gen=1&seed=2', '&gen=1&seed=7', '&gen=1&seed=1234567']) {
+    test(`a new game opens on a clear view of the street${query && ` (${query.slice(1)})`}`, async ({ page }) => {
+        await page.goto(`/?capture=1${query}`);
+        await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
+        await page.waitForTimeout(1500);
+        const view = await page.evaluate((near) => window.__game.frameCheck(near), OPENING_NEAR);
+        expect(view.blocked, view.blockers.join('; ')).toBeLessThanOrEqual(OPENING_BLOCKED_MAX);
+    });
+}
+
 test(`whole frame stays within ${DRAW_BUDGET} draws`, async ({ page }) => {
     await boot(page);
 
