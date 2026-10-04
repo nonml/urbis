@@ -5,7 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { mulberry32 } from '../sim/rng.js';
 import { zoneAt } from '../sim/street.js';
-import { loadPBRMaps, standardFromMaps } from './materials.js';
+import { loadPBRMaps, standardFromMaps, wetness } from './materials.js';
 import { PUDDLES, SHOPS, VENTS } from '../sim/dressing.js';
 
 // A signwriter's colours: a painted board and the letters on it. Lacquer red
@@ -179,9 +179,12 @@ export function buildPuddles() {
   return { group, mats };
 }
 
-// Zone dimmer: the mirror dies with the lights it reflects (VGA-010).
+// Zone dimmer: the mirror dies with the lights it reflects (VGA-010), and the
+// water itself is the weather's: no wetness, no puddle. It fades out over the
+// two game minutes the roads take to dry, so the same 0-1 the roads read.
 export function setPuddleGlow(puddles, zone, glow) {
   puddles.mats[zone].reflectivity = MIRROR_GAIN * (MIRROR_FLOOR + (1 - MIRROR_FLOOR) * glow);
+  puddles.mats[zone].opacity = wetness();
 }
 
 export function buildCityMirror() {

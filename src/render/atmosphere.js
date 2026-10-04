@@ -9,6 +9,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { getGlowTex } from './signs.js';
+import { weatherState } from './rain.js';
 
 const SUN_DIR = new THREE.Vector3(-0.55, 0.52, -0.42).normalize();
 const DAY_TOP = new THREE.Color(0x2f66a8);
@@ -22,6 +23,10 @@ const NIGHT_SKY = new THREE.Color(0x24314d);
 const DAY_GND = new THREE.Color(0x5a6068);
 const NIGHT_GND = new THREE.Color(0x05070a);
 const SUN_WARM = new THREE.Color(0xfff0d8);
+// Overcast and rain kill the sun disc and lay a grey lid on the sky; the fog,
+// the dome fill and the lid all take the same neutral grey, near-black at night.
+const OVERCAST_FOG = new THREE.Color(0x92969a);
+const OVERCAST_SKY = new THREE.Color(0x9aa0a5);
 
 function buildSky() {
   const mat = new THREE.ShaderMaterial({
@@ -36,6 +41,7 @@ function buildSky() {
       uNightTop: { value: NIGHT_TOP.clone() },
       uNightHor: { value: NIGHT_HOR.clone() },
       uSunColor: { value: SUN_WARM.clone() },
+      uGloom: { value: 0 },
     },
     vertexShader: `
       varying vec3 vDir;
@@ -46,6 +52,7 @@ function buildSky() {
       }`,
     fragmentShader: `
       uniform float uNight;
+      uniform float uGloom;
       uniform vec3 uSunDir, uDayTop, uDayHor, uNightTop, uNightHor, uSunColor;
       varying vec3 vDir;
       void main() {
@@ -56,10 +63,13 @@ function buildSky() {
         vec3 col = mix(day, night, uNight);
         if (d.y < 0.0) col = mix(col, mix(uDayHor, uNightHor, uNight) * 0.35, min(1.0, -d.y * 4.0));
         float s = max(dot(d, uSunDir), 0.0);
-        col += uSunColor * (pow(s, 700.0) * 3.0 + pow(s, 10.0) * 0.22) * (1.0 - uNight);
+        col += uSunColor * (pow(s, 700.0) * 3.0 + pow(s, 10.0) * 0.22) * (1.0 - uNight) * (1.0 - 0.9 * uGloom);
         // Light pollution: warm amber glow on the horizon band at night.
         float horizonBand = exp(-pow((h - 0.08) * 6.0, 2.0));
-        col += vec3(0.18, 0.10, 0.04) * horizonBand * uNight * 0.6;
+        col += vec3(0.18, 0.10, 0.04) * horizonBand * uNight * 0.6 * (1.0 - 0.7 * uGloom);
+        // Overcast and rain: one grey lid, brighter by day, near-black at night.
+        vec3 grey = mix(vec3(0.035, 0.038, 0.045), vec3(0.42, 0.45, 0.52), 1.0 - uNight);
+        col = mix(col, grey * (0.85 + 0.3 * h), uGloom);
         gl_FragColor = vec4(col, 1.0);
       }`,
   });
@@ -141,23 +151,29 @@ const _fog = new THREE.Color();
 
 export function updateDaylight(env, scene, bloom, n, renderer) {
   const day = 1 - n;
+  // Overcast and rain are one gloom: the sun disc goes, the sky greys and the
+  // direct light falls to the dome fill. Clear is the only state that keeps sun.
+  const gloom = weatherState() === 'clear' ? 0 : 1;
   env.skyMat.uniforms.uNight.value = n;
-  env.sun.intensity = 2.3 * day;
+  env.skyMat.uniforms.uGloom.value = gloom;
+  env.sun.intensity = 2.3 * day * (1 - 0.6 * gloom);
   // The sun is the only light that casts, and at full night it is at zero, so
   // the shadow it would draw multiplies nothing: re-rendering the map is every
   // caster's second draw for no pixel. It holds still instead, and redraws on
   // the first frame the sun is back, before anything samples it lit.
   env.sun.shadow.autoUpdate = day > 0;
-  env.moon.intensity = 0.25 * n;
-  env.bounce.intensity = 0.5 * day;
-  env.hemi.intensity = 0.25 + 0.5 * day;
+  env.moon.intensity = 0.25 * n * (1 - 0.7 * gloom);
+  env.bounce.intensity = 0.5 * day * (1 - 0.35 * gloom);
+  env.hemi.intensity = 0.25 + 0.15 * gloom + (0.5 + 0.05 * gloom) * day;
   env.hemi.color.copy(NIGHT_SKY).lerp(DAY_SKY, day);
+  if (gloom) env.hemi.color.lerp(OVERCAST_SKY, 0.35 + 0.5 * day);
   env.hemi.groundColor.copy(NIGHT_GND).lerp(DAY_GND, day);
   _fog.copy(NIGHT_FOG).lerp(DAY_FOG, day);
+  _fog.lerp(OVERCAST_FOG, 0.85 * gloom * day);
   scene.fog.color.copy(_fog);
   scene.fog.density = 0.012 - 0.0055 * day;
   scene.background = null; // sky dome owns the background
-  env.moonGlowMat.opacity = 0.5 * n;
+  env.moonGlowMat.opacity = 0.5 * n * (1 - 0.7 * gloom);
   bloom.threshold = 0.92 + 0.05 * day;
   bloom.strength = 0.45 - 0.1 * day;
   // Exposure sits lower at night so the street stays dark and its signs,
