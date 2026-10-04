@@ -13,6 +13,7 @@
 // This module is game-side, not sim: it holds no state of its own beyond an
 // accumulator, the whole-step count (a replay stops on it), and the poses it
 // snapshots onto movers for the renderer.
+import { weatherPin } from '../sim/weather.js';
 
 export const STEP = 0.05;
 export const MAX_STEPS = 5;
@@ -46,6 +47,12 @@ function readSpeed() {
   const raw = new URLSearchParams(search).get('speed');
   if (raw === null) return 1;
   return Math.min(MAX_SPEED, Math.max(1, Math.floor(Number(raw) || 0)));
+}
+
+// `?weather=clear|overcast|rain` pins the sweep's state, as `?speed=` pins the
+// step rate. Null when absent or not a state.
+export function readWeather() {
+  return weatherPin(globalThis.location?.search ?? '');
 }
 
 export function createFixedStep(speed = readSpeed()) {

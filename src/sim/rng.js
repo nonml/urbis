@@ -17,5 +17,6 @@ export function createStreams(seed) {
   return {
     world: mulberry32(seed),
     sim: mulberry32(seed ^ 0x9e3779b9),
+    weather: mulberry32(seed ^ 0x85ebca6b),
   };
 }
