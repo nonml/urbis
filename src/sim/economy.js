@@ -90,6 +90,17 @@ export const FLIGHT_PER_CHASE_SEC = 0.002;
 // A use whose floor moved less than this many people in a tick is holding.
 const STILL = 1e-6;
 
+// A rezone earns a line in the news only once it moves a district's market over
+// the level that builds: the demand zoning breaks ground at. Below it the
+// change is real but nothing the player can see answers, so the line would be
+// noise (pillar 4). The level is zoning's BREAK_GROUND_AT, copied because
+// zoning imports this module and the two stay one-way.
+const CREDIT_AT = 0.55;
+// How long a rezone stays the district's live cause. Long enough for the floor
+// it added to break ground and the 20 s market lag to arrive; the deadline also
+// keeps an old rezone from claiming a swing that is really the market's own.
+const CREDIT_SECS = 300;
+
 // The market constants above, read back by scripts/economy-probe.mjs so its
 // report quotes the shipped numbers instead of hard-coding a second copy.
 export function probeConstants() {
@@ -104,6 +115,8 @@ export function probeConstants() {
     flightSecs: FLIGHT_SECS,
     flightPerDarkSec: FLIGHT_PER_DARK_SEC,
     flightPerChaseSec: FLIGHT_PER_CHASE_SEC,
+    creditAt: CREDIT_AT,
+    creditSecs: CREDIT_SECS,
   };
 }
 
@@ -127,6 +140,11 @@ function makeDistrict(id, lots, rand, calm) {
     dark: false,
     nextMove: lerp(MOVE_MIN_SECS, MOVE_MAX_SECS, rand()),
     last: null,
+    // The player's rezone taking the ground, while it is the live cause, and
+    // the demand change it is credited with once one crosses the bar. Both null
+    // until a rezone happens; the news reads `credit`.
+    rezone: null,
+    credit: null,
     darkFor: 0,
     chase: 0,
     chaseFor: 0,
@@ -146,8 +164,10 @@ function makeDistrict(id, lots, rand, calm) {
 
 // People standing on the lots right now, per district and use, and which way
 // that is going: +1 rising, -1 coming down, 0 holding — what the lots show.
+// A use appearing on more lots than last tick is the player's rezone taking the
+// ground, not the market growing; it becomes the district's live cause.
 function measureFloors(economy, parcels, heightOf) {
-  const was = economy.districts.map((d) => ({ ...d.floor }));
+  const was = economy.districts.map((d) => ({ floor: { ...d.floor }, lots: { ...d.lots } }));
   for (const d of economy.districts) {
     for (const use of USES) {
       d.floor[use] = 0;
@@ -162,8 +182,9 @@ function measureFloors(economy, parcels, heightOf) {
   }
   economy.districts.forEach((d, i) => {
     for (const use of USES) {
-      const moved = d.floor[use] - was[i][use];
+      const moved = d.floor[use] - was[i].floor[use];
       d.trend[use] = Math.abs(moved) < STILL ? 0 : Math.sign(moved);
+      if (d.lots[use] > was[i].lots[use]) d.rezone = { at: economy.time, use, need: { ...d.need } };
     }
   });
 }
@@ -191,6 +212,9 @@ export function createEconomy(parcels, heightOf, rand, calm = false) {
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
+    // The opening city is what the seed rolled, not a rezone: the first measure
+    // counts it, and no player did that.
+    d.rezone = null;
     price(d);
     Object.assign(d.demand, d.price);
   }
@@ -279,6 +303,33 @@ function react(d, dt) {
   for (const use of USES) d.demand[use] += (d.price[use] - d.demand[use]) * Math.min(1, dt / MARKET_LAG_SECS);
 }
 
+// The use a rezone to `use` pulls, in the order the chain finds them (the loop
+// above): works and offices bring jobs, so homes are wanted first; offices are
+// also floor shops supply, so works follow; homes bring spending, so shops.
+const PULLS = { res: ['com'], com: ['res', 'ind'], ind: ['res'] };
+// The chain a rezone sets off, named only when it counts: while d.rezone is the
+// district's live cause, the first pulled use the rezone's own floor has lifted
+// past the build bar is credited to it. The base need it must clear is the
+// district's at the rezone, so a bar already crossed does not claim it — only
+// what the new floor added does. That is the line the news prints; a rezone
+// that never moves a district over the bar says nothing. It gives up at
+// CREDIT_SECS so an old rezone cannot claim the market's own swing, and it
+// never draws from economy.rand, so the streams stay in step.
+function creditRezone(d, time) {
+  if (d.rezone === null) return;
+  if (time - d.rezone.at > CREDIT_SECS) {
+    d.rezone = null;
+    return;
+  }
+  for (const pulled of PULLS[d.rezone.use]) {
+    if (d.demand[pulled] >= CREDIT_AT && d.need[pulled] > d.rezone.need[pulled]) {
+      d.credit = { at: time, use: pulled, cause: 'rezone', source: d.rezone.use };
+      d.rezone = null;
+      return;
+    }
+  }
+}
+
 // `heightOf(parcel)` is how tall it stands now (zoning's builtHeight), passed in
 // so the economy never imports zoning and the two stay one-way.
 export function tickEconomy(economy, parcels, heightOf, street, dt) {
@@ -291,6 +342,7 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
     price(d);
     earn(d, dt);
     react(d, dt);
+    creditRezone(d, economy.time);
   }
 }
 
@@ -322,5 +374,11 @@ export function districtReport(city) {
     need: perUse((use) => Math.round(d.need[use])),
     have: perUse((use) => Math.round(d.have[use])),
     last: d.last && { ago: +(economy.time - d.last.at).toFixed(1), use: d.last.use, jobs: Math.round(d.last.jobs) },
+    credit: d.credit && {
+      ago: +(economy.time - d.credit.at).toFixed(1),
+      use: d.credit.use,
+      cause: d.credit.cause,
+      source: d.credit.source,
+    },
   }));
 }

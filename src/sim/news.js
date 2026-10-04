@@ -23,6 +23,9 @@ export const JOBS = { com: 'office', ind: 'workshop' };
 // How a firm's leaving line ends, by its cause (economy.js flee): the chain
 // reads in one line after the poke's own line has scrolled off.
 export const WHY = { dark: ' after the power cut', chase: ' after the police chase' };
+// What the use a rezone added is called in the credit line (economy.js d.credit):
+// the demand it set off is wanted "for the new workshops".
+export const CREDIT_NOUN = { res: 'homes', com: 'offices', ind: 'workshops' };
 
 export function createNews() {
   return { items: [], last: null, residents: null };
@@ -30,12 +33,14 @@ export function createNews() {
 
 // What the news compares, one frame's worth: each lot's stage, each district's
 // last firm move (economy.js replaces d.last with a new object on every move, so
-// a move is a change of identity), whether each district is dark, and how many
-// people live on the lots.
+// a move is a change of identity), whether each district is dark, the demand
+// change a rezone was credited with (economy.js d.credit, a new object when it
+// lands), and how many people live on the lots.
 export function snapshot(city, people, street) {
   return {
     stages: city.parcels.map((p) => p.stage),
     moves: city.economy.districts.map((d) => d.last),
+    credits: city.economy.districts.map((d) => d.credit),
     dark: city.economy.districts.map((d) => isDark(street, d.id)),
     residents: people.list.length,
   };
@@ -57,6 +62,10 @@ export function snapshot(city, people, street) {
 //    jobs moved into the ${name} district`, else `${n} ${JOBS[m.use]} jobs left the
 //    ${name} district`, and when m.cause is set (economy.js flee: the firm a
 //    power cut or a chase drove out) that line ends WHY[m.cause].
+// 4. Each district i, in order, whose credit after is set and is not the same
+//    object as its credit before, with c = that credit (economy.js creditRezone:
+//    a rezone that moved the district over the build bar): `More ${NOUN[c.use],
+//    lower case} wanted in the ${name} district for the new ${CREDIT_NOUN[c.source]}`.
 export function newsBetween(before, after, city) {
   const lines = [];
   const { districts } = city.economy;
@@ -82,6 +91,12 @@ export function newsBetween(before, after, city) {
     lines.push(m.jobs > 0
       ? `${n} ${JOBS[m.use]} jobs moved into the ${d.name} district`
       : `${n} ${JOBS[m.use]} jobs left the ${d.name} district${WHY[m.cause] ?? ''}`);
+  });
+  districts.forEach((d, i) => {
+    const c = after.credits[i];
+    if (c == null || c === before.credits[i]) return;
+    const noun = NOUN[c.use].toLowerCase();
+    lines.push(`More ${noun} wanted in the ${d.name} district for the new ${CREDIT_NOUN[c.source]}`);
   });
   return lines;
 }
