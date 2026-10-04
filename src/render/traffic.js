@@ -287,7 +287,7 @@ function throwTexture() {
   c.width = c.height = 64;
   const g = c.getContext('2d');
   const along = g.createLinearGradient(0, 0, 0, 64);
-  along.addColorStop(0, 'rgba(255,255,255,0.15)');
+  along.addColorStop(0, 'rgba(255,255,255,0)');
   along.addColorStop(0.18, 'rgba(255,255,255,0.85)');
   along.addColorStop(0.55, 'rgba(255,255,255,0.32)');
   along.addColorStop(1, 'rgba(255,255,255,0)');
@@ -470,7 +470,9 @@ export function updateTraffic(rig, street, camera = null) {
     }
     if (camera) dummy.quaternion.copy(camera.quaternion);
     else dummy.rotation.set(0, 0, 0);
-    dummy.scale.set(1, 1, 1);
+    // The same near-camera fade as the throw: a headlight glare the lens is
+    // standing inside reads as a bright rectangle, not as light.
+    dummy.scale.set(fade, fade, 1);
     dummy.updateMatrix();
     glows.setMatrixAt(i, dummy.matrix);
   });
