@@ -10,7 +10,7 @@
 // render/cityview.js; the pointer, the palette and the readout are
 // ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
 import { STAGE, zoneParcel } from './zoning.js';
-import { WALK_BOUNDS } from './world.js';
+import { worldMap } from './patrol.js';
 
 // Seconds for the whole rise, and for the whole descent.
 const LIFT_SECS = 1.6;
@@ -41,7 +41,7 @@ function lotCentre(city) {
 // the rules that move it belong to sim/zoning.js and are not repeated here.
 const levelOf = (p) => p.stage + p.progress;
 
-export function createCityView(city) {
+export function createCityView(city, map = worldMap()) {
   const home = lotCentre(city);
   return {
     mode: 'street',        // where the camera is heading: 'street' or 'city'
@@ -49,6 +49,8 @@ export function createCityView(city) {
     home,
     x: home.x,             // the overview's pivot on the ground
     z: home.z,
+    // The map's own district floor: the pan stays over it, whatever the seed.
+    bounds: map.district.walk,
     yaw: 0,
     tilt: TILT.start,
     reach: REACH.start,
@@ -125,8 +127,8 @@ function pan(view, keys, dt) {
   const step = (PAN_SPEED * (view.reach / REACH.start) * (keys.has('shift') ? HURRY_PAN : 1) * dt) / len;
   const fx = Math.sin(view.yaw);
   const fz = Math.cos(view.yaw);
-  view.x = clamp(view.x + (fx * ahead - fz * right) * step, WALK_BOUNDS.minX, WALK_BOUNDS.maxX);
-  view.z = clamp(view.z + (fz * ahead + fx * right) * step, WALK_BOUNDS.minZ, WALK_BOUNDS.maxZ);
+  view.x = clamp(view.x + (fx * ahead - fz * right) * step, view.bounds.minX, view.bounds.maxX);
+  view.z = clamp(view.z + (fz * ahead + fx * right) * step, view.bounds.minZ, view.bounds.maxZ);
 }
 
 // After tickZoning, every frame. `keys` is the set of held keys, lower-case.

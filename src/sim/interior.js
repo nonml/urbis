@@ -8,7 +8,8 @@
 import { zoneAt } from './street.js';
 import { PINNED_TOWERS, towerCentreX } from './landmarks.js';
 import { STAGE, SETBACK } from './zoning.js';
-import { nearestEdge } from './world.js';
+import { edgesNear } from './map.js';
+import { worldMap } from './patrol.js';
 
 export const STREET = 'street';
 
@@ -60,18 +61,18 @@ function yawIn(fr, heading) {
 // The spaces.
 //
 // RAMEN is the noodle bar behind the RAMEN fascia on the main avenue: the
-// 44 m tower on the west side at z = -14 (landmarks.js PINNED_TOWERS 'ramen').
+// 44 m tower on the west side at z = -14 (the map's pinned tower 'ramen').
 // Its podium face and the noodle-bar bay of its glazing are derived below; the
 // door is hung in that bay. The room stops 0.65 m short of the face on purpose
 // — that is where the tower's shaft begins, and a camera inside the shaft sees
 // none of the city's single-sided boxes from behind.
 //
-// ROOF is the crown of the neighbouring tower to the south (PINNED_TOWERS
-// 'roof', 34 m with a setback crown to 44.2 m). It is the roof on this side of
-// the avenue with a clear line to the growth lots: the south-west pair below
-// it, the one in the gap in the east row across the avenue, the two past the
-// east avenue. Its walking surface is the crown's lip plate, 12.9 x 10.9 m at
-// y 44.475.
+// ROOF is the crown of the neighbouring tower to the south (the map's pinned
+// tower 'roof', 34 m with a setback crown to 44.2 m). It is the roof on this
+// side of the avenue with a clear line to the growth lots: the south-west pair
+// below it, the one in the gap in the east row across the avenue, the two past
+// the east avenue. Its walking surface is the crown's lip plate, 12.9 x 10.9 m
+// at y 44.475.
 
 // How far the podium and the crown lip stand proud of the shaft face, and which
 // bay of the noodle bar's glazing the door is hung in. The frames below and the
@@ -80,16 +81,30 @@ const PODIUM_LIP = 1.2;
 const CROWN_LIP = 0.9;
 const RAMEN_BAY_DZ = 3.23;
 
-const RAMEN_TOWER = PINNED_TOWERS.find((t) => t.id === 'ramen');
-const ROOF_TOWER = PINNED_TOWERS.find((t) => t.id === 'roof');
+// The world's map, read once: a generated map carries its pinned towers in
+// `buildings` as `tower:<id>` (layout.js pinnedBuildings); the hand preset map
+// has no buildings entry yet, so it falls back to landmarks' table (M4.T15
+// deletes it). x is the shaft centre and side -1 is west either way, so the
+// two spaces hang off their tower on every world.
+const MAP = worldMap();
+
+function towerOf(id) {
+  const b = MAP.buildings?.find((q) => q.id === `tower:${id}`);
+  if (b) return { id, x: b.x, z: b.z, w: b.w, side: -b.face[0] };
+  const t = PINNED_TOWERS.find((q) => q.id === id);
+  return { ...t, x: towerCentreX(t, MAP.district.avenues[0].x) };
+}
+
+const RAMEN_TOWER = towerOf('ramen');
+const ROOF_TOWER = towerOf('roof');
 
 const RAMEN_FRAME = {
-  x: towerCentreX(RAMEN_TOWER) - RAMEN_TOWER.side * (RAMEN_TOWER.w + PODIUM_LIP) / 2,
+  x: RAMEN_TOWER.x - RAMEN_TOWER.side * (RAMEN_TOWER.w + PODIUM_LIP) / 2,
   z: RAMEN_TOWER.z + RAMEN_BAY_DZ,
   out: [-RAMEN_TOWER.side, 0],
 };
 const ROOF_FRAME = {
-  x: towerCentreX(ROOF_TOWER) - ROOF_TOWER.side * (ROOF_TOWER.w + CROWN_LIP) / 2,
+  x: ROOF_TOWER.x - ROOF_TOWER.side * (ROOF_TOWER.w + CROWN_LIP) / 2,
   z: ROOF_TOWER.z,
   out: [-ROOF_TOWER.side, 0],
 };
@@ -174,7 +189,7 @@ const RAMEN_DOOR_ARRIVE = { dx: 8.7, dz: 5.0 };
 const ROOF_DOOR_FACE = { dx: 0, dz: 5.6 };
 const ROOF_DOOR_ARRIVE = { dx: 1.5, dz: 7.1 };
 // The offset spot on the hand map, hung off the tower so it travels with it.
-const towerSpot = (tower, off) => ({ x: towerCentreX(tower) + off.dx, z: tower.z + off.dz });
+const towerSpot = (tower, off) => ({ x: tower.x + off.dx, z: tower.z + off.dz });
 export const DOORS = [
   {
     id: 'ramen-front',
@@ -290,14 +305,14 @@ function parcelSide(p, s) {
   };
 }
 
-// Which of the four shell faces stands nearest a road. Ties break in table
-// order, so the choice is deterministic.
+// Which of the four shell faces stands nearest a road, measured against the
+// map's own graph. Ties break in table order, so the choice is deterministic.
 function streetFace(p) {
   let best = parcelSide(p, PARCEL_SIDES[0]);
-  let bestD = nearestEdge(best.x, best.z).dist;
+  let bestD = edgesNear(MAP, best.x, best.z)[0].dist;
   for (const s of PARCEL_SIDES.slice(1)) {
     const side = parcelSide(p, s);
-    const d = nearestEdge(side.x, side.z).dist;
+    const d = edgesNear(MAP, side.x, side.z)[0].dist;
     if (d < bestD) { best = side; bestD = d; }
   }
   return best;

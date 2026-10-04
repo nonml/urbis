@@ -3,10 +3,13 @@
 // what grows next. The loop and every number here are argued in docs/ECONOMY.md.
 // Pure: zoning ticks it, render and the probe read it (law 5).
 import { isDark } from './street.js';
+import { worldMap } from './patrol.js';
 
 // A district is a power zone (zoneAt in street.js): the grid is what a player
-// can cut, so it is the unit a consequence lands on. Indexed by zone.
-export const DISTRICTS = ['south', 'north'];
+// can cut, so it is the unit a consequence lands on. Indexed by zone; the names
+// are the readout's, not a map field — the map holds districts, the grid holds
+// zones, and the two meet again at M3.T7.
+const ZONE_NAMES = ['south', 'north'];
 const USES = ['res', 'com', 'ind'];
 
 // A resident or a worker for every 25 m² of floor, on the 3.5 m storey the lots
@@ -130,7 +133,7 @@ function makeDistrict(id, lots, rand, calm) {
   const firms = size * FIRMS_USUAL * BOOT_FIRMS;
   return {
     id,
-    name: DISTRICTS[id],
+    name: ZONE_NAMES[id],
     calm,
     size,
     // The established district. Its jobs match its homes.
@@ -203,12 +206,16 @@ function price(d) {
   for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
 }
 
-export function createEconomy(parcels, heightOf, rand, calm = false) {
+// `map` is the city being played: a map carrying its own lots is a generated
+// plan, and a generated new game gets the calm market (docs/ECONOMY.md, M1.T3).
+// The hand preset's map has no lots and keeps the market it shipped with.
+export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
+  const calm = Boolean(map.lots);
   const economy = {
     time: 0,
     rand,
     calm,
-    districts: DISTRICTS.map((_, id) => makeDistrict(id, parcels.filter((p) => p.powerZone === id), rand, calm)),
+    districts: ZONE_NAMES.map((_, id) => makeDistrict(id, parcels.filter((p) => p.powerZone === id), rand, calm)),
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
