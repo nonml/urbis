@@ -16,6 +16,16 @@ function streakTexture() {
   grad.addColorStop(1, 'rgba(255,255,255,0)');
   g.fillStyle = grad;
   g.fillRect(0, 0, 16, 128);
+  // The length fade above leaves the two long sides as straight edges, which
+  // on a wet road read as a glowing rectangle. Fade the sides out too.
+  g.globalCompositeOperation = 'destination-in';
+  const across = g.createLinearGradient(0, 0, 16, 0);
+  across.addColorStop(0, 'rgba(0,0,0,0)');
+  across.addColorStop(0.3, 'rgba(0,0,0,1)');
+  across.addColorStop(0.7, 'rgba(0,0,0,1)');
+  across.addColorStop(1, 'rgba(0,0,0,0)');
+  g.fillStyle = across;
+  g.fillRect(0, 0, 16, 128);
   const tex = new THREE.CanvasTexture(c);
   return tex;
 }

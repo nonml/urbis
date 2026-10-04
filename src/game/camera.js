@@ -3,8 +3,9 @@
 // state and writes the THREE camera; it never mutates the sim. Pointer events
 // stay in game/input.js, which hands the deltas to look() and dolly().
 import * as THREE from 'three';
-import { currentPlace, frameCamera } from '../sim/interior.js';
+import { currentPlace, frameCamera, STREET } from '../sim/interior.js';
 import { heightAt } from '../sim/world.js';
+import { builtHeight } from '../sim/zoning.js';
 
 // The follow cam's street framing, put back when the player comes out.
 export const STREET_RIG = { dist: 4.5, pitch: 0.18 };
@@ -44,6 +45,77 @@ function angDiff(a, b) {
   while (d > Math.PI) d -= Math.PI * 2;
   while (d < -Math.PI) d += Math.PI * 2;
   return d;
+}
+
+// The camera keeps this much off a wall it would enter, and never pulls closer
+// than this share of its arm to the pivot (or it would sit in the player's head).
+const CAM_SOLID_PAD = 0.35;
+const CAM_SOLID_MIN = 0.15;
+// An obstacle no taller than this above the pivot is stepped over, not pulled
+// out of: the hero car parked at the spawn is right behind the player when they
+// turn around, and a camera yanked to the player's skull is worse than one that
+// rides the car's roof.
+const CAM_HOP = 1.4;
+
+// A footprint carries its height; a sim parcel derives it from its stage.
+function solidHeight(b) {
+  return b.h ?? builtHeight(b);
+}
+
+// Does the arm cross this box's footprint, in plan?
+function crossesPlan(px, pz, ex, ez, lo, hi) {
+  let t0 = 0, t1 = 1;
+  const o = [px, pz], d = [ex - px, ez - pz];
+  for (let a = 0; a < 2 && t0 <= t1; a++) {
+    if (Math.abs(d[a]) < 1e-6) {
+      if (o[a] < lo[a] || o[a] > hi[a]) { t0 = 1; t1 = 0; }
+      continue;
+    }
+    let near = (lo[a] - o[a]) / d[a], far = (hi[a] - o[a]) / d[a];
+    if (near > far) { const s = near; near = far; far = s; }
+    t0 = Math.max(t0, near);
+    t1 = Math.min(t1, far);
+  }
+  return t0 <= t1 && t1 > 0;
+}
+
+// Keep the street arm out of the blocks. The first-minutes sweep found the
+// follow cam inside the block east of the spawn on seeds 7 and 22, where a west
+// heading opens on the inside of a facade. Low obstacles are hopped over, tall
+// ones shorten the arm. Returns null when the arm needs nothing.
+function clearStreetArm(px, py, pz, ex, ey, ez, boxes) {
+  let top = ey;
+  for (const b of boxes) {
+    const h = solidHeight(b);
+    if (h < 1 || h + CAM_SOLID_PAD > py + CAM_HOP) continue;
+    const lo = [b.x - b.w / 2 - CAM_SOLID_PAD, b.z - b.d / 2 - CAM_SOLID_PAD];
+    const hi = [b.x + b.w / 2 + CAM_SOLID_PAD, b.z + b.d / 2 + CAM_SOLID_PAD];
+    if (crossesPlan(px, pz, ex, ez, lo, hi)) top = Math.max(top, h + CAM_SOLID_PAD);
+  }
+  const dx = ex - px, dy = top - py, dz = ez - pz;
+  let t = 1;
+  for (const b of boxes) {
+    const h = solidHeight(b);
+    if (h < 1 || h + CAM_SOLID_PAD <= top) continue;
+    const lo = [b.x - b.w / 2 - CAM_SOLID_PAD, -1, b.z - b.d / 2 - CAM_SOLID_PAD];
+    const hi = [b.x + b.w / 2 + CAM_SOLID_PAD, h + CAM_SOLID_PAD, b.z + b.d / 2 + CAM_SOLID_PAD];
+    const o = [px, py, pz], d = [dx, dy, dz];
+    let t0 = 0, t1 = 1;
+    for (let a = 0; a < 3 && t0 <= t1; a++) {
+      if (Math.abs(d[a]) < 1e-6) {
+        if (o[a] < lo[a] || o[a] > hi[a]) { t0 = 1; t1 = 0; }
+        continue;
+      }
+      let near = (lo[a] - o[a]) / d[a], far = (hi[a] - o[a]) / d[a];
+      if (near > far) { const s = near; near = far; far = s; }
+      t0 = Math.max(t0, near);
+      t1 = Math.min(t1, far);
+    }
+    if (t0 <= t1 && t0 > 0 && t0 < t) t = t0;
+  }
+  if (t >= 1 && top === ey) return null;
+  t = Math.max(t, CAM_SOLID_MIN);
+  return { x: px + dx * t, y: py + dy * t, z: pz + dz * t };
 }
 
 // `camera` is the THREE camera to place; `interior` is sim/interior.js's state,
@@ -90,8 +162,10 @@ export function createFollowRig({ camera, interior }) {
   }
 
   // Place the eye behind the drawn actor (the blended pose) and aim it. `dt` is
-  // the clamped frame delta. Returns the look point the city view frames against.
-  function placeFollowCamera(actor, driving, dt) {
+  // the clamped frame delta; `boxes` are the street's solid footprints, so the
+  // arm can stop at a wall instead of entering the block. Returns the look point
+  // the city view frames against.
+  function placeFollowCamera(actor, driving, dt, boxes = null) {
     const cp = Math.cos(cam.pitch);
     const sp = Math.sin(cam.pitch);
     const cx = actor.x - Math.sin(cam.yaw) * cam.dist * cp;
@@ -99,9 +173,13 @@ export function createFollowRig({ camera, interior }) {
     // The camera rides the higher of two grounds — the one under the actor and
     // the one under itself — so a bank standing between them cannot swallow it.
     cam.ground += (Math.max(actor.y, heightAt(cx, cz)) - cam.ground) * Math.min(1, dt * GROUND_EASE);
-    camera.position.set(cx, sp * cam.dist + EYE_LIFT + cam.ground, cz);
+    const pivot = { x: actor.x, y: actor.y + CAM_PIVOT, z: actor.z };
+    const eye = { x: cx, y: sp * cam.dist + EYE_LIFT + cam.ground, z: cz };
+    const clear = boxes && interior.space === STREET
+      ? clearStreetArm(pivot.x, pivot.y, pivot.z, eye.x, eye.y, eye.z, boxes)
+      : null;
+    camera.position.set(clear?.x ?? eye.x, clear?.y ?? eye.y, clear?.z ?? eye.z);
     if (!driving) {
-      const pivot = { x: actor.x, y: actor.y + CAM_PIVOT, z: actor.z };
       camera.position.copy(frameCamera(interior, pivot, camera.position));
     }
     lookAt.set(

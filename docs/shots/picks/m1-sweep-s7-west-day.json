@@ -6,15 +6,15 @@
   "weather": "rain",
   "city": false,
   "dark": false,
-  "draws": 128,
-  "peak": 137,
+  "draws": 129,
+  "peak": 138,
   "blocked": 0,
   "blockers": [],
   "ledger": {
-    "draws": 128,
+    "draws": 129,
     "byPass": {
       "shadow": 21,
-      "main": 92,
+      "main": 93,
       "post": 15
     },
     "top": [
@@ -32,14 +32,14 @@
       ],
       [
         "Mesh · MeshStandardMaterial ×72",
-        9
+        8
       ],
       [
         "Mesh · MeshBasicMaterial",
         6
       ],
       [
-        "Mesh · MeshStandardMaterial ×35",
+        "Mesh · MeshStandardMaterial ×6",
         4
       ],
       [
@@ -59,29 +59,26 @@
       {
         "c": 0,
         "r": 0,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 350.3
       },
       {
         "c": 1,
         "r": 0,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 350.6
       },
       {
         "c": 2,
         "r": 0,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 352.8
       },
       {
         "c": 3,
@@ -89,8 +86,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -98,17 +95,17 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
         "r": 0,
-        "path": "Group/Mesh",
+        "path": "Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 48.6
       },
       {
         "c": 6,
@@ -116,17 +113,17 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15
       },
       {
         "c": 7,
         "r": 0,
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "mat": "MeshBasicMaterial",
+        "color": "ffffff",
+        "dist": 13.7
       },
       {
         "c": 8,
@@ -134,8 +131,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 14.9
       },
       {
         "c": 9,
@@ -143,8 +140,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15
       },
       {
         "c": 10,
@@ -152,8 +149,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15.3
       },
       {
         "c": 11,
@@ -161,8 +158,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15.7
       },
       {
         "c": 12,
@@ -170,62 +167,59 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 16.3
       },
       {
         "c": 13,
         "r": 0,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 22.3
       },
       {
         "c": 14,
         "r": 0,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 19.7
       },
       {
         "c": 15,
         "r": 0,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 20.1
       },
       {
         "c": 0,
         "r": 1,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 350.7
       },
       {
         "c": 1,
         "r": 1,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 351.5
       },
       {
         "c": 2,
         "r": 1,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 354.1
       },
       {
         "c": 3,
@@ -233,8 +227,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -242,8 +236,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -251,8 +245,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 17.7
       },
       {
         "c": 6,
@@ -260,17 +254,17 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 14.6
       },
       {
         "c": 7,
         "r": 1,
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "mat": "MeshBasicMaterial",
+        "color": "ffffff",
+        "dist": 13.3
       },
       {
         "c": 8,
@@ -278,8 +272,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 14.5
       },
       {
         "c": 9,
@@ -287,8 +281,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 14.6
       },
       {
         "c": 10,
@@ -296,8 +290,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 14.9
       },
       {
         "c": 11,
@@ -305,8 +299,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15.4
       },
       {
         "c": 12,
@@ -314,44 +308,43 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 15.9
       },
       {
         "c": 13,
         "r": 1,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 21.7
       },
       {
         "c": 14,
         "r": 1,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 19.2
       },
       {
         "c": 15,
         "r": 1,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 19.8
       },
       {
         "c": 0,
         "r": 2,
-        "path": "Group/Mesh",
-        "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "path": "Mesh",
+        "geo": "SphereGeometry",
+        "mat": "ShaderMaterial",
+        "dist": 349.4
       },
       {
         "c": 1,
@@ -359,8 +352,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 208.6
       },
       {
         "c": 2,
@@ -368,8 +361,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 181.3
       },
       {
         "c": 3,
@@ -377,8 +370,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -386,8 +379,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -395,8 +388,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 17.6
       },
       {
         "c": 6,
@@ -404,8 +397,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 13.7
       },
       {
         "c": 7,
@@ -413,8 +406,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "1b1f27",
+        "dist": 12.8
       },
       {
         "c": 8,
@@ -422,8 +415,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 13.6
       },
       {
         "c": 9,
@@ -431,8 +424,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 13.7
       },
       {
         "c": 10,
@@ -440,8 +433,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 14
       },
       {
         "c": 11,
@@ -449,8 +442,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 14.5
       },
       {
         "c": 12,
@@ -458,8 +451,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 15
       },
       {
         "c": 13,
@@ -467,26 +460,26 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 15.5
       },
       {
         "c": 14,
         "r": 2,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 18.8
       },
       {
         "c": 15,
         "r": 2,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 19.7
       },
       {
         "c": 0,
@@ -494,8 +487,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "54575f",
+        "dist": 31.8
       },
       {
         "c": 1,
@@ -503,8 +496,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 148.9
       },
       {
         "c": 2,
@@ -512,8 +505,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 44.2
       },
       {
         "c": 3,
@@ -521,8 +514,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -530,8 +523,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -539,8 +532,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "232a33",
+        "dist": 13.6
       },
       {
         "c": 6,
@@ -548,8 +541,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 13.6
       },
       {
         "c": 7,
@@ -558,7 +551,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.4
       },
       {
         "c": 8,
@@ -567,7 +560,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.4
       },
       {
         "c": 9,
@@ -576,7 +569,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.6
       },
       {
         "c": 10,
@@ -585,7 +578,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.9
       },
       {
         "c": 11,
@@ -594,7 +587,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 14.3
       },
       {
         "c": 12,
@@ -603,7 +596,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 14.9
       },
       {
         "c": 13,
@@ -611,53 +604,53 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 15.4
       },
       {
         "c": 14,
         "r": 3,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 18.6
       },
       {
         "c": 15,
         "r": 3,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "BoxGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "767a83",
+        "dist": 19.6
       },
       {
         "c": 0,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "bcc8b0",
+        "dist": 19.6
       },
       {
         "c": 1,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "bcc8b0",
+        "dist": 21.6
       },
       {
         "c": 2,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "bcc8b0",
+        "dist": 19.1
       },
       {
         "c": 3,
@@ -665,8 +658,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -674,8 +667,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -683,8 +676,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "232a33",
+        "dist": 12.7
       },
       {
         "c": 6,
@@ -692,8 +685,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "4e5158",
+        "dist": 13.7
       },
       {
         "c": 7,
@@ -702,7 +695,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.4
       },
       {
         "c": 8,
@@ -711,7 +704,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.4
       },
       {
         "c": 9,
@@ -720,7 +713,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.6
       },
       {
         "c": 10,
@@ -729,7 +722,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 13.9
       },
       {
         "c": 11,
@@ -738,7 +731,7 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 14.4
       },
       {
         "c": 12,
@@ -747,34 +740,34 @@
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
         "color": "11161d",
-        "dist": 0
+        "dist": 14.9
       },
       {
         "c": 13,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Group/fleet-car-body",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 11.6
       },
       {
         "c": 14,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Group/fleet-car-body",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 11
       },
       {
         "c": 15,
         "r": 4,
-        "path": "Group/Mesh",
+        "path": "Group/fleet-car-body",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "ffffff",
+        "dist": 11.6
       },
       {
         "c": 0,
@@ -782,8 +775,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 13.1
       },
       {
         "c": 1,
@@ -791,8 +784,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 12.5
       },
       {
         "c": 2,
@@ -800,8 +793,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 11.9
       },
       {
         "c": 3,
@@ -809,8 +802,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -818,8 +811,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -827,8 +820,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.6
       },
       {
         "c": 6,
@@ -836,8 +829,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.4
       },
       {
         "c": 7,
@@ -845,8 +838,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.2
       },
       {
         "c": 8,
@@ -854,8 +847,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.2
       },
       {
         "c": 9,
@@ -863,8 +856,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.4
       },
       {
         "c": 10,
@@ -872,53 +865,53 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7d828c",
+        "dist": 10.6
       },
       {
         "c": 11,
         "r": 5,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 4.4
       },
       {
         "c": 12,
         "r": 5,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.8
       },
       {
         "c": 13,
         "r": 5,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.5
       },
       {
         "c": 14,
         "r": 5,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.7
       },
       {
         "c": 15,
         "r": 5,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.9
       },
       {
         "c": 0,
@@ -926,8 +919,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 9
       },
       {
         "c": 1,
@@ -935,8 +928,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 8.5
       },
       {
         "c": 2,
@@ -944,8 +937,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 8.1
       },
       {
         "c": 3,
@@ -953,8 +946,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -962,80 +955,80 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
         "r": 6,
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "mat": "MeshBasicMaterial",
+        "color": "0a0e14",
+        "dist": 7.2
       },
       {
         "c": 6,
         "r": 6,
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "mat": "MeshBasicMaterial",
+        "color": "0a0e14",
+        "dist": 7
       },
       {
         "c": 7,
         "r": 6,
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
-        "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "mat": "MeshBasicMaterial",
+        "color": "0a0e14",
+        "dist": 7
       },
       {
         "c": 8,
         "r": 6,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 4.3
       },
       {
         "c": 9,
         "r": 6,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.7
       },
       {
         "c": 10,
         "r": 6,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.8
       },
       {
         "c": 11,
         "r": 6,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.9
       },
       {
         "c": 12,
         "r": 6,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.4
       },
       {
         "c": 13,
@@ -1043,8 +1036,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "0b1119",
+        "dist": 3.2
       },
       {
         "c": 14,
@@ -1052,8 +1045,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "0b1119",
+        "dist": 3.3
       },
       {
         "c": 15,
@@ -1061,8 +1054,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "0b1119",
+        "dist": 3.5
       },
       {
         "c": 0,
@@ -1070,8 +1063,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 6.7
       },
       {
         "c": 1,
@@ -1079,8 +1072,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 6.4
       },
       {
         "c": 2,
@@ -1088,8 +1081,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 6.1
       },
       {
         "c": 3,
@@ -1097,8 +1090,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 4,
@@ -1106,8 +1099,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.2
       },
       {
         "c": 5,
@@ -1115,8 +1108,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 5.4
       },
       {
         "c": 6,
@@ -1124,8 +1117,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 5.3
       },
       {
         "c": 7,
@@ -1133,8 +1126,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 5.3
       },
       {
         "c": 8,
@@ -1142,71 +1135,71 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "15171b",
+        "dist": 4.3
       },
       {
         "c": 9,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 2.9
       },
       {
         "c": 10,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 2.9
       },
       {
         "c": 11,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3
       },
       {
         "c": 12,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.1
       },
       {
         "c": 13,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.3
       },
       {
         "c": 14,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.4
       },
       {
         "c": 15,
         "r": 7,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.6
       },
       {
         "c": 0,
@@ -1214,8 +1207,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 5.4
       },
       {
         "c": 1,
@@ -1223,8 +1216,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 5.1
       },
       {
         "c": 2,
@@ -1232,8 +1225,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 4.9
       },
       {
         "c": 3,
@@ -1241,8 +1234,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.3
       },
       {
         "c": 4,
@@ -1250,8 +1243,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "14171d",
+        "dist": 1.3
       },
       {
         "c": 5,
@@ -1259,8 +1252,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 4.4
       },
       {
         "c": 6,
@@ -1268,8 +1261,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 4.4
       },
       {
         "c": 7,
@@ -1277,8 +1270,8 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 4.3
       },
       {
         "c": 8,
@@ -1286,26 +1279,26 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "7e838d",
+        "dist": 4.3
       },
       {
         "c": 9,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3
       },
       {
         "c": 10,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.1
       },
       {
         "c": 11,
@@ -1313,47 +1306,58 @@
         "path": "Group/Mesh",
         "geo": "BufferGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "c2c8d0",
+        "dist": 3.1
       },
       {
         "c": 12,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.8
       },
       {
         "c": 13,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.4
       },
       {
         "c": 14,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.6
       },
       {
         "c": 15,
         "r": 8,
         "path": "Group/Mesh",
-        "geo": "BufferGeometry",
+        "geo": "ExtrudeGeometry",
         "mat": "MeshStandardMaterial",
-        "color": "11161d",
-        "dist": 0
+        "color": "8f4a0c",
+        "dist": 3.7
       }
     ],
-    "raw": []
+    "raw": [
+      {
+        "key": "Mesh (SphereGeometry)",
+        "n": 7
+      },
+      {
+        "key": "Group/Mesh (BoxGeometry)",
+        "n": 10
+      }
+    ]
   },
-  "flags": []
+  "flags": [
+    "raw primitives: Mesh (SphereGeometry) ×7, Group/Mesh (BoxGeometry) ×10"
+  ]
 }

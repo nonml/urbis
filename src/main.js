@@ -87,6 +87,13 @@ const sceneCtx = {
   city, street, clock, interior, wanted, arc, heroCar, player, cityView,
 };
 const camRig = createFollowRig({ camera, interior }), cam = camRig.cam;
+// The follow camera stops at these: the street wall's fixed footprints (their
+// height rides on the record from block.js) and the grown lots. The hero car
+// joins them on foot, so turning around at the spawn rides its roof instead of
+// opening inside it.
+const CAM_BLOCKERS = [...towers.footprints, ...city.parcels];
+const HERO_BOX = { x: 0, z: 0, w: 2.6, d: 5.2, h: 1.7 };
+const WALK_BLOCKERS = [...CAM_BLOCKERS, HERO_BOX];
 const hudCtx = {
   city, street, dispatch, arc, interior, cam, camera, clock, wanted, mission, player, heroCar,
   dark: [false, false],
@@ -268,7 +275,10 @@ function render() {
   const hx = driving ? carDraw.x : playerDraw.x, hz = driving ? carDraw.z : playerDraw.z;
 
   // Follow rig (M3.T3): the eye behind the drawn actor, aimed by the rig.
-  const lookAt = camRig.placeFollowCamera(driving ? carDraw : playerDraw, driving, dt);
+  HERO_BOX.x = carDraw.x;
+  HERO_BOX.z = carDraw.z;
+  const lookAt = camRig.placeFollowCamera(
+    driving ? carDraw : playerDraw, driving, dt, driving ? CAM_BLOCKERS : WALK_BLOCKERS);
   const target = driving || interior.space !== STREET ? null : acquire(street, player.x, player.z, player.yaw);
   const targetPerson = target && people.list.length > 0
     ? people.list[street.npcs.indexOf(target.npc) % people.list.length]
