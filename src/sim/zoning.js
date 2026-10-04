@@ -3,7 +3,7 @@
 // ticks it (law 5). Why growth lives on empty land instead of on the 68 shipped
 // towers is docs/ZONING.md.
 import { createStreams } from './rng.js';
-import { WORLD_PLAN } from './layout.js';
+import { worldMap } from './patrol.js';
 import { isDark, zoneAt } from './street.js';
 import {
   COMMERCE_PER_HOME,
@@ -31,6 +31,10 @@ export const SETBACK = 1.2;
 // tower, road, tree and verge tables and then checked from the street — every
 // lot clears every carriageway, footway, podium, trunk and grass strip. Five
 // each side of z = 0, so whichever zone is blacked out has work to stop.
+//
+// A generated map carries its plan's lots in `map.lots`; this table is the
+// hand preset's map entry, read only while the preset map has no lots of its
+// own (M4.T15 deletes it with the rest of the preset).
 const LOTS = [
   [-15.25, 56, 16.5, 10],     // main avenue, west side, north of the plaza
   [28.5, 56, 16, 10],         // behind the main and east rows, north of the plaza
@@ -116,10 +120,10 @@ function makeParcel(rand, [x, z, w, d]) {
 
 // A new city leaves the player land to zone: a rezone that must knock a
 // building down first takes jobs away before it adds any, so empty land is
-// where a zoning change starts a chain. In each district of a generated world
-// (WORLD_PLAN set), the FREE_LOTS lots that start EMPTY with the least
-// progress (ties by index) start unzoned: use and zoned null, progress 0. The
-// hand preset keeps every lot zoned.
+// where a zoning change starts a chain. In each district of a generated map,
+// the FREE_LOTS lots that start EMPTY with the least progress (ties by index)
+// start unzoned: use and zoned null, progress 0. The hand preset keeps every
+// lot zoned.
 export const FREE_LOTS = 2;
 function freeLand(parcels) {
   for (const zone of new Set(parcels.map((p) => p.powerZone))) {
@@ -226,14 +230,17 @@ function updateDemand(city, dt, street) {
   city.demand = cityDemand(city.economy);
 }
 
-export function createCity(seed) {
+export function createCity(seed, map = worldMap()) {
   const rng = createStreams(seed);
-  const parcels = (WORLD_PLAN?.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
-  if (WORLD_PLAN) {
+  // A map with lots of its own is a generated plan; the preset map has none,
+  // and its hand tables play the generated behaviour off, exactly as before.
+  const generated = Boolean(map.lots);
+  const parcels = (map.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
+  if (generated) {
     freeLand(parcels);
     balanceUses(parcels);
   }
-  const economy = createEconomy(parcels, builtHeight, rng.sim, Boolean(WORLD_PLAN));
+  const economy = createEconomy(parcels, builtHeight, rng.sim, map);
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
 

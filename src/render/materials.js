@@ -7,6 +7,48 @@ const BASE = 'assets/';
 // Metres of facade one repeat of a window map covers, on every tower in the city.
 export const FACADE_TILE = 11;
 
+// Wet grade (VGA-005, drawn for M2-7): one 0-1 wetness every standard surface
+// reads without a draw. uWet is one shared uniform, so the whole city costs a
+// single write whatever the material count, and the rain rig (render/rain.js)
+// sets it from the sim's wetness; roughness falls, albedo darkens and the
+// environment read lifts, which is what wet asphalt, paving and concrete do.
+const WET = { value: 0 };
+const WET_ROUGH = 0.55, WET_DARK = 0.24, WET_ENV = 1.5;
+
+export function setWetness(w) {
+  WET.value = Math.max(0, Math.min(1, w));
+}
+
+export function wetness() {
+  return WET.value;
+}
+
+// Compose the wet patch into whatever onBeforeCompile the material already
+// carries, so concrete keeps its window mask and the wet grade lands under it.
+export function wetGrade(mat) {
+  const own = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, renderer) => {
+    own.call(mat, sh, renderer);
+    sh.uniforms.uWet = WET;
+    sh.fragmentShader = sh.fragmentShader
+      .replace('#include <common>', '#include <common>\nuniform float uWet;')
+      .replace(
+        '#include <roughnessmap_fragment>',
+        `#include <roughnessmap_fragment>\nroughnessFactor *= 1.0 - ${WET_ROUGH.toFixed(2)} * uWet;`
+      )
+      .replace(
+        '#include <map_fragment>',
+        `#include <map_fragment>\ndiffuseColor.rgb *= 1.0 - ${WET_DARK.toFixed(2)} * uWet;`
+      )
+      .replaceAll(
+        'return envMapColor.rgb * envMapIntensity;',
+        `return envMapColor.rgb * envMapIntensity * (1.0 + ${WET_ENV.toFixed(1)} * uWet);`
+      );
+    if (!sh.fragmentShader.includes('uWet')) console.error('[wet] patch missed');
+  };
+  return mat;
+}
+
 function load(texLoader, maxAniso, path, srgb, rx, ry) {
   const tex = texLoader.load(BASE + path);
   tex.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace;
@@ -112,7 +154,9 @@ export function concreteFacadeMaterial(maps, windowMap, tint) {
     envMapIntensity: 0.4,
     color: tint,
   });
-  mat.onBeforeCompile = (sh) => {
+  const wet = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, renderer) => {
+    wet.call(mat, sh, renderer);
     const before = sh.fragmentShader;
     sh.fragmentShader = before
       .replace(
@@ -194,7 +238,7 @@ export function withZone(geo, zone) {
 }
 
 export function standardFromMaps(maps, opts) {
-  return new THREE.MeshStandardMaterial({
+  return wetGrade(new THREE.MeshStandardMaterial({
     map: maps.albedo,
     normalMap: maps.normal,
     roughnessMap: maps.rough,
@@ -206,5 +250,5 @@ export function standardFromMaps(maps, opts) {
     metalness: opts.metalness ?? 0.0,
     envMapIntensity: opts.envMapIntensity ?? 1.0,
     color: opts.color ?? 0xffffff,
-  });
+  }));
 }

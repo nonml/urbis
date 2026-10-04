@@ -1,0 +1,273 @@
+{
+  "milestone": "M7 sound and the front door",
+  "tasks": [
+    {
+      "id": "M7.T1",
+      "lane": "tools",
+      "goal": "Audio engine. Web Audio context started on the first input; the listener follows the camera; pooled positional sources; master, effects and ambience buses; silent under `?capture=1` unless asked; `__game.sounds()` lists what plays",
+      "files": [
+        "src/audio/engine.js",
+        "src/game/scene.js"
+      ],
+      "needs": [],
+      "commit": "M7.T1 (M7-1): audio engine",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T2",
+      "lane": "tools",
+      "goal": "The sound set. A fetch script with checksums for each CC0 sound, the horn and a completion sting among them, each in `CREDITS.md`; `m7-sound.spec.js` first",
+      "files": [
+        "tools/sounds/fetch.sh",
+        "public/assets/sounds/",
+        "public/assets/CREDITS.md",
+        "tests/accept/m7-sound.spec.js"
+      ],
+      "needs": [
+        "M7.T1"
+      ],
+      "commit": "M7.T2 (M7-1): the sound set",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-sound.spec.js"
+    },
+    {
+      "id": "M7.T3",
+      "lane": "tools",
+      "goal": "Street ambience by hour and district kind; traffic hum from the commute flow; crowd from walkers nearby",
+      "files": [
+        "src/audio/ambience.js"
+      ],
+      "needs": [
+        "M7.T2"
+      ],
+      "commit": "M7.T3 (M7-1): street ambience",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T4",
+      "lane": "tools",
+      "goal": "Engines and the horn. The hero car's pitch rises with speed; traffic passes by; E in a car sounds the horn",
+      "files": [
+        "src/audio/vehicles.js"
+      ],
+      "needs": [
+        "M7.T2"
+      ],
+      "commit": "M7.T4 (M7-1): engines and the horn",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T5",
+      "lane": "tools",
+      "goal": "Police. Sirens on active units; dispatch crackle under the subtitles",
+      "files": [
+        "src/audio/vehicles.js",
+        "src/ui/dispatch.js"
+      ],
+      "needs": [
+        "M7.T4"
+      ],
+      "commit": "M7.T5 (M7-1): police",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T6",
+      "lane": "tools",
+      "goal": "Sites. Crane and site sounds at working lots",
+      "files": [
+        "src/audio/sites.js"
+      ],
+      "needs": [
+        "M7.T2"
+      ],
+      "commit": "M7.T6 (M7-1): sites",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T7",
+      "lane": "tools",
+      "goal": "Blackout. The district's hum dies and comes back with the lights",
+      "files": [
+        "src/audio/ambience.js"
+      ],
+      "needs": [
+        "M7.T3"
+      ],
+      "commit": "M7.T7 (M7-1): blackout",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-1: An audio system plays: street ambience, an engine whose pitch rises with speed, the horn (E in a car), a crane at a working site, police sirens, a sting when a mission or gig completes, and the street dying and coming back in a blackout. Every sound is in `CREDITS.md` (checked by `tests/accept/m7-sound.spec.js` (lists playing sounds per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T17",
+      "lane": "tools",
+      "goal": "Music. CC0 tracks fetched with checksums the way the sounds are, each in `CREDITS.md`; a title theme; a score under the arc's missions that turns urgent when `wanted.js` starts a chase and settles when it ends; `m7-music.spec.js` first",
+      "files": [
+        "src/audio/music.js",
+        "tools/sounds/fetch.sh",
+        "public/assets/CREDITS.md",
+        "tests/accept/m7-music.spec.js"
+      ],
+      "needs": [
+        "M7.T2"
+      ],
+      "commit": "M7.T17 (M7-10): music",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-10: **Music and the radio:** a title theme; a score under the arc's missions that turns urgent when a chase starts and settles when it ends; in a car, B cycles two radio stations of instrumental music and off, and the station holds when the player gets out and back in. Every track is CC0 (`ASSETS.md`: CC0 first) and in `CREDITS.md`; one station if CC0 cannot fill two. DJs, talk and news voices wait (G23) (checked by `tests/accept/m7-music.spec.js` (lists the playing tracks per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-music.spec.js"
+    },
+    {
+      "id": "M7.T18",
+      "lane": "tools",
+      "goal": "Car radio. In a car, B cycles two stations and off; getting back in, a station plays on from where it would have been; one station if CC0 cannot fill two",
+      "files": [
+        "src/audio/music.js",
+        "src/game/input.js"
+      ],
+      "needs": [
+        "M7.T17"
+      ],
+      "commit": "M7.T18 (M7-10): car radio",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-10: **Music and the radio:** a title theme; a score under the arc's missions that turns urgent when a chase starts and settles when it ends; in a car, B cycles two radio stations of instrumental music and off, and the station holds when the player gets out and back in. Every track is CC0 (`ASSETS.md`: CC0 first) and in `CREDITS.md`; one station if CC0 cannot fill two. DJs, talk and news voices wait (G23) (checked by `tests/accept/m7-music.spec.js` (lists the playing tracks per pose)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T8",
+      "lane": "render",
+      "goal": "Title screen. New Game, Continue (disabled with no save), Settings, by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed; `m7-title.spec.js` first; a city name made from the seed, which the player can change, shown on the HUD and the save slot",
+      "files": [
+        "src/ui/title.js",
+        "src/boot.js"
+      ],
+      "needs": [],
+      "commit": "M7.T8 (M7-2): title screen",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-2: A title screen (New Game, Continue disabled with no save, Settings) works by mouse; New Game shows the new city's seed with a reroll, and takes a typed seed; it also shows a city name made from the seed, which the player can change, and the HUD and the save slot show that name (checked by `tests/accept/m7-title.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T9",
+      "lane": "render",
+      "goal": "Pause. Esc holds the fixed-step loop and shows a menu; Esc resumes; its check first",
+      "files": [
+        "src/ui/pause.js",
+        "src/game/loop.js",
+        "tests/accept/m7-pause.spec.js"
+      ],
+      "needs": [
+        "M7.T8",
+        "M2.T16"
+      ],
+      "commit": "M7.T9 (M7-3): pause",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-3: Esc pauses: game time holds for 5 s and a menu shows; Esc resumes (checked by `tests/accept/m7-pause.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-pause.spec.js"
+    },
+    {
+      "id": "M7.T10",
+      "lane": "render",
+      "goal": "Settings. Mouse speed and invert, volumes, quality (shadow distance, resolution scale), field of view, full screen, subtitle size; stored the way `savestore.js` stores the save; its check first",
+      "files": [
+        "src/ui/settings.js",
+        "src/settingsstore.js",
+        "tests/accept/m7-settings.spec.js"
+      ],
+      "needs": [
+        "M7.T8"
+      ],
+      "commit": "M7.T10 (M7-4): settings",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-4: Settings for mouse, volume, quality, field of view, full screen, key bindings and subtitle size survive a reload (the first slice of `BACKLOG.md` accessibility) (checked by `tests/accept/m7-settings.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-settings.spec.js"
+    },
+    {
+      "id": "M7.T11",
+      "lane": "render",
+      "goal": "Key bindings. A rebinding screen; `input.js` reads the bindings",
+      "files": [
+        "src/ui/settings.js",
+        "src/game/input.js"
+      ],
+      "needs": [
+        "M7.T10",
+        "M7.T18"
+      ],
+      "commit": "M7.T11 (M7-4): key bindings",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-4: Settings for mouse, volume, quality, field of view, full screen, key bindings and subtitle size survive a reload (the first slice of `BACKLOG.md` accessibility) (checked by `tests/accept/m7-settings.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T12",
+      "lane": "render",
+      "goal": "First hints. One hint per key, gone once done, read from `content/hints.json`: Z, E, F and H now; each later milestone's close adds its own keys; its check first",
+      "files": [
+        "src/ui/hints.js",
+        "content/hints.json",
+        "tests/accept/m7-hints.spec.js"
+      ],
+      "needs": [
+        "M7.T8"
+      ],
+      "commit": "M7.T12 (M7-5): first hints",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-5: A fresh game teaches every key with one hint each (Z, E, F and H when M7 closes; each later milestone adds its own), and each goes away once the player has done it (checked by `tests/accept/m7-hints.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-hints.spec.js"
+    },
+    {
+      "id": "M7.T13",
+      "lane": "render",
+      "goal": "60 fps. `scripts/fps.mjs` reads the 95th-percentile frame at the busiest pose at 1280 \u00d7 720 and full Retina size; quality defaults set until it is under 16.7 ms (16.8-17.6 ms at the spawn today)",
+      "files": [
+        "scripts/fps.mjs",
+        "src/render/atmosphere.js"
+      ],
+      "needs": [
+        "M7.T10",
+        "M2.T17"
+      ],
+      "commit": "M7.T13 (M7-6): 60 fps",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-6: The busiest pose holds **60 fps** (95th-percentile frame under 16.7 ms) on this Mac's GPU, at 1280 \u00d7 720 and at the window's full Retina size (checked by `scripts/fps.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M7.T14",
+      "lane": "render",
+      "goal": "Save slots. Three slots, each named by its city's name, seed, population and save time; the pause menu saves to the slot at once; New Game takes an empty slot or asks before it replaces one; N in play asks first, in the page; today's single save moves into slot 1; its check first",
+      "files": [
+        "src/savestore.js",
+        "src/ui/title.js",
+        "src/game/input.js",
+        "tests/accept/m7-slots.spec.js"
+      ],
+      "needs": [
+        "M7.T8",
+        "M7.T18"
+      ],
+      "commit": "M7.T14 (M7-7): save slots",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-7: **Saves are safe:** three slots, each named by its city's name, seed, population and save time; the pause menu saves to the slot at once; New Game and N never replace a save without asking first, in the page (checked by `tests/accept/m7-slots.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-slots.spec.js"
+    },
+    {
+      "id": "M7.T15",
+      "lane": "render",
+      "goal": "Gamepad. The browser's Gamepad API, standard mapping: move, look, run, drive, enter, hack, journal; the city view stays mouse and keys; the bindings screen shows the pad; its check first (a fake pad behind `navigator.getGamepads`)",
+      "files": [
+        "src/game/input.js",
+        "src/ui/settings.js",
+        "tests/accept/m7-gamepad.spec.js"
+      ],
+      "needs": [
+        "M7.T11",
+        "M7.T18"
+      ],
+      "commit": "M7.T15 (M7-8): gamepad",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-8: **Gamepad:** a standard pad plays the street (move, look, run, drive, enter, hack, journal), and the bindings screen shows it (the city view stays mouse and keys: D13) (checked by `tests/accept/m7-gamepad.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-gamepad.spec.js"
+    },
+    {
+      "id": "M7.T16",
+      "lane": "render",
+      "goal": "When the GPU fails. With no WebGL, or when the context is lost, the page says so in words and what to try; a context that comes back restores the game; its check first (the test forces a lost context with `WEBGL_lose_context`)",
+      "files": [
+        "src/boot.js",
+        "src/ui/gpufail.js",
+        "tests/accept/m7-webgl.spec.js"
+      ],
+      "needs": [
+        "M7.T8"
+      ],
+      "commit": "M7.T16 (M7-9): when the GPU fails",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M7-9: **When the GPU fails:** with no WebGL, or when the context is lost, the page says so in words and what to try; a context that comes back restores the game (checked by `tests/accept/m7-webgl.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m7-webgl.spec.js"
+    }
+  ]
+}
