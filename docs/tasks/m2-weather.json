@@ -1,0 +1,38 @@
+{
+  "milestone": "M2 weather (the parts that need no installs)",
+  "tasks": [
+    {
+      "id": "M2.T16",
+      "lane": "tools",
+      "goal": "Weather, sim. New `sim/weather.js`: each game day's states (clear, overcast, rain) from a stream of their own (`createStreams` gains `weather`, so no existing replay shifts); a wetness 0-1 that rises in rain and falls over 2 game minutes after; `?weather=` pins a state for the sweep; its check first",
+      "files": [
+        "src/sim/weather.js",
+        "src/sim/rng.js",
+        "src/game/loop.js",
+        "tests/accept/m2-weather.test.js"
+      ],
+      "needs": [],
+      "commit": "M2.T16 (M2-7): weather, sim",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-7: **Weather changes:** each game day has at least two weather states out of clear, overcast and rain, drawn from the seed; the roads are dry in clear weather, wet in rain, and dry over 2 game minutes once it stops (VGA-005's wet grade becomes a 0-1 wetness that the rain, the puddle mirrors and the road gloss all read); no new draws; the sweep shoots every state (checked by `tests/accept/m2-weather.test.js` (the schedule and the wetness, in Node); `tests/accept/m2-weather.spec.js` (shots)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-weather.test.js"
+    },
+    {
+      "id": "M2.T17",
+      "lane": "tools",
+      "goal": "Weather, drawn. The rain falls only in rain; VGA-005's wet grade, the puddle mirrors and the road gloss read the wetness; overcast greys the sky and dims the sun; no new draws; each state shot at the spawn by day and night and judged in `REVIEW.md`",
+      "files": [
+        "src/render/rain.js",
+        "src/render/materials.js",
+        "src/render/setdress.js",
+        "src/render/atmosphere.js",
+        "tests/accept/m2-weather.spec.js"
+      ],
+      "needs": [
+        "M2.T16"
+      ],
+      "commit": "M2.T17 (M2-7): weather, drawn",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-7: **Weather changes:** each game day has at least two weather states out of clear, overcast and rain, drawn from the seed; the roads are dry in clear weather, wet in rain, and dry over 2 game minutes once it stops (VGA-005's wet grade becomes a 0-1 wetness that the rain, the puddle mirrors and the road gloss all read); no new draws; the sweep shoots every state (checked by `tests/accept/m2-weather.test.js` (the schedule and the wetness, in Node); `tests/accept/m2-weather.spec.js` (shots)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-weather.spec.js"
+    }
+  ]
+}
