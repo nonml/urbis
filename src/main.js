@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, hackCooldownLeft, isDark, zoneAt, profilerTarget, zonePhase, zoneGlow, blink } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { WALK_BOUNDS, DISTRICTS, clampToBounds } from './sim/world.js';
+import { WALK_BOUNDS, clampToBounds } from './sim/world.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import {
@@ -26,43 +26,30 @@ import {
 } from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
 import { loadSave, writeSave, clearSave } from './savestore.js';
-import { buildGround, buildTowers, buildSkyline } from './render/block.js';
-import { buildSigns, buildPools } from './render/signs.js';
-import { buildLamps } from './render/lamps.js';
-import { buildNPCs, updateNPCs } from './render/npcs.js';
-import { buildTraffic, updateTraffic, updateCarPools, buildPlayerCar, updatePlayerCar } from './render/traffic.js';
-import { buildPolice, updatePolice } from './render/police.js';
+import { buildScene } from './game/scene.js';
+import { updateNPCs } from './render/npcs.js';
+import { updateTraffic, updateCarPools, updatePlayerCar } from './render/traffic.js';
+import { updatePolice } from './render/police.js';
 import { buildDispatchHud, updateDispatchHud } from './ui/dispatch.js';
-import { buildPlayer, updatePlayer } from './render/player.js';
-import {
-  buildShops, buildPuddles, setPuddleGlow, buildCityMirror, showInMirror, onlyInMirror,
-  cityMirrorStale, requestCityMirror, tickCityMirror, buildSteam, tickSteam, buildBeacons, buildStars,
-} from './render/setdress.js';
-import { buildHackFx, firePulse, fireSparks, tickHackFx, setSlit } from './render/hackfx.js';
+import { updatePlayer } from './render/player.js';
+import { setPuddleGlow, cityMirrorStale, requestCityMirror, tickCityMirror, tickSteam } from './render/setdress.js';
+import { firePulse, fireSparks, tickHackFx, setSlit } from './render/hackfx.js';
 import { SUBSTATIONS } from './sim/anchors.js';
-import { buildStreaks, buildCarStreaks, updateCarStreaks } from './render/streaks.js';
-import { loadPropInstances, buildTrees } from './render/props.js';
+import { updateCarStreaks } from './render/streaks.js';
 import { buildProfiler, updateProfiler } from './render/profiler.js';
-import { buildBlobs, updateBlobs } from './render/blobs.js';
-import { buildRain, tickRain } from './render/rain.js';
-import { createRenderer, buildAtmosphere, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
-import { buildGrassGround, buildGrassTufts, buildMountains } from './render/landscape.js';
-import { createChunkManager } from './render/chunks.js';
-import { buildOutskirts } from './render/outskirts.js';
-import { buildZoning } from './render/zoning.js';
-import { buildVacant } from './render/vacant.js';
+import { updateBlobs } from './render/blobs.js';
+import { tickRain } from './render/rain.js';
+import { createRenderer, updateDaylight, createComposer, fitRenderer } from './render/atmosphere.js';
 import { hideFaded } from './render/faded.js';
 import { buildEconomyPanel, updateEconomyPanel } from './render/economy.js';
-import { buildDecline } from './render/decline.js';
 import { buildLotNote, showLotNote } from './render/lotnote.js';
 import { buildNews, showNews } from './render/news.js';
 import { focusParcel } from './sim/decline.js';
 import { createCityView, tickCityView } from './sim/cityview.js';
-import { buildCityView } from './render/cityview.js';
-import { buildInteriors, updateInteriors } from './render/interior.js';
+import { updateInteriors } from './render/interior.js';
 import { buildDoorHud, updateDoorHud, fadeThroughDoor } from './render/doorhud.js';
 import { ARC, createArc, tickArc, arcTarget, arcSigns } from './sim/arc.js';
-import { buildArcMarker, updateArcMarker } from './render/arc.js';
+import { updateArcMarker } from './render/arc.js';
 import { buildArcUI, updateArcUI } from './render/arcui.js';
 
 const DRAW_BUDGET = 175;
@@ -84,138 +71,47 @@ const texLoader = new THREE.TextureLoader();
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerHeight, 0.1, 400);
 
-const env = buildAtmosphere(scene, renderer);
-const spots = env.spots;
-const ground = buildGround(texLoader, maxAniso);
-scene.add(ground.group);
-const groundMats = ground.mats;
-const markingMats = ground.markings;
-const towers = buildTowers(texLoader, maxAniso);
-scene.add(towers.group);
-const skyline = buildSkyline(texLoader, maxAniso);
-scene.add(skyline.mesh);
-const stars = buildStars();
-scene.add(stars);
-scene.add(buildGrassGround());
-scene.add(buildGrassTufts());
-scene.add(buildMountains(DISTRICTS[0]));
-// Streamed world. The outskirts own their meshes for the whole game — a tile
-// borrows instance slots in them, so residency changes cost zero draws — and
-// the manager only decides which tiles have claimed any. Two tiles a frame and
-// 1.5 ms is the whole build allowance; boot warms the spawn's ring up front so
-// frame one is not a half-built world.
-const outskirts = buildOutskirts();
-for (const m of outskirts.meshes) scene.add(m);
-const chunks = createChunkManager({ scene, budgetTiles: 2, budgetMs: 1.5 });
-chunks.register('outskirts', outskirts.build);
-let streamOrigin = null;
-const beacons = buildBeacons(towers.beacons);
-scene.add(beacons.mesh);
-scene.add(buildTrees());
-// Props resolve a frame or two after boot — the loop never touches them.
-Promise.all([
-  loadPropInstances('assets/models/fire_hydrant/fire_hydrant_1k.gltf', [
-    [-6.9, -50], [6.9, -15], [-6.9, 20], [6.9, 45], [37.1, -40],
-    [50.9, -5], [37.1, 25], [50.9, 48], [-2, -69.5], [30, -69.5],
-  ]),
-  loadPropInstances('assets/models/metal_trash_can/metal_trash_can_1k.gltf', [
-    [-5.9, -44], [-5.9, -26], [5.9, -8], [5.9, 10], [-5.9, 28], [-5.9, 46],
-    [38.1, -44], [49.9, -8], [38.1, 28], [49.9, 46], [8, -69], [36, -69],
-  ]),
-]).then(([hydrants, trash]) => scene.add(hydrants, trash));
-const signs = buildSigns();
-scene.add(signs.group);
-const signPoolMeshes = [0, 1].map((zone) => {
-  const m = buildPools([...signs.pools, ...towers.shopPools].filter((q) => q.zone === zone));
-  scene.add(m);
-  return m;
-});
-const lamps = buildLamps();
-scene.add(lamps.group);
-const streakMeshes = buildStreaks([
-  ...signs.streakSources,
-  ...lamps.heads.map((h) => ({ x: h.x, z: h.z, color: '#c98a4a', len: 9, width: 1.3 })),
-]);
-for (const m of streakMeshes) scene.add(m);
-const carStreaks = buildCarStreaks();
-scene.add(carStreaks.mesh);
-const lampPoolMeshes = lamps.poolsByZone.map((quads) => {
-  const m = buildPools(quads);
-  scene.add(m);
-  return m;
-});
-// Faded to nothing by day, and per zone in a blackout: skipped, not drawn clear.
-const fadedDraws = [...lampPoolMeshes, ...signPoolMeshes, ...streakMeshes, stars, lamps.cones, env.moonGlow];
-
-// The seed (and whether this is a saved game) was settled in boot.js, before the
-// world was built from it; here the saved city and street are restored on top.
+// Sim state (restored or generated) is created before the scene: assembly reads
+// it, and the save is the source of truth for what city this is.
 const restored = SAVING ? deserialize(loadSave()) : null;
 const street = restored?.street ?? createStreet(SEED);
 const city = restored?.city ?? createCity(SEED);
 const people = restored?.people ?? createPeople(SEED);
-const growth = buildZoning(city, towers.kinds, towers.footprints);
-scene.add(growth.group);
-// Free land the player can zone (sim/zoning.js freeLand): its own programme, so
-// the district's growth kit is not touched by another worker's file.
-const vacant = buildVacant(city);
-scene.add(vacant.group);
-const economyPanel = buildEconomyPanel();
-const decline = buildDecline(city, maxAniso);
-scene.add(decline.mesh);
-const lotNote = buildLotNote();
-const news = createNews();
-const newsLine = buildNews();
 const player = restored?.player ?? createPlayer();
 player.mode ??= 'foot';
 const heroCar = restored?.car ?? createPlayerCar();
 const mission = restored?.mission ?? createMission();
 const arc = createArc();
-const arcMarker = buildArcMarker(ARC.signs);
-scene.add(arcMarker.mesh);
-const arcUI = buildArcUI();
 const wanted = createWanted();
 let lastWantedStatus = 'clean';
-const npcRig = buildNPCs(street);
-scene.add(npcRig.group);
-const traffic = buildTraffic(street);
-scene.add(traffic.group);
-const heroRig = buildPlayerCar(scene, heroCar);
-scene.add(heroRig.group);
-const police = buildPolice(scene);
 const dispatch = createDispatch(20260916);
-const radio = buildDispatchHud();
-let policeHold = false;
-const avatar = buildPlayer();
-scene.add(avatar.group);
-const shops = buildShops(texLoader, maxAniso);
-scene.add(shops.group);
+const news = createNews();
+const clock = restored?.clock ?? createClock();
 // Verticality: the noodle bar behind the RAMEN board and the roof next door,
 // plus a street door and a room on every grown lot (sim/interior.js).
 const interior = restored?.interior ?? createInterior(city);
 interior.city = city;
-const interiors = buildInteriors(city);
-scene.add(interiors.group);
+const cityView = createCityView(city);
+
+// Scene assembly (M3.T4a) lives in game/scene.js; it takes the sim state and
+// returns every handle the frame loop, probe and city view read.
+const {
+  env, spots, groundMats, markingMats, towers, skyline, stars, outskirts, chunks,
+  beacons, signs, signPoolMeshes, lamps, streakMeshes, carStreaks, lampPoolMeshes,
+  fadedDraws, growth, vacant, decline, arcMarker, npcRig, traffic, heroRig, police,
+  avatar, shops, interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig,
+} = buildScene({ scene, renderer, texLoader, maxAniso, city, street, heroCar, cityView });
+// The probe can pin the streamer's origin; null follows the camera.
+let streamOrigin = null;
+
+// The HUD's own builders stay in main.js until M3.T5 moves them to game/hud.js.
+const economyPanel = buildEconomyPanel();
+const lotNote = buildLotNote();
+const newsLine = buildNews();
+const arcUI = buildArcUI();
+const radio = buildDispatchHud();
+let policeHold = false;
 const doorHud = buildDoorHud();
-const puddles = buildPuddles();
-scene.add(puddles.group);
-const mirror = buildCityMirror();
-for (const m of puddles.mats) m.envMap = mirror.texture;
-// The reflection world (VGA-002): sky, skyline, the two merged tower proxies
-// and the alley washes — what a near-horizontal mirror ray off road water can
-// actually hit. Sign faces sit too high to land in a puddle; their road read is
-// the VGA-001 streaks. Lights ride along at +0 draws, or the probe renders
-// unlit facades and every mirror comes back black but for the emissive windows.
-showInMirror(env.skyMesh, skyline.mesh);
-onlyInMirror(...towers.mirrorProxies);
-for (const proxy of towers.mirrorProxies) scene.add(proxy);
-showInMirror(env.sun, env.moon, env.bounce, env.hemi, ...spots);
-signs.group.traverse((o) => { if (o.isMesh && o.userData.mirror) showInMirror(o); });
-const blobs = buildBlobs(street);
-scene.add(blobs);
-const steam = buildSteam();
-scene.add(steam.group);
-const fx = buildHackFx();
-scene.add(fx.group);
 buildProfiler();
 
 const prompt = document.createElement('div');
@@ -251,14 +147,6 @@ banner.style.cssText = [
 ].join(';');
 document.body.appendChild(banner);
 
-const rain = buildRain();
-scene.add(rain);
-// Hero key: a small warm light riding the player so the closest object in
-// every frame never dissolves into the dark. Scaled by night, +0 draws.
-const heroKey = new THREE.PointLight(0xffe0c0, 0, 11, 2);
-heroKey.layers.enable(1);
-scene.add(heroKey);
-
 const { composer, bloom, grade } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, grade));
 
@@ -268,15 +156,9 @@ window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, 
 const camRig = createFollowRig({ camera, interior });
 const cam = camRig.cam;
 
-// City view (Z): the same world from above, where the player zones the lots.
-const cityView = createCityView(city);
-const cityRig = buildCityView(city, cityView);
-scene.add(cityRig.mesh);
-
 // Input (M3.T2) lives in game/input.js: keys, mouse, the city-view binding and
 // the foot/car reads. Its drag and wheel deltas go to the follow rig's own
 // look/dolly (game/camera.js), so this file only wires the two together.
-const clock = restored?.clock ?? createClock();
 // A capture holds the clock so the same seed, pose and hour reproduce: a shot
 // must not drift through the day while the rasteriser crawls.
 if (CAPTURE) clock.rate = 0;
