@@ -81,7 +81,9 @@ export function towerCentreX(t, ax = AVENUE_X[0]) {
 // The pinned towers in buildingsOf's shape (layout.js): id from the interior
 // they carry, x from their avenue, the front facing it. style is null — they
 // have no district style; facade is the architecture block.js draws them at.
-export function pinnedBuildings(district, towers = PINNED_TOWERS) {
+// The towers default to the district's own placement, so a map built for
+// another district never reads the booted world's PINNED_TOWERS table (M3-2).
+export function pinnedBuildings(district, towers = placePinned(HAND_PINNED, district.avenues[0], district.crossings)) {
   const ax = district.avenues[0].x;
   return towers.map((t, i) => ({
     id: `tower:${t.id}`, kind: 'tower', style: null, facade: i % 6,

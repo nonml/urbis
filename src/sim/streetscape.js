@@ -1,11 +1,14 @@
-// What the street wears that the hand preset placed by hand: the neon blade
-// signs over the shopfronts and the one mid-block zebra on each avenue. The hand
+// What the street wears that the hand preset placed by hand: the blade signs
+// over the shopfronts and the one mid-block zebra on each avenue. The hand
 // preset keeps its coordinates; a generated world hangs each blade sign on a
 // real building front of the avenue it was written against (main, east or west,
 // as sim/anchors.js maps them), the noodle bar's ラーメン blade over its RAMEN
 // board (sim/dressing.js), and paints each avenue's zebra between two kerb
 // parking slots, clear of every junction and of the car the player starts by.
-// Pure (law 5): render/signs.js reads worldSigns, render/block.js MIDBLOCK.
+// Pure (law 5): render/signs.js reads worldSigns, render/block.js MIDBLOCK and
+// midblockFor. A reader holding a map passes it last and the map's own signs
+// and zebras win; the load-time constants are the hand map's fallback until
+// M3.T14 deletes them (M3-2).
 //
 // Milestone 2 skeleton: the constants and hand tables are final; zebrasFor and
 // placeSigns are stubs with their test in tests/streetscape-place.todo.js.
@@ -122,11 +125,24 @@ export function ramenBoard(shop) {
 }
 
 // The zebras of the world being played: a generated world's own, or the hand
-// preset's.
+// preset's. The load-time constant is the hand map's entry; a caller holding a
+// map reads midblockFor(map) (M3.T14).
 export const MIDBLOCK = WORLD_PLAN ? zebrasFor(DISTRICTS[0], spawnFor(DISTRICTS[0]).car.z) : HAND_MIDBLOCK;
 
-// The blade signs of the world being played: the hand preset draws `defs` as
-// written; a generated world places them on its own streets.
-export function worldSigns(defs) {
+// The zebras the map's own streets carry: a map with dressing is a generated
+// plan, and paints one zebra per avenue off its own spawn; a map without one is
+// the hand preset, which keeps its table. With no map the booted world's
+// MIDBLOCK stands, so today's callers are unchanged.
+export function midblockFor(map) {
+  if (!map) return MIDBLOCK;
+  return map.dressing ? zebrasFor(map.district, map.spawn.car.z) : HAND_MIDBLOCK;
+}
+
+// The blade signs of the world being played. A map with dressing is a generated
+// plan and carries its placed signs; a map without one is the hand preset,
+// which draws `defs` as written. With no map the booted world's signs are
+// placed as before, until M3.T14's renderer passes the map (M3-2).
+export function worldSigns(defs, map) {
+  if (map) return map.dressing?.signs ?? defs;
   return WORLD_PLAN ? placeSigns(defs, DISTRICTS[0], WORLD_PLAN.rows, ramenBoard(SHOPS[0])) : defs;
 }

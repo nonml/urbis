@@ -7,7 +7,10 @@
 // avenue's pavement and the first mission's substation is the one the hack
 // sparks at.
 // Pure (law 5): render/hackfx.js and main.js read SUBSTATIONS, sim/wanted.js
-// reads PURSUIT_HOMES, sim/arc.js reads worldArc.
+// reads PURSUIT_HOMES, sim/arc.js reads worldArc. Every reader takes the map
+// last; the map's `anchors` field is where createMap puts these places, and the
+// load-time constants below are the hand map's fallback until M3.T14 deletes
+// them (M3-2).
 //
 // Milestone 2 skeleton: the constants and hand tables are final; counterpartX,
 // placeX, substationsFor, pursuitHomesFor and arcFor are stubs with their test
@@ -122,10 +125,18 @@ export function arcFor(def, district) {
 }
 
 // The world being played: generated games move everything, the hand preset
-// keeps its tables.
+// keeps its tables. The constants are the hand map's entries; a caller holding
+// a map reads map.anchors instead and never touches them.
 const GENERATE = worldSeed().generate;
 export const SUBSTATIONS = GENERATE ? substationsFor(DISTRICTS[0]) : HAND_SUBSTATIONS;
 export const PURSUIT_HOMES = GENERATE ? pursuitHomesFor(DISTRICTS[0]) : HAND_PURSUIT_HOMES;
-export function worldArc(def) {
+
+// The arc definition (content/arc.json) moved onto the world the map is: a map
+// built by createMap carries the moved places and signs in map.anchors, so a
+// generated map places `def` against its own district; a map without them is
+// the hand preset, which keeps the definition as written. With no map the
+// booted world's own move stands, so today's caller is unchanged (M3-2).
+export function worldArc(def, map) {
+  if (map) return map.anchors?.places ? arcFor(def, map.district) : def;
   return GENERATE ? arcFor(def, DISTRICTS[0]) : def;
 }
