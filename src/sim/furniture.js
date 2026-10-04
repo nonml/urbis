@@ -7,10 +7,11 @@
 //
 // Milestone 2 skeleton: the constants are final, the bodies are stubs that each
 // have a test in tests/furniture-*.todo.js.
-import { AVENUES, CROSSINGS, DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
+import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { mulberry32 } from './rng.js';
 import { CAM_ROOM, spawnFor } from './spawn.js';
+import { worldMap } from './patrol.js';
 
 // Its own random stream, so furniture never moves a lot, a vista or a person.
 export const FURN_SALT = 0xf00d;
@@ -72,14 +73,15 @@ export function crossingSpots(c, avenues, phase, step) {
 // A kerbside rhythm for the avenue at x = ax, as the render's loops write it:
 // `from` to `to` inclusive, every `step`. On the hand preset exactly that range;
 // on a generated world the same rhythm down that avenue's whole length, off its
-// crossings: avenueSpots(the avenue at ax, CROSSINGS, from, step).
-export function rhythm(ax, from, to, step) {
-  if (!worldSeed().generate) {
+// crossings: avenueSpots(the avenue at ax, the map's crossings, from, step).
+export function rhythm(ax, from, to, step, map = worldMap()) {
+  if (!map.furniture) {
     const out = [];
     for (let z = from; z <= to; z += step) out.push(z);
     return out;
   }
-  return avenueSpots(AVENUES.find((a) => a.x === ax), CROSSINGS, from, step);
+  const avenue = map.district.avenues.find((a) => a.x === ax);
+  return avenueSpots(avenue, map.district.crossings, from, step);
 }
 
 // Street lamps { x, z, hx, hz, rotY, zone }, the shape render/lamps.js draws.

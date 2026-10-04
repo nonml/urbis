@@ -1,20 +1,15 @@
 // Living-street sim: sidewalk walkers, lane traffic, lamp-zone blackout hack.
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
-import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUES, AVENUE_X, CROSSINGS, wayLength } from './world.js';
+import { ROAD_HALF_WIDTH, LANE_OFFSET, wayLength } from './world.js';
 import { WORLD_FURNITURE } from './furniture.js';
+import { worldMap } from './patrol.js';
 // Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is called
 // here so every walker and car carries the pose the last step started from.
 import { snap } from '../game/loop.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
-
-const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
-// The two crossings street life is keyed to, in declaration order — generated
-// districts carry no hand way names, and a one-crossing district plays both.
-const PLAZA = CROSSINGS[0];
-const SOUTH = CROSSINGS[CROSSINGS.length - 1];
 
 // Parked cars sit just inside the kerb, and walkers keep two lines each side of
 // an avenue: one off the kerb, one up against the shopfronts.
@@ -27,24 +22,21 @@ const SOUTH_WALK_OUT = 5.5;
 const PLAZA_WALK_OUT = 5.2;
 const WALK_INSET = 2;
 
-// Curb parking slots: [avenueX, side, z]. Static, never ticked — density for
-// +0 draws (they ride the same traffic InstancedMeshes as moving cars). On a
-// generated world the plan parks them; the hand preset keeps its table.
+// Curb parking slots for the hand preset: [avenue, side, z], the avenue by its
+// index in the district's list (main, east, west — world.js's order). Static,
+// never ticked — density for +0 draws (they ride the same traffic
+// InstancedMeshes as moving cars). On a generated world the plan parks them.
 const HAND_PARKED_SLOTS = [
-  [MAIN_X, 1, -70], [MAIN_X, -1, -52], [MAIN_X, 1, -30],
-  [MAIN_X, -1, -12], [MAIN_X, 1, 8], [MAIN_X, -1, 26],
-  [EAST_X, 1, -58], [EAST_X, -1, -34], [EAST_X, 1, -8], [EAST_X, -1, 54], [EAST_X, 1, 72],
-  [WEST_X, -1, -64], [WEST_X, 1, -20], [WEST_X, -1, 60],
+  [0, 1, -70], [0, -1, -52], [0, 1, -30],
+  [0, -1, -12], [0, 1, 8], [0, -1, 26],
+  [1, 1, -58], [1, -1, -34], [1, 1, -8], [1, -1, 54], [1, 1, 72],
+  [2, -1, -64], [2, 1, -20], [2, -1, 60],
 ];
-const PARKED_SLOTS = WORLD_FURNITURE ? WORLD_FURNITURE.parked : HAND_PARKED_SLOTS;
 export const LAMP_ZONES = 2;
 export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
 export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
-// Half an avenue's run. Walkers and traffic wrap here, so the loop is exactly
-// as long as the tarmac is.
-export const STREET_HALF = wayLength(AVENUES[0]) / 2;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
 export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];
@@ -96,22 +88,24 @@ function makeBody(rng, i) {
   return body;
 }
 
-function makeNSWalker(rng, i, npcSpots) {
+function makeNSWalker(rng, i, npcSpots, half) {
   return {
     axis: 'z',
     x: npcSpots[Math.floor(rng.sim() * npcSpots.length)],
-    z: (rng.sim() - 0.5) * STREET_HALF * 2,
+    z: (rng.sim() - 0.5) * half * 2,
     ...makeBody(rng, i),
   };
 }
 
-function makeEWWalker(rng, i) {
+function makeEWWalker(rng, i, crossings) {
   // Cross-street walkers: stroll the connector sidewalks (E-W), not the avenues.
   const onSouth = i >= 56;
+  const plaza = crossings[0];
+  const south = crossings[crossings.length - 1];
   const z = onSouth
-    ? SOUTH.z + SOUTH_WALK_OUT
-    : PLAZA.z + (rng.sim() < 0.5 ? -PLAZA_WALK_OUT : PLAZA_WALK_OUT);
-  const cross = onSouth ? SOUTH : PLAZA;
+    ? south.z + SOUTH_WALK_OUT
+    : plaza.z + (rng.sim() < 0.5 ? -PLAZA_WALK_OUT : PLAZA_WALK_OUT);
+  const cross = onSouth ? south : plaza;
   const xMin = cross.x0 + WALK_INSET;
   const xMax = cross.x1 - WALK_INSET;
   return {
@@ -124,24 +118,24 @@ function makeEWWalker(rng, i) {
   };
 }
 
-function makeNSCar(rng, i) {
+function makeNSCar(rng, i, avenueXs, half) {
   const dir = i % 2 === 0 ? 1 : -1;
-  const avenue = AVENUE_X[i % AVENUE_X.length];
+  const avenue = avenueXs[i % avenueXs.length];
   return {
     axis: 'z',
     lane: avenue + dir * LANE_OFFSET,
     dir,
-    z: -STREET_HALF + ((i * 37) % 12) / 12 * STREET_HALF * 2,
+    z: -half + ((i * 37) % 12) / 12 * half * 2,
     speed: 7 + rng.sim() * 3,
     paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
     shape: (i * 3 + 1) % SHAPE_COUNT,
   };
 }
 
-function makeEWCar(rng, i) {
+function makeEWCar(rng, i, crossings) {
   // Cross-street traffic: run the plaza connector + south road E-W.
   const onSouth = i >= 15;
-  const cross = onSouth ? SOUTH : PLAZA;
+  const cross = onSouth ? crossings[crossings.length - 1] : crossings[0];
   const dir = i % 2 === 0 ? 1 : -1;
   const xMin = cross.x0;
   const xMax = cross.x1;
@@ -158,10 +152,24 @@ function makeEWCar(rng, i) {
   };
 }
 
-export function createStreet(seed) {
+// The parked plan: the map's own on a generated world. WORLD_FURNITURE is the
+// same plan built at load and stays the fallback until M3.T14 deletes it; the
+// hand preset has no plan, so its table stands, its avenue x read off the map.
+function parkedSlots(map, avenues) {
+  if (map.furniture) return map.furniture.parked;
+  if (WORLD_FURNITURE) return WORLD_FURNITURE.parked;
+  return HAND_PARKED_SLOTS.map(([avenue, side, z]) => [avenues[avenue].x, side, z]);
+}
+
+export function createStreet(seed, map = worldMap()) {
   const rng = createStreams(seed);
+  const { avenues, crossings } = map.district;
+  // Half an avenue's run. Walkers and traffic wrap here, so the loop is
+  // exactly as long as the tarmac is.
+  const half = wayLength(avenues[0]) / 2;
+  const avenueXs = avenues.map((a) => a.x);
   const npcSpots = [];
-  for (const baseX of AVENUE_X) {
+  for (const baseX of avenueXs) {
     npcSpots.push(
       baseX - WALL_LANE_OUT, baseX - KERB_LANE_OUT,
       baseX + KERB_LANE_OUT, baseX + WALL_LANE_OUT
@@ -169,14 +177,14 @@ export function createStreet(seed) {
   }
   const npcs = [];
   for (let i = 0; i < NPC_COUNT; i++) {
-    if (i < 48 || i >= 60) npcs.push(makeNSWalker(rng, i, npcSpots));
-    else npcs.push(makeEWWalker(rng, i));
+    if (i < 48 || i >= 60) npcs.push(makeNSWalker(rng, i, npcSpots, half));
+    else npcs.push(makeEWWalker(rng, i, crossings));
   }
   const cars = [];
   for (let i = 0; i < CAR_COUNT; i++) {
-    cars.push(i < 12 ? makeNSCar(rng, i) : makeEWCar(rng, i));
+    cars.push(i < 12 ? makeNSCar(rng, i, avenueXs, half) : makeEWCar(rng, i, crossings));
   }
-  PARKED_SLOTS.forEach(([ax, side, z], k) => {
+  parkedSlots(map, avenues).forEach(([ax, side, z], k) => {
     cars.push({
       axis: 'z',
       lane: ax + side * PARKED_LANE_OUT,
@@ -190,6 +198,7 @@ export function createStreet(seed) {
   });
   return {
     time: 0,
+    half,
     npcs,
     cars,
     zones: [
@@ -281,14 +290,12 @@ export function tickStreet(state, dt) {
     if (hurrying && !dark) v *= 1.6;
     if (n.axis === 'x') {
       n.x += n.dir * v * dt;
-      const lo = n.xMin ?? PLAZA.x0 + WALK_INSET;
-      const hi = n.xMax ?? PLAZA.x1 - WALK_INSET;
-      if (n.x > hi) n.x = lo;
-      if (n.x < lo) n.x = hi;
+      if (n.x > n.xMax) n.x = n.xMin;
+      if (n.x < n.xMin) n.x = n.xMax;
     } else {
       n.z += n.dir * v * dt;
-      if (n.z > STREET_HALF) n.z = -STREET_HALF;
-      if (n.z < -STREET_HALF) n.z = STREET_HALF;
+      if (n.z > state.half) n.z = -state.half;
+      if (n.z < -state.half) n.z = state.half;
     }
     n.phase += dt * (dark ? 0 : v * 4);
   }
@@ -297,14 +304,12 @@ export function tickStreet(state, dt) {
     snap(c);
     if (c.axis === 'x') {
       c.x += c.dir * c.speed * dt;
-      const lo = (c.xMin ?? PLAZA.x0) - 3;
-      const hi = (c.xMax ?? PLAZA.x1) + 3;
-      if (c.x > hi) c.x = lo;
-      if (c.x < lo) c.x = hi;
+      if (c.x > c.xMax + 3) c.x = c.xMin - 3;
+      if (c.x < c.xMin - 3) c.x = c.xMax + 3;
     } else {
       c.z += c.dir * c.speed * dt;
-      if (c.z > STREET_HALF + 5) c.z = -STREET_HALF - 5;
-      if (c.z < -STREET_HALF - 5) c.z = STREET_HALF + 5;
+      if (c.z > state.half + 5) c.z = -state.half - 5;
+      if (c.z < -state.half - 5) c.z = state.half + 5;
     }
   }
 }

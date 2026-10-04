@@ -6,7 +6,7 @@
 // A building that shrinks with no explanation is a bug to the player (pillar 5),
 // so decline has an order: a lot empties before it loses a floor. Its windows go
 // dark and the letting boards go up first; only an empty building comes down.
-import { AVENUES, CROSSINGS } from './world.js';
+import { worldMap } from './patrol.js';
 import { streetName } from './streetnames.js';
 
 export const TREND = {
@@ -104,10 +104,11 @@ function doing(p) {
 // when the lot is within a short block of one.
 const CORNER = 25;
 
-export function address(x, z) {
+export function address(x, z, map = worldMap()) {
+  const { avenues, crossings } = map.district;
   const nearest = (ways, at) => ways.reduce((a, b) => (Math.abs(at(b)) < Math.abs(at(a)) ? b : a));
-  const avenue = nearest(AVENUES, (a) => a.x - x);
-  const crossing = nearest(CROSSINGS, (c) => c.z - z);
+  const avenue = nearest(avenues, (a) => a.x - x);
+  const crossing = nearest(crossings, (c) => c.z - z);
   if (Math.abs(crossing.z - z) <= CORNER) return `${streetName(avenue)} & ${streetName(crossing)}`;
   return `${streetName(avenue)} Ave`;
 }
@@ -118,11 +119,11 @@ function newsworthy(p) {
 }
 
 // One line, or null when there is nothing to say.
-export function describe(p) {
+export function describe(p, map = worldMap()) {
   if (!newsworthy(p)) return null;
   const noun = (hasFloors(p) ? BUILDING : SITE)[p.use];
   const reason = REASONS[p.why] ?? REASONS[PLAIN_CAUSE[p.trend]];
-  return `${noun} at ${address(p.x, p.z)} ${doing(p)} — ${reason(MARKET[p.use])}`;
+  return `${noun} at ${address(p.x, p.z, map)} ${doing(p)} — ${reason(MARKET[p.use])}`;
 }
 
 // Which changing lot the player means: the one they stand beside, or the one
