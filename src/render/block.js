@@ -8,25 +8,27 @@ import {
 } from './materials.js';
 import { displaceToTerrain } from './landscape.js';
 import { mulberry32 } from '../sim/rng.js';
-import { WORLD_PLAN, WORLD_BUILDINGS } from '../sim/layout.js';
+import { worldMap } from '../sim/patrol.js';
+import { WORLD_PLAN } from '../sim/layout.js';
 import {
-  ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, AVENUES, AVENUE_X, CROSSINGS,
-  isAvenue, wayCenter, wayLength,
+  ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, isAvenue, wayCenter, wayLength,
 } from '../sim/world.js';
 import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
-import { PINNED_TOWERS, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
-import { WORLD_VISTAS } from '../sim/vistas.js';
+import { HAND_PINNED, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
+import { WORLD_VISTAS, vistasOf } from '../sim/vistas.js';
 import { MIDBLOCK } from '../sim/streetscape.js';
+import { midblockFor } from '../sim/streetscape.js';
 
-// Where the city is comes from sim/world.js — this file draws the road graph,
-// it does not get a second opinion about where the roads are. The ways the
-// street furniture is keyed to are read in declaration order: generated
-// districts have no hand way names to look up.
-const PLAZA = CROSSINGS[0];
-const SOUTH = CROSSINGS[CROSSINGS.length - 1];
-// Every avenue runs the same span today, and the markings that straddle the
-// zone boundary at z = 0 are cut against it.
-const STREET_LEN = wayLength(AVENUES[0]);
+// Where the city is comes from the map (sim/map.js): this file draws the road
+// graph the map returns, it does not get a second opinion about where the roads
+// are. The hand preset's map carries roads and story places but no buildings,
+// lots or furniture yet, so its own load-time tables still stand in for those —
+// every branch that can read the map does, and the last fallbacks go with
+// M3.T14 (M3-2). The ways the street furniture is keyed to are read in
+// declaration order: generated districts have no hand way names to look up.
+function furnitureOf(map) {
+  return map.furniture ?? WORLD_FURNITURE;
+}
 // The ground under and beyond the city. One mesh, one draw — subdividing it is
 // what lets it carry a Y (law 4 bans splitting it, not refining it). 4 m cells
 // resolve the lip where relief meets the flat road corridor, which blends over
@@ -49,9 +51,11 @@ function worldUVs(geo, w, h, d, tile) {
   return geo;
 }
 
-// The carriageways, in the order the street was merged in: avenues north-south,
-// then the crossings east-west.
-const ROADS = [...AVENUES, ...CROSSINGS];
+// The carriageways of a map, in the order the street was merged in: avenues
+// north-south, then the crossings east-west.
+function streetsOf(map) {
+  return [...map.district.avenues, ...map.district.crossings];
+}
 
 // A way's tarmac as one quad: full width across, its own span along.
 function carriageway(w) {
@@ -86,12 +90,17 @@ const KERB_RISE = 0.15;
 // this refactor's to move.
 const EDGE_LINE_OUT = ROAD_HALF + 0.2;
 
-export function buildGround(texLoader, maxAniso) {
+export function buildGround(texLoader, maxAniso, map = worldMap()) {
+  const { avenues, crossings } = map.district;
+  const plaza = crossings[0];
+  const south = crossings[crossings.length - 1];
+  const avenueX = avenues.map((a) => a.x);
+  const furniture = furnitureOf(map);
   const group = new THREE.Group();
   const mats = {};
   const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
   const roadMat = standardFromMaps(asphalt, { roughness: 0.38, envMapIntensity: 1.4, color: 0x7e838d });
-  const roadMesh = new THREE.Mesh(mergeGeometries(ROADS.map(carriageway)), roadMat);
+  const roadMesh = new THREE.Mesh(mergeGeometries(streetsOf(map).map(carriageway)), roadMat);
   roadMesh.receiveShadow = true;
   group.add(roadMesh);
   mats.road = roadMat;
@@ -99,9 +108,9 @@ export function buildGround(texLoader, maxAniso) {
   const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
   const walkMat = standardFromMaps(paving, { roughness: 0.6, envMapIntensity: 0.7, color: 0x9aa0ab });
   const walks = mergeGeometries([
-    ...AVENUES.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
-    ...flankingSlabs(PLAZA, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
-    ...flankingSlabs(SOUTH, WALKWAY_WIDTH, WALK_RISE, 0.0),
+    ...avenues.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
+    ...flankingSlabs(plaza, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
+    ...flankingSlabs(south, WALKWAY_WIDTH, WALK_RISE, 0.0),
     ...(WORLD_PLAN ? [] : [box(22, WALK_RISE, 9, -17, 0.0, -32)]),   // river promenade slab, hand preset only
   ]);
   const walkMesh = new THREE.Mesh(walks, walkMat);
@@ -113,9 +122,9 @@ export function buildGround(texLoader, maxAniso) {
   const curbMat = standardFromMaps(concrete, { roughness: 0.75, envMapIntensity: 0.4, color: 0x7d828c });
   const kerbRails = (w) => flankingSlabs(w, KERB_WIDTH, KERB_RISE, KERB_RISE / 2);
   const curbs = mergeGeometries([
-    ...AVENUES.flatMap(kerbRails),
-    ...kerbRails(SOUTH),
-    ...kerbRails(PLAZA),
+    ...avenues.flatMap(kerbRails),
+    ...kerbRails(south),
+    ...kerbRails(plaza),
     ...(WORLD_PLAN ? [] : [box(0.35, 1.0, 9, -27.8, 0.5, -32)]),     // river promenade parapet, hand preset only
   ]);
   const curbMesh = new THREE.Mesh(curbs, curbMat);
@@ -125,8 +134,8 @@ export function buildGround(texLoader, maxAniso) {
   // Curb clutter: bollards, drain grates, utility boxes — all merged, +0 draws.
   const clutter = [];
   // Bollards at regular intervals along each avenue curb.
-  for (const ax of AVENUE_X) {
-    for (const z of rhythm(ax, -80, 80, 16)) {
+  for (const ax of avenueX) {
+    for (const z of rhythm(ax, -80, 80, 16, map)) {
       for (const side of [-1, 1]) {
         const bx = ax + side * (ROAD_HALF + 0.5);
         // Post
@@ -137,28 +146,28 @@ export function buildGround(texLoader, maxAniso) {
     }
   }
   // Drain grates at intersections. The hand preset keeps the plaza; a generated
-  // world grates every junction the plan names.
-  const grates = WORLD_FURNITURE
-    ? WORLD_FURNITURE.junctions.map((j) => [j.x, j.z])
-    : AVENUE_X.map((ax) => [ax, PLAZA.z]);
+  // world grates every junction the map names.
+  const grates = furniture
+    ? furniture.junctions.map((j) => [j.x, j.z])
+    : avenueX.map((ax) => [ax, plaza.z]);
   for (const [gx, gz] of grates) {
     for (const dz of [-ROAD_HALF - 0.5, ROAD_HALF + 0.5]) {
       clutter.push(box(0.8, 0.02, 0.4, gx, 0.03, gz + dz));
     }
   }
   // Utility boxes on the wider sidewalk sections, out against the building line.
-  const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
+  const [MAIN_X, EAST_X, WEST_X] = avenueX;
   const UTILITY_OUT = ROAD_HALF + 2.7;
   const boxPositions = [
     [MAIN_X - UTILITY_OUT, -40], [MAIN_X + UTILITY_OUT, -20],
     [WEST_X - UTILITY_OUT, 0], [EAST_X + UTILITY_OUT, 16],
     [MAIN_X - UTILITY_OUT, 36], [MAIN_X + UTILITY_OUT, 56],
   ];
-  const boxes = WORLD_FURNITURE ? WORLD_FURNITURE.boxes : boxPositions;
+  const boxes = furniture ? furniture.boxes : boxPositions;
   for (const [bx, bz] of boxes) {
     clutter.push(box(0.6, 1.0, 0.5, bx, 0.5, bz));
   }
-  for (const ax of AVENUE_X) for (const side of [-1, 1]) pavementFurniture(clutter, ax, side);
+  for (const ax of avenueX) for (const side of [-1, 1]) pavementFurniture(clutter, ax, side, map);
   const clutterMesh = new THREE.Mesh(
     mergeGeometries(clutter.map((g) => (g.attributes.color ? g : tint(g, 1)))),
     new THREE.MeshStandardMaterial({
@@ -170,7 +179,7 @@ export function buildGround(texLoader, maxAniso) {
   group.add(clutterMesh);
 
   group.add(terrainBase());
-  const markings = buildMarkings();
+  const markings = buildMarkings(map);
   group.add(markings.group);
   return { group, mats, markings: markings.mats };
 }
@@ -188,12 +197,20 @@ function terrainBase() {
   return mesh;
 }
 
-function buildMarkings() {
+function buildMarkings(map) {
+  const { avenues, crossings } = map.district;
+  const plaza = crossings[0];
+  const south = crossings[crossings.length - 1];
+  const avenueX = avenues.map((a) => a.x);
+  // Every avenue runs the same span today, and the markings that straddle the
+  // zone boundary at z = 0 are cut against it.
+  const streetLen = wayLength(avenues[0]);
+  const furniture = furnitureOf(map);
   const quads = [[], []];
   const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
   // Center dashes: 10cm wide, 3m long, 6m gap (real road standard).
   const dash = new THREE.PlaneGeometry(0.10, 3);
-  for (const av of AVENUES) {
+  for (const av of avenues) {
     for (let z = av.z0 + 3; z < av.z1 - 3; z += 6) {
       const q = dash.clone();
       q.rotateX(-Math.PI / 2);
@@ -211,13 +228,13 @@ function buildMarkings() {
       push(q, cr.z);
     }
   };
-  crossDashes(SOUTH, 3);
-  crossDashes(PLAZA, 2);
+  crossDashes(south, 3);
+  crossDashes(plaza, 2);
   // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
   // avenue, each at its own z so they do not line up across the district
-  // (sim/streetscape.js places them).
+  // (sim/streetscape.js places them; a generated world's come from its map).
   const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  for (const { x, z: cz } of MIDBLOCK) {
+  const paintZebra = (x, cz) => {
     for (let i = -3; i <= 3; i++) {
       const q = stripe.clone();
       q.rotateX(-Math.PI / 2);
@@ -225,13 +242,18 @@ function buildMarkings() {
       q.translate(x, 0.02, cz + i * 0.7);
       push(q, cz);
     }
+  };
+  if (map.dressing) {
+    for (const { x, z: cz } of midblockFor(map)) paintZebra(x, cz);
+  } else {
+    for (const { x, z: cz } of MIDBLOCK) paintZebra(x, cz);
   }
   // Zebra crossings over the plaza connector at each avenue on the hand preset;
-  // a generated world stripes every junction the plan names.
+  // a generated world stripes every junction the map names.
   const stripeC = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  const junctions = WORLD_FURNITURE
-    ? WORLD_FURNITURE.junctions
-    : [...AVENUE_X].sort((a, b) => a - b).map((ax) => ({ x: ax, z: PLAZA.z }));
+  const junctions = furniture
+    ? furniture.junctions
+    : [...avenueX].sort((a, b) => a - b).map((ax) => ({ x: ax, z: plaza.z }));
   for (const j of junctions) {
     for (let i = -3; i <= 3; i++) {
       const q = stripeC.clone();
@@ -241,10 +263,10 @@ function buildMarkings() {
     }
   }
   // Edge lines split at the zone boundary — same look, two draws.
-  const edge = new THREE.PlaneGeometry(0.10, STREET_LEN / 2);
-  for (const ax of AVENUE_X) {
+  const edge = new THREE.PlaneGeometry(0.10, streetLen / 2);
+  for (const ax of avenueX) {
     for (const ex of [ax - EDGE_LINE_OUT, ax + EDGE_LINE_OUT]) {
-      for (const [zc, zs] of [[-STREET_LEN / 4, 0], [STREET_LEN / 4, 1]]) {
+      for (const [zc, zs] of [[-streetLen / 4, 0], [streetLen / 4, 1]]) {
         const q = edge.clone();
         q.rotateX(-Math.PI / 2);
         q.translate(ex, 0.02, zc);
@@ -262,8 +284,8 @@ function buildMarkings() {
   });
   const manholes = [];
   const mh = new THREE.CircleGeometry(0.55, 14);
-  for (const ax of AVENUE_X) {
-    for (const z of rhythm(ax, -48, 48, 24)) {
+  for (const ax of avenueX) {
+    for (const z of rhythm(ax, -48, 48, 24, map)) {
       const q = mh.clone();
       q.rotateX(-Math.PI / 2);
       q.translate(ax + (z % 48 === 0 ? -1.8 : 1.8), 0.022, z);
@@ -280,7 +302,7 @@ function buildMarkings() {
   return { group: g, mats };
 }
 
-// PINNED_TOWERS and BUILD_LINE live in sim/landmarks.js, shared with the
+// HAND_PINNED and BUILD_LINE live in sim/landmarks.js, shared with the
 // interior frames so neither hand-copies a coordinate from the other.
 // Where an avenue row may stand: south of the plaza crossing and north of it.
 const ROW_RUNS = [[-55.5, 33.5], [46.5, 97]];
@@ -311,18 +333,18 @@ function styleFor(ax, z) {
   return { kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };                             // west: older brick
 }
 
-// The hand preset's wall, in planBuildings' shape. A generated world draws
-// WORLD_BUILDINGS instead; this path goes when stage 7 deletes the preset
-// (M3.T13). Its rand order is fixed: avenues in AVENUE_X order, sides -1 then 1.
-function handBuildings() {
+// The hand preset's wall, in planBuildings' shape. It is cut here because the
+// hand map carries no buildings: a generated map draws map.buildings instead.
+// Its rand order is fixed: avenues in map order, sides -1 then 1.
+function handBuildings(avenueX, pinned) {
   const rand = mulberry32(STREET_WALL_SEED);
   const out = [];
-  for (const ax of AVENUE_X) {
+  for (const ax of avenueX) {
     for (const side of [-1, 1]) {
       let runs = ROW_RUNS;
       for (const [kx, ks, z0, z1] of KEEP_OUT) if (kx === ax && ks === side) runs = subtract(runs, [z0, z1]);
-      if (ax === AVENUE_X[0]) {
-        for (const t of PINNED_TOWERS) {
+      if (ax === avenueX[0]) {
+        for (const t of pinned) {
           if (t.side === side) runs = subtract(runs, [t.z - (t.d + 1.2) / 2, t.z + (t.d + 1.2) / 2]);
         }
       }
@@ -526,34 +548,34 @@ function tint(geo, r, g = r, b = r) {
 // past, bikes locked to hoops, stock waiting outside a back door, and the
 // plant on the wall behind it all. Every piece merges into the clutter mesh
 // that already exists, so a street's worth of life costs no draw at all.
-function pavementFurniture(out, ax, side) {
+function pavementFurniture(out, ax, side, map) {
   const kerb = ax + side * 4.35;
   const mid = ax + side * 6.1;
   const wall = ax + side * 7.62;
-  for (const z of rhythm(ax, -72, 72, 16)) {
+  for (const z of rhythm(ax, -72, 72, 16, map)) {
     out.push(tint(box(0.09, 1.1, 0.09, kerb, 0.55, z + 8), 0.9));
     out.push(tint(box(0.17, 0.3, 0.13, kerb, 1.2, z + 8), 1.0));
     out.push(tint(box(0.12, 0.12, 0.02, kerb - side * 0.07, 1.24, z + 8), 2.6, 2.3, 1.4));
   }
-  for (const z of rhythm(ax, -66, 66, 22)) {
+  for (const z of rhythm(ax, -66, 66, 22, map)) {
     // Downpipe with its hopper: the one thing that stops a podium wall being
     // a painted plane, and it reads at every distance.
     out.push(tint(box(0.17, 4.2, 0.17, wall, 2.1, z), 0.8));
     out.push(tint(box(0.34, 0.3, 0.3, wall, 4.05, z), 0.8));
     out.push(tint(box(0.26, 0.26, 0.26, wall, 0.5, z), 0.8));
   }
-  for (const z of rhythm(ax, -55, 60, 38)) {
+  for (const z of rhythm(ax, -55, 60, 38, map)) {
     // Condenser on a bracket, high enough to clear a head.
     out.push(tint(box(0.78, 0.6, 0.46, ax + side * 7.4, 3.72, z), 1.5));
     out.push(tint(box(0.9, 0.08, 0.1, ax + side * 7.5, 3.38, z), 0.7));
   }
-  for (const z of rhythm(ax, -48, 60, 27)) {
+  for (const z of rhythm(ax, -48, 60, 27, map)) {
     // Bike hoop: two posts and a bar, the cheapest object that says people
     // arrive here under their own power.
     for (const dz of [-0.36, 0.36]) out.push(tint(box(0.07, 0.78, 0.07, mid, 0.39, z + dz), 1.1));
     out.push(tint(box(0.07, 0.07, 0.79, mid, 0.78, z), 1.1));
   }
-  for (const z of (WORLD_FURNITURE ? rhythm(ax, -34, 52, 48) : [-34, 14, 52])) {
+  for (const z of (map.furniture ? rhythm(ax, -34, 52, 48, map) : [-34, 14, 52])) {
     // Stock crates by a back door. Warm timber against all that cold steel.
     out.push(tint(box(0.78, 0.5, 0.62, ax + side * 7.1, 0.25, z), 2.5, 1.95, 1.15));
     out.push(tint(box(0.62, 0.44, 0.5, ax + side * 7.1, 0.72, z + 0.1), 2.2, 1.7, 1.0));
@@ -733,7 +755,8 @@ function roofline(caps, cx, cz, w, top, d, kind) {
   }
 }
 
-export function buildTowers(texLoader, maxAniso) {
+export function buildTowers(texLoader, maxAniso, map = worldMap()) {
+  const avenueX = map.district.avenues.map((a) => a.x);
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
   const facades = mats.kinds.map(() => [[], []]);
@@ -884,25 +907,33 @@ export function buildTowers(texLoader, maxAniso) {
     footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, name });
   }
   let idx = 0;
-  PINNED_TOWERS.forEach((t, i) => {
-    emitTower(towerCentreX(t), t.z, t.w, t.h, t.d, idx++, [-t.side, 0], `PINNED_TOWERS[${i}]`);
-  });
-  // The wall comes from the sim: planBuildings cut it from the world seed for a
-  // generated city; the hand preset builds its own until M3.T13. One loop draws
-  // either, so the renderer never cuts a row itself.
-  const perRow = new Map();
-  for (const b of WORLD_BUILDINGS ?? handBuildings()) {
-    const key = `${b.ax}|${b.side}`;
-    const i = perRow.get(key) ?? 0;
-    perRow.set(key, i + 1);
-    emitTower(b.ax + b.side * (BUILD_LINE + b.w / 2), b.z, b.w, b.h, b.d, idx++, [-b.side, 0],
-      `ROW[x=${b.ax} side ${b.side}][${i}]`, b.kind, false);
-  }
-  if (WORLD_VISTAS) {
-    WORLD_VISTAS.caps.forEach((c, i) => {
-      emitTower(c.x, c.z, c.w, c.h, c.d, idx++, c.face, `CAPS[${i}]`);
-    });
+  if (map.buildings) {
+    // The map's own list, in buildingsOf's order: pinned towers, row buildings
+    // and end caps. Only a row is doorless; its id names its row and span.
+    const seen = { tower: 0, cap: 0 };
+    for (const b of map.buildings) {
+      if (b.kind === 'row') {
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, b.id, b.facade, false);
+      } else if (b.kind === 'cap') {
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `CAPS[${seen.cap++}]`);
+      } else if (b.kind === 'tower') {
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `PINNED_TOWERS[${seen.tower++}]`, b.facade);
+      }
+    }
   } else {
+    // The hand map carries no buildings, so its wall is cut here: the pinned
+    // towers, then the hand rows, then the south row and terminus caps.
+    HAND_PINNED.forEach((t, i) => {
+      emitTower(towerCentreX(t, avenueX[0]), t.z, t.w, t.h, t.d, idx++, [-t.side, 0], `PINNED_TOWERS[${i}]`);
+    });
+    const perRow = new Map();
+    for (const b of handBuildings(avenueX, HAND_PINNED)) {
+      const key = `${b.ax}|${b.side}`;
+      const i = perRow.get(key) ?? 0;
+      perRow.set(key, i + 1);
+      emitTower(b.ax + b.side * (BUILD_LINE + b.w / 2), b.z, b.w, b.h, b.d, idx++, [-b.side, 0],
+        `ROW[x=${b.ax} side ${b.side}][${i}]`, b.kind, false);
+    }
     SOUTH_TOWERS.forEach(([x, w, h], i) => {
       emitTower(x, SOUTH_ROW_Z, w, h, 10, idx++, [0, 1], `SOUTH_TOWERS[${i}]`);
     });
@@ -1034,11 +1065,13 @@ function skylineMaterial(day, night, emit) {
   return mat;
 }
 
-export function buildSkyline(texLoader, maxAniso) {
-  // A generated world carries its own ring; the hand preset keeps its table so
-  // the gate's numbers do not move. Rows are [x, z, w, h, d].
-  const RING = WORLD_VISTAS
-    ? WORLD_VISTAS.ring.map((r) => [r.x, r.z, r.w, r.h, r.d])
+export function buildSkyline(texLoader, maxAniso, map = worldMap()) {
+  // A map with buildings carries its own ring (vistasOf derives it from the
+  // map's district and seed); the hand map keeps the fallback table so the
+  // gate's numbers do not move. Rows are [x, z, w, h, d].
+  const vistas = map.buildings ? vistasOf(map) : WORLD_VISTAS;
+  const RING = vistas
+    ? vistas.ring.map((r) => [r.x, r.z, r.w, r.h, r.d])
     : [
       // x, z, w, h, d — east wall, north rim, south rim (west stays open valley)
       [110, -70, 22, 64, 18], [128, -30, 26, 88, 20], [112, 10, 20, 52, 16],
