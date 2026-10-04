@@ -45,14 +45,18 @@ const LOTS = [
 ];
 
 // Seconds to finish each stage at full demand — breaking ground, then up to the
-// low block, the mid-rise and the tower. Quick enough that a player standing on
-// the pavement watches a lot become a building.
-const STAGE_SECS = [12, 22, 32, 45];
+// low block, the mid-rise and the tower. The first two are quick: a lot the
+// player zones raises its first floor in at most 20 game seconds and stands as a
+// low block inside a minute, so a player standing on the pavement watches a lot
+// become a building. The later stages keep the city's slower pace.
+const STAGE_SECS = [8, 16, 32, 45];
 // A slump takes a stage back per minute. Slower than growth on purpose: a city
 // that empties as fast as it fills is flickering, not declining.
 const DECLINE_SECS = 60;
-// Demand bands. An empty lot needs a real market before anyone breaks ground; a
-// started building keeps going on less; below the floor the district sheds it.
+// Demand bands. Empty land the district rolled needs a real market before
+// anyone breaks ground; a lot the player zones is the player's order and starts
+// on that alone (tickParcel). A started building keeps going on less; below the
+// floor the district sheds it.
 const BREAK_GROUND_AT = 0.55;
 const GROW_AT = 0.42;
 const DECLINE_AT = 0.28;
@@ -92,6 +96,9 @@ function makeParcel(rand, [x, z, w, d]) {
     // use and balanceUses settles the mix; the player repaints in city view.
     use,
     zoned: use,
+    // Whether the player's zone still owns this lot's first floors
+    // (sim/cityview.js): set by zoneParcel, spent when the lot reaches LOW.
+    painted: false,
     stage,
     progress: rand() * START_PROGRESS,
     powerZone: zoneAt(z),
@@ -230,8 +237,13 @@ export function createCity(seed) {
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
 
+// The pace a lot works at, as a share of its stage a second. While the player's
+// zone owns a lot's first floors it works at least at the pace of a market at
+// the bottom of the growth band: the order shows in any district, and a market
+// above the band still speeds it. Every other lot works at its demand's pace.
 function growthRate(p, demand) {
-  const eager = Math.min(1, (demand - GROW_AT) / (1 - GROW_AT));
+  const wanted = p.painted && p.stage < STAGE.LOW ? Math.max(demand, GROW_AT) : demand;
+  const eager = Math.min(1, (wanted - GROW_AT) / (1 - GROW_AT));
   return (p.pace * (SLOW_PACE + (1 - SLOW_PACE) * eager)) / STAGE_SECS[p.stage];
 }
 
@@ -240,7 +252,8 @@ function growthRate(p, demand) {
 // and lands at the top of the one beneath, the same height it just left. A
 // building empties before it sheds anything (vacate).
 function tickParcel(p, demand, dt, powered) {
-  const bar = p.stage === STAGE.EMPTY ? BREAK_GROUND_AT : GROW_AT;
+  const seeded = p.painted && p.stage < STAGE.LOW;
+  const bar = seeded ? 0 : p.stage === STAGE.EMPTY ? BREAK_GROUND_AT : GROW_AT;
   const grows = p.stage < STAGE.HIGH && demand >= bar;
   const lets = demand >= GROW_AT && p.vacancy > 0;
   const slumps = !grows && demand < DECLINE_AT;
@@ -254,6 +267,8 @@ function tickParcel(p, demand, dt, powered) {
     if (p.progress >= 1) {
       p.stage += 1;
       p.progress = p.stage === STAGE.HIGH ? 0 : p.progress - 1;
+      // The order is fulfilled at the low block; the market owns the lot after.
+      if (p.stage >= STAGE.LOW) p.painted = false;
     }
   } else if (slumps && vacate(p, dt)) {
     p.progress -= dt / DECLINE_SECS;
@@ -295,6 +310,9 @@ export function zoneParcel(city, index, use) {
   const p = city.parcels[index];
   if (!p || (use !== null && !USES.includes(use)) || p.zoned === use) return false;
   p.zoned = use;
+  // The player's hand, not the market's: the lot's first floors go up on the
+  // player's order alone (tickParcel, growthRate), spent at the low block.
+  if (use !== null) p.painted = true;
   return true;
 }
 
