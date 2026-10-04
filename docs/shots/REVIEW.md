@@ -4,6 +4,43 @@ Every shot is judged here before it counts as evidence (AGENTS.md, "How to work"
 step 5). One entry per shot: the slice, the verdict, and each defect by id. Open
 defects stay in the table at the bottom until a commit fixes them.
 
+## 2026-10-04 — M1.T6, first-minutes sweep (50 shots)
+
+`SWEEP_PORT=6291 node scripts/sweep.mjs --poses docs/shots/poses/first-minutes.json`
+on seeds 7, 11, 22, 33, 73 (generated): 50 shots, 5.5 min of the 10 min budget,
+0 page errors, worst peak 141 of 175, `blocked` 0.0% everywhere. 45 shots are
+flagged for raw-primitive cells only (M2 owns those). The draft with every pick
+report is `docs/shots/REVIEW-first-minutes.md` and `docs/shots/picks/m1-sweep-*.json`.
+
+Fixed in the M1.T6 working tree:
+
+- **D3** — the grey box on the facade is the jib of the site crane on the parcel
+  at (-6.25, 7.47) on seed 7. The crane zoning from `f690cc8` already leaves
+  every boom clear (`__game.cranes()`: jib 9 m, `clear: true`) and the mast is
+  drawn from the ground to the mast top, so the jib no longer floats. The pick
+  at the reported spot now lands on that jib, not on a detached box.
+- **D4** — the bright rectangle at night was a fleet car's headlight glow at
+  the lens plus the hard-sided sign/lamp streaks. The glow takes the same
+  near-camera fade as the throw, the throw's near edge fades to zero, and the
+  streak texture fades its two long sides (`traffic.js`, `streaks.js`). No pick
+  in the 50 final reports hits the `#cfe6ff` plane that named the defect.
+- **D17** — on seeds 7 and 22 a west heading at the spawn opened the follow
+  camera inside the block east of the avenue (144/144 picked cells at 0 m,
+  centre pixel pure black). The camera now pulls out of the street wall's
+  footprints and steps over obstacles under 1.4 m (`game/camera.js`,
+  `block.js` carries each footprint's height); west now has 0 cells at 0 m on
+  both seeds, and the shot shows the street.
+- **D18** — the HUD panels all anchored to the same two corners: news covered
+  the mission panel end to end, and the city palette sat under the district
+  table, lot note and story dialogue. The bottom-left column re-stacks what is
+  visible on the 4 Hz HUD tick (city palette, district table, lot note, police
+  radio, story dialogue) and the mission panel sits under the news
+  (`game/hud.js`): measured 0 overlapping panel pairs in the city view (was 4).
+
+Still open, and not this task's: D5 (puddle shards), D8 (cranes over neighbours
+in city view), D15 (wet road by day), D16 (the hero car is a raw slab).
+Raw-primitive cells in the picks are M2's list, not defects here.
+
 ## 2026-10-03 — retro-review of slices 074–077: all FAIL
 
 These shipped as "done" without a real review. The operator found the problems.
@@ -74,8 +111,8 @@ the night-road lane built nothing).
 |---|---|---|---|
 | D1 | A parked car's roof fills 15% of a new game's opening frame, 1.4 m from the lens | seeds 2, 7: the kerb slot behind the spawn | **fixed** slice-078; gate checks 4 seeds |
 | D2 | The chase shots have no police car in them; nothing in frame shows a chase | 075, 076 | open |
-| D3 | A grey box with a yellow band hangs on a facade 10 m up | seed 7 spawn, right side; instanced box near (-11, 10–11.7, 8) | open, not yet identified |
-| D4 | A hard-edged bright rectangle lies on the road under the player at night | seed 7 spawn, night | open |
+| D3 | A grey box with a yellow band hangs on a facade 10 m up | seed 7 spawn, right side; instanced box near (-11, 10–11.7, 8) | **fixed** `f690cc8` crane zoning; identified M1.T6 as the parcel's jib, mast drawn |
+| D4 | A hard-edged bright rectangle lies on the road under the player at night | seed 7 spawn, night | **fixed** M1.T6: glow near-camera fade, throw near fade, streak side fade |
 | D5 | Puddle reflections break into scattered glass-like shards | 076 tier2, lower left | open |
 | D6 | Mountains stand at fixed hand-map coordinates: a range rises inside the city on 127 of 300 seeds (94 m over the road on seed 73), and 99% of their slope is steeper than 55°, so they read as blue spikes | 077 city view, left; seed 73 street | **fixed** slice-079 (`m5-mountains`); `tests/landscape-place.spec.js`, 300 seeds |
 | D7 | The outer towers are giant boxes with a TV-static window texture | 077 city view, right | **fixed** slice-080 (`m5-skyline` and review) |
@@ -88,3 +125,5 @@ the night-road lane built nothing).
 | D14 | The verges, pocket park and tufts stand at hand-map coordinates: on all 300 seeds grass lies across a street (826 m² on seed 73, where the z = 9 crossing runs into a lawn) | landscape.js `buildGrassGround`, `TUFT_RECTS` | **fixed** slice-080 (`m5-grass`); `tests/grass-place.spec.js`, 301 seeds |
 | D15 | By day, looking down a street toward the sun, the wet road reads as brushed steel | seed 73, (46, 9) facing east | open |
 | D16 | The hero car beside the spawn is still a slab with a cabin on it: the car-body lane changed the traffic, not the car the player stands next to | slice-080 street shots, right of the player | open |
+| D17 | A west heading at the spawn opened the follow camera inside the block east of the avenue: 144/144 picked cells at 0 m, centre pixel pure black | seeds 7 and 22, spawn, day and night | **fixed** M1.T6 (`game/camera.js` pulls the arm out of the street wall); 0 cells at 0 m on both seeds |
+| D18 | HUD panels overlap each other's text: news covered the mission panel end to end and the city palette sat under the district table, lot note and story dialogue | city view, seed 7 | **fixed** M1.T6 (`game/hud.js` stacks the bottom-left column and sets the mission panel under the news; measured 0 overlapping pairs) |

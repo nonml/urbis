@@ -1,8 +1,20 @@
 // GPU rain: one draw, zero per-frame CPU. Streaks fall, wrap, fade with distance.
+//
+// The same rig owns the drawn weather (M2-7). sim/weather.js is the schedule —
+// a day's clear/overcast/rain states and the 0-1 wetness — and it is a pure
+// function of the seed and the clock, so this reads it back from the elapsed
+// seconds the frame already passes and ?weather= pins a state for the sweep.
+// Nothing new is drawn: clear and overcast hide the one cloud rain always was,
+// and the wetness rides the shared material uniform (materials.js setWetness).
 import * as THREE from 'three';
+import { createWeather, tickWeather, weatherPin } from '../sim/weather.js';
+import { worldSeed } from '../sim/seedstore.js';
+import { START_HOUR, DAY_SECS } from '../sim/clock.js';
+import { setWetness } from './materials.js';
 
 const COUNT = 2600;
 const AREA = { x: 34, y: 26, z: 66 };
+const RAIN_FADE = 3; // seconds for the cloud to come and go with the state
 
 // Seeded scatter — rain placement must not depend on Math.random (save/load determinism).
 function mulberry32(seed) {
@@ -13,6 +25,26 @@ function mulberry32(seed) {
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+// The sim's weather, reconstructed where the frame can see it: the seed it was
+// rolled from and the ?weather= pin, then ticked from clock.elapsed. hour and
+// day are views of elapsed, exactly as sim/clock.js makes them.
+function buildWeather() {
+  const pinned = weatherPin(globalThis.location?.search ?? '');
+  const weather = createWeather(worldSeed().seed, pinned);
+  return {
+    weather, view: { day: 0, hour: START_HOUR }, last: 0,
+    state: weather.state, wetness: weather.wetness,
+    amount: weather.state === 'rain' ? 1 : 0,
+  };
+}
+
+let rig = null;
+
+// What atmosphere.js greys the sky by: clear is the only state with a sun.
+export function weatherState() {
+  return rig?.state ?? 'clear';
 }
 
 export function buildRain() {
@@ -35,6 +67,7 @@ export function buildRain() {
       uTime: { value: 0 },
       uHeight: { value: AREA.y },
       uColor: { value: new THREE.Color(0x8fa8c8) },
+      uAmount: { value: 1 },
     },
     vertexShader: `
       attribute float aSeed;
@@ -56,22 +89,42 @@ export function buildRain() {
       }`,
     fragmentShader: `
       uniform vec3 uColor;
+      uniform float uAmount;
       varying float vFade;
       varying float vSeed;
       void main() {
         vec2 pc = gl_PointCoord - vec2(0.5);
         float streak = pow(max(0.0, 1.0 - abs(pc.x) * 7.0), 1.6);
         float ends = smoothstep(0.5, 0.28, abs(pc.y));
-        float a = streak * ends * vFade * 0.7;
+        float a = streak * ends * vFade * 0.7 * uAmount;
         if (a < 0.01) discard;
         gl_FragColor = vec4(uColor, a);
       }`,
   });
   const points = new THREE.Points(geo, mat);
   points.frustumCulled = false;
+  rig = buildWeather();
+  points.userData.weather = rig;
+  points.visible = rig.state === 'rain';
   return points;
 }
 
 export function tickRain(points, elapsed) {
   points.material.uniforms.uTime.value = elapsed;
+  const weather = points.userData.weather;
+  const dt = Math.min(Math.max(elapsed - weather.last, 0), 0.5);
+  weather.last = elapsed;
+  const total = START_HOUR + (elapsed * 24) / DAY_SECS;
+  weather.view.day = Math.floor(total / 24);
+  weather.view.hour = total % 24;
+  tickWeather(weather.weather, dt, weather.view);
+  weather.state = weather.weather.state;
+  weather.wetness = weather.weather.wetness;
+  const want = weather.state === 'rain' ? 1 : 0;
+  weather.amount += (want - weather.amount) * Math.min(1, dt * RAIN_FADE);
+  points.material.uniforms.uAmount.value = weather.amount;
+  // The frame's own visibility (indoors, roofs) passes through: the weather
+  // only ever hides the cloud, never shows it where the scene said not to.
+  points.visible = points.visible && weather.amount > 0.02;
+  setWetness(weather.wetness);
 }

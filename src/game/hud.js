@@ -109,10 +109,26 @@ export function buildHud(newsLine) {
     'color:#fff', 'text-shadow:0 0 18px rgba(84,240,255,0.9),0 0 46px rgba(84,240,255,0.5)',
   ]);
   return {
-    el, prompt, missionPanel, banner, economyPanel, lotNote, radio, doorHud, arcUI,
+    el, prompt, missionPanel, banner, economyPanel, lotNote, radio, doorHud, arcUI, news: newsLine,
     fpsAcc: 0, fpsN: 0, fpsShown: 0, timer: 0,
     fadeDoor: () => fadeThroughDoor(doorHud),
   };
+}
+
+// The HUD shares its corners without any panel covering another's text: the
+// bottom-left stack re-measures what is visible on the 4 Hz HUD tick. The sweep
+// found the palette, the district table, the lot note and the story dialogue all
+// anchored to one spot, so a fixed bottom per panel cannot hold.
+const STACK_GAP = 8;
+const STACK_BASE = 12;
+
+function stackBottomLeft(els) {
+  let bottom = STACK_BASE;
+  for (const el of els) {
+    if (!el || el.style.display === 'none' || el.offsetHeight === 0) continue;
+    el.style.bottom = `${bottom}px`;
+    bottom += el.offsetHeight + STACK_GAP;
+  }
 }
 
 // The profiler's sticky lock: the HUD owns which NPC is targeted, the sim only
@@ -201,6 +217,10 @@ export function tickHud(hud, ctx, frame) {
   const obj = mission.phases.map((p, i) => `${mission.done[i] ? '✓' : '·'} ${p}`).join('<br>');
   hud.missionPanel.innerHTML = `<b>◈ ${mission.id}</b><br>${obj}`;
   hud.missionPanel.style.display = mission.complete && street.time > mission.bannerUntil ? 'none' : 'block';
+  hud.missionPanel.style.top = `${!hud.news || hud.news.style.display === 'none' ? 12 : hud.news.offsetHeight + 20}px`;
+  stackBottomLeft([
+    document.getElementById('cityview'), hud.economyPanel.panel, hud.lotNote, hud.radio.el, hud.arcUI.dialogue,
+  ]);
   if (busted) {
     hud.banner.textContent = 'BUSTED';
     hud.banner.style.display = 'block';
