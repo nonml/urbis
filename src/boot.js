@@ -5,6 +5,7 @@ import { setWorldSeed } from './sim/seedstore.js';
 import { loadSave, clearSave } from './savestore.js';
 import { pickWorld } from './sim/newgame.js';
 import { initTitle, readPending } from './ui/title.js';
+import { initGpuFail } from './ui/gpufail.js';
 
 // The rules — seed, generate, saving — live in sim/newgame.js (pure, law 5).
 // Here we only hand it the browser's facts and apply the answer before the world
@@ -25,6 +26,10 @@ const { seed: SEED, generate: GENERATE, saving: SAVING } = pickWorld({
 });
 setWorldSeed(SEED, GENERATE);
 console.info('urbis seed', SEED, GENERATE ? 'generated' : 'hand preset');
+
+// M7-9: no WebGL means no city to draw. Say so in the page, then stop before
+// main.js asks three for a renderer and gets an unexplained throw.
+if (!initGpuFail()) throw new Error('Urbis needs WebGL — see #gpufail');
 
 // The title is the player's front door. Automated runs, screenshots and URL
 // world picks (?seed / ?gen / ?replay) boot straight into play, as before.
