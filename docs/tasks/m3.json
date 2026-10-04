@@ -232,8 +232,7 @@
         "M1.T2",
         "M1.T3",
         "M1.T4",
-        "M1.T5",
-        "M1.T6"
+        "M1.T5"
       ],
       "commit": "M3.T11 (M3-2): lots read the map",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-2: **One live map:** `src/sim/map.js` makes roads, districts, buildings, lots, furniture and story places from the seed; no module exports a load-time city constant (the 20 listed in `docs/plan/TASKS.md`); golden maps unchanged except the street wall's declared change (M3-3) (checked by `scripts/check_boundary.mjs` rule; `tests/golden/`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
@@ -343,8 +342,7 @@
         "M1.T2",
         "M1.T3",
         "M1.T4",
-        "M1.T5",
-        "M1.T6"
+        "M1.T5"
       ],
       "commit": "M3.T16 (M3-3): the economy counts buildings",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-3: **Every building is a parcel:** every building footprint the renderer draws is one entry in `map.parcels` with an id; `__game.pick()` on any building names its parcel id; the street wall comes from the world seed, not seed 2084, and its styles from the district plan, not the hand map's coordinates (checked by `tests/accept/m3-parcels.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
