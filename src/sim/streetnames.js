@@ -4,7 +4,9 @@
 // the avenues that play the hand map's east and west avenues (sim/anchors.js) are
 // East or West by which side of Main they lie on, and every other avenue and
 // every crossing takes a name from the pools below, by the seed.
-// Pure (law 5): sim/decline.js reads streetName for lot addresses.
+// Pure (law 5): sim/decline.js reads streetName for lot addresses. It takes the
+// map last and names the world that map is; the load-time NAMES is the hand
+// map's fallback until M3.T14 deletes it (M3-2).
 //
 // Milestone 2 skeleton: the pools and the salt are final; nameStreets is a stub
 // with its test in tests/streetnames.todo.js.
@@ -12,6 +14,7 @@ import { DISTRICTS } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { counterpartX } from './anchors.js';
 import { mulberry32 } from './rng.js';
+import { worldMap } from './patrol.js';
 
 // Its own random stream, so naming never moves a lot, a sign or a person.
 export const NAME_SALT = 0x5717;
@@ -48,8 +51,23 @@ export function nameStreets(district, seed) {
 
 const NAMES = worldSeed().generate ? nameStreets(DISTRICTS[0], worldSeed().seed) : {};
 
-// The name the player reads for way `w` (an avenue or a crossing): its generated
-// name, else its id in title case.
-export function streetName(w) {
-  return NAMES[w.id] ?? w.id[0].toUpperCase() + w.id.slice(1);
+// A map's own names, derived once from its district and seed. nameStreets is
+// pure but not free, and every lot note asks for a name.
+const NAMES_OF = new WeakMap();
+function namesOf(map) {
+  let names = NAMES_OF.get(map);
+  if (!names) {
+    names = nameStreets(map.district, map.seed);
+    NAMES_OF.set(map, names);
+  }
+  return names;
+}
+
+// The name the player reads for way `w` (an avenue or a crossing): the name the
+// map gives it, else its id in title case. A map with lots is a generated plan
+// and names its own streets; a map without them is the hand preset, whose ids
+// (main, east, west, plaza, south) are already the names on the signs.
+export function streetName(w, map = worldMap()) {
+  const names = map.lots ? namesOf(map) : NAMES;
+  return names[w.id] ?? w.id[0].toUpperCase() + w.id.slice(1);
 }

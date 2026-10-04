@@ -3,7 +3,10 @@
 // street. On the hand preset that is the spot the game has always started on; a
 // generated world derives it from its own main avenue and crossings
 // (docs/PROCGEN.md), so a new city never starts the player inside a wall.
-// Pure (law 5): sim/player.js and sim/vehicle.js read SPAWN.
+// Pure (law 5): sim/player.js and sim/vehicle.js read the spawn off the map,
+// and sim/furniture.js and sim/dressing.js derive their kerbside rhythm from
+// spawnFor; the load-time SPAWN below is the hand map's entry until M3.T14
+// deletes it (M3-2).
 //
 // Milestone 2 skeleton: the constants are final; spawnFor is a stub with its
 // test in tests/spawn-place.todo.js.
@@ -61,5 +64,12 @@ export function spawnFor(district) {
   return HAND_SPAWN;
 }
 
-// The start of the world being played.
+// The start a map carries: a map built by createMap holds its own spawn, and
+// the hand map's fallback holds HAND_SPAWN. Readers that already hold a map
+// (player.js, vehicle.js) read map.spawn; this names that read for the rest.
+// With no map the booted world's SPAWN stands (M3-2).
+export function spawnOf(map) {
+  return map ? map.spawn : SPAWN;
+}
+
 export const SPAWN = worldSeed().generate ? spawnFor(DISTRICTS[0]) : HAND_SPAWN;
