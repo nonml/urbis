@@ -35,6 +35,7 @@ import { buildCityView } from '../render/cityview.js';
 import { buildInteriors, updateInteriors } from '../render/interior.js';
 import { buildArcMarker, updateArcMarker } from '../render/arc.js';
 import { hideFaded } from '../render/faded.js';
+import { createAudioEngine } from '../audio/engine.js';
 
 // The zone light the city mirror was last shot under, 1 lit or 0 dead.
 const MIRRORED = [1, 1];
@@ -43,6 +44,12 @@ const MIRRORED = [1, 1];
 // builders read — `city`, `street`, `heroCar`, `cityView`.
 export function buildScene(ctx) {
   const { scene, renderer, texLoader, maxAniso, city, street, heroCar, cityView } = ctx;
+
+  // Audio (M7.T1): the graph starts on the first input inside the engine and is
+  // driven from updateScene. A capture run is silent unless it asks with
+  // `?audio=1`, so screenshots never make noise.
+  const params = new URLSearchParams(location.search);
+  const audio = createAudioEngine({ silent: params.has('capture') && !params.has('audio') });
 
   const env = buildAtmosphere(scene, renderer);
   const spots = env.spots;
@@ -166,7 +173,7 @@ export function buildScene(ctx) {
     towers, skyline, stars, outskirts, chunks, beacons, signs, signPoolMeshes,
     lamps, streakMeshes, carStreaks, lampPoolMeshes, fadedDraws, growth, vacant,
     decline, arcMarker, npcRig, traffic, heroRig, police, avatar, shops,
-    interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig,
+    interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig, audio,
   };
 }
 
@@ -181,9 +188,15 @@ export function updateScene(ctx, frame) {
     heroCar, player, cityView, spots, lampPoolMeshes, signPoolMeshes, towers, puddles,
     fx, interiors, streakMeshes, markingMats, signs, shops, rain, lamps, env, groundMats,
     skyline, stars, beacons, growth, decline, npcRig, traffic, blobs, heroKey, police,
-    arcMarker, vacant, fadedDraws, heroRig, avatar, carStreaks, mirror,
+    arcMarker, vacant, fadedDraws, heroRig, avatar, carStreaks, mirror, audio,
   } = ctx;
   const { driving, braking, playerDraw, carDraw } = frame;
+
+  // Audio follows the lens, and the probe lists what plays. The probe surface
+  // binds after buildScene and has no audio part, so the listing is hung here,
+  // once, the first frame it exists.
+  audio.follow(camera);
+  if (window.__game && !window.__game.sounds) window.__game.sounds = () => audio.sounds();
 
   if (driving) updatePlayerCar(heroRig, carDraw, braking);
   else updatePlayer(avatar, playerDraw);
