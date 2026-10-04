@@ -881,7 +881,8 @@ export function buildTowers(texLoader, maxAniso) {
     caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
     caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
-    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, name });
+    // h: the follow camera stops at this box instead of entering the block.
+    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, h: topY, name });
   }
   let idx = 0;
   PINNED_TOWERS.forEach((t, i) => {
