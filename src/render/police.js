@@ -8,6 +8,7 @@
 // and neither draws while the city is clean. The two per-car pursuit meshes
 // this replaced cost eight draws a cruiser.
 import * as THREE from 'three';
+import { blend, drawAlpha } from '../game/loop.js';
 import { fireSparks } from './hackfx.js';
 import { heightAt } from '../sim/world.js';
 import { buildHeli, updateHeli } from './heli.js';
@@ -15,6 +16,8 @@ import { BARRICADE_POSTS, KIT, STINGER_HALF, beginKit, buildKit, endKit, placeKi
 
 // Two chasing, two across a roadblock.
 const MAX_CRUISERS = 4;
+// One blended pose per cruiser, reused every frame (M0-9).
+const CRUISER_POSES = Array.from({ length: MAX_CRUISERS }, () => ({}));
 // Four cruisers' lamps, the roadblock's, the strips' reflectors, the
 // helicopter's and forty search-ring dashes.
 const MAX_LIGHTS = 96;
@@ -65,6 +68,7 @@ function activeStrips(r) {
 export function buildPolice(scene) {
   const group = new THREE.Group();
   const kit = buildKit();
+  kit.mesh.name = 'police-kit';
   const lights = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX_LIGHTS
   );
@@ -110,13 +114,17 @@ function cruisersOf(wanted) {
 }
 
 function drawCruisers(rig, cars, t) {
+  const alpha = drawAlpha();
   cars.forEach((u, i) => {
-    placeKit(rig.kit, KIT.CRUISER, u.x, u.y, u.z, u.yaw);
+    // Body and lamps ride the pose blended between the last two sim steps
+    // (M0-9), so a cruiser chasing at 10 m/s does not stutter at 20 Hz.
+    const p = blend(u, alpha, CRUISER_POSES[i]);
+    placeKit(rig.kit, KIT.CRUISER, p.x, p.y, p.z, p.yaw);
     const f = flashOn(t + i * CAR_PHASE);
-    for (const l of HEAD) pushLight(rig, u.x, u.y, u.z, u.yaw, l, LAMP.head);
-    for (const l of TAIL) pushLight(rig, u.x, u.y, u.z, u.yaw, l, LAMP.tail);
-    pushLight(rig, u.x, u.y, u.z, u.yaw, BAR[0], f.red ? LAMP.redOn : LAMP.barOff);
-    pushLight(rig, u.x, u.y, u.z, u.yaw, BAR[1], f.blue ? LAMP.blueOn : LAMP.barOff);
+    for (const l of HEAD) pushLight(rig, p.x, p.y, p.z, p.yaw, l, LAMP.head);
+    for (const l of TAIL) pushLight(rig, p.x, p.y, p.z, p.yaw, l, LAMP.tail);
+    pushLight(rig, p.x, p.y, p.z, p.yaw, BAR[0], f.red ? LAMP.redOn : LAMP.barOff);
+    pushLight(rig, p.x, p.y, p.z, p.yaw, BAR[1], f.blue ? LAMP.blueOn : LAMP.barOff);
   });
 }
 
@@ -222,6 +230,10 @@ export function updatePolice(rig, wanted, ctx) {
     body: (x, y, z, yaw) => placeKit(rig.kit, KIT.HELI, x, y, z, yaw),
   });
   endKit(rig.kit, ctx.night < SHADOWLESS_NIGHT);
+  // three caches an InstancedMesh's raycast sphere on the first ray. The kit
+  // starts empty, so a probe that asked before any cruiser was placed would
+  // keep missing these instances; keep the sphere on the placed ones.
+  if (rig.kit.n > 0) rig.kit.mesh.computeBoundingSphere();
   rig.lights.count = rig.lightN;
   rig.lights.visible = rig.lightN > 0;
   rig.lights.instanceMatrix.needsUpdate = true;

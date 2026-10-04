@@ -4,6 +4,7 @@
 // plus a real headlight spot so wet asphalt answers the beams.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { blend, drawAlpha } from '../game/loop.js';
 import { getGlowTex } from './signs.js';
 
 // --- Car bodies from a side profile, not boxes -----------------------------
@@ -381,6 +382,7 @@ export function buildTraffic(street) {
     roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
   }), 'car-body');
   const bodies = new THREE.InstancedMesh(fleetBodyGeo, paintMat, N);
+  bodies.name = 'fleet-car-body';
   bodies.castShadow = true;
   bodies.customDepthMaterial = patchCarShape(
     new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'car-body-depth'
@@ -420,21 +422,29 @@ export function buildTraffic(street) {
   bodies.instanceColor.needsUpdate = true;
   iShape.needsUpdate = true;
   group.add(bodies, wheels, beams, tails, glass, trim, pools);
-  const rig = { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy };
+  const rig = {
+    bodies, wheels, beams, tails, glass, trim, pools, glows, dummy,
+    // One blended pose per car, reused every frame (M0-9).
+    poses: street.cars.map(() => ({})),
+  };
   updateCarPools(rig, [0, 0, 0].map(() => ({ x: 0, z: 0, yaw: 0, speed: 0, on: false })));
   updateTraffic(rig, street);
   return { group, rig };
 }
 
 export function updateTraffic(rig, street, camera = null) {
-  const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy } = rig;
+  const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, poses } = rig;
+  const alpha = drawAlpha();
   street.cars.forEach((c, i) => {
-    bodies.setMatrixAt(i, placeShape(dummy, c, 0));
-    glass.setMatrixAt(i, placeShape(dummy, c, 0));
-    trim.setMatrixAt(i, placeShape(dummy, c, 0));
-    wheels.setMatrixAt(i, placeShape(dummy, c, 0));
-    const m = placeOnCar(dummy, c, 0);
-    if (c.parked) {
+    const p = blend(c, alpha, poses[i]);
+    p.axis = c.axis;
+    p.parked = c.parked;
+    bodies.setMatrixAt(i, placeShape(dummy, p, 0));
+    glass.setMatrixAt(i, placeShape(dummy, p, 0));
+    trim.setMatrixAt(i, placeShape(dummy, p, 0));
+    wheels.setMatrixAt(i, placeShape(dummy, p, 0));
+    const m = placeOnCar(dummy, p, 0);
+    if (p.parked) {
       // Dark and quiet: parked cars wear no headlight glow.
       dummy.scale.set(0, 0, 0);
       dummy.updateMatrix();
@@ -448,15 +458,15 @@ export function updateTraffic(rig, street, camera = null) {
     tails.setMatrixAt(i, m);
     // The pool rides the car's heading, not the world axis: before this,
     // connector traffic threw its light across the street it was crossing.
-    placeOnCar(dummy, c, POOL_Y);
-    const fade = poolFade(c.x ?? c.lane, c.z, camera);
-    dummy.scale.set(fade, 1, throwScale(c.speed) * fade);
+    placeOnCar(dummy, p, POOL_Y);
+    const fade = poolFade(p.x ?? p.lane, p.z, camera);
+    dummy.scale.set(fade, 1, throwScale(p.speed) * fade);
     dummy.updateMatrix();
     pools.setMatrixAt(i, dummy.matrix);
-    if (c.axis === 'x') {
-      dummy.position.set(c.x + c.dir * 2.3, 0.7, c.z);
+    if (p.axis === 'x') {
+      dummy.position.set(p.x + p.dir * 2.3, 0.7, p.z);
     } else {
-      dummy.position.set(c.x ?? c.lane, 0.7, c.z + c.dir * 2.3);
+      dummy.position.set(p.x ?? p.lane, 0.7, p.z + p.dir * 2.3);
     }
     if (camera) dummy.quaternion.copy(camera.quaternion);
     else dummy.rotation.set(0, 0, 0);

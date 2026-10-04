@@ -12,6 +12,10 @@ import { DRIVE_BOUNDS, clampToBounds, heightAt } from './world.js';
 import { PURSUIT_HOMES } from './anchors.js';
 import { canSee, nextWaypoint, spawnNode } from './patrol.js';
 import { createResponse, heliSees, placeRoadblock, tickObstacles, tickResponse } from './response.js';
+// Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is taken
+// here so every cruiser and the helicopter carries the pose the step started
+// from. blend() draws a spawn or a wrap where it landed.
+import { snap } from '../game/loop.js';
 
 export const MAX_HEAT = 3;
 export const PURSUIT_SPEED = 10;
@@ -273,6 +277,8 @@ function searchOn(w, dt, time) {
 // car whether or not they are in it (spikes and flats live on it); `body` is
 // whatever is moving them — the car, or the player on foot.
 export function tickWanted(w, dt, hero, time) {
+  for (const u of w.pursuit) snap(u);
+  snap(w.response.heli);
   tickObstacles(w, hero, dt, time);
   if (isBusted(w, time)) return 'busted';
   judgeSpeed(w, dt, hero, time);
