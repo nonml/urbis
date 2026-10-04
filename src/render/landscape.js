@@ -7,9 +7,10 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { mulberry32 } from '../sim/rng.js';
-import { heightAt, DISTRICTS } from '../sim/world.js';
-import { WORLD_PLAN, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
-import { WORLD_VISTAS } from '../sim/vistas.js';
+import { heightAt } from '../sim/world.js';
+import { planLayout, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
+import { vistasOf } from '../sim/vistas.js';
+import { worldMap } from '../sim/patrol.js';
 
 // Lift every vertex of an already-positioned geometry onto the field. A slab's
 // top and bottom move together, so its thickness and its vertical sides survive
@@ -87,9 +88,18 @@ export function grassFor(district, plan, vistas) {
   return { slabs, tufts };
 }
 
-const GRASS = WORLD_PLAN ? grassFor(DISTRICTS[0], WORLD_PLAN, WORLD_VISTAS) : HAND_GRASS;
+// A generated map's grass: its own plan, rebuilt from the district, seed and
+// pinned towers the map carries, and its vistas. A map without buildings is the
+// hand preset, which keeps its table.
+function grassOf(map) {
+  if (!map.buildings) return HAND_GRASS;
+  const pinned = map.buildings.filter((b) => b.kind === 'tower')
+    .map((b) => ({ side: -b.face[0], z: b.z, d: b.d }));
+  return grassFor(map.district, planLayout(map.district, map.seed, pinned), vistasOf(map));
+}
 
-export function buildGrassGround() {
+export function buildGrassGround(map = worldMap()) {
+  const grass = grassOf(map);
   const mat = new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1.0, envMapIntensity: 0.2 });
   const geos = [];
   const slab = (w, d, x, z) => {
@@ -98,7 +108,7 @@ export function buildGrassGround() {
     g.translate(x, -0.1, z);
     geos.push(g);
   };
-  for (const s of GRASS.slabs) slab(s.w, s.d, s.x, s.z);
+  for (const s of grass.slabs) slab(s.w, s.d, s.x, s.z);
   const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos)), mat);
   mesh.receiveShadow = true;
   return mesh;
@@ -129,7 +139,8 @@ function bladeTexture() {
   return tex;
 }
 
-export function buildGrassTufts() {
+export function buildGrassTufts(map = worldMap()) {
+  const grass = grassOf(map);
   const rand = mulberry32(9001);
   const blade = new THREE.PlaneGeometry(0.9, 0.7);
   blade.translate(0, 0.35, 0);
@@ -144,7 +155,7 @@ export function buildGrassTufts() {
   let placed = 0;
   let guard = 0;
   while (placed < N && guard++ < N * 20) {
-    const r = GRASS.tufts[Math.floor(rand() * GRASS.tufts.length)];
+    const r = grass.tufts[Math.floor(rand() * grass.tufts.length)];
     const x = r.x0 + rand() * (r.x1 - r.x0);
     const z = r.z0 + rand() * (r.z1 - r.z0);
     const s = 0.7 + rand() * 0.9;

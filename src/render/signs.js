@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import SIGN_DEFS from '../content/signs.json';
 import { worldSigns } from '../sim/streetscape.js';
 import { WORLD_PLAN } from '../sim/layout.js';
+import { worldMap } from '../sim/patrol.js';
 
 // Runtime guard: content errors must degrade to a missing sign, never a dead boot.
 function validSign(s) {
@@ -13,14 +14,11 @@ function validSign(s) {
     && /^#[0-9a-fA-F]{6}$/.test(s.color || '') && [-1, 0, 1].includes(s.side)
     && typeof s.z === 'number' && typeof s.y === 'number';
 }
-const SIGNS = worldSigns(SIGN_DEFS.filter((s, i) => validSign(s) || (console.error(`[signs] bad def ${i}, skipped`), false)));
-
 const SIGN_W = 1.5;
 const SIGN_H = 4.5;
 const CELL_W = 128;
 const CELL_H = 384;
 const ATLAS_COLS = 4;
-const ATLAS_ROWS = Math.max(1, Math.ceil(SIGNS.length / ATLAS_COLS));
 const QUAD_VERTS = 4;
 
 // A sign is a lit box: a painted face in the shop's own colour, backlit, in a
@@ -88,14 +86,14 @@ function paintSignCell(g, main, sub, color, ox, oy) {
 }
 
 // One texture for every sign is what lets ten faces merge into one draw.
-function signAtlas() {
+function signAtlas(signs, atlasRows) {
   const c = document.createElement('canvas');
   c.width = ATLAS_COLS * CELL_W;
-  c.height = ATLAS_ROWS * CELL_H;
+  c.height = atlasRows * CELL_H;
   const g = c.getContext('2d');
   g.fillStyle = '#000';
   g.fillRect(0, 0, c.width, c.height);
-  SIGNS.forEach((s, i) => paintSignCell(
+  signs.forEach((s, i) => paintSignCell(
     g, s.text, s.sub, s.color, (i % ATLAS_COLS) * CELL_W, Math.floor(i / ATLAS_COLS) * CELL_H
   ));
   const tex = new THREE.CanvasTexture(c);
@@ -105,12 +103,12 @@ function signAtlas() {
 
 // Point a sign's UVs at its atlas cell. Canvas row 0 is the top and a
 // CanvasTexture flips Y, so row 0 lives at the top of UV space.
-function uvCell(geo, index) {
+function uvCell(geo, index, atlasRows) {
   const uv = geo.attributes.uv;
   const u0 = (index % ATLAS_COLS) / ATLAS_COLS;
-  const v0 = 1 - (Math.floor(index / ATLAS_COLS) + 1) / ATLAS_ROWS;
+  const v0 = 1 - (Math.floor(index / ATLAS_COLS) + 1) / atlasRows;
   for (let i = 0; i < uv.count; i += 1) {
-    uv.setXY(i, u0 + uv.getX(i) / ATLAS_COLS, v0 + uv.getY(i) / ATLAS_ROWS);
+    uv.setXY(i, u0 + uv.getX(i) / ATLAS_COLS, v0 + uv.getY(i) / atlasRows);
   }
   return geo;
 }
@@ -194,8 +192,8 @@ function signPlacement(s) {
   return { ax, faceSouth, zone: s.z < 0 ? 0 : 1, x: faceSouth ? ax : ax + s.side * 6.4, z: s.z };
 }
 
-function faceGeometry(s, p, index) {
-  const geo = uvCell(new THREE.PlaneGeometry(SIGN_W, SIGN_H), index);
+function faceGeometry(s, p, index, atlasRows) {
+  const geo = uvCell(new THREE.PlaneGeometry(SIGN_W, SIGN_H), index, atlasRows);
   geo.rotateY(p.faceSouth ? Math.PI : s.side > 0 ? -Math.PI / 2 : Math.PI / 2);
   geo.translate(p.x, s.y, p.z);
   return geo;
@@ -208,7 +206,10 @@ function armGeometry(s, p) {
 }
 
 // Returns { group, pools } — pools are {x,z,size,color} quads merged later.
-export function buildSigns() {
+export function buildSigns(map = worldMap()) {
+  // A generated map carries its placed signs; the hand preset draws `defs`.
+  const SIGNS = worldSigns(SIGN_DEFS.filter((s, i) => validSign(s) || (console.error(`[signs] bad def ${i}, skipped`), false)), map);
+  const ATLAS_ROWS = Math.max(1, Math.ceil(SIGNS.length / ATLAS_COLS));
   const group = new THREE.Group();
   const pools = [];
   const arms = [];
@@ -220,7 +221,7 @@ export function buildSigns() {
   const faceAttr = quadColors(SIGNS.length);
   SIGNS.forEach((s, idx) => {
     const p = signPlacement(s);
-    faces.push(faceGeometry(s, p, idx));
+    faces.push(faceGeometry(s, p, idx, ATLAS_ROWS));
     arms.push(armGeometry(s, p));
     zoneMats.push({ zone: p.zone, seed: idx * 2.3 + 1, attr: faceAttr, quad: idx });
     const tint = new THREE.Color(s.color).multiplyScalar(GLOW_OPACITY);
@@ -232,7 +233,7 @@ export function buildSigns() {
   });
   const faceGeo = mergeGeometries(faces);
   faceGeo.setAttribute('color', faceAttr);
-  group.add(new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(), vertexColors: true })));
+  group.add(new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(SIGNS, ATLAS_ROWS), vertexColors: true })));
   const glows = buildGlows(glowPlacements);
   group.add(glows);
   group.add(new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 })));

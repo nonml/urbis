@@ -4,17 +4,11 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
-import { AVENUE_X, CROSSINGS } from '../sim/world.js';
+import { worldMap } from '../sim/patrol.js';
 import { WORLD_FURNITURE } from '../sim/furniture.js';
 
-// Which street a fixture belongs to comes from sim/world.js; how it stands on
-// that street is this file's business.
-const [MAIN_X, EAST_X, WEST_X] = AVENUE_X;
-// The two crossings the fixtures are keyed to, in declaration order —
-// generated districts carry no hand way names.
-const PLAZA_Z = CROSSINGS[0].z;
-const SOUTH_Z = CROSSINGS[CROSSINGS.length - 1].z;
-
+// Which street a fixture belongs to comes from the map's district; how it
+// stands on that street is this file's business.
 // Explicit per-lamp placement: pole base (x,z), head offset toward the road,
 // instance yaw, blackout zone. Main + east avenues share the z rhythm.
 const POLE_X = 5.4;
@@ -23,60 +17,66 @@ const ARM = 1.8;
 // arm is the same length; both offsets are measured off the way's centre-line.
 const CROSS_POLE_OUT = 4.2;
 const CROSS_HEAD_OUT = 2.4;
-const HAND_LAMPS = [
-  ...[-45, -27, -9, 9, 27, 45].flatMap((z, i) => {
-    const side = i % 2 === 0 ? -1 : 1;
-    return [MAIN_X, EAST_X].map((ax) => ({
-      x: ax + side * POLE_X,
-      z,
-      hx: ax + side * (POLE_X - ARM),
-      hz: z,
-      rotY: side > 0 ? 0 : Math.PI,
-      zone: z < 0 ? 0 : 1,
-    }));
-  }),
-  ...[-2, 12, 26, 40].map((x) => ({
-    x,
-    z: SOUTH_Z - CROSS_POLE_OUT,
-    hx: x,
-    hz: SOUTH_Z - CROSS_HEAD_OUT,
-    rotY: Math.PI / 2,
-    zone: 0,
-  })),
-  { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
-  { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
-  // West avenue (sparser rhythm — different mood, fewer fixtures)
-  ...[-27, -9, 9, 27].flatMap((z, i) => {
-    const side = i % 2 === 0 ? -1 : 1;
-    return [{
-      x: WEST_X + side * POLE_X, z,
-      hx: WEST_X + side * (POLE_X - ARM), hz: z,
-      rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
-    }];
-  }),
-  // North extension + cross street. The two on main keep their written head
-  // offset rather than POLE_X - ARM, which is the same 3.6 m one ulp away.
-  { x: MAIN_X + POLE_X, z: 63, hx: MAIN_X + 3.6, hz: 63, rotY: 0, zone: 1 },
-  { x: MAIN_X - POLE_X, z: 81, hx: MAIN_X - 3.6, hz: 81, rotY: Math.PI, zone: 1 },
-  {
-    x: -20,
-    z: PLAZA_Z - CROSS_POLE_OUT,
-    hx: -20,
-    hz: PLAZA_Z - CROSS_HEAD_OUT,
-    rotY: Math.PI / 2,
-    zone: 1,
-  },
-  {
-    x: 20,
-    z: PLAZA_Z + CROSS_POLE_OUT,
-    hx: 20,
-    hz: PLAZA_Z + CROSS_HEAD_OUT,
-    rotY: -Math.PI / 2,
-    zone: 1,
-  },
-];
-// On a generated world the plan places the lamps; the hand preset keeps its table.
-const LAMPS = WORLD_FURNITURE ? WORLD_FURNITURE.lamps : HAND_LAMPS;
+// The hand preset's table: the map's district carries the avenues and crossings
+// the fixtures are keyed to, in declaration order — a generated district places
+// its lamps in its own plan (map.furniture) and never reads this.
+function handLamps(district) {
+  const [MAIN_X, EAST_X, WEST_X] = district.avenues.map((a) => a.x);
+  const PLAZA_Z = district.crossings[0].z;
+  const SOUTH_Z = district.crossings[district.crossings.length - 1].z;
+  return [
+    ...[-45, -27, -9, 9, 27, 45].flatMap((z, i) => {
+      const side = i % 2 === 0 ? -1 : 1;
+      return [MAIN_X, EAST_X].map((ax) => ({
+        x: ax + side * POLE_X,
+        z,
+        hx: ax + side * (POLE_X - ARM),
+        hz: z,
+        rotY: side > 0 ? 0 : Math.PI,
+        zone: z < 0 ? 0 : 1,
+      }));
+    }),
+    ...[-2, 12, 26, 40].map((x) => ({
+      x,
+      z: SOUTH_Z - CROSS_POLE_OUT,
+      hx: x,
+      hz: SOUTH_Z - CROSS_HEAD_OUT,
+      rotY: Math.PI / 2,
+      zone: 0,
+    })),
+    { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
+    { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
+    // West avenue (sparser rhythm — different mood, fewer fixtures)
+    ...[-27, -9, 9, 27].flatMap((z, i) => {
+      const side = i % 2 === 0 ? -1 : 1;
+      return [{
+        x: WEST_X + side * POLE_X, z,
+        hx: WEST_X + side * (POLE_X - ARM), hz: z,
+        rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
+      }];
+    }),
+    // North extension + cross street. The two on main keep their written head
+    // offset rather than POLE_X - ARM, which is the same 3.6 m one ulp away.
+    { x: MAIN_X + POLE_X, z: 63, hx: MAIN_X + 3.6, hz: 63, rotY: 0, zone: 1 },
+    { x: MAIN_X - POLE_X, z: 81, hx: MAIN_X - 3.6, hz: 81, rotY: Math.PI, zone: 1 },
+    {
+      x: -20,
+      z: PLAZA_Z - CROSS_POLE_OUT,
+      hx: -20,
+      hz: PLAZA_Z - CROSS_HEAD_OUT,
+      rotY: Math.PI / 2,
+      zone: 1,
+    },
+    {
+      x: 20,
+      z: PLAZA_Z + CROSS_POLE_OUT,
+      hx: 20,
+      hz: PLAZA_Z + CROSS_HEAD_OUT,
+      rotY: -Math.PI / 2,
+      zone: 1,
+    },
+  ];
+}
 const HEAD_Y = 7;
 const HEAD_LIT = new THREE.Color(0xffe2b0);
 const HEAD_DARK = new THREE.Color(0x11100c);
@@ -109,7 +109,9 @@ function glowMaterial() {
   return mat;
 }
 
-export function buildLamps() {
+export function buildLamps(map = worldMap()) {
+  // On a generated world the plan places the lamps; the hand preset keeps its table.
+  const LAMPS = (map.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(map.district);
   const group = new THREE.Group();
   const poolsByZone = [[], []];
   const dummy = new THREE.Object3D();

@@ -20,8 +20,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { displaceToTerrain } from './landscape.js';
-import { heightAt, DISTRICTS } from '../sim/world.js';
-import { WORLD_VISTAS } from '../sim/vistas.js';
+import { heightAt } from '../sim/world.js';
+import { vistasOf } from '../sim/vistas.js';
+import { worldMap } from '../sim/patrol.js';
 import { tileSeed } from './chunks.js';
 import { mulberry32 } from '../sim/rng.js';
 
@@ -100,8 +101,6 @@ export const HAND_LANES = [
   [[30, -122], [35, -151], [29, -206]],
 ];
 
-const BANDS = WORLD_VISTAS ? bandsFor(DISTRICTS[0], WORLD_VISTAS) : HAND_BANDS;
-const LANES = WORLD_VISTAS ? lanesFor(DISTRICTS[0], BANDS) : HAND_LANES;
 const LANE_STEP = 3;
 const LANE_LIFT = 0.06;
 const POLE_EVERY = 9;          // one pole per 27 m of lane
@@ -413,21 +412,23 @@ function walkLane(lane, step, visit) {
   }
 }
 
-// The whole lane network, stepped once at module load. It is world-static, so
-// no tile ever recomputes it and every tile sees the same steps.
-const LANE_STEPS = LANES.map((lane) => {
-  const steps = [];
-  walkLane(lane, LANE_STEP, (x, z, dx, dz, i) => steps.push({ x, z, dx, dz, i }));
-  return steps;
-});
+// The whole lane network, stepped once per map. It is world-static, so no tile
+// ever recomputes it and every tile sees the same steps.
+function laneStepsOf(lanes) {
+  return lanes.map((lane) => {
+    const steps = [];
+    walkLane(lane, LANE_STEP, (x, z, dx, dz, i) => steps.push({ x, z, dx, dz, i }));
+    return steps;
+  });
+}
 
 // Half-open on the high side: two rects that share an edge must not both place
 // the thing standing on it.
 const inRect = (r, x, z) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1;
 
-function eligibleRects(bounds) {
+function eligibleRects(bounds, bands) {
   const rects = [];
-  for (const b of BANDS) {
+  for (const b of bands) {
     const r = {
       x0: Math.max(b.x0, bounds.minX), x1: Math.min(b.x1, bounds.maxX),
       z0: Math.max(b.z0, bounds.minZ), z1: Math.min(b.z1, bounds.maxZ),
@@ -437,9 +438,9 @@ function eligibleRects(bounds) {
   return rects;
 }
 
-function nearbyLaneSteps(rect) {
+function nearbyLaneSteps(rect, laneSteps) {
   const near = [];
-  for (const steps of LANE_STEPS) {
+  for (const steps of laneSteps) {
     for (const s of steps) {
       if (s.x < rect.x0 - LANE_PAD || s.x > rect.x1 + LANE_PAD) continue;
       if (s.z < rect.z0 - LANE_PAD || s.z > rect.z1 + LANE_PAD) continue;
@@ -646,8 +647,8 @@ function smoothFade(t) {
   return u * u * (3 - 2 * u);
 }
 
-function buildOutskirtGround() {
-  const geos = BANDS.map((b) => {
+function buildOutskirtGround(bands) {
+  const geos = bands.map((b) => {
     const w = b.x1 - b.x0;
     const d = b.z1 - b.z0;
     const g = new THREE.BoxGeometry(w, 0.3, d, Math.round(w / GROUND_CELL), 1, Math.round(d / GROUND_CELL));
@@ -691,18 +692,24 @@ function buildPools() {
 // builder to register with the chunk manager. build() returns a claim handle —
 // a release(), no Object3D — which is what tells chunks.js to hand slots back
 // instead of disposing geometry.
-export function buildOutskirts() {
+export function buildOutskirts(map = worldMap()) {
+  // A generated map lays its bands past its own skyline; the hand preset keeps
+  // its tables.
+  const vistas = vistasOf(map);
+  const bands = vistas ? bandsFor(map.district, vistas) : HAND_BANDS;
+  const lanes = vistas ? lanesFor(map.district, bands) : HAND_LANES;
+  const laneSteps = laneStepsOf(lanes);
   const pools = buildPools();
-  const ground = buildOutskirtGround();
+  const ground = buildOutskirtGround(bands);
   const meshes = [ground, ...Object.values(pools).map((p) => p.mesh)];
 
   function build(bounds) {
-    const rects = eligibleRects(bounds);
+    const rects = eligibleRects(bounds, bands);
     if (!rects.length) return null;
     const claim = createClaim();
     rects.forEach((rect, i) => {
       const rand = mulberry32(tileSeed(i, bounds.tz, bounds.seed ^ YARD_SEED_SALT));
-      const near = nearbyLaneSteps(rect);
+      const near = nearbyLaneSteps(rect, laneSteps);
       emitLanes(claim, pools, near);
       emitFields(claim, pools, rect, near);
       emitYards(claim, pools, rect, near, rand);

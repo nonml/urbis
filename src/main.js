@@ -116,7 +116,7 @@ function fireHack() {
   if (hackBlackout(street, zone) === 0) return;
   wantedOnBlackout(wanted, px, pz, street.time, map);
   firePulse(fx, px, pz);
-  const sub = SUBSTATIONS.find((s) => s.zone === zone);
+  const sub = (map.anchors.substations ?? SUBSTATIONS).find((s) => s.zone === zone);
   fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
   // Companion burst at the lamp head nearest the player — the visible one.
   let best = null, bestD = 1e9;

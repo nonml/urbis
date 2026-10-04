@@ -14,7 +14,8 @@
 import * as THREE from 'three';
 import { STAGE, SETBACK, builtHeight } from '../sim/zoning.js';
 import { craneBase } from '../sim/interior.js';
-import { AVENUES, CROSSINGS, ROAD_HALF_WIDTH } from '../sim/world.js';
+import { ROAD_HALF_WIDTH } from '../sim/world.js';
+import { worldMap } from '../sim/patrol.js';
 import { emptyFloorsGoDark, litTop, withLitTop } from './vacancy.js';
 
 // towerMaterials() in block.js: kinds 0 and 1 are curtain glass, 2 is concrete.
@@ -183,7 +184,7 @@ function dressParcel(rig, p, i) {
   }
 }
 
-export function buildZoning(city, kinds, footprints) {
+export function buildZoning(city, kinds, footprints, map = worldMap()) {
   const group = new THREE.Group();
   const geo = unitBox();
   const n = city.parcels.length;
@@ -210,8 +211,8 @@ export function buildZoning(city, kinds, footprints) {
   // The carriageways count as obstacles too: a jib swung low over the road reads
   // from the pavement as a yellow bar floating across the street, not a crane.
   const roads = [
-    ...AVENUES.map((a) => ({ x: a.x, z: (a.z0 + a.z1) / 2, w: ROAD_HALF_WIDTH * 2, d: a.z1 - a.z0 })),
-    ...CROSSINGS.map((c) => ({ x: (c.x0 + c.x1) / 2, z: c.z, w: c.x1 - c.x0, d: ROAD_HALF_WIDTH * 2 })),
+    ...map.district.avenues.map((a) => ({ x: a.x, z: (a.z0 + a.z1) / 2, w: ROAD_HALF_WIDTH * 2, d: a.z1 - a.z0 })),
+    ...map.district.crossings.map((c) => ({ x: (c.x0 + c.x1) / 2, z: c.z, w: c.x1 - c.x0, d: ROAD_HALF_WIDTH * 2 })),
   ];
   const rects = [...footprints, ...city.parcels, ...roads];
   const slew = city.parcels.map((p) => craneRig(p, rects));

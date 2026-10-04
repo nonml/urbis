@@ -9,7 +9,7 @@
 // keyed on the sim's own `zed === null`, never on a geometry edit.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { AVENUES } from '../sim/world.js';
+import { worldMap } from '../sim/patrol.js';
 
 // Grounded, unlit-looking paint: gravel plate, galvanised fence, dark posts,
 // pale board frame. The board face is plate white so the atlas letters show.
@@ -44,16 +44,16 @@ export function isFree(p) {
   return p.zoned === null && p.use === null;
 }
 
-function nearestAvenue(x) {
-  let best = AVENUES[0].x;
-  for (const av of AVENUES) if (Math.abs(av.x - x) < Math.abs(best - x)) best = av.x;
+function nearestAvenue(x, map) {
+  let best = map.district.avenues[0].x;
+  for (const av of map.district.avenues) if (Math.abs(av.x - x) < Math.abs(best - x)) best = av.x;
   return best;
 }
 
 // Where a player stands on the pavement to face the lot: the walkway's centre,
 // turned to look at the land. The test and a shot pose read it from here.
-export function streetPose(p) {
-  const dir = Math.sign(nearestAvenue(p.x) - p.x) || 1;
+export function streetPose(p, map = worldMap()) {
+  const dir = Math.sign(nearestAvenue(p.x, map) - p.x) || 1;
   return { x: p.x + dir * (p.w / 2 + 2.5), z: p.z, yaw: -dir * Math.PI / 2 };
 }
 
@@ -142,8 +142,8 @@ function board(parts, bx, z, dir) {
 
 // One lot's street dressing: the full lot footprint is known, the street side
 // is the nearer avenue. Everything the programme needs is here.
-function streetParts(parts, p) {
-  const dir = Math.sign(nearestAvenue(p.x) - p.x) || 1;
+function streetParts(parts, p, map) {
+  const dir = Math.sign(nearestAvenue(p.x, map) - p.x) || 1;
   const edge = p.x + dir * (p.w / 2);
 
   const plate = new THREE.BoxGeometry(p.w - 0.3, PLATE_H, p.d - 0.3);
@@ -161,8 +161,8 @@ function streetParts(parts, p) {
   board(parts, edge + dir * BOARD_OUT, p.z, dir);
 }
 
-function outlineParts(parts, p) {
-  const dir = Math.sign(nearestAvenue(p.x) - p.x) || 1;
+function outlineParts(parts, p, map) {
+  const dir = Math.sign(nearestAvenue(p.x, map) - p.x) || 1;
   const edge = p.x + dir * (p.w / 2);
   const back = p.x - dir * (p.w / 2);
   dashes(parts, edge, p.z, p.d, true, OUTLINE_COLOR);
@@ -176,7 +176,7 @@ function merged(parts) {
   return geo ?? new THREE.BufferGeometry();
 }
 
-export function buildVacant(city) {
+export function buildVacant(city, map = worldMap()) {
   const group = new THREE.Group();
   const street = new THREE.Mesh(new THREE.BufferGeometry(), new THREE.MeshStandardMaterial({
     map: boardTexture(), vertexColors: true, roughness: 0.9, metalness: 0.0, envMapIntensity: 0.4,
@@ -200,8 +200,8 @@ export function buildVacant(city) {
     const sParts = [];
     const oParts = [];
     for (const p of free) {
-      streetParts(sParts, p);
-      outlineParts(oParts, p);
+      streetParts(sParts, p, map);
+      outlineParts(oParts, p, map);
     }
     street.geometry.dispose();
     outline.geometry.dispose();
