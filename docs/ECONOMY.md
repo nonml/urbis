@@ -72,29 +72,54 @@ Need against have, per use:
 | `com` | homes × wealth × 0.35 + office firms | commercial floor |
 | `ind` | commercial floor × wealth × 0.4 + works firms | industrial floor |
 
-The price of a use is `0.36 + 3 × (need − have) / district size`, clamped to 0..1:
-balance sits in zoning's hold band (lots neither start nor shed work), and a gap of
-a tenth of the district moves it 0.3 — enough to break ground or shed a stage.
+The price of a use is `0.36 + 1.5 × (need − have) / district size`, clamped to 0..1:
+balance sits in zoning's hold band (lots neither start nor shed work). M1.T3 took
+`GAP_GAIN` from `3` to `1.5`: a finished lot is 3–21 % of its district's size, so
+at `3` one lot swung demand across most of the 0.28–0.55 band and uses sat pinned
+or idle; at `1.5` a lot moves demand 0.04–0.31 and a firm move 0.05–0.11 — a nudge
+across a band edge, not a slam. The fixed hand preset keeps gain `3`.
 **Demand chases the price with a 20 s lag**: developers build on the last twenty
 seconds' numbers, not today's, so a boom overshoots into a glut and a glut into a
 shortage, instead of parking at a balance.
 
+### The lot mix — jobs about equal homes (zoning.js)
+
+In a generated city the mix is fixed when the city is made — `balanceUses` in
+`zoning.js` — and the uniform roll of one use in three was the second half of the
+bang-bang: two lots in three were workplaces, so lot jobs outran lot homes, homes
+demand pinned while offices and works idled. `balanceUses` aims each district at
+the full-build equilibrium — homes 48 % of the lots' floor, shops 29 %, works
+23 %, then lots, and pairs trading uses, walk while that lowers the worst of the
+three full-build gaps against `USE_ROOM = 0.04`, the price each use sits at full
+(`0.36 + 1.5 × 0.04 = 0.42`, the top of the hold band). It measures each lot at
+its full height, so lumpy lots land as close to the centre as their shapes allow.
+Unzoned free lots are left for the player: zoning one is how the balance shifts,
+which M1-2 measures.
+
 ### Why it never settles (pillar 2)
 
-A closed deterministic loop settles; this one is kicked. Every 25–70 s per district
-a firm moves in or out — offices or works, 6–15 % of the district's size in jobs.
-The odds lean back toward the usual level (12 % of the district per kind), so the
-district wanders without drifting to empty or full. The district boots with twice
-the usual firms queueing: the boom the first minutes build into.
+A closed deterministic loop settles; this one is kicked. In a generated city,
+every 25–70 s a firm moves in or out — offices or works, **3–7 % of the
+district's size in jobs** (was 6–15 %), the kind furthest from its usual level
+taking the move (within `FIRM_TIE = 2 %`, the draw picks), so neither kind can
+starve while the other absorbs every turn. The odds lean back toward the usual
+level (12 % of the district per kind, `FIRMS_PULL = 8`), so the district wanders
+without drifting, inside the band the 1.5 gain leaves. The generated city still
+boots with twice the usual firms queueing — the boom the first minutes build
+into — but the surplus above the usual level is served off as the market works
+(`BOOT_THIN_SECS = 240`), so it no longer leaves one use pinned for the whole run.
 
 Measured with the pure sim, ticked the way `main.js` ticks it (50 ms steps):
+`node scripts/economy-probe.mjs --seeds 1-5 --minutes 10` before and after the
+constant changes, same sitting; the per-district check is
+`tests/accept/m1-calm.test.js`:
 
-- **The game's seed, 30 idle minutes:** some lot changed stage in 29 of the 30
-  minutes — a lot went up in 20 of them and one came down in 20; the whole city
-  never stood still for more than 49 s; some lot was moving on 90 % of ticks.
-- **Twelve seeds, 10 idle minutes each:** longest city-wide stillness 11–142 s
-  (median 28 s), lots moving on 64–97 % of ticks, ending between a third and four
-  fifths of the way to fully built — never frozen full, never emptied.
+| Demand state | before (gain 3, firms 6–15 %) | after, generated city (gain 1.5, firms 3–7 %, balanced mix) |
+|---|---|---|
+| pinned ≥ `BREAK_GROUND_AT`, per district, seeds 1–5 | up to **100 %** (four seeds; the fifth 92 %) | worst seat **33 %** (seed 3, south, industrial) |
+| idle < `DECLINE_AT`, per district, seeds 1–5 | worst **37 %** (seed 3, north, commercial) | worst **6 %** |
+| in band, median pooled over both districts | res **2 %** | res, com, ind **89 %, 91 %, 85 %** |
+| A/B rezone, flat storeys at minute 5, zoned − untouched | **0, 0, 0, 0, 0** | **+3, +3, +9, 0, +1** — 4 of 5 seeds (M1-2) |
 
 What a slump looks like, from `tests/economy.spec.js`: when the firms leave, the
 offices and works come down first; the homes hold while jobs still match them,
@@ -105,20 +130,21 @@ then empty once the jobs fall below the homes. That is the chain a player can re
 
 While a zone is dark its district trades nothing: wealth drains with a 60 s time
 constant and recovers with 25 s. One blackout (8.9 s dark) costs the south about
-13 % of its wealth (1.00 → 0.87); commercial demand then runs up to 0.08 below a
+14 % of its wealth (1.00 → 0.86); commercial demand then runs up to 0.08 below a
 never-cut twin for about a minute after the power returns — the sites there build
-slower (`growthRate` scales with demand) — and wealth is back within 0.03 of the
+slower (`growthRate` scales with demand) — and wealth is back within 0.02 of the
 twin a minute after. The other district is **bit-identical** to the twin
 throughout: the firms draw a fixed four numbers from the `sim` stream per move
 whatever happens, so one district's fortunes can never reach the other's through
 the RNG either.
 
 A single blackout is a dent. A campaign is not. Rehacking the south as fast as its
-cooldown allows for three minutes (16 hacks) holds its wealth near 0.45 and its
-commercial and industrial demand near zero. Its sites are frozen while dark, so
-the damage lands when the lights stay on: a minute after the campaign ends, the
-south's offices and works stand a third lower than its never-cut twin's, and its
-homes have started to follow. Big acts spread; small acts stay local.
+cooldown allows for three minutes (16 hacks) holds its wealth at 0.43–0.79 and
+swings its commercial and industrial demand between nothing and pinned. Its sites
+are frozen while dark, so the damage lands when the lights stay on: a minute after
+the campaign ends, the south's offices and works stand at about a sixth of its
+never-cut twin's, and its homes at half — the homes follow the jobs out. Big acts
+spread; small acts stay local.
 
 ## The readout (law 6)
 
@@ -165,6 +191,12 @@ It refreshes four times a second, is DOM only (+0 draws), and reads nothing but
 Each was mutation-checked: a blackout reaching both districts, no trade lost in the
 dark, firms that never move, residents that do not spend, jobs that do not pull
 homes and a market with no lag each fail at least one of them.
+
+M1's own checks: `tests/accept/m1-calm.test.js` and
+`tests/accept/m1-rezone-ab.test.js` — no district's use pinned or idle past 40 %
+of ten minutes; the works rezone adds a flat storey on 4 of 5 seeds — each one
+seed per process on the A/B runner. `tests/economy.spec.js` keeps its hand-preset
+expectations, unchanged.
 
 `tests/zoning.spec.js`'s slump test now holds every district's market at zero
 each tick instead of freezing the old sine at its trough — the same claim.
