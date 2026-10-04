@@ -10,7 +10,8 @@ import * as THREE from 'three';
 import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, isDark, zoneAt } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
-import { WALK_BOUNDS, clampToBounds } from './sim/world.js';
+import { clampToBounds } from './sim/world.js';
+import { worldMap } from './sim/patrol.js';
 import { createPlayerCar, tickPlayerCar } from './sim/vehicle.js';
 import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero, missionOnProfile, missionReset, missionNote } from './sim/mission.js';
 import { createWanted, wantedOnBlackout, tickWanted, drainEvents } from './sim/wanted.js';
@@ -50,17 +51,16 @@ const camera = new THREE.PerspectiveCamera(52, window.innerWidth / window.innerH
 
 // Sim state (restored or generated) is created before the scene: assembly reads
 // it, and the save is the source of truth for what city this is.
-const restored = SAVING ? deserialize(loadSave()) : null;
+const restored = SAVING ? deserialize(loadSave()) : null, map = worldMap();
 const street = restored?.street ?? createStreet(SEED);
 const city = restored?.city ?? createCity(SEED);
 const people = restored?.people ?? createPeople(SEED);
-const player = restored?.player ?? createPlayer();
-player.mode ??= 'foot';
-const heroCar = restored?.car ?? createPlayerCar();
+const player = restored?.player ?? createPlayer(map);
+player.mode ??= 'foot'; const heroCar = restored?.car ?? createPlayerCar(map);
 const mission = restored?.mission ?? createMission();
-const arc = createArc(), wanted = createWanted();
+const arc = createArc(), wanted = createWanted(map);
 let lastWantedStatus = 'clean';
-const dispatch = createDispatch(20260916), news = createNews();
+const dispatch = createDispatch(20260916, map), news = createNews();
 const clock = restored?.clock ?? createClock();
 // Every grown lot carries a street door and a room (sim/interior.js).
 const interior = restored?.interior ?? createInterior(city);
@@ -107,7 +107,7 @@ function fireHack() {
   const px = driving ? heroCar.x : player.x, pz = driving ? heroCar.z : player.z;
   const zone = zoneAt(pz);
   if (hackBlackout(street, zone) === 0) return;
-  wantedOnBlackout(wanted, px, pz, street.time);
+  wantedOnBlackout(wanted, px, pz, street.time, map);
   firePulse(fx, px, pz);
   const sub = SUBSTATIONS.find((s) => s.zone === zone);
   fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
@@ -139,7 +139,7 @@ function toggleVehicle() {
     missionOnEnterCar(mission); camRig.enterDrive();
   } else if (player.mode === 'drive') {
     player.mode = 'foot';
-    ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, heroCar.x + 1.8, heroCar.z));
+    ({ x: player.x, z: player.z } = clampToBounds(map.district.walk, heroCar.x + 1.8, heroCar.z));
     player.speed = 0;
     // A step snap, not a step: without it the drawn avatar would blend from
     // where it last stood on foot, possibly across the map.
@@ -209,10 +209,10 @@ function tickSim() {
   tickNews(news, city, people, street);
   tickCityView(cityView, city, STEP, input.keys);
   if (driving) {
-    braking = tickPlayerCar(heroCar, input.driveInput(), STEP).braking;
+    braking = tickPlayerCar(heroCar, input.driveInput(), STEP, map).braking;
     camRig.easeDrive(heroCar.yaw, clock.elapsed, input, STEP);
   } else {
-    tickPlayer(player, input.footInput(), STEP); tickInterior(interior, player);
+    tickPlayer(player, input.footInput(), STEP, map); tickInterior(interior, player);
   }
   tickSteam(steam, clock.elapsed, STEP); tickHackFx(fx, STEP);
   // DARK is sim truth about the two zones, so it settles on the step.
@@ -228,7 +228,7 @@ function tickSim() {
     x: hx, z: hz, yaw: driving ? heroCar.yaw : player.yaw, inCar: driving, car: heroCar,
     body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
   };
-  if (!policeHold) lastWantedStatus = tickWanted(wanted, STEP, suspect, street.time);
+  if (!policeHold) lastWantedStatus = tickWanted(wanted, STEP, suspect, street.time, map);
   missionOnHeatZero(mission, wanted.heat, street.time);
   // A chase scares trade off the district it runs through (economy.js flee).
   chaseIn(city.economy, zoneAt(hz), wanted.heat);

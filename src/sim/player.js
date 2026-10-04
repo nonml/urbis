@@ -1,12 +1,12 @@
 // On-foot player state. Pure data — render reads, main ticks.
-import { WALK_BOUNDS, clampToBounds, heightAt } from './world.js';
-import { SPAWN } from './spawn.js';
+import { clampToBounds, heightAt } from './world.js';
+import { worldMap } from './patrol.js';
 
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
 
-export function createPlayer() {
-  const { x, z, yaw } = SPAWN.player;
+export function createPlayer(map = worldMap()) {
+  const { x, z, yaw } = map.spawn.player;
   return {
     x,
     y: heightAt(x, z),
@@ -18,14 +18,14 @@ export function createPlayer() {
 }
 
 // input: {mx, mz} desired move dir (world space, normalized), hurry bool.
-export function tickPlayer(player, input, dt) {
+export function tickPlayer(player, input, dt, map = worldMap()) {
   const want = Math.hypot(input.mx, input.mz) > 0.01;
   const targetSpeed = want ? (input.hurry ? HURRY_SPEED : WALK_SPEED) : 0;
   player.speed += (targetSpeed - player.speed) * Math.min(1, dt * 8);
   if (player.speed > 0.05) {
     player.x += input.mx * player.speed * dt;
     player.z += input.mz * player.speed * dt;
-    const inside = clampToBounds(WALK_BOUNDS, player.x, player.z);
+    const inside = clampToBounds(map.district.walk, player.x, player.z);
     player.x = inside.x;
     player.z = inside.z;
     // Only steer while there is actually a direction to steer to. Coasting to

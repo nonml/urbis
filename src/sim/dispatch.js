@@ -5,8 +5,7 @@
 // replay says the same thing.
 import CHATTER from '../content/dispatch.json' with { type: 'json' };
 import { createStreams } from './rng.js';
-import { streetAt } from './patrol.js';
-import { AVENUES, CROSSINGS } from './world.js';
+import { streetAt, worldMap } from './patrol.js';
 import { streetName } from './streetnames.js';
 
 export { CHATTER };
@@ -20,8 +19,8 @@ const STALE_SECS = 5;
 const REPEAT_SECS = 6;
 const HISTORY = 3;
 
-export function createDispatch(seed) {
-  return { rng: createStreams(seed).sim, queue: [], lines: [], nextAt: 0, lastSaid: {}, said: 0 };
+export function createDispatch(seed, map = worldMap()) {
+  return { rng: createStreams(seed).sim, map, queue: [], lines: [], nextAt: 0, lastSaid: {}, said: 0 };
 }
 
 function headingOf(yaw) {
@@ -35,17 +34,17 @@ function headingOf(yaw) {
 // news line use (sim/streetnames.js): an avenue is `${streetName(way)} Avenue`,
 // a crossing `${streetName(way)} Street`, where way is the avenue or crossing
 // whose id is streetAt(x, z).
-export function streetWord(x, z) {
-  const id = streetAt(x, z);
-  const avenue = AVENUES.find((w) => w.id === id);
+export function streetWord(x, z, map = worldMap()) {
+  const id = streetAt(x, z, map);
+  const avenue = map.district.avenues.find((w) => w.id === id);
   if (avenue) return `${streetName(avenue)} Avenue`;
-  const crossing = CROSSINGS.find((w) => w.id === id);
+  const crossing = map.district.crossings.find((w) => w.id === id);
   return crossing ? `${streetName(crossing)} Street` : '';
 }
 
-function fill(template, e) {
+function fill(template, e, map) {
   const words = {
-    street: streetWord(e.x, e.z),
+    street: streetWord(e.x, e.z, map),
     heading: CHATTER.headings[headingOf(e.yaw ?? 0)],
     mode: CHATTER.modes[e.inCar ? 'car' : 'foot'],
     cause: CHATTER.causes[e.cause],
@@ -56,7 +55,7 @@ function fill(template, e) {
 function say(d, e, time) {
   const options = CHATTER.lines[e.type];
   const pick = options[Math.floor(d.rng() * options.length)];
-  return { speaker: CHATTER.speakers[pick.by], text: fill(pick.say, e), kind: e.type, at: time };
+  return { speaker: CHATTER.speakers[pick.by], text: fill(pick.say, e, d.map), kind: e.type, at: time };
 }
 
 // events: drained from the wanted sim this tick. Lines land in d.lines, newest
