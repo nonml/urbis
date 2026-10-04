@@ -14,6 +14,7 @@
 // accumulator, the whole-step count (a replay stops on it), and the poses it
 // snapshots onto movers for the renderer.
 import { weatherPin } from '../sim/weather.js';
+import { installPause } from '../ui/pause.js';
 
 export const STEP = 0.05;
 export const MAX_STEPS = 5;
@@ -55,6 +56,17 @@ export function readWeather() {
   return weatherPin(globalThis.location?.search ?? '');
 }
 
+// Pause (M7.T9, criterion M7-3): while the menu is up no step runs, so every
+// clock and entity holds where it was; advance() drops the frame's dt instead
+// of banking it, so resume continues at the present rather than fast-forwarding
+// through the pause. The key and the menu are the DOM side (ui/pause.js); this
+// module stays importable in Node and owns only the state.
+let paused = false;
+export function setPaused(on) { paused = !!on; return paused; }
+export function isPaused() { return paused; }
+// Wire the menu once there is a DOM; a Node import (tests) gets the state only.
+if (typeof document !== 'undefined') installPause({ setPaused, isPaused });
+
 export function createFixedStep(speed = readSpeed()) {
   return { acc: 0, alpha: 0, steps: 0, speed: clampSpeed(speed), total: 0 };
 }
@@ -75,6 +87,12 @@ export function setSpeed(step, speed) {
 // the frames fell. Without a replay it is Infinity and nothing changes; the
 // caller sees the cap on the next frame, which is where the sim freezes.
 export function advance(step, dt, end = Infinity) {
+  if (paused) {
+    step.acc = 0;
+    step.steps = 0;
+    frameAlpha = step.alpha = 0;
+    return 0;
+  }
   const left = end - step.total;
   if (left <= 0) {
     step.acc = 0;
