@@ -5,7 +5,17 @@
 import { createStreams } from './rng.js';
 import { WORLD_PLAN } from './layout.js';
 import { isDark, zoneAt } from './street.js';
-import { cityDemand, createEconomy, demandFor, tickEconomy } from './economy.js';
+import {
+  COMMERCE_PER_HOME,
+  ESTABLISHED_PER_LOT_M2,
+  FIRMS_USUAL,
+  INDUSTRY_PER_COMMERCE,
+  M3_PER_PERSON,
+  cityDemand,
+  createEconomy,
+  demandFor,
+  tickEconomy,
+} from './economy.js';
 import { TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
 
 export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
@@ -78,9 +88,8 @@ function makeParcel(rand, [x, z, w, d]) {
   return {
     x, z, w, d,
     // `use` is what stands on the lot, or what it is breaking ground as; `zoned`
-    // is what the lot is zoned for (null: unzoned). The district arrives zoned
-    // for what it is already building, so an untouched city grows exactly as
-    // it did before the player could zone. The player repaints it in city view.
+    // is what the lot is zoned for (null: unzoned). The seed rolls the opening
+    // use and balanceUses settles the mix; the player repaints in city view.
     use,
     zoned: use,
     stage,
@@ -119,6 +128,89 @@ function freeLand(parcels) {
   }
 }
 
+// What each district's zoned lots should carry so lot jobs about equal lot
+// homes: homes 48 % of the lots' full floor, shops 29 %, works 23 % — shops
+// serve the homes, works supply the shops and the offices' stock. `USE_ROOM`
+// is the price each use aims at when full: 0.42, the top of zoning's hold
+// band. The start is the share guess, biggest lot first; then single lots and
+// pairs trading uses walk while that lowers the worst of the three full-build
+// gaps. Unzoned free lots are left for the player (M1-2); the hand preset
+// keeps its rolled mix.
+const USE_SHARE = { res: 0.48, com: 0.29, ind: 0.23 };
+const USE_ROOM = 0.04;
+
+function fullBuildGap(cap, size, firms) {
+  const dev = {
+    res: (cap.com + cap.ind - cap.res) / size,
+    com: (COMMERCE_PER_HOME * cap.res + firms - cap.com) / size,
+    ind: (INDUSTRY_PER_COMMERCE * cap.com + firms - cap.ind) / size,
+  };
+  return Math.max(...USES.map((use) => Math.abs(dev[use] - USE_ROOM)));
+}
+
+// The opening mix: each lot (biggest first) takes the use furthest short of
+// its share, so no single giant lot blocks the smaller ones from a use.
+function greedyMix(lots, capacity, total) {
+  const cap = Object.fromEntries(USES.map((use) => [use, 0]));
+  for (const p of [...lots].sort((a, b) => capacity(b) - capacity(a))) {
+    let pick = USES[0];
+    for (const use of USES) if (USE_SHARE[use] * total - cap[use] > USE_SHARE[pick] * total - cap[pick]) pick = use;
+    p.use = pick; p.zoned = pick; cap[pick] += capacity(p);
+  }
+  return cap;
+}
+
+function balanceUses(parcels) {
+  const capacity = (p) => (p.heights[STAGE.HIGH] * p.w * p.d) / M3_PER_PERSON;
+  for (const zone of new Set(parcels.map((p) => p.powerZone))) {
+    const all = parcels.filter((p) => p.powerZone === zone);
+    const lots = all.filter((p) => p.zoned !== null);
+    if (lots.length < USES.length) continue;
+    const size = all.reduce((sum, p) => sum + p.w * p.d, 0) * ESTABLISHED_PER_LOT_M2;
+    const firms = FIRMS_USUAL * size;
+    const total = lots.reduce((sum, p) => sum + capacity(p), 0);
+    const cap = greedyMix(lots, capacity, total);
+    let best = fullBuildGap(cap, size, firms);
+    for (let pass = 0; pass < lots.length; pass++) {
+      let moved = false;
+      for (const p of lots) {
+        const c = capacity(p);
+        for (const use of USES) {
+          if (use === p.use) continue;
+          cap[p.use] -= c; cap[use] += c;
+          const gap = fullBuildGap(cap, size, firms);
+          if (gap < best) {
+            p.use = use; p.zoned = use;
+            best = gap;
+            moved = true;
+          } else {
+            cap[use] -= c; cap[p.use] += c;
+          }
+        }
+      }
+      // Two lots trading uses escape what one lot's walk cannot: the centre is often a swap.
+      for (let i = 0; i < lots.length; i++) {
+        for (let j = i + 1; j < lots.length; j++) {
+          const [a, b] = [lots[i], lots[j]];
+          if (a.use === b.use) continue;
+          const [ca, cb] = [capacity(a), capacity(b)];
+          cap[a.use] += cb - ca; cap[b.use] += ca - cb;
+          const gap = fullBuildGap(cap, size, firms);
+          if (gap < best) {
+            [a.use, b.use] = [b.use, a.use];
+            [a.zoned, b.zoned] = [a.use, b.use];
+            best = gap;
+            moved = true;
+          } else {
+            cap[a.use] -= cb - ca; cap[b.use] -= ca - cb;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+  }
+}
+
 // Demand is the district economy's (sim/economy.js): what stands on the lots and
 // what happens in each district move it. A parcel reads its own district's
 // market through demandFor(); `demand` is the whole city's mean, for a glance.
@@ -130,8 +222,11 @@ function updateDemand(city, dt, street) {
 export function createCity(seed) {
   const rng = createStreams(seed);
   const parcels = (WORLD_PLAN?.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
-  if (WORLD_PLAN) freeLand(parcels);
-  const economy = createEconomy(parcels, builtHeight, rng.sim);
+  if (WORLD_PLAN) {
+    freeLand(parcels);
+    balanceUses(parcels);
+  }
+  const economy = createEconomy(parcels, builtHeight, rng.sim, Boolean(WORLD_PLAN));
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
 
