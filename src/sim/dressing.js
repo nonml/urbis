@@ -4,8 +4,10 @@
 // render/setdress.js has always drawn; a generated world derives its own from its
 // rows, roads, pinned towers and start (docs/PROCGEN.md), so no sign hangs in
 // mid-air or inside a wall and no puddle lies across a zebra.
-// Pure (law 5): render/setdress.js reads SHOPS, PUDDLES and VENTS. A world may
-// put every shop, or every puddle, in one power zone (z < 0 or z >= 0).
+// Pure (law 5): render/setdress.js reads dressingOf(map), whose `dressing`
+// field createMap fills; the load-time SHOPS, PUDDLES and VENTS below are the
+// hand map's fallback until M3.T14 deletes them (M3-2). A world may put every
+// shop, or every puddle, in one power zone (z < 0 or z >= 0).
 //
 // Milestone 2 skeleton: the constants and hand tables are final; planDressing is
 // a stub with its test in tests/dressing-place.todo.js.
@@ -196,3 +198,12 @@ export const WORLD_DRESSING = worldSeed().generate ? planDressing(DISTRICTS[0], 
 export const SHOPS = WORLD_DRESSING ? WORLD_DRESSING.shops : HAND_SHOPS;
 export const PUDDLES = WORLD_DRESSING ? WORLD_DRESSING.puddles : HAND_PUDDLES;
 export const VENTS = WORLD_DRESSING ? WORLD_DRESSING.vents : HAND_VENTS;
+
+// The dressing a map carries: a map built by createMap holds its own shops,
+// puddles and vents; a map without them is the hand preset, which keeps its
+// tables. With no map the booted world's SHOPS, PUDDLES and VENTS stand, so
+// today's callers are unchanged until M3.T14's renderer passes the map (M3-2).
+export function dressingOf(map) {
+  if (map) return map.dressing ?? { shops: HAND_SHOPS, puddles: HAND_PUDDLES, vents: HAND_VENTS };
+  return { shops: SHOPS, puddles: PUDDLES, vents: VENTS };
+}

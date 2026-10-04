@@ -84,10 +84,12 @@ export function rowRuns(district, ax, side) {
 const EPS = 1e-6;
 // The pinned towers that stand on one avenue side, widened by PIN_CLEAR into
 // the z spans a lot may not cross. Only the district's first avenue carries
-// them, as the hand layout's two interiors do.
-function pinsOn(district, ax, side) {
+// them, as the hand layout's two interiors do. `pinned` is the map's own table
+// (map.pinned); the load-time PINNED_TOWERS is the hand map's fallback until
+// M3.T14 deletes it (M3-2).
+function pinsOn(district, ax, side, pinned) {
   if (ax !== district.avenues[0].x) return [];
-  return PINNED_TOWERS.filter((t) => t.side === side)
+  return pinned.filter((t) => t.side === side)
     .map((t) => [t.z - (t.d + PIN_CLEAR) / 2, t.z + (t.d + PIN_CLEAR) / 2]);
 }
 
@@ -165,14 +167,14 @@ function placeLot(sides, [w0, w1], rand) {
 // One pass over every avenue side: the side's free z runs, then one lot per
 // band so the lots spread across the district. A band with no room on any side
 // falls back to anywhere in the drive. Tagged with avenue and side for planLayout.
-function districtLots(district, seed) {
+function districtLots(district, seed, pinned) {
   const rand = mulberry32(seed);
   const lo = district.drive.minZ;
   const hi = district.drive.maxZ;
   const count = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
   const sides = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const depth = rowDepth(district, a.x, side);
-    const runs = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side))
+    const runs = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side, pinned))
       .map(([f0, f1]) => [Math.max(f0, lo), Math.min(f1, hi)])
       .filter(([f0, f1]) => f1 - f0 > EPS);
     return { ax: a.x, side, depth, runs, placed: [] };
@@ -189,9 +191,10 @@ function districtLots(district, seed) {
 // them from the seed, each on one avenue side's building line, rowDepth deep,
 // a LOT_FRONT long inside one of that side's rowRuns, wholly inside the
 // district's drive bounds in z, clear of the pinned towers, and never
-// overlapping another lot. The same seed always gives the same lots.
-export function deriveLots(district, seed) {
-  return districtLots(district, seed).map((p) => p.lot);
+// overlapping another lot. The same seed always gives the same lots. `pinned`
+// is the map's own tower table; omitted, the hand map's PINNED_TOWERS.
+export function deriveLots(district, seed, pinned = PINNED_TOWERS) {
+  return districtLots(district, seed, pinned).map((p) => p.lot);
 }
 
 // Everything the street wall and zoning need: { district, seed, lots, rows },
@@ -199,12 +202,13 @@ export function deriveLots(district, seed) {
 // nothing else. lots is deriveLots. rows has one { ax, side, depth, runs } per
 // avenue side: rowRuns less each lot widened by LOT_CLEAR and the pinned towers
 // (on the first avenue) widened by PIN_CLEAR, with runs under MIN_RUN dropped.
-export function planLayout(district, seed) {
-  const picked = districtLots(district, seed);
+// `pinned` is the map's own tower table; omitted, the hand map's PINNED_TOWERS.
+export function planLayout(district, seed, pinned = PINNED_TOWERS) {
+  const picked = districtLots(district, seed, pinned);
   const rows = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const holes = picked.filter((p) => p.ax === a.x && p.side === side)
       .map((p) => [p.lot[1] - p.lot[3] / 2 - LOT_CLEAR, p.lot[1] + p.lot[3] / 2 + LOT_CLEAR])
-      .concat(pinsOn(district, a.x, side));
+      .concat(pinsOn(district, a.x, side, pinned));
     const runs = subtractRuns(rowRuns(district, a.x, side), holes)
       .filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EPS);
     return { ax: a.x, side, depth: rowDepth(district, a.x, side), runs };
