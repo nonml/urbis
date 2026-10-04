@@ -18,6 +18,20 @@ export const STEP = 0.05;
 export const MAX_STEPS = 5;
 export const MAX_SPEED = 8;
 
+// The fastest a body can be in one step is a metre (the helicopter); a wrap at
+// the street's end or a unit entering at distance is tens. Past this, blend()
+// draws the new pose instead of sweeping across the map between the two.
+const TELEPORT = 5;
+
+// The alpha of the frame currently being drawn, published by advance() so the
+// render layers outside main.js (traffic, npcs, police, heli) blend the same
+// frame that main.js blends the player, the car and the camera.
+let frameAlpha = 0;
+
+export function drawAlpha() {
+  return frameAlpha;
+}
+
 const TAU = Math.PI * 2;
 
 function clampSpeed(speed) {
@@ -59,6 +73,7 @@ export function advance(step, dt, end = Infinity) {
     step.acc = 0;
     step.alpha = 0;
     step.steps = 0;
+    frameAlpha = 0;
     return 0;
   }
   const speed = step.speed ?? 1;
@@ -66,6 +81,7 @@ export function advance(step, dt, end = Infinity) {
     step.acc = 0;
     step.alpha = 0;
     step.steps = Math.min(Math.floor(speed), left);
+    frameAlpha = 0;
     return step.steps;
   }
   step.acc += dt * speed;
@@ -84,6 +100,7 @@ export function advance(step, dt, end = Infinity) {
   } else {
     step.alpha = step.acc / STEP;
   }
+  frameAlpha = step.alpha;
   return step.steps;
 }
 
@@ -108,17 +125,26 @@ function shortTurn(from, to) {
 }
 
 // The pose to draw for `entity` between its previous and current step. Every
-// numeric field blends; yaw takes the short way. `out` is reused by the caller
-// to keep the frame allocation-free. With no snapshot yet it is the live pose.
+// numeric field blends; yaw takes the short way. A position that teleported
+// past TELEPORT is drawn where it landed, not lerped across the map. `out` is
+// reused by the caller to keep the frame allocation-free. With no snapshot yet
+// it is the live pose.
 export function blend(entity, alpha, out = {}) {
   const prev = entity.prev ?? entity;
+  let teleport = false;
   for (const k of Object.keys(entity)) {
     const now = entity[k];
     if (k === 'prev' || k === 'yaw' || typeof now !== 'number') continue;
     const was = typeof prev[k] === 'number' ? prev[k] : now;
-    out[k] = was + (now - was) * alpha;
+    const jumped = (k === 'x' || k === 'y' || k === 'z') && Math.abs(now - was) > TELEPORT;
+    if (jumped) teleport = true;
+    out[k] = jumped ? now : was + (now - was) * alpha;
+  }
+  if (typeof entity.yaw !== 'number') {
+    out.yaw = undefined;
+    return out;
   }
   const wasYaw = typeof prev.yaw === 'number' ? prev.yaw : entity.yaw;
-  out.yaw = wasYaw + shortTurn(wasYaw, entity.yaw) * alpha;
+  out.yaw = teleport ? entity.yaw : wasYaw + shortTurn(wasYaw, entity.yaw) * alpha;
   return out;
 }

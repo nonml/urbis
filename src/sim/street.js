@@ -3,6 +3,9 @@
 import { createStreams } from './rng.js';
 import { ROAD_HALF_WIDTH, LANE_OFFSET, AVENUES, AVENUE_X, CROSSINGS, wayLength } from './world.js';
 import { WORLD_FURNITURE } from './furniture.js';
+// Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is called
+// here so every walker and car carries the pose the last step started from.
+import { snap } from '../game/loop.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
@@ -272,6 +275,7 @@ export function tickStreet(state, dt) {
   }
   const hurrying = state.time < state.hurryUntil;
   for (const n of state.npcs) {
+    snap(n);
     const dark = isDark(state, zoneAt(n.z));
     let v = dark ? 0 : n.speed;
     if (hurrying && !dark) v *= 1.6;
@@ -290,6 +294,7 @@ export function tickStreet(state, dt) {
   }
   for (const c of state.cars) {
     if (c.parked) continue;
+    snap(c);
     if (c.axis === 'x') {
       c.x += c.dir * c.speed * dt;
       const lo = (c.xMin ?? PLAZA.x0) - 3;

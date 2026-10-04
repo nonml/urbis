@@ -3,6 +3,7 @@
 // the walker freezes. Hats/glasses hide via zero-scale for wearers without.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { blend, drawAlpha } from '../game/loop.js';
 import { bakeVerticalShade, coatFabric, weaveUVs } from './player.js';
 import { NPC_COUNT, SKIN_TONES, isDark, zoneAt } from '../sim/street.js';
 
@@ -85,6 +86,7 @@ export function buildNPCs(street) {
     ...coatFabric(0.42),
   });
   const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
+  bodies.name = 'npc-body';
   bodies.castShadow = true;
   const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, vertexColors: true });
   const heads = new THREE.InstancedMesh(headWithHairGeo(), headMat, NPC_COUNT);
@@ -123,7 +125,11 @@ export function buildNPCs(street) {
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
   }
   group.add(bodies, heads, legL, legR, armL, armR, hats, faces, glasses);
-  const rig = { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy };
+  const rig = {
+    bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy,
+    // One blended pose per walker, reused every frame (M0-9).
+    poses: street.npcs.map(() => ({})),
+  };
   updateNPCs(rig, street);
   return { group, ...rig };
 }
@@ -163,73 +169,79 @@ function mergeHat() {
 const _fwd = new THREE.Vector3();
 
 export function updateNPCs(rig, street) {
-  const { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy } = rig;
+  const { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy, poses } = rig;
+  const alpha = drawAlpha();
   street.npcs.forEach((n, i) => {
+    // Draw between the last two sim steps (M0-9); flags that are not numbers
+    // ride through from the live walker.
+    const p = blend(n, alpha, poses[i]);
+    p.axis = n.axis;
+    p.glasses = n.glasses;
     if (n.out === false) {
-      dummy.position.set(n.x, 0, n.z);
+      dummy.position.set(p.x, 0, p.z);
       dummy.rotation.set(0, 0, 0);
       dummy.scale.set(0, 0, 0);
       dummy.updateMatrix();
       for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) m.setMatrixAt(i, dummy.matrix);
       return;
     }
-    const yaw = n.axis === 'x' ? (n.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (n.dir > 0 ? 0 : Math.PI);
-    const moving = !isDark(street, zoneAt(n.z));
-    const bob = moving ? Math.abs(Math.sin(n.phase)) * 0.05 : 0;
-    const swing = moving ? Math.sin(n.phase) * 0.5 : 0;
-    const flip = n.dir > 0 ? 1 : -1;
-    dummy.position.set(n.x, bob, n.z);
+    const yaw = p.axis === 'x' ? (p.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (p.dir > 0 ? 0 : Math.PI);
+    const moving = !isDark(street, zoneAt(p.z));
+    const bob = moving ? Math.abs(Math.sin(p.phase)) * 0.05 : 0;
+    const swing = moving ? Math.sin(p.phase) * 0.5 : 0;
+    const flip = p.dir > 0 ? 1 : -1;
+    dummy.position.set(p.x, bob, p.z);
     dummy.rotation.set(0, yaw, 0);
-    dummy.scale.set(n.bulk ?? 1, n.h, 1);
+    dummy.scale.set(p.bulk ?? 1, p.h, 1);
     dummy.updateMatrix();
     bodies.setMatrixAt(i, dummy.matrix);
-    dummy.scale.set(1, n.h, 1);
+    dummy.scale.set(1, p.h, 1);
     dummy.updateMatrix();
     heads.setMatrixAt(i, dummy.matrix);
     _fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
-    const lx = n.axis === 'x' ? n.x : n.x + 0.13 * flip;
-    const lz = n.axis === 'x' ? n.z + 0.13 * flip : n.z;
-    const rx = n.axis === 'x' ? n.x : n.x - 0.13 * flip;
-    const rz = n.axis === 'x' ? n.z - 0.13 * flip : n.z;
-    dummy.position.set(lx, 0.85 * n.h + bob, lz);
+    const lx = p.axis === 'x' ? p.x : p.x + 0.13 * flip;
+    const lz = p.axis === 'x' ? p.z + 0.13 * flip : p.z;
+    const rx = p.axis === 'x' ? p.x : p.x - 0.13 * flip;
+    const rz = p.axis === 'x' ? p.z - 0.13 * flip : p.z;
+    dummy.position.set(lx, 0.85 * p.h + bob, lz);
     dummy.rotation.set(swing, yaw, 0, 'YXZ');
     dummy.updateMatrix();
     legL.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(rx, 0.85 * n.h + bob, rz);
+    dummy.position.set(rx, 0.85 * p.h + bob, rz);
     dummy.rotation.set(-swing, yaw, 0, 'YXZ');
     dummy.updateMatrix();
     legR.setMatrixAt(i, dummy.matrix);
     // Arms hang from the shoulders, counter-swinging the legs.
-    const sx = 0.268 * (n.bulk ?? 1);
-    const sy = 1.42 * n.h + bob;
-    dummy.position.set(n.x + Math.cos(yaw) * sx, sy, n.z - Math.sin(yaw) * sx);
+    const sx = 0.268 * (p.bulk ?? 1);
+    const sy = 1.42 * p.h + bob;
+    dummy.position.set(p.x + Math.cos(yaw) * sx, sy, p.z - Math.sin(yaw) * sx);
     dummy.rotation.set(-swing * 0.7, yaw, 0, 'YXZ');
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     armL.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(n.x - Math.cos(yaw) * sx, sy, n.z + Math.sin(yaw) * sx);
+    dummy.position.set(p.x - Math.cos(yaw) * sx, sy, p.z + Math.sin(yaw) * sx);
     dummy.rotation.set(swing * 0.7, yaw, 0, 'YXZ');
     dummy.updateMatrix();
     armR.setMatrixAt(i, dummy.matrix);
     // Hat sits on the head; face + glasses ride the forward vector.
-    const hy = 1.68 * n.h + bob;
-    if (n.hat) {
-      dummy.position.set(n.x, hy - 0.04, n.z);
+    const hy = 1.68 * p.h + bob;
+    if (p.hat) {
+      dummy.position.set(p.x, hy - 0.04, p.z);
       dummy.rotation.set(0, yaw, 0);
       dummy.scale.set(1, 1, 1);
     } else {
-      dummy.position.set(n.x, hy, n.z);
+      dummy.position.set(p.x, hy, p.z);
       dummy.scale.set(0, 0, 0);
     }
     dummy.updateMatrix();
     hats.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(n.x + _fwd.x * 0.105, hy + 0.01, n.z + _fwd.z * 0.105);
+    dummy.position.set(p.x + _fwd.x * 0.105, hy + 0.01, p.z + _fwd.z * 0.105);
     dummy.rotation.set(0, yaw, 0);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
     faces.setMatrixAt(i, dummy.matrix);
-    if (n.glasses) {
-      dummy.position.set(n.x + _fwd.x * 0.115, hy + 0.025, n.z + _fwd.z * 0.115);
+    if (p.glasses) {
+      dummy.position.set(p.x + _fwd.x * 0.115, hy + 0.025, p.z + _fwd.z * 0.115);
       dummy.rotation.set(0, yaw, 0);
       dummy.scale.set(1, 1, 1);
     } else {

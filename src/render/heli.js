@@ -8,6 +8,7 @@
 // at night only. The searchlight pool is a real spot light, so it lights the
 // road, the cars and the player it finds for no draw at all.
 import * as THREE from 'three';
+import { blend, drawAlpha } from '../game/loop.js';
 import { heightAt } from '../sim/world.js';
 import { HELI_POOL } from '../sim/response.js';
 
@@ -149,10 +150,19 @@ function aimBeam(rig, h, on) {
   rig.spot.intensity = SEARCHLIGHT;
 }
 
+// One blended pose for the helicopter, reused every frame (M0-9).
+const _pose = {};
+
 // h: the sim's heli. draw.body(x, y, z, yaw) places the helicopter in the
 // police kit; draw.light(x, y, z, yaw, [lx, ly, lz, w, h, d], color) adds a
 // lamp to the police light mesh.
 export function updateHeli(rig, h, wanted, ctx, t, draw) {
+  // Enters and exits are teleports; they are snapped by the blend, so the
+  // machine is drawn where it is and not swept across the sky.
+  blend(h, drawAlpha(), _pose);
+  _pose.active = h.active;
+  _pose.leaving = h.leaving;
+  h = _pose;
   if (wanted.search.active && wanted.heat > 0) {
     pushRing(wanted.search, Math.min(1, (ctx.time - wanted.search.since) / RING_FADE_IN), t, draw.light);
   }
