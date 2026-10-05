@@ -4,6 +4,32 @@ Every shot is judged here before it counts as evidence (AGENTS.md, "How to work"
 step 5). One entry per shot: the slice, the verdict, and each defect by id. Open
 defects stay in the table at the bottom until a commit fixes them.
 
+## 2026-10-06 — M1.T4/M1.T2 evidence, re-shot on the plan's five seeds
+
+`tests/accept/m1-zone-shows.spec.js` (M1-1) re-ran on seeds 7, 11, 22, 33, 73 and
+wrote `docs/shots/m1-zone-<seed>-before/after.png` for each. Seed 7's pair was
+reviewed: before, the free lot's LAND FOR SALE board fills the frame; after, the
+board is gone and the lot stands with its first floor inside the 60 game second
+bar. PASS. The same test asserts the click zoned the lot and the height is > 0 on
+every seed, and the run passed all five. The old seeds 1-5 shots are removed: the
+criterion's five seeds are the plan's own.
+
+## 2026-10-06 — M2.T17, weather drawn (6 shots)
+
+`tests/accept/m2-weather.spec.js` on seed 1 at the spawn: clear, overcast and rain,
+each by day and night (`docs/shots/m2-weather-<state>-<day|night>.png`). Judged:
+
+- **Rain shows the feature.** Day and night the road is dark and wet with the
+  streetlight smeared across it; clear and overcast roads stay dry. PASS.
+- **Overcast vs clear is drawn and measured, but weak on the eye at this pose.**
+  The spec reads the clear day's blue sky cells losing 15+ levels of blue in
+  overcast and rain, >5% of the 48x27 grid changed, and the sun disc gone; at the
+  spawn the sky is a sliver between towers, so a player looking only at the still
+  would struggle to name clear against overcast. Logged as D19 (open).
+- Known open defects in frame: **D5** puddle shards (rain, lower left, day and
+  night) and **D16** the hero car's raw slab (centre). Both belong to M2's list.
+- No neon; no new draws (the spec measures overcast = clear, rain = clear + 1).
+
 ## 2026-10-04 — M1.T6, first-minutes sweep (50 shots)
 
 `SWEEP_PORT=6291 node scripts/sweep.mjs --poses docs/shots/poses/first-minutes.json`
@@ -127,3 +153,4 @@ the night-road lane built nothing).
 | D16 | The hero car beside the spawn is still a slab with a cabin on it: the car-body lane changed the traffic, not the car the player stands next to | slice-080 street shots, right of the player | open |
 | D17 | A west heading at the spawn opened the follow camera inside the block east of the avenue: 144/144 picked cells at 0 m, centre pixel pure black | seeds 7 and 22, spawn, day and night | **fixed** M1.T6 (`game/camera.js` pulls the arm out of the street wall); 0 cells at 0 m on both seeds |
 | D18 | HUD panels overlap each other's text: news covered the mission panel end to end and the city palette sat under the district table, lot note and story dialogue | city view, seed 7 | **fixed** M1.T6 (`game/hud.js` stacks the bottom-left column and sets the mission panel under the news; measured 0 overlapping pairs) |
+| D19 | At the spawn pose the clear and overcast day shots are hard to tell apart on the eye: towers occlude the sky, and the sun's dimming shows mostly in the distant haze | M2-7 shots, `docs/shots/m2-weather-clear-day.png` / `-overcast-day.png` | open; measured in the frame (sky cells, 15+ levels), weak in the still. M2/M26 weather look |
