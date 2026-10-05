@@ -153,12 +153,14 @@ function offlineContext() {
 // after their buffers land, and only their gain and rate move after. `buffers`
 // lets a caller or a test hand over decoded AudioBuffers; left out, the module
 // decodes its own files, and a pose still lists what would play while they load.
+// Nothing loads under `?capture=1`: the crew's screenshots never pay for a fetch.
 export function createAmbience(audio, buffers = {}) {
   const decoded = { ...buffers };
   let beds = null, loading = false, error = null;
 
   async function load() {
     if (loading || (decoded[BEDS.street] && decoded[BEDS.hum])) return;
+    if (typeof audio.silent === 'function' && audio.silent()) return;
     loading = true;
     try {
       Object.assign(decoded, await loadAmbience(offlineContext()));
