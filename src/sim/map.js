@@ -36,7 +36,8 @@ export const USES = ['res', 'com', 'ind'];
 // end caps. The style already came from the district plan (layout.rowStyle);
 // nothing here reads the hand map's coordinates.
 const USE_BY_STYLE = { core: 'com', glass: 'com', brick: 'res', tower: 'res' };
-const USE_BY_KIND = { tower: 'res', cap: 'com' };
+// Read by edits too (sim/ops.js): a placed building takes its use from here.
+export const USE_BY_KIND = { tower: 'res', cap: 'com' };
 
 // Every building the renderer draws as one parcel. It stands finished
 // (STAGE.HIGH), it never grows or declines — only kind 'lot' is ticked
@@ -142,6 +143,9 @@ export function createMap(seed) {
   return {
     seed,
     version: 0,
+    // Tiles an edit has touched since the renderer last drained them (M3.T27).
+    // Render state, not map content: mapHash ignores it by design.
+    dirty: new Set(),
     district,
     graph: buildGraph(district),
     buildings,
@@ -212,6 +216,47 @@ export function districtAt(map, x, z) {
   const districts = map.districts ?? [map.district];
   return districts.find((d) => x >= d.walk.minX && x <= d.walk.maxX
     && z >= d.walk.minZ && z <= d.walk.maxZ) ?? null;
+}
+
+// ---------------------------------------------------------------------------
+// Dirty tiles. The render's chunk manager cuts the world at 64 m (render/
+// chunks.js); an edit marks the tiles its footprint touches so only they are
+// built again (M3.T27). The size and the keys live in the sim, next to the map
+// that holds them, because src/sim/ cannot import the renderer (law 5).
+export const TILE_SIZE = 64;
+const TILE_EPS = 1e-6;
+
+export function tileOf(x, z) {
+  return `${Math.floor(x / TILE_SIZE)},${Math.floor(z / TILE_SIZE)}`;
+}
+
+// Every tile a box overlaps. A box edge that lands exactly on a tile line does
+// not reach across it: the epsilon keeps a footprint touching a boundary from
+// claiming the neighbour.
+export function tilesIn(box) {
+  const keys = new Set();
+  const hiX = Math.floor((box.maxX - TILE_EPS) / TILE_SIZE);
+  const hiZ = Math.floor((box.maxZ - TILE_EPS) / TILE_SIZE);
+  for (let tx = Math.floor(box.minX / TILE_SIZE); tx <= hiX; tx++) {
+    for (let tz = Math.floor(box.minZ / TILE_SIZE); tz <= hiZ; tz++) keys.add(`${tx},${tz}`);
+  }
+  return [...keys];
+}
+
+export function markDirty(map, box) {
+  for (const key of tilesIn(box)) map.dirty.add(key);
+}
+
+// Hand the dirty tiles back in a stable order (by tile x, then z) and clear the
+// set, so one version change rebuilds each tile once.
+export function drainDirty(map) {
+  const keys = [...map.dirty].sort((a, b) => {
+    const [ax, az] = a.split(',').map(Number);
+    const [bx, bz] = b.split(',').map(Number);
+    return ax - bx || az - bz;
+  });
+  map.dirty.clear();
+  return keys;
 }
 
 const FNV_OFFSET = 0xcbf29ce484222325n;
