@@ -27,16 +27,27 @@ export const SCORE_URGENT = 'music_urgent';
 export const RADIO_A = 'music_radio_a';
 export const RADIO_B = 'music_radio_b';
 
+// The files the set needs, for whoever owns the AudioContext.
+export const MUSIC_FILES = {
+  [TITLE]: 'assets/music/music_title.mp3',
+  [SCORE_CALM]: 'assets/music/music_calm.mp3',
+  [SCORE_URGENT]: 'assets/music/music_urgent.mp3',
+  [RADIO_A]: 'assets/music/music_radio_a.mp3',
+  [RADIO_B]: 'assets/music/music_radio_b.mp3',
+};
+
 // Music is not an effect: it rides the ambience bus, under the street.
 export const MUSIC_BUS = 'ambience';
-export const STATIONS = [RADIO_A, RADIO_B];
+// The stations the set actually ships (M7.T18): two when CC0 filled two, one
+// when it could only fill one.
+export const STATIONS = [RADIO_A, RADIO_B].filter((name) => MUSIC_FILES[name]);
 
 // B's one line (input.js): off -> the first station -> the next -> off. The
-// step is built from STATIONS's length, so a set CC0 only filled with one
+// step is built from the stations handed in, so a set CC0 only filled with one
 // station cycles that one and off (M7.T18).
-export function cycleRadio(station = null) {
-  const i = STATIONS.indexOf(station);
-  return i + 1 < STATIONS.length ? STATIONS[i + 1] : null;
+export function cycleRadio(station = null, stations = STATIONS) {
+  const i = stations.indexOf(station);
+  return i + 1 < stations.length ? stations[i + 1] : null;
 }
 
 // The title sits over the front door, the score under a mission. Both are beds,
@@ -95,15 +106,6 @@ export function musicPlan(pose = {}) {
   const radio = radioTrack(pose);
   return radio ? [radio] : [];
 }
-
-// The files the set needs, for whoever owns the AudioContext.
-export const MUSIC_FILES = {
-  [TITLE]: 'assets/music/music_title.mp3',
-  [SCORE_CALM]: 'assets/music/music_calm.mp3',
-  [SCORE_URGENT]: 'assets/music/music_urgent.mp3',
-  [RADIO_A]: 'assets/music/music_radio_a.mp3',
-  [RADIO_B]: 'assets/music/music_radio_b.mp3',
-};
 
 export async function loadMusic(context, names = Object.keys(MUSIC_FILES), base = '') {
   const buffers = {};
