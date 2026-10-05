@@ -1,7 +1,8 @@
 // Building pieces pooled (M3.T22 rows, M3.T23 towers and caps, M3.T24 podiums
-// and shop glass, M3-5). A shaft, a podium slab, a pilaster or a shop pane was
-// merged geometry in render/block.js: permanent, and a rebuild a load-time
-// hitch exactly when a building changes. Now every piece is one slot in a
+// and shop glass, M3.T25 posters and roof trim, M3-5). A shaft, a podium slab,
+// a pilaster, a shop pane, a parapet or a bill was merged geometry in
+// render/block.js: permanent, and a rebuild a load-time hitch exactly when a
+// building changes. Now every piece is one slot in a
 // per-architecture InstancedMesh — the render/zoning.js pattern, at city scale
 // — so the wall costs one fixed pool per architecture whatever the map does,
 // and no merged building path is left (law 6). Each slot carries the parcel it
@@ -19,6 +20,14 @@ function unitShell() {
   g.translate(0, 0.5, 0); // base on the ground: scale.y is the height
   return g;
 }
+
+// The unit pieces a pool instances: a shell sitting on its base, a centred box
+// (a tilted cap bracket pivots about its middle) and a poster plane.
+const SHAPES = {
+  shell: unitShell,
+  box: () => new THREE.BoxGeometry(1, 1, 1),
+  plane: () => new THREE.PlaneGeometry(1, 1),
+};
 
 // The float a slot stores for an id, adding it to the pool's table the first
 // time it appears (an op can name a parcel the first wall never drew). The
@@ -38,12 +47,15 @@ function idIndex(ids, seen, id) {
 // One fixed pool per architecture material, filled from parcel-keyed slots.
 // `slots` is what to draw now: { x, y, z, w, h, d, kind, zone, parcel,
 // district }; `y` is the slot's base (0 for a shaft, the shaft height for its
-// crown, a part's own foot for a podium piece). `extra` names per-instance
-// attributes a slot also carries (a shop pane's atlas cell); `kind` indexes
-// `materials`. A slot past capacity is dropped, not grown: the pool's size is
-// fixed at build (M3.T27 reclaims the tiles).
+// crown, a part's own foot for a podium piece) or its centre on a centred
+// shape. A rotation is optional per slot (`rx`, `ry`, `rz`, radians, XYZ
+// order). `extra` names per-instance attributes a slot also carries (a shop
+// pane's atlas cell); `kind` indexes `materials`; `shape` names the unit piece
+// every mesh of the pool instances. A slot past capacity is dropped, not
+// grown: the pool's size is fixed at build (M3.T27 reclaims the tiles).
 export function buildInstancePools(materials, slots, {
   slack = SHELL_SLACK, extra = [], castShadow = true, receiveShadow = true,
+  shape = 'shell',
 } = {}) {
   const group = new THREE.Group();
   const meshes = [];
@@ -56,7 +68,7 @@ export function buildInstancePools(materials, slots, {
   const counts = new Map();
   for (const s of slots) counts.set(s.kind, (counts.get(s.kind) ?? 0) + 1);
   for (const [kind, n] of counts) {
-    const geo = unitShell();
+    const geo = SHAPES[shape]();
     geo.setAttribute('zone', new THREE.InstancedBufferAttribute(new Float32Array(n + slack), 1));
     geo.setAttribute('parcel', new THREE.InstancedBufferAttribute(new Float32Array(n + slack), 1));
     geo.setAttribute('district', new THREE.InstancedBufferAttribute(new Float32Array(n + slack), 1));
@@ -76,6 +88,7 @@ export function buildInstancePools(materials, slots, {
   }
   const at = new THREE.Vector3();
   const quat = new THREE.Quaternion();
+  const euler = new THREE.Euler();
   const size = new THREE.Vector3();
   const matrix = new THREE.Matrix4();
 
@@ -87,8 +100,11 @@ export function buildInstancePools(materials, slots, {
       if (!mesh || mesh.count >= mesh.instanceMatrix.count) continue;
       const i = mesh.count++;
       at.set(s.x, s.y ?? 0, s.z);
-      size.set(s.w, s.h, s.d);
-      mesh.setMatrixAt(i, matrix.compose(at, quat.identity(), size));
+      size.set(s.w, s.h, s.d ?? 1);
+      const turn = s.rx || s.ry || s.rz
+        ? quat.setFromEuler(euler.set(s.rx ?? 0, s.ry ?? 0, s.rz ?? 0))
+        : quat.identity();
+      mesh.setMatrixAt(i, matrix.compose(at, turn, size));
       const attrs = mesh.geometry.attributes;
       attrs.zone.setX(i, s.zone ?? 0);
       attrs.parcel.setX(i, idIndex(parcelIds, parcelSlot, s.parcel));

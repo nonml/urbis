@@ -616,16 +616,17 @@ function pavementFurniture(out, ax, side, map) {
 // The other three were flat plaster slabs four metres tall, and from any
 // cross street that is a grey void where a building should be. Every face
 // gets the rhythm instead: pilasters, a corner downpipe with its hopper and
-// shoe, and a condenser where a back-of-house wall would carry one. All of
-// it merges into the podium and trim meshes that already exist.
-function podiumSkin(cx, cz, pw, pd, caps, part) {
+// shoe, and a condenser where a back-of-house wall would carry one. The
+// pilasters are podium slots, the pipes and condensers trim slots (M3.T25):
+// a bulldoze frees them with their building.
+function podiumSkin(cx, cz, pw, pd, cap, part) {
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       const x = cx + sx * (pw / 2 + 0.16);
       const z = cz + sz * (pd / 2 + 0.16);
-      caps.push(box(0.19, 4.2, 0.19, x, 2.1, z));
-      caps.push(box(0.36, 0.3, 0.36, x, 4.06, z));
-      caps.push(box(0.28, 0.26, 0.28, x, 0.5, z));
+      cap(0.19, 4.2, 0.19, x, 2.1, z);
+      cap(0.36, 0.3, 0.36, x, 4.06, z);
+      cap(0.28, 0.26, 0.28, x, 0.5, z);
     }
   }
   // Pilasters on the two faces the avenue never sees, at the same 0.55 width
@@ -640,8 +641,8 @@ function podiumSkin(cx, cz, pw, pd, caps, part) {
       part(0.22, 4.2, 0.55, cx + sx * (pw / 2 + 0.11), 2.1, cz + u);
     }
   }
-  caps.push(box(0.8, 0.62, 0.48, cx + pw / 2 + 0.34, 3.5, cz + pd * 0.28));
-  caps.push(box(0.48, 0.62, 0.8, cx - pw * 0.3, 3.5, cz - pd / 2 - 0.34));
+  cap(0.8, 0.62, 0.48, cx + pw / 2 + 0.34, 3.5, cz + pd * 0.28);
+  cap(0.48, 0.62, 0.8, cx - pw * 0.3, 3.5, cz - pd / 2 - 0.34);
 }
 
 // Flyposting. A podium wall with pilasters on it is still a clean wall, and
@@ -690,12 +691,27 @@ function posterAtlas() {
   return tex;
 }
 
-function posterCell(geo, k) {
-  const uv = geo.attributes.uv;
-  const cu = (k % 2) * 0.5;
-  const cv = k < 2 ? 0.5 : 0;
-  for (let i = 0; i < uv.count; i += 1) uv.setXY(i, cu + uv.getX(i) * 0.5, cv + uv.getY(i) * 0.5);
-  return geo;
+// The atlas offset the merged geometry used to bake into a poster's UVs,
+// carried as two per-instance floats instead so the pooled plane samples the
+// same cell. Both components are kept unbucketed: the merged path allowed
+// fractional cells and the instance path has to look the same.
+function posterCellUv(k) {
+  return [(k % 2) * 0.5, k < 2 ? 0.5 : 0];
+}
+
+function instancedPosterCells(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float cu;\nattribute float cv;')
+    .replace('#include <uv_vertex>', `
+#ifdef USE_INSTANCING
+  vec2 posterUv = vec2( cu, cv ) + uv * 0.5;
+  #define uv posterUv
+#endif
+#include <uv_vertex>
+#ifdef USE_INSTANCING
+  #undef uv
+#endif`);
+  if (!sh.vertexShader.includes('posterUv')) console.error('[posters] instanced cell patch missed');
 }
 
 // Bills go on all four faces, seeded off the tower index so the same wall
@@ -703,21 +719,22 @@ function posterCell(geo, k) {
 // spacing out politely: evenly spaced posters read as signage, and a stack
 // of them half over each other reads as a wall nobody owns. Pasted at 0.03
 // off the plaster so they sit behind the pilasters, not in front of them.
-function posterCluster(out, at, span, base, idx, f) {
+function posterCluster(out, at, span, base, idx, f, tag) {
   const n = 2 + ((idx * 7 + f) % 3);
   for (let i = 0; i < n; i += 1) {
+    if (Math.abs(base) >= span / 2) continue;
     const seed = idx * 31 + f * 11 + i * 7 + base * 3;
     const h = 0.58 + ((seed % 5) * 0.11);
-    const geo = posterCell(new THREE.PlaneGeometry(h * 0.72, h), (seed * 5) % 4);
-    geo.rotateZ((((seed * 13) % 11) - 5) * 0.014);
-    at(geo, base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17), i);
-    if (Math.abs(base) < span / 2) out.push(geo);
+    const [cu, cv] = posterCellUv((seed * 5) % 4);
+    at(base + (((seed * 23) % 100) / 100 - 0.5) * 0.9, 1.45 + ((seed % 7) * 0.17), i, {
+      w: h * 0.72, h, d: 1, rz: (((seed * 13) % 11) - 5) * 0.014, cu, cv, ...tag,
+    });
   }
 }
 
 const POSTER_LAYER = 0.006;
 
-function posterWall(out, cx, cz, pw, pd, idx) {
+function posterWall(out, cx, cz, pw, pd, idx, tag) {
   for (let f = 0; f < 4; f += 1) {
     const alongZ = f < 2;
     const dir = f % 2 ? 1 : -1;
@@ -725,19 +742,25 @@ function posterWall(out, cx, cz, pw, pd, idx) {
     const t = (alongZ ? pw : pd) / 2 + 0.03;
     // Each later bill in a cluster is pasted POSTER_LAYER further out, so two
     // that overlap never share a plane and z-fight into black stripes.
-    const at = (geo, u, y, layer) => {
+    const at = (u, y, layer, piece) => {
       const off = t + layer * POSTER_LAYER;
-      geo.rotateY(alongZ ? dir * Math.PI / 2 : (dir > 0 ? 0 : Math.PI));
-      geo.translate(alongZ ? cx + dir * off : cx + u, y, alongZ ? cz + u : cz + dir * off);
+      out.push({
+        x: alongZ ? cx + dir * off : cx + u,
+        y,
+        z: alongZ ? cz + u : cz + dir * off,
+        ry: alongZ ? dir * Math.PI / 2 : (dir > 0 ? 0 : Math.PI),
+        ...piece,
+      });
     };
-    for (const base of [-span * 0.28, span * 0.3]) posterCluster(out, at, span, base, idx, f);
+    for (const base of [-span * 0.28, span * 0.3]) posterCluster(out, at, span, base, idx, f, tag);
   }
 }
 
-// A box laid flat against a podium face. `alongZ` says the face normal points
-// down X, so the pane's width runs in Z instead.
-function faceBox(wide, tall, thick, x, y, z, alongZ) {
-  return alongZ ? box(thick, tall, wide, x, y, z) : box(wide, tall, thick, x, y, z);
+// A trim slot laid flat against a podium face. `alongZ` says the face normal
+// points down X, so the piece's width runs in Z instead.
+function faceCap(cap, wide, tall, thick, x, y, z, alongZ) {
+  if (alongZ) cap(thick, tall, wide, x, y, z);
+  else cap(wide, tall, thick, x, y, z);
 }
 
 // The ground a merged box covers, as a centre and a size.
@@ -758,19 +781,15 @@ const CROWN = 0.72;
 // a few landmarks instead of every box wearing the same hat.
 const SKYLINE_CROWN_MIN = 62;
 
-function roofline(caps, cx, cz, w, top, d, kind) {
-  caps.push(
-    box(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz + d / 2 - PARAPET_T / 2),
-    box(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz - d / 2 + PARAPET_T / 2),
-    box(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx + w / 2 - PARAPET_T / 2, top + PARAPET_H / 2, cz),
-    box(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx - w / 2 + PARAPET_T / 2, top + PARAPET_H / 2, cz),
-    box(w + 0.3, 0.12, d + 0.3, cx, top + PARAPET_H + 0.06, cz),
-  );
+function roofline(cap, cx, cz, w, top, d, kind) {
+  cap(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz + d / 2 - PARAPET_T / 2);
+  cap(w, PARAPET_H, PARAPET_T, cx, top + PARAPET_H / 2, cz - d / 2 + PARAPET_T / 2);
+  cap(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx + w / 2 - PARAPET_T / 2, top + PARAPET_H / 2, cz);
+  cap(PARAPET_T, PARAPET_H, d - 2 * PARAPET_T, cx - w / 2 + PARAPET_T / 2, top + PARAPET_H / 2, cz);
+  cap(w + 0.3, 0.12, d + 0.3, cx, top + PARAPET_H + 0.06, cz);
   if (MASONRY_KINDS.includes(kind)) {
-    caps.push(
-      box(w + 0.8, 0.45, d + 0.8, cx, top - 0.55, cz),
-      box(w + 0.45, 0.25, d + 0.45, cx, top - 0.9, cz),
-    );
+    cap(w + 0.8, 0.45, d + 0.8, cx, top - 0.55, cz);
+    cap(w + 0.45, 0.25, d + 0.45, cx, top - 0.9, cz);
   }
 }
 
@@ -779,11 +798,12 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const districtId = map.district?.id ?? null;
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
-  // Podium parts and shop panes are parcel-keyed pool slots (M3.T24), like the
-  // shells: a bulldoze frees them with the shaft they dress.
+  // Podium parts, shop panes and trim are parcel-keyed pool slots (M3.T24,
+  // M3.T25), like the shells: a bulldoze frees them with the shaft they dress.
   const podSlots = [];
   const glassSlots = [];
-  const caps = [];
+  const capSlots = [];
+  const posterSlots = [];
   // Every building's shaft is a pool slot (M3.T22 rows, M3.T23 towers and
   // caps); the same boxes go into the mirror proxy merged, because a puddle
   // reflects the wall.
@@ -791,7 +811,6 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const mirrorShells = [];
   const shopPools = [];
   const beaconPts = [];
-  const posters = [];
   // Where every tower stands, podium included: a crane on a growth lot zones
   // its jib around these (render/zoning.js).
   const footprints = [];
@@ -806,7 +825,7 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const SHOP_MARGIN = 1.5;     // solid pier each side of the glazing
   const AWNING_OUT = 0.85;
   const SPILL_OUT = 1.9;       // pool centre, just off the kerb side of the glass
-  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], part, idx, parcel) {
+  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], cap, part, idx, parcel) {
     const alongZ = fx !== 0;
     const pw = w + 1.2;
     const pd = d + 1.2;
@@ -821,7 +840,7 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       : [ox + u, oz + dir * t]);
     // Plinth: a dark stone base the whole podium stands on. Without it the
     // wall grows out of the pavement like a decal.
-    caps.push(box(pw + 0.16, 0.5, pd + 0.16, cx, 0.25, cz));
+    cap(pw + 0.16, 0.5, pd + 0.16, cx, 0.25, cz);
     const run = span - SHOP_MARGIN * 2;
     const midY = (SHOP_SILL + SHOP_HEAD) / 2;
     const gh = SHOP_HEAD - SHOP_SILL;
@@ -854,7 +873,7 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
         // Mullions inside a bay: the vertical rhythm that says shopfront.
         for (const mu of [-bayW / 4, bayW / 4]) {
           const [mx, mz] = at(u + mu, 0.09);
-          caps.push(faceBox(0.09, gh, 0.1, mx, midY, mz, alongZ));
+          faceCap(cap, 0.09, gh, 0.1, mx, midY, mz, alongZ);
         }
         if (i < bays - 1) {
           const [px, pz] = at(u + bayW / 2 + pier / 2, 0.08);
@@ -864,27 +883,24 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       }
       // Sill under the glass, awning over it: two horizontal shadow lines.
       const [sx, sz] = at(0, 0.12);
-      caps.push(faceBox(run + 0.3, 0.14, 0.24, sx, SHOP_SILL - 0.05, sz, alongZ));
+      faceCap(cap, run + 0.3, 0.14, 0.24, sx, SHOP_SILL - 0.05, sz, alongZ);
       const [ax2, az2] = at(0, AWNING_OUT / 2);
-      caps.push(faceBox(run + 0.5, 0.12, AWNING_OUT, ax2, SHOP_HEAD + 0.18, az2, alongZ));
+      faceCap(cap, run + 0.5, 0.12, AWNING_OUT, ax2, SHOP_HEAD + 0.18, az2, alongZ);
       // A canopy is a plate held up by something, with an edge that hangs.
       // Without the valance and the brackets it is a slab floating off a
       // wall, which is most of why the awnings read as black voids rather
       // than as awnings.
       const [vx, vz] = at(0, AWNING_OUT - 0.04);
-      caps.push(faceBox(run + 0.5, 0.26, 0.07, vx, SHOP_HEAD + 0.01, vz, alongZ));
+      faceCap(cap, run + 0.5, 0.26, 0.07, vx, SHOP_HEAD + 0.01, vz, alongZ);
       const stays = Math.max(2, Math.round(run / 3.2));
       for (let k = 0; k <= stays; k += 1) {
         const u = -run / 2 + (run / stays) * k;
         const [bx, bz] = at(u, AWNING_OUT / 2);
-        const b = alongZ
-          ? new THREE.BoxGeometry(AWNING_OUT * 1.25, 0.07, 0.07)
-          : new THREE.BoxGeometry(0.07, 0.07, AWNING_OUT * 1.25);
-        b.translate(0, 0, 0);
-        b.rotateZ(alongZ ? dir * 0.42 : 0);
-        b.rotateX(alongZ ? 0 : -dir * 0.42);
-        b.translate(bx, SHOP_HEAD - 0.06, bz);
-        caps.push(b);
+        const turn = alongZ ? { rz: dir * 0.42 } : { rx: -dir * 0.42 };
+        cap(
+          alongZ ? AWNING_OUT * 1.25 : 0.07, 0.07,
+          alongZ ? 0.07 : AWNING_OUT * 1.25, bx, SHOP_HEAD - 0.06, bz, turn,
+        );
       }
     }
     // Pilasters in podium plaster, so they self-shadow and the lamps rake them.
@@ -906,23 +922,30 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       x: px, y: py - ph / 2, z: pz, w: pw, h: ph, d: pd,
       kind: podKind, zone, parcel, district: districtId,
     });
+    // Trim is a centred pool slot too (M3.T25), keyed to the same parcel; `py`
+    // is the piece's centre, so a tilted bracket pivots about its own middle.
+    const cap = (cw, ch, cd, px, py, pz, turn = null) => capSlots.push({
+      x: px, y: py, z: pz, w: cw, h: ch, d: cd,
+      kind: 0, zone, parcel, district: districtId, ...turn,
+    });
+    const posterTag = { zone, parcel, district: districtId };
     part(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz);
-    podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, part);
-    posterWall(posters, cx, cz, w + 1.2, d + 1.2, idx);
+    podiumSkin(cx, cz, w + 1.2, d + 1.2, cap, part);
+    posterWall(posterSlots, cx, cz, w + 1.2, d + 1.2, idx, posterTag);
     // Stone trim course capping the podium — one thin ring, catches lamp light.
-    caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
+    cap(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz);
     // Door recess: dark inset on the street-facing podium face.
     const doorW = Math.min(w * 0.35, 2.4);
     const doorH = 3.0;
     const faceZ = cz + (d + 1.2) / 2 + 0.01;
     if (door) {
-      caps.push(box(doorW, doorH, 0.06, cx, doorH / 2, faceZ));
+      cap(doorW, doorH, 0.06, cx, doorH / 2, faceZ);
       // Small canopy over the door.
-      caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
+      cap(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35);
     }
-    if (face) dressGroundFloor(cx, cz, w, d, zone, face, part, idx, parcel);
-    // The shaft is a pool slot too (M3.T22/T23); the podium pieces and the
-    // glazing became slots in M3.T24. Caps and posters still merge (M3.T25).
+    if (face) dressGroundFloor(cx, cz, w, d, zone, face, cap, part, idx, parcel);
+    // The shaft is a pool slot too (M3.T22/T23); podium, glazing, trim and
+    // posters all became slots by M3.T25.
     const shellBox = (sw, sh, sd, baseY) => {
       shellSlots.push({
         x: cx, y: baseY, z: cz, w: sw, h: sh, d: sd, kind, zone, parcel, district: districtId,
@@ -941,16 +964,16 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       topY = h + uh;
     }
     if (door) {
-      caps.push(box(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz));
-      caps.push(box(w + 0.9, 0.35, d + 0.9, cx, topY + 0.1, cz));
+      cap(w + 0.4, 0.5, d + 0.4, cx, h + 0.25, cz);
+      cap(w + 0.9, 0.35, d + 0.9, cx, topY + 0.1, cz);
     } else {
-      roofline(caps, cx, cz, w, h, d, kind);
-      if (topY > h) roofline(caps, cx, cz, w * CROWN, topY, d * CROWN, kind);
+      roofline(cap, cx, cz, w, h, d, kind);
+      if (topY > h) roofline(cap, cx, cz, w * CROWN, topY, d * CROWN, kind);
     }
     const ux = cx + (idx % 3 - 1) * w * 0.22;
     const uz = cz + ((idx + 1) % 3 - 1) * d * 0.22;
-    caps.push(box(2.2, 1.4, 1.8, ux, topY + 0.9, uz));
-    caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
+    cap(2.2, 1.4, 1.8, ux, topY + 0.9, uz);
+    cap(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz);
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
     // h: the follow camera stops at this box instead of entering the block.
     footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, h: topY, name, parcel });
@@ -1019,22 +1042,30 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   mirrorProxy.castShadow = false;
   mirrorProxy.receiveShadow = false;
   const mirrorProxies = [mirrorProxy];
+  // Rooflines, cornices, awnings and bills are fixed-size pools too (M3.T25):
+  // a bulldoze frees a building's trim and posters with its shell, not a merge
+  // rebuild. The poster pool carries each bill's atlas offset per instance.
   const capMat = new THREE.MeshStandardMaterial({
     color: 0x1b1f27, roughness: 0.78, metalness: 0.15, envMapIntensity: 0.7,
   });
-  const posterMesh = new THREE.Mesh(mergeGeometries(posters), new THREE.MeshStandardMaterial({
+  const capPool = buildInstancePools([capMat], capSlots, {
+    shape: 'box', castShadow: true, receiveShadow: false,
+  });
+  group.add(capPool.group);
+  const posterMat = new THREE.MeshStandardMaterial({
     map: posterAtlas(), roughness: 0.94, metalness: 0, side: THREE.DoubleSide,
-  }));
-  posterMesh.receiveShadow = true;
-  group.add(posterMesh);
-  const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
-  capMesh.castShadow = true;
-  group.add(capMesh);
+  });
+  posterMat.onBeforeCompile = instancedPosterCells;
+  posterMat.customProgramCacheKey = () => 'instanced-posters';
+  const posterPool = buildInstancePools([posterMat], posterSlots, {
+    shape: 'plane', extra: ['cu', 'cv'], castShadow: false, receiveShadow: true,
+  });
+  group.add(posterPool.group);
 
   return {
     group, beacons: beaconPts, facadeMats: mats.facadeMats,
     zoneMats: mats.zoneMats, kinds: mats.kinds, mirrorProxies, shopPools, footprints,
-    shells, podiumPools, glassPool,
+    shells, podiumPools, glassPool, capPool, posterPool,
   };
 }
 
