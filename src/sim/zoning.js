@@ -5,6 +5,10 @@
 import { createStreams } from './rng.js';
 import { worldMap } from './patrol.js';
 import { isDark, zoneAt } from './street.js';
+// The stage scale and the use set belong to the map's parcels (sim/map.js);
+// re-exported so every reader keeps importing them from zoning, as before.
+import { STAGE, STAGES, USES } from './map.js';
+export { STAGE, STAGES, USES };
 import {
   COMMERCE_PER_HOME,
   ESTABLISHED_PER_LOT_M2,
@@ -17,10 +21,6 @@ import {
   tickEconomy,
 } from './economy.js';
 import { TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
-
-export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
-export const STAGE = Object.fromEntries(STAGES.map((name, i) => [name, i]));
-export const USES = ['res', 'com', 'ind'];
 
 // The shell stands this far inside the hoarding line on every side. It lives
 // here, not in render/zoning.js, because the interiors derive their door face
@@ -88,12 +88,16 @@ const MID_SHARE = 0.45;
 const START_STAGES = [STAGE.EMPTY, STAGE.EMPTY, STAGE.EMPTY, STAGE.SITE, STAGE.SITE, STAGE.LOW, STAGE.LOW, STAGE.MID];
 const START_PROGRESS = 0.8;
 
-function makeParcel(rand, [x, z, w, d]) {
+function makeParcel(rand, [x, z, w, d], index) {
   const stage = START_STAGES[Math.floor(rand() * START_STAGES.length)];
   const fit = Math.min(TOP_MAX, Math.max(TOP_MIN, Math.min(w, d) * SLENDERNESS));
   const top = fit * (0.85 + rand() * 0.25);
   const use = USES[Math.floor(rand() * USES.length)];
   return {
+    // The building parcels live in map.parcels; these are the lots the city
+    // grows. The id matches the map's own lot parcel (sim/map.js lotParcel).
+    id: `lot:${index}`,
+    kind: 'lot',
     x, z, w, d,
     // `use` is what stands on the lot, or what it is breaking ground as; `zoned`
     // is what the lot is zoned for (null: unzoned). The seed rolls the opening
@@ -235,11 +239,17 @@ export function createCity(seed, map = worldMap()) {
   // A map with lots of its own is a generated plan; the preset map has none,
   // and its hand tables play the generated behaviour off, exactly as before.
   const generated = Boolean(map.lots);
-  const parcels = (map.lots ?? LOTS).map((lot) => makeParcel(rng.world, lot));
+  const parcels = (map.lots ?? LOTS).map((lot, i) => makeParcel(rng.world, lot, i));
   if (generated) {
     freeLand(parcels);
     balanceUses(parcels);
   }
+  // Every building and lot is one live parcel in the map (sim/map.js): the lots
+  // the city grows, then the standing row, tower and cap parcels. This replaces
+  // the map's opening lot stubs, so one lot is one object, not two.
+  const standing = (map.parcels ?? []).filter((p) => p.kind !== 'lot');
+  for (const p of standing) p.powerZone = zoneAt(p.z);
+  map.parcels = [...parcels, ...standing];
   const economy = createEconomy(parcels, builtHeight, rng.sim, map);
   return { time: 0, parcels, economy, demand: cityDemand(economy) };
 }
@@ -315,7 +325,7 @@ function clearLot(p, dt) {
 // the ticks that follow. Returns whether the zoning changed.
 export function zoneParcel(city, index, use) {
   const p = city.parcels[index];
-  if (!p || (use !== null && !USES.includes(use)) || p.zoned === use) return false;
+  if (!p || p.kind !== 'lot' || (use !== null && !USES.includes(use)) || p.zoned === use) return false;
   p.zoned = use;
   // The player's hand, not the market's: the lot's first floors go up on the
   // player's order alone (tickParcel, growthRate), spent at the low block.
@@ -327,6 +337,9 @@ export function tickZoning(city, dt, street, hold = -1) {
   city.time += dt;
   updateDemand(city, dt, street);
   city.parcels.forEach((p, i) => {
+    // Only a lot grows or declines on its own. A row, tower or cap is a fixed
+    // parcel the player edits (M3.T18), never one the market moves.
+    if (p.kind !== 'lot') return;
     // The player's own building waits for them: while they stand inside it,
     // its decline (or ordered demolition) is deferred, so the space they are
     // in never disappears around them.
