@@ -77,6 +77,7 @@ export function buildSettingsPanel(host) {
   }
   host.appendChild(grid);
   buildBindingsPanel(host);
+  buildPadPanel(host);
   return host;
 }
 
@@ -226,6 +227,44 @@ export function buildBindingsPanel(host) {
     buttons.set(action, button);
     button.addEventListener('click', () => captureKey(action, button, buttons));
     grid.append(name, button);
+  }
+  host.appendChild(grid);
+  return host;
+}
+
+// ---- The pad (M7.T15) ------------------------------------------------------
+// The standard mapping (W3C) the street plays with: left stick moves and
+// steers, right stick looks, RT runs, A enters, X hacks, Y opens the journal.
+// The city view stays mouse and keys (D13), so no row points at it. Rebinding
+// the pad, layouts and dead zones are M29.
+export const PAD_CONTROLS = [
+  ['MOVE', 'LEFT STICK'], ['LOOK', 'RIGHT STICK'], ['RUN', 'RT'],
+  ['DRIVE', 'LEFT STICK'], ['ENTER', 'A / CROSS'], ['BLACKOUT', 'X / SQUARE'],
+  ['JOURNAL', 'Y / TRIANGLE'],
+];
+
+// The pad listing under the key grid: the connection the browser reports, then
+// one row per control. Exported so later tabs (M29) mount it beside their own.
+export function buildPadPanel(host) {
+  let on = false;
+  try {
+    const pads = globalThis.navigator?.getGamepads?.() ?? [];
+    for (const p of pads) if (p && p.connected !== false) on = true;
+  } catch { /* an embed can deny the API; then there is no pad */ }
+  const status = document.createElement('div');
+  status.id = 'pad-status';
+  status.style.cssText = 'margin:10px 0 2px;font:10px ui-monospace,Menlo,monospace;letter-spacing:0.14em;opacity:0.65';
+  status.textContent = on ? 'GAMEPAD CONNECTED' : 'GAMEPAD NOT CONNECTED';
+  host.appendChild(status);
+  const grid = document.createElement('div');
+  grid.id = 'pad-grid';
+  grid.style.cssText = GRID;
+  for (const [label, control] of PAD_CONTROLS) {
+    const name = document.createElement('label');
+    name.textContent = label;
+    const padKey = document.createElement('div');
+    padKey.textContent = control;
+    grid.append(name, padKey);
   }
   host.appendChild(grid);
   return host;
