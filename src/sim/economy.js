@@ -15,18 +15,30 @@ const USES = ['res', 'com', 'ind'];
 // A resident or a worker for every 25 m² of floor, on the 3.5 m storey the lots
 // build to — a finished lot holds 20 to 120 people.
 export const M3_PER_PERSON = 25 * 3.5;
-// The towers a district already stood in before any lot broke ground: this many
-// residents per m² of its lot land, about what the lots hold at full build. It
-// is balanced — as many jobs as homes, shops for its spending, workshops for its
-// shops — so everything the lots add is the margin that moves.
+// The hand preset's towers are not parcels, so only it still estimates the
+// established district this way: residents per m² of lot land, about what the
+// lots hold at full build. A generated map measures its buildings (M3.T16);
+// M4.T15 deletes this with the preset.
 export const ESTABLISHED_PER_LOT_M2 = 0.4;
 
+// The floor a parcel holds right now, in the economy's people: its built height
+// over its footprint, at M3_PER_PERSON of floor. The lots measure it through
+// zoning's builtHeight; a map's standing buildings stand at their full height.
+// One formula, exported so sim/people.js counts the same floor the economy does.
+export function floorPeople(p, heightOf) {
+  return (heightOf(p) * p.w * p.d) / M3_PER_PERSON;
+}
+
 // What the district needs of each use, per unit of what drives it. Every job
-// on the lots wants a home; residents' spending keeps about a third as many
-// people busy in shops; trading shops keep two in five of theirs again in
-// workshops supplying them.
-export const COMMERCE_PER_HOME = 0.35;
+// on the lots wants a home; trading shops keep two in five of theirs again in
+// workshops supplying them. A measured generated district counts every floor as
+// jobs (M3.T16), so its mix keeps jobs equal to homes: COMMERCE_PER_HOME is the
+// shops a home's spending keeps, 1/(1 + INDUSTRY_PER_COMMERCE), and it makes
+// the base's shops plus its workshops add up to one home — half its floor homes,
+// half work. The hand preset shipped with a third instead.
 export const INDUSTRY_PER_COMMERCE = 0.4;
+export const COMMERCE_PER_HOME = 1 / (1 + INDUSTRY_PER_COMMERCE);
+const COMMERCE_PER_HOME_HAND = 0.35;
 
 // Firms from beyond the map looking for floor in the district — offices want
 // commercial floor, works want industrial — in the jobs they would bring. One
@@ -34,9 +46,12 @@ export const INDUSTRY_PER_COMMERCE = 0.4;
 // lean back toward the usual level, so the district wanders but never drifts.
 // This is the market the city cannot control, and why it never settles.
 // A generated new game gets the calm market (docs/ECONOMY.md, M1.T3): a firm
-// 3-7% of the district, pull 8, the opening queue served off. The hand preset
-// keeps the market it shipped with.
-export const FIRMS_USUAL = 0.12;
+// 3-7% of the district, pull 8, the opening queue served off. A measured
+// district is several times the lots' full build (M3.T16), so the usual level a
+// firm wanders around is 6% of it and the bands stay un-pinned; the hand preset
+// is still sized by the old estimate and keeps the market it shipped with.
+export const FIRMS_USUAL = 0.06;
+const FIRMS_USUAL_HAND = 0.12;
 const FIRM_MIN = 0.03;
 const FIRM_MAX = 0.07;
 const FIRM_MIN_HAND = 0.06;
@@ -127,10 +142,26 @@ const clamp01 = (v) => Math.max(0, Math.min(1, v));
 const lerp = (a, b, t) => a + (b - a) * t;
 const perUse = (fn) => Object.fromEntries(USES.map((use) => [use, fn(use)]));
 
-function makeDistrict(id, lots, rand, calm) {
-  const size = lots.reduce((sum, p) => sum + p.w * p.d, 0) * ESTABLISHED_PER_LOT_M2;
-  const shops = size * COMMERCE_PER_HOME;
-  const firms = size * FIRMS_USUAL * BOOT_FIRMS;
+// A district's size is the floor area of its parcels (M3.T16): every building
+// already standing, measured parcel by parcel in the economy's people, not a
+// flat 0.4 rate over lot land. The base mix is one home, COMMERCE_PER_HOME shops
+// and their workshops per resident, so the measured floor divided by that sum is
+// the district's own size — the floor the model assumes its established district
+// holds is the floor its buildings actually hold. The hand preset has no
+// building parcels and keeps the shipped estimate (M4.T15 deletes it with it).
+function districtSize(parcels, heightOf, calm) {
+  const built = parcels.filter((p) => p.kind !== 'lot');
+  if (!calm || built.length === 0) {
+    return parcels.reduce((sum, p) => sum + p.w * p.d, 0) * ESTABLISHED_PER_LOT_M2;
+  }
+  const mix = 1 + COMMERCE_PER_HOME * (1 + INDUSTRY_PER_COMMERCE);
+  return built.reduce((sum, p) => sum + floorPeople(p, heightOf), 0) / mix;
+}
+
+function makeDistrict(id, parcels, rand, calm, heightOf) {
+  const size = districtSize(parcels, heightOf, calm);
+  const shops = size * (calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND);
+  const firms = size * (calm ? FIRMS_USUAL : FIRMS_USUAL_HAND) * BOOT_FIRMS;
   return {
     id,
     name: ZONE_NAMES[id],
@@ -180,7 +211,7 @@ function measureFloors(economy, parcels, heightOf) {
   for (const p of parcels) {
     const d = economy.districts[p.powerZone];
     if (!(p.use in d.floor)) continue;
-    d.floor[p.use] += (heightOf(p) * p.w * p.d) / M3_PER_PERSON;
+    d.floor[p.use] += floorPeople(p, heightOf);
     d.lots[p.use] += 1;
   }
   economy.districts.forEach((d, i) => {
@@ -192,15 +223,18 @@ function measureFloors(economy, parcels, heightOf) {
   });
 }
 
-// Need against have, per use. Homes follow the jobs on the lots; commerce
-// follows what residents spend, plus offices wanting floor; industry follows
-// what the shops sell, plus works wanting floor.
+// Need against have, per use. Homes follow the jobs; commerce follows what
+// residents spend, plus offices wanting floor; industry follows what the shops
+// sell, plus works wanting floor. A measured district's jobs are every
+// non-residential floor it has (M3.T16); the hand preset shipped with its
+// balanced base standing in for them through base.res.
 function price(d) {
   for (const use of USES) d.have[use] = d.base[use] + d.floor[use];
   d.homes = d.have.res;
-  d.jobs = d.base.res + d.floor.com + d.floor.ind;
+  d.jobs = d.calm ? d.have.com + d.have.ind : d.base.res + d.floor.com + d.floor.ind;
+  const commerce = d.calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND;
   d.need.res = d.jobs;
-  d.need.com = d.homes * d.wealth * COMMERCE_PER_HOME + d.firms.com;
+  d.need.com = d.homes * d.wealth * commerce + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
   const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
   for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
@@ -211,11 +245,15 @@ function price(d) {
 // The hand preset's map has no lots and keeps the market it shipped with.
 export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
   const calm = Boolean(map.lots);
+  // The map's parcel list holds every building and lot (M3.T15); the economy
+  // sizes each district from the buildings on it. The grown lots arrive in
+  // `parcels` and stay the margin measured in `d.floor`.
+  const all = map.parcels ?? parcels;
   const economy = {
     time: 0,
     rand,
     calm,
-    districts: ZONE_NAMES.map((_, id) => makeDistrict(id, parcels.filter((p) => p.powerZone === id), rand, calm)),
+    districts: ZONE_NAMES.map((_, id) => makeDistrict(id, all.filter((p) => p.powerZone === id), rand, calm, heightOf)),
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
@@ -232,20 +270,20 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
 // stream stays in step and one district's fortunes never reach the other's.
 function moveFirm(economy, d) {
   const [kind, roll, share, wait] = [economy.rand(), economy.rand(), economy.rand(), economy.rand()];
+  const usual = d.size * (d.calm ? FIRMS_USUAL : FIRMS_USUAL_HAND);
   let use = kind < 0.5 ? 'com' : 'ind';
   if (d.calm) {
     // The serving of the opening queue: every move, the surplus above the usual
     // level loses a serving's worth (a frozen market never acts, so its firms stay).
     for (const u of ['com', 'ind']) {
-      const usual = d.size * FIRMS_USUAL;
       if (d.firms[u] > usual) d.firms[u] -= (d.firms[u] - usual) * BOOT_THIN;
     }
     // The kind furthest from its usual level takes the move.
-    const short = perUse((u) => (d.size * FIRMS_USUAL - d.firms[u]) / d.size);
+    const short = perUse((u) => (usual - d.firms[u]) / d.size);
     const far = Math.abs(short.com) - Math.abs(short.ind);
     use = far > FIRM_TIE ? 'com' : far < -FIRM_TIE ? 'ind' : use;
   }
-  const short = (d.size * FIRMS_USUAL - d.firms[use]) / d.size;
+  const short = (usual - d.firms[use]) / d.size;
   const pull = d.calm ? FIRMS_PULL : FIRMS_PULL_HAND;
   const odds = Math.max(MOVE_ODDS_FLOOR, Math.min(1 - MOVE_ODDS_FLOOR, 0.5 + pull * short));
   const firm = d.size * lerp(d.calm ? FIRM_MIN : FIRM_MIN_HAND, d.calm ? FIRM_MAX : FIRM_MAX_HAND, share);
@@ -259,6 +297,10 @@ function moveFirm(economy, d) {
 // on the first tick lit again a flight sized to them is booked FLIGHT_SECS out.
 // A flight that comes due takes its jobs from whichever of offices or works has
 // more firms, as far as there are any, and d.last says why (cause) for the news.
+// A measured district's floor is what its jobs are counted on, so when the
+// firms cannot cover the flight, the established floor the rest sat on goes with
+// it (M3.T16): the jobs leave the city and the lots answer the empty want. The
+// hand preset's balanced base is not counted that way and only loses firms.
 // It never draws from economy.rand, so the other district's stream stays in step.
 function flee(economy, d, dt) {
   if (d.dark) d.darkFor += dt;
@@ -272,7 +314,9 @@ function flee(economy, d, dt) {
     const use = d.firms.com >= d.firms.ind ? 'com' : 'ind';
     const jobs = Math.min(flight.jobs, d.firms[use]);
     d.firms[use] -= jobs;
-    if (jobs > 0) d.last = { at: economy.time, use, jobs: -jobs, cause: flight.cause };
+    const floor = d.calm ? Math.min(flight.jobs - jobs, d.base[use]) : 0;
+    if (floor > 0) d.base[use] -= floor;
+    if (jobs + floor > 0) d.last = { at: economy.time, use, jobs: -(jobs + floor), cause: flight.cause };
   }
 }
 

@@ -9,7 +9,7 @@
 // Milestone 3 skeleton: the constants and shapes are final; moveHomes and
 // matchJobs are stubs that each have a test in tests/people-*.todo.js.
 import { builtHeight } from './zoning.js';
-import { M3_PER_PERSON } from './economy.js';
+import { floorPeople } from './economy.js';
 import { mulberry32 } from './rng.js';
 
 export const FIRST = [
@@ -29,7 +29,7 @@ export const USE_NAMES = { res: 'flats', com: 'shop', ind: 'workshop' };
 // empty. A lot with no use holds nobody.
 export function lotPeople(p) {
   if (!p.use) return 0;
-  return Math.round(((builtHeight(p) * p.w * p.d) / M3_PER_PERSON) * (1 - p.vacancy));
+  return Math.round(floorPeople(p, builtHeight) * (1 - p.vacancy));
 }
 
 // `list` holds every person, oldest first: { id, name, age, home, job }. `home` is
