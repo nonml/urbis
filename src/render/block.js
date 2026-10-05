@@ -18,6 +18,7 @@ import { HAND_PINNED, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS, vistasOf } from '../sim/vistas.js';
 import { MIDBLOCK } from '../sim/streetscape.js';
 import { midblockFor } from '../sim/streetscape.js';
+import { buildShellPools } from './buildings.js';
 
 // Where the city is comes from the map (sim/map.js): this file draws the road
 // graph the map returns, it does not get a second opinion about where the roads
@@ -757,11 +758,16 @@ function roofline(caps, cx, cz, w, top, d, kind) {
 
 export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const avenueX = map.district.avenues.map((a) => a.x);
+  const districtId = map.district?.id ?? null;
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
-  const facades = mats.kinds.map(() => [[], []]);
   const podiums = mats.podium.map(() => []);
   const caps = [];
+  // Every building's shaft is a pool slot (M3.T22 rows, M3.T23 towers and
+  // caps); the same boxes go into the mirror proxy merged, because a puddle
+  // reflects the wall.
+  const shellSlots = [];
+  const mirrorShells = [];
   const shopGeos = [[], []];
   const shopPools = [];
   const beaconPts = [];
@@ -865,9 +871,8 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   // `name` says which table row this is, so the overlap check can point at it;
   // `parcel` is the map parcel this building is (M3-3), null on the hand preset.
-  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % facades.length, door = true, parcel = null) {
+  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % mats.kinds.length, door = true, parcel = null) {
     const zone = cz < 0 ? 0 : 1;
-    const shaft = facades[kind][zone];
     const pod = podiums[idx % podiums.length];
     pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
     podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, pod);
@@ -884,13 +889,24 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
     }
     if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
-    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
+    // The shaft is a pool slot, not merged geometry (M3.T22/T23). Everything
+    // else about it — podium, caps, posters, shopfront — stays merged until
+    // M3.T24 pools it.
+    const shellBox = (sw, sh, sd, baseY) => {
+      shellSlots.push({
+        x: cx, y: baseY, z: cz, w: sw, h: sh, d: sd, kind, zone, parcel, district: districtId,
+      });
+      mirrorShells.push(withZone(
+        worldUVs(box(sw, sh, sd, cx, baseY + sh / 2, cz), sw, sh, sd, FACADE_TILE), zone,
+      ));
+    };
+    shellBox(w, h, d, 0);
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * CROWN;
       const uh = h * 0.3;
       const ud = d * CROWN;
-      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, FACADE_TILE));
+      shellBox(uw, uh, ud, h);
       topY = h + uh;
     }
     if (door) {
@@ -943,15 +959,15 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
     });
   }
-  // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
-  // architecture lights both halves of the district.
-  for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
-  const batches = [
-    ...facades.map((zoned, kind) => [zoned.flat(), mats.kinds[kind]]),
-    ...podiums.map((geos, i) => [geos, mats.podium[i]]),
-  ];
+  // Every building's shaft, one fixed-size pool per architecture: a bulldoze
+  // or a rezone is a matrix write, not a merge rebuild (M3.T22/T23).
+  const shells = buildShellPools(mats.kinds, shellSlots);
+  group.add(shells.group);
+  const batches = podiums.map((geos, i) => [geos, mats.podium[i]]);
   for (const [geos, mat] of batches) {
-    if (!geos.length) throw new Error('buildTowers: empty batch would leave a material unlit');
+    // A podium architecture the wall never wears leaves an empty merged batch;
+    // nothing merged draws it.
+    if (!geos.length) continue;
     const m = new THREE.Mesh(mergeGeometries(geos), mat);
     m.castShadow = true;
     m.receiveShadow = true;
@@ -963,7 +979,7 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   // glass material — and each zone still dies with its own lights, because the
   // proxy carries the same zone stamp.
   const mirrorProxy = new THREE.Mesh(
-    mergeGeometries([0, 1].flatMap((zone) => facades.flatMap((zoned) => zoned[zone]))),
+    mergeGeometries(mirrorShells),
     mats.kinds[0],
   );
   mirrorProxy.castShadow = false;
