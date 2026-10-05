@@ -24,7 +24,7 @@ import { bindCityView } from '../ui/cityview.js';
 import { toggleJournal } from '../render/arcui.js';
 import { cycleRadio } from '../audio/music.js';
 import { loadBindings, onBindingsChange } from '../ui/settings.js';
-import { askNewGame } from '../ui/title.js';
+import { askNewGame, titleShowing } from '../ui/title.js';
 
 // The reads the sim step gets while the overview owns the input: no movement.
 const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
@@ -113,8 +113,9 @@ export function bindInput(parts) {
     if (action === 'hack') fireHack();
     if (action === 'vehicle') toggleVehicle();
     if (action === 'dayNight') toggleDay(clock);
-    // N (M7-7): the ask comes first, in the page, whenever a save exists.
-    if (action === 'newGame') askNewGame(newGame);
+    // N (M7-7): the ask comes first, in the page, whenever a save exists — but
+    // only in play; on the title the front door's own button asks.
+    if (action === 'newGame' && !titleShowing()) askNewGame(newGame);
     if (action === 'radio' && driving) radio = cycleRadio(radio);
     if (action === 'journal') toggleJournal(arcUI);
     if (action === 'choice1') arcChoose(arc, 1, street.time);

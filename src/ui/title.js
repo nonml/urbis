@@ -238,10 +238,10 @@ function buildSettings() {
 // handed to the next boot (savestore handoffSlot). New Game opens the panel on
 // an empty slot, and asks in the page first when the selected one holds a city.
 function buildSlots(seed, start, lift) {
-  const infos = slotInfos();
   const boot = activeSlot();
-  let selected = infos.some((s) => s.slot === boot && s.hasSave)
-    ? boot : (infos.find((s) => s.hasSave) ?? infos[0]).slot;
+  const first = slotInfos();
+  let selected = first.some((s) => s.slot === boot && s.hasSave)
+    ? boot : (first.find((s) => s.hasSave) ?? first[0]).slot;
   const host = el('div', 'margin:4px 0');
   const target = el('div', 'margin:2px 0 6px;font-size:10px;letter-spacing:0.14em;opacity:0.65', '');
   target.id = 'title-slot-target';
@@ -264,6 +264,9 @@ function buildSlots(seed, start, lift) {
     refresh();
   };
   function refresh() {
+    // Fresh on every render: the world behind the title keeps autosaving, so a
+    // snapshot taken once would show stale population and save time.
+    const infos = slotInfos();
     host.replaceChildren(...infos.map((info) => slotButton(info, info.slot === selected, picked)));
     continueBtn.disabled = !slotInfo(selected).hasSave;
   }
@@ -352,6 +355,14 @@ function mountPauseSave() {
 // N (M7-7): a new game never replaces a save without asking, in the page.
 // Automated runs are not players, and boot.js hides the title for them, so
 // the gate drives N straight through; a real browser is asked first.
+// The title is not play: N does nothing there (titleShowing), because its own
+// NEW GAME button is the front door's ask.
+export function titleShowing() {
+  if (typeof document === 'undefined') return false;
+  const root = document.getElementById('title');
+  return !!root && root.style.display !== 'none';
+}
+
 export function askNewGame(onYes) {
   if (typeof document === 'undefined' || navigator.webdriver) { onYes(); return null; }
   const shown = document.getElementById('newgame-ask');

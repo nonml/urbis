@@ -19,19 +19,28 @@ const savedAtKey = (slot) => `urbis.savedat.${slot}`;
 
 const clampSlot = (n) => (Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT ? n : 1);
 
+// The one door to localStorage. A denied or full store costs the player a
+// save, never the game: a blocked read is an empty slot, a blocked write is a
+// save that did not happen.
+function read(key) {
+  try { return localStorage.getItem(key); } catch { return null; }
+}
+
+function write(key, value) {
+  try { localStorage.setItem(key, value); return true; } catch { return false; }
+}
+
+function drop(key) {
+  try { localStorage.removeItem(key); return true; } catch { return false; }
+}
+
 export function activeSlot() {
-  try {
-    return clampSlot(Number(localStorage.getItem(ACTIVE_KEY)));
-  } catch {
-    return 1;
-  }
+  return clampSlot(Number(read(ACTIVE_KEY)));
 }
 
 export function setActiveSlot(slot) {
   const n = clampSlot(slot);
-  try {
-    localStorage.setItem(ACTIVE_KEY, String(n));
-  } catch { /* a named slot costs nothing */ }
+  write(ACTIVE_KEY, String(n));
   return n;
 }
 
@@ -40,30 +49,20 @@ export function setActiveSlot(slot) {
 // autosave never sees it, so it cannot write this city over that slot's save.
 export function handoffSlot(slot) {
   const n = clampSlot(slot);
-  try {
-    localStorage.setItem(NEXT_KEY, String(n));
-  } catch { /* the handoff is optional; a failed one just reloads the same slot */ }
+  write(NEXT_KEY, String(n));
   return n;
 }
 
 function takeHandoff() {
-  try {
-    const raw = localStorage.getItem(NEXT_KEY);
-    if (raw === null) return null;
-    localStorage.removeItem(NEXT_KEY);
-    const n = Number(raw);
-    return Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT ? n : null;
-  } catch {
-    return null;
-  }
+  const raw = read(NEXT_KEY);
+  if (raw === null) return null;
+  drop(NEXT_KEY);
+  const n = Number(raw);
+  return Number.isInteger(n) && n >= 1 && n <= SLOT_COUNT ? n : null;
 }
 
 function readRaw(slot) {
-  try {
-    return localStorage.getItem(slotKey(slot));
-  } catch {
-    return null;
-  }
+  return read(slotKey(slot));
 }
 
 // The active slot's game JSON, or null. boot.js and main.js only ever ask for
@@ -86,12 +85,10 @@ export function slotInfo(slot) {
   try { saved = JSON.parse(raw); } catch { saved = null; }
   const seed = Number.isInteger(saved?.seed) && saved.seed > 0 ? saved.seed : null;
   const list = saved?.people?.list;
-  let savedAt = 0;
-  try { savedAt = Number(localStorage.getItem(savedAtKey(n))) || 0; } catch { savedAt = 0; }
   return {
     slot: n, hasSave: true, seed,
     population: Array.isArray(list) ? list.length : 0,
-    savedAt,
+    savedAt: Number(read(savedAtKey(n))) || 0,
   };
 }
 
@@ -111,12 +108,6 @@ export function writeSave(data) {
 }
 
 export function clearSave() {
-  try {
-    const slot = activeSlot();
-    localStorage.removeItem(slotKey(slot));
-    localStorage.removeItem(savedAtKey(slot));
-    return true;
-  } catch {
-    return false;
-  }
+  const slot = activeSlot();
+  return drop(slotKey(slot)) && drop(savedAtKey(slot));
 }
