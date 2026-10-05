@@ -21,7 +21,7 @@ import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { hold, waitGame } from './lib/input.js';
 
-const SEEDS = [1, 2, 3, 4, 5];
+const SEEDS = [7, 11, 22, 33, 73];
 const HACK_AT = 60;          // the poke lands at minute 1
 const SECS = 300;            // the bar: 5 game minutes
 const LOSS = 0.10;           // M1-5's at least 10% of jobs

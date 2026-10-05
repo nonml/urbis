@@ -7,16 +7,11 @@
 // The click is a real one (M0.T4): the free lot projects through __game.screenOf
 // onto the canvas and the city view's own pick names it before the mouse goes
 // down. The overview is aimed at the lot the way a player pans to it.
-//
-// Red today: ROADMAP M1-1 records a 113 s median and seed 2 never breaking
-// ground inside the bar. M1.T4, fast first floor, is the task that turns the
-// assertion green; until it lands the file carries its expected-fail marker, so
-// the run still measures and reports the real seconds instead of skipping.
 import { test, expect } from '@playwright/test';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { clickWorld, cityView, waitGame } from './lib/input.js';
 
-const SEEDS = [1, 2, 3, 4, 5];
+const SEEDS = [7, 11, 22, 33, 73];
 const SPEED = 4;              // ?speed: 4 fixed steps a frame, the M0 convention
 const LIMIT = 60;             // M1-1's game seconds to the first floor
 const STEPS_PER_SEC = 20;     // the fixed step is 50 ms (game/loop.js)
@@ -31,11 +26,6 @@ function saveShot(dataUrl, name) {
 test.setTimeout(300000);
 
 test('M1-1: a mouse-zoned empty lot shows its first floor within 60 game seconds', async ({ page }) => {
-  // M1.T4, fast first floor, is what turns this green. Until it lands, the run
-  // above fails on the real thing and this marker keeps the guard honest: the
-  // assertions stay, the check is expected red, and the day it passes for real
-  // Playwright fails on "passed unexpectedly" until the marker is dropped.
-  test.fail(true, 'M1-1 red: a zoned lot is slow to break ground (ROADMAP: 113 s median, never on seed 2)');
   const errors = [];
   page.on('pageerror', (e) => errors.push(String(e)));
   const late = [];

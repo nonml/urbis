@@ -96,6 +96,25 @@ its full height, so lumpy lots land as close to the centre as their shapes allow
 Unzoned free lots are left for the player: zoning one is how the balance shifts,
 which M1-2 measures.
 
+### The credit line, and the pace M1-2 reads (M1-2, M1-3)
+
+A rezone earns a news line when the floor it added lifts a use the chain pulls
+where the district can see it: the pulled use's demand reaches `BREAK_GROUND_AT`,
+or the district's need for it grows 2 % of the district — the jobs the new floor
+itself added, because `need.res` moves with real floor, never with a firm's queue
+— while that use's demand is in the building band. The first pulled use the
+rezone lifts is credited; the line gives up at 300 s so an old rezone cannot
+claim the market's own swing.
+
+The last stage had to slow for that A/B to read at minute 5. At 45 game seconds
+a finished lot's tower stage, every res lot on seeds 7 and 22 stood finished
+before the check, so no rezone could show a storey there at all: the five seeds'
+gains were 0, +5, 0, +22, +7. The last stage is 90 s (`STAGE_SECS` in
+`zoning.js`); the first stages are unchanged, so a player's zoned lot still
+raises its first floor inside 60 game seconds (M1-1). On seeds 7, 11, 22, 33 and
+73 the A/B now reads **0, +1, +1, +22, +4** — 4 of 5 (M1-2) — and the credit
+line lands on every seed that passes, never on the untouched control (M1-3).
+
 ### Why it never settles (pillar 2)
 
 A closed deterministic loop settles; this one is kicked. In a generated city,
@@ -194,9 +213,10 @@ homes and a market with no lag each fail at least one of them.
 
 M1's own checks: `tests/accept/m1-calm.test.js` and
 `tests/accept/m1-rezone-ab.test.js` — no district's use pinned or idle past 40 %
-of ten minutes; the works rezone adds a flat storey on 4 of 5 seeds — each one
-seed per process on the A/B runner. `tests/economy.spec.js` keeps its hand-preset
-expectations, unchanged.
+of ten minutes; the works rezone adds a flat storey on 4 of 5 seeds (7, 11, 22,
+33, 73) and earns its credit line on every seed that passes, the untouched
+control never showing the line — each one seed per process on the A/B runner.
+`tests/economy.spec.js` keeps its hand-preset expectations, unchanged.
 
 `tests/zoning.spec.js`'s slump test now holds every district's market at zero
 each tick instead of freezing the old sine at its trough — the same claim.

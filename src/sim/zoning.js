@@ -52,8 +52,10 @@ const LOTS = [
 // low block, the mid-rise and the tower. The first two are quick: a lot the
 // player zones raises its first floor in at most 20 game seconds and stands as a
 // low block inside a minute, so a player standing on the pavement watches a lot
-// become a building. The later stages keep the city's slower pace.
-const STAGE_SECS = [8, 16, 32, 45];
+// become a building. The later stages keep the city's slower pace. The last is
+// 90 s, not 45: at 45 every res lot on seeds 7 and 22 stood finished before
+// minute 5, so M1-2's A/B could not read a rezone at all (docs/ECONOMY.md).
+const STAGE_SECS = [8, 16, 32, 90];
 // A slump takes a stage back per minute. Slower than growth on purpose: a city
 // that empties as fast as it fills is flickering, not declining.
 const DECLINE_SECS = 60;

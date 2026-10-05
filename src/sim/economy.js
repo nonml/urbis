@@ -108,12 +108,19 @@ export const FLIGHT_PER_CHASE_SEC = 0.002;
 // A use whose floor moved less than this many people in a tick is holding.
 const STILL = 1e-6;
 
-// A rezone earns a line in the news only once it moves a district's market over
-// the level that builds: the demand zoning breaks ground at. Below it the
-// change is real but nothing the player can see answers, so the line would be
-// noise (pillar 4). The level is zoning's BREAK_GROUND_AT, copied because
-// zoning imports this module and the two stay one-way.
+// A rezone earns a line in the news when the floor it added lifts a use the
+// chain pulls (PULLS below) where the district can see it. Two ways to clear
+// that bar: the pulled use's demand reaches the level zoning breaks ground at
+// (BREAK_GROUND_AT, copied because zoning imports this module and the two stay
+// one-way), or the district's need for it grows by this share of the district —
+// the jobs the new floor itself added. need.res only moves with real floor, not
+// with a firm's queue (need.com / need.ind), so the second path names the act
+// and not the market's own noise, and the demand band gate keeps the line off
+// while the use is not building. A lot is 3-21% of its district (ECONOMY.md),
+// so 2% is a lot's early floors, not a rounding error.
 const CREDIT_AT = 0.55;
+const CREDIT_BAND = 0.42;
+const CREDIT_NEED_RISE = 0.02;
 // How long a rezone stays the district's live cause. Long enough for the floor
 // it added to break ground and the 20 s market lag to arrive; the deadline also
 // keeps an old rezone from claiming a swing that is really the market's own.
@@ -218,7 +225,9 @@ function measureFloors(economy, parcels, heightOf) {
     for (const use of USES) {
       const moved = d.floor[use] - was[i].floor[use];
       d.trend[use] = Math.abs(moved) < STILL ? 0 : Math.sign(moved);
-      if (d.lots[use] > was[i].lots[use]) d.rezone = { at: economy.time, use, need: { ...d.need } };
+      if (d.lots[use] > was[i].lots[use]) {
+        d.rezone = { at: economy.time, use, need: { ...d.need } };
+      }
     }
   });
 }
@@ -373,7 +382,9 @@ function creditRezone(d, time) {
     return;
   }
   for (const pulled of PULLS[d.rezone.use]) {
-    if (d.demand[pulled] >= CREDIT_AT && d.need[pulled] > d.rezone.need[pulled]) {
+    const added = (d.need[pulled] - d.rezone.need[pulled]) / d.size;
+    if (d.demand[pulled] >= CREDIT_AT
+        || (d.demand[pulled] >= CREDIT_BAND && added >= CREDIT_NEED_RISE)) {
       d.credit = { at: time, use: pulled, cause: 'rezone', source: d.rezone.use };
       d.rezone = null;
       return;
