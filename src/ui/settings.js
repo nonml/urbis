@@ -229,6 +229,22 @@ export function buildBindingsPanel(host) {
     grid.append(name, button);
   }
   host.appendChild(grid);
+  // The one control under the grid: the shipped keys back, for a player who has
+  // painted themselves into a corner. clearBindings is the store's own remove,
+  // so a denied store leaves the grid as it was; the watchers hear the reset
+  // exactly as they hear a rebind, so input.js moves at once.
+  const reset = document.createElement('button');
+  reset.type = 'button';
+  reset.id = 'bind-reset';
+  reset.style.cssText = BIND_BUTTON;
+  reset.textContent = 'RESET TO DEFAULTS';
+  reset.addEventListener('click', () => {
+    if (!clearBindings()) return;
+    const fresh = loadBindings();
+    for (const [action, button] of buttons) button.textContent = keyLabel(fresh[action]);
+    for (const fn of bindingWatchers) fn(fresh);
+  });
+  host.appendChild(reset);
   return host;
 }
 
