@@ -322,15 +322,20 @@ function meets(box, p) {
 // planned along the roads the box now holds, with every standing footprint as
 // their keep-out. A parcel the box does not reach is not read, so it keeps its
 // id, and a lot that survives keeps its own: its footprint is part of the
-// keep-out, so the planner only fills free frontage.
-function replanFrontage(map, box) {
-  if (!Array.isArray(map.parcels) || !Array.isArray(map.lots)) return;
-  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+// keep-out, so the planner only fills free frontage. The frontage of every
+// surviving lot is already known here — `kept` hands it to reconcile, so no
+// parcel's frontage is computed twice in one op.
+function replanFrontage(map, box, byId) {
+  const kept = new Map();
+  if (!Array.isArray(map.parcels) || !Array.isArray(map.lots)) return kept;
   for (let i = map.parcels.length - 1; i >= 0; i--) {
     const p = map.parcels[i];
     if (p.kind !== 'lot' || !meets(box, p)) continue;
     const road = frontageRoad(map, p, byId);
-    if (road && road.gap > EPS) continue;
+    if (road && road.gap > EPS) {
+      kept.set(p, false);
+      continue;
+    }
     map.parcels.splice(i, 1);
     const at = map.lots.findIndex((l) => l[0] === p.x && l[1] === p.z && l[2] === p.w && l[3] === p.d);
     if (at >= 0) map.lots.splice(at, 1);
@@ -341,19 +346,21 @@ function replanFrontage(map, box) {
     map.parcels.push(newLotParcel(id, lot));
     map.lots.push(lot);
   }
+  return kept;
 }
 
 // Recompute `noRoad` for every parcel the road touched: one with an edge
 // centre-line inside FRONTAGE_MAX of its footprint has frontage, one without
 // does not. Returns the parcels that changed, with enough to put them back.
-function reconcileFrontage(map, box) {
-  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+// `byId` is indexed once for the whole op; `kept` holds the frontage replan
+// already found, so only the new lots and the buildings are swept here.
+function reconcileFrontage(map, box, byId, kept) {
   const touched = [];
   for (const p of map.parcels) {
     const pb = parcelBox(p);
     const meets = pb.minX <= box.maxX && pb.maxX >= box.minX && pb.minZ <= box.maxZ && pb.maxZ >= box.minZ;
     if (!meets) continue;
-    const next = frontageRoad(map, p, byId) === null;
+    const next = kept.has(p) ? false : frontageRoad(map, p, byId) === null;
     const current = Object.hasOwn(p, 'noRoad') ? p.noRoad : false;
     if (current === next) continue;
     touched.push({ p, had: Object.hasOwn(p, 'noRoad'), value: p.noRoad });
@@ -373,8 +380,9 @@ function roadEdit(map, box, change) {
   const parcelsBefore = map.parcels ? map.parcels.slice() : null;
   const lotsBefore = map.lots ? map.lots.slice() : null;
   change();
-  replanFrontage(map, box);
-  const touched = reconcileFrontage(map, box);
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const kept = replanFrontage(map, box, byId);
+  const touched = reconcileFrontage(map, box, byId, kept);
   map.version = version + 1;
   markDirty(map, box);
   const reverse = () => {
