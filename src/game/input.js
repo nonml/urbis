@@ -14,6 +14,7 @@ import { cityKey } from '../sim/cityview.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
 import { toggleJournal } from '../render/arcui.js';
+import { cycleRadio } from '../audio/music.js';
 
 // The reads the sim step gets while the overview owns the input: no movement.
 const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
@@ -33,6 +34,12 @@ export function bindInput(parts) {
   window.addEventListener('keydown', (e) => keys.add(e.key.toLowerCase()));
   window.addEventListener('keyup', (e) => keys.delete(e.key.toLowerCase()));
 
+  // The car radio (M7.T18): B steps off -> station A -> station B -> off while
+  // the sim is asking for driveInput, so it tunes from the wheel only. The
+  // tuned station outlives the car; musicPlan holds it for the re-entry.
+  let radio = null;
+  let driving = false;
+
   // The action keys; WASD/Shift are read by footInput/driveInput.
   window.addEventListener('keydown', (e) => {
     if (e.repeat) return;
@@ -41,6 +48,7 @@ export function bindInput(parts) {
     if (k === 'f') toggleVehicle();
     if (k === 't') toggleDay(clock);
     if (k === 'n') newGame();
+    if (k === 'b' && driving) radio = cycleRadio(radio);
     // The overview lifts off the street, never out of a shop or off a roof, and a
     // door is used at street scale, never from the overview.
     if (interior.space === STREET) cityKey(cityView, k, cam.yaw);
@@ -76,6 +84,7 @@ export function bindInput(parts) {
   const cityUi = bindCityView({ canvas, cam, camera, city, street, view: cityView, rig: cityRig });
 
   function footInput() {
+    driving = false;
     if (cityView.mode === 'city') return HELD_FOOT;
     const lx = Math.sin(cam.yaw);
     const lz = Math.cos(cam.yaw);
@@ -92,6 +101,7 @@ export function bindInput(parts) {
   }
 
   function driveInput() {
+    driving = true;
     if (cityView.mode === 'city') return HELD_CAR;
     return {
       throttle: (keys.has('w') ? 1 : 0) + (keys.has('s') ? -1 : 0),
@@ -101,6 +111,7 @@ export function bindInput(parts) {
 
   return {
     keys, footInput, driveInput, cityUi,
+    get radio() { return radio; },
     get dragging() { return dragging; },
     get lastDragT() { return lastDragT; },
   };

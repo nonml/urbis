@@ -1,11 +1,13 @@
-// Music (M7.T17, criterion M7-10): the title theme and the score under the arc.
+// Music (M7.T17-M7.T18, criterion M7-10): the title theme, the score under the
+// arc, and the car's radio.
 //
 // Every track is CC0, pinned to its sha256 in tools/sounds/fetch.sh and listed
 // in CREDITS.md (M7.T2's rule): `m7-music.spec.js` hashes the committed bytes.
 // The title theme plays at the front door. Under an arc mission the score plays
 // — calm, and urgent while wanted.js has the suspect in contact; losing the
-// trail settles it back to calm. The two radio beds are fetched here for
-// M7.T18's car radio.
+// trail settles it back to calm. B in a car steps the radio off -> station A ->
+// station B -> off; a tuned station is a live bed, so it keeps its place while
+// the player is on foot and getting back in finds it later in the track.
 //
 // `musicPlan(pose)` is the whole decision as pure data, so a check can list the
 // playing tracks per pose with no browser and no AudioContext (M7-10). The pose
@@ -14,6 +16,7 @@
 //   { scene: 'title' }                      the title theme, looping
 //   { mission }                             calm score under the arc's mission
 //   { mission, wanted: { heat, contact } }  urgent while the chase holds
+//   { driving, radio }                      the car's station (silent on foot)
 //   { scene: 'play' }                       silence
 //
 // `createMusic(audio)` turns that list into one looping bed; `isChase(pose)` is
@@ -28,11 +31,21 @@ export const RADIO_B = 'music_radio_b';
 export const MUSIC_BUS = 'ambience';
 export const STATIONS = [RADIO_A, RADIO_B];
 
+// B's one line (input.js): off -> the first station -> the next -> off. The
+// step is built from STATIONS's length, so a set CC0 only filled with one
+// station cycles that one and off (M7.T18).
+export function cycleRadio(station = null) {
+  const i = STATIONS.indexOf(station);
+  return i + 1 < STATIONS.length ? STATIONS[i + 1] : null;
+}
+
 // The title sits over the front door, the score under a mission. Both are beds,
 // not features; urgency lifts the score, it does not push the mix.
 export const TITLE_GAIN = 0.5;
 export const CALM_GAIN = 0.34;
 export const URGENT_GAIN = 0.5;
+// The radio is the car's own bed, a touch under the story's score.
+export const RADIO_GAIN = 0.4;
 
 // The score is what plays under the arc; a mission object is the whole switch.
 export function missionOf(pose = {}) {
@@ -51,13 +64,36 @@ function track(name, gain) {
   return { name, bus: MUSIC_BUS, loop: true, flat: true, gain, rate: 1 };
 }
 
+// The station a pose's radio is tuned to: a station name, its index in
+// STATIONS, or `{ station }`, the shape input.js keeps. Anything else is off.
+function stationOf(radio) {
+  const value = radio !== null && typeof radio === 'object' ? radio.station : radio;
+  if (STATIONS.includes(value)) return value;
+  return Number.isInteger(value) ? STATIONS[value] ?? null : null;
+}
+
+// The car radio (M7.T18): a tuned station is the car's bed while driving. On
+// foot the same loop is listed at silence, so its place in the track carries
+// across getting out and back in; the title and the mission score cut it.
+function radioTrack(pose) {
+  const name = stationOf(pose.radio);
+  if (!name) return null;
+  const inCar = !!(pose.driving ?? pose.inCar);
+  return track(name, inCar ? RADIO_GAIN : 0);
+}
+
 // What plays at this pose: the title theme, the mission score (urgent while
-// wanted.js holds contact), or nothing.
+// wanted.js holds contact), the car's radio, or nothing. The score outranks the
+// radio — a mission cuts the station, and it comes back after (M7.T17's score
+// is the arc's; M28-3 settles scenes and radio) — and the title outranks both.
 export function musicPlan(pose = {}) {
   if (pose.scene === 'title' || pose.title) return [track(TITLE, TITLE_GAIN)];
-  if (!missionOf(pose)) return [];
-  const urgent = isChase(pose);
-  return [track(urgent ? SCORE_URGENT : SCORE_CALM, urgent ? URGENT_GAIN : CALM_GAIN)];
+  if (missionOf(pose)) {
+    const urgent = isChase(pose);
+    return [track(urgent ? SCORE_URGENT : SCORE_CALM, urgent ? URGENT_GAIN : CALM_GAIN)];
+  }
+  const radio = radioTrack(pose);
+  return radio ? [radio] : [];
 }
 
 // The files the set needs, for whoever owns the AudioContext.
