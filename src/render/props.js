@@ -1,10 +1,10 @@
-// Street props: CC0 GLBs (hydrant, trash can) loaded once, merged per material,
-// instanced down the sidewalks. Plus procedural street trees (2 draws).
+// Street props: CC0 GLBs (hydrant, trash can) through the model pool loader
+// (M2.T2), instanced down the sidewalks, plus procedural street trees (2 draws).
 // Static decor — positions are authored constants, not sim.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mulberry32 } from '../sim/rng.js';
+import { loadModelPool } from './models.js';
 
 // Static decor — placement lists live at the call site, not here.
 
@@ -26,19 +26,6 @@ const CANOPY_FLOOR = 0.42;   // how dark the underside goes
 const LEAF_GREENS = [0x35502c, 0x2a4526, 0x3d5730, 0x24401f, 0x466033];
 const LEAF_AUTUMN = [0x8a5a1c, 0x9c4a18, 0x7a5520, 0xa8621f];
 
-function clean(geo) {
-  const g = geo.index ? geo.toNonIndexed() : geo;
-  for (const name of Object.keys(g.attributes)) {
-    if (!['position', 'normal', 'uv'].includes(name)) g.deleteAttribute(name);
-  }
-  // GLB UVs may be missing on some parts — merge needs uniform attributes.
-  if (!g.attributes.uv) {
-    const n = g.attributes.position.count;
-    g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
-  }
-  return g;
-}
-
 function centreX(geos) {
   let lo = Infinity;
   let hi = -Infinity;
@@ -55,63 +42,46 @@ function centreX(geos) {
 // planted BOTH at every position, so the whole city had its bins and hydrants
 // in identical twos about a metre apart — a clone tell on every corner.
 //
-// Split them by which side of the model they sit on, recentre each variant on
-// its own origin, and deal the placements out between them. Same material
-// count, so the same number of draws, and now there are two bins in the city
-// instead of one bin twice.
-function splitVariants(byMat) {
-  const groups = [...byMat];
-  const mids = groups.map(([, geos]) => centreX(geos));
+// Split them by which side of the model each material mesh sits on, recentre
+// each variant on its own origin, and deal the placements out between them.
+// Same material count, so the same number of draws, and now there are two bins
+// in the city instead of one bin twice.
+function splitVariants(meshes) {
+  const mids = meshes.map((m) => centreX([m.geometry]));
   const lo = Math.min(...mids);
   const hi = Math.max(...mids);
   const single = hi - lo < 0.05;
   const variantOf = mids.map((x) => (single || x >= (lo + hi) / 2 ? 0 : 1));
   const centres = [0, 1].map((v) => {
-    const geos = groups.filter((_, i) => variantOf[i] === v).flatMap(([, g]) => g);
+    const geos = meshes.filter((_, i) => variantOf[i] === v).map((m) => m.geometry);
     return geos.length ? centreX(geos) : 0;
   });
-  return groups.map(([mat, geos], i) => {
+  return meshes.map((mesh, i) => {
     const v = variantOf[i];
-    for (const g of geos) g.translate(-centres[v], 0, 0);
-    return { mat, geos, variant: single ? -1 : v };
+    mesh.geometry.translate(-centres[v], 0, 0);
+    return { mesh, variant: single ? -1 : v };
   });
 }
 
-// One InstancedMesh per source material. Original PBR materials kept as-is.
+// A prop model loads through the pool loader (M2.T2): one InstancedMesh per
+// material, each carrying its file in `userData.model`. Small props skip the
+// shadow pass: their shadows are subpixel at play distance.
 export async function loadPropInstances(relPath, placements) {
-  const gltf = await new GLTFLoader().loadAsync(relPath);
-  gltf.scene.updateMatrixWorld(true);
-  const byMat = new Map();
-  gltf.scene.traverse((o) => {
-    if (!o.isMesh) return;
-    const geos = Array.isArray(o.geometry) ? o.geometry : [o.geometry];
-    const mats = Array.isArray(o.material) ? o.material : [o.material];
-    geos.forEach((g, gi) => {
-      const m = mats[Math.min(gi, mats.length - 1)];
-      const baked = clean(g.clone());
-      baked.applyMatrix4(o.matrixWorld);
-      if (!byMat.has(m)) byMat.set(m, []);
-      byMat.get(m).push(baked);
-    });
-  });
-  const group = new THREE.Group();
+  const pool = await loadModelPool(relPath, placements.length);
   const dummy = new THREE.Object3D();
-  for (const { mat, geos, variant } of splitVariants(byMat)) {
+  for (const { mesh, variant } of splitVariants(pool.meshes)) {
     const mine = placements.filter((_, i) => variant < 0 || i % 2 === variant);
-    if (!mine.length) continue;
-    const inst = new THREE.InstancedMesh(mergeGeometries(geos), mat, mine.length);
+    mesh.count = mine.length;
     mine.forEach(([x, z], i) => {
       dummy.position.set(x, 0, z);
       dummy.rotation.set(0, (x * 13 + z * 7) % 6.28, 0);
       dummy.scale.set(1, 1, 1);
       dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
+      mesh.setMatrixAt(i, dummy.matrix);
     });
-    inst.instanceMatrix.needsUpdate = true;
-    // Small props skip the shadow pass: their shadows are subpixel at play distance.
-    group.add(inst);
+    mesh.instanceMatrix.needsUpdate = true;
   }
-  return group;
+  return pool.group;
 }
 
 function treeSpots() {
