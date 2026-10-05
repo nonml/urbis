@@ -24,6 +24,39 @@ const validSign = (s) => s && typeof s.text === 'string' && typeof s.sub === 'st
 const GROUND_Y = 0;
 
 // ---------------------------------------------------------------------------
+// Parcels: the map's own record of every building, lot and, later, service. The
+// stage scale and the use set live here, with the map that holds the parcels;
+// zoning.js re-exports them — it owns what parcels do, not what one is (M3.T15).
+export const STAGES = ['EMPTY', 'SITE', 'LOW', 'MID', 'HIGH'];
+export const STAGE = Object.fromEntries(STAGES.map((name, i) => [name, i]));
+export const USES = ['res', 'com', 'ind'];
+
+// The use a standing building carries, from its own style: offices behind glass
+// and in the core, homes in the brick rows and the plain towers, shops in the
+// end caps. The style already came from the district plan (layout.rowStyle);
+// nothing here reads the hand map's coordinates.
+const USE_BY_STYLE = { core: 'com', glass: 'com', brick: 'res', tower: 'res' };
+const USE_BY_KIND = { tower: 'res', cap: 'com' };
+
+// Every building the renderer draws as one parcel. It stands finished
+// (STAGE.HIGH), it never grows or declines — only kind 'lot' is ticked
+// (zoning.js) — and it keeps the building's own id, so a pick can name it.
+// powerZone is filled in when the city is created, where the power grid is.
+export function buildingParcel(b) {
+  const use = USE_BY_STYLE[b.style] ?? USE_BY_KIND[b.kind] ?? USES[0];
+  return {
+    id: b.id, kind: b.kind,
+    x: b.x, z: b.z, w: b.w, d: b.d, h: b.h,
+    use, zoned: use, painted: false,
+    stage: STAGE.HIGH, progress: 0,
+    powerZone: 0, pace: 0,
+    // The drawn height at every stage: a building already high stays high.
+    heights: STAGES.map(() => b.h),
+    building: false, trend: 0, why: null, vacancy: 0,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // The road graph. world.js derives the world's own at load; this is the same
 // cutting, parameterized by a district, so a map can be built for any seed.
 // tests/map.test.js pins the two together via the goldens until M3.T14.
@@ -80,6 +113,13 @@ function buildGraph(district) {
   return { nodes: [...byId.values()], edges };
 }
 
+// A lot is a parcel of its own: the plan's footprint and the id the live city
+// gives it (sim/zoning.js `lot:<index>`), an empty stage the city fills in.
+function lotParcel(lot, index) {
+  const [x, z, w, d] = lot;
+  return { id: `lot:${index}`, kind: 'lot', style: null, use: null, stage: STAGE.EMPTY, x, z, w, d };
+}
+
 // A seed's whole map. `version` is the edit revision; ops (M3.T18) bump it, so
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
@@ -88,12 +128,19 @@ export function createMap(seed) {
   plan.pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings);
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
+  const buildings = buildingsOf(plan);
   return {
     seed,
     version: 0,
     district,
     graph: buildGraph(district),
-    buildings: buildingsOf(plan),
+    buildings,
+    // Every building the renderer draws, and every lot, is one parcel with an
+    // id: nothing the city shows a footprint for is anonymous (M3-3).
+    parcels: [
+      ...plan.lots.map(lotParcel),
+      ...buildings.map(buildingParcel),
+    ],
     lots: plan.lots,
     furniture: planFurniture(district, seed),
     dressing: {
