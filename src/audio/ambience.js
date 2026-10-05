@@ -54,6 +54,7 @@ const PHASE_POWER = { lit: 1, dying: 0.5, dark: 0, restoring: 0.5 };
 
 const square = (v) => v * v;
 const frac01 = (n, full) => Math.min(1, n / full);
+const clamp01 = (v) => Math.min(1, Math.max(0, v));
 const round3 = (v) => Math.round(v * 1000) / 1000;
 
 // The kind of district at a point: the nearest grown lot's use, or `downtown`
@@ -71,16 +72,21 @@ export function kindAt(city, x = 0, z = 0) {
 // How much of the district's voice survives at the listener's zone (M7.T7).
 // `dark` is the [zone0, zone1] pair `__game.dark()` returns and sites.js reads;
 // `phase` is street.js's zonePhase, so a caller that has the live collapse lets
-// the hum fade through it. `zone` picks the zone outright; a pose with none of
-// them is lit.
+// the hum fade through it; `glow` is zoneGlow per zone — the light the lamps
+// actually show — and wins, so sound crosses the threshold with the light. Any
+// of the three may sit in a probe's `lights` object. `zone` picks the zone
+// outright; a pose with none of them is lit.
 export function zonePower(pose = {}, pz = 0) {
   const zone = pose.zone ?? zoneAt(pz);
-  const phases = pose.phase ?? pose.phases;
-  const phase = Array.isArray(phases) ? phases[zone] : phases;
+  const lights = pose.lights ?? {};
+  const at = (v) => (Array.isArray(v) ? v[zone] : v);
+  const glow = at(pose.glow ?? lights.glow);
+  if (typeof glow === 'number') return clamp01(glow);
+  const phase = at(pose.phase ?? pose.phases ?? lights.phase);
   if (PHASE_POWER[phase] !== undefined) return PHASE_POWER[phase];
-  const dark = pose.dark ?? pose.darkZones;
+  const dark = pose.dark ?? pose.darkZones ?? lights.dark;
   if (dark === undefined || dark === null) return 1;
-  return (Array.isArray(dark) ? dark[zone] : dark) ? 0 : 1;
+  return at(dark) ? 0 : 1;
 }
 
 function countNear(list, x, z, r2, keep) {
@@ -95,7 +101,7 @@ function countNear(list, x, z, r2, keep) {
 //   hour 0..24; walkers street.npcs; cars street.cars; px/pz the listener;
 //   kind 'res' | 'com' | 'ind' | 'downtown' (or city/px/pz to derive it);
 //   commute the flow 0..1, defaulting to the sim's own shareOut(hour);
-//   dark [zone0, zone1] out, or phase zonePhase per zone (M7.T7).
+//   dark [zone0, zone1] out, or phase/glow per zone (M7.T7).
 export function ambienceSounds(pose = {}) {
   const hour = (((pose.hour ?? pose.clock?.hour ?? 12) % 24) + 24) % 24;
   const px = pose.px ?? pose.x ?? 0;
@@ -153,12 +159,14 @@ function offlineContext() {
 // after their buffers land, and only their gain and rate move after. `buffers`
 // lets a caller or a test hand over decoded AudioBuffers; left out, the module
 // decodes its own files, and a pose still lists what would play while they load.
+// Nothing loads under `?capture=1`: the crew's screenshots never pay for a fetch.
 export function createAmbience(audio, buffers = {}) {
   const decoded = { ...buffers };
   let beds = null, loading = false, error = null;
 
   async function load() {
     if (loading || (decoded[BEDS.street] && decoded[BEDS.hum])) return;
+    if (typeof audio.silent === 'function' && audio.silent()) return;
     loading = true;
     try {
       Object.assign(decoded, await loadAmbience(offlineContext()));

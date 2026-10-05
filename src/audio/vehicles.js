@@ -15,6 +15,8 @@
 // sounds per pose"). `createVehicles(audio, buffers)` turns that list into one
 // engine loop plus a one-shot per pass, and `honk()` is the horn; the E key is
 // the input layer's one line (`if (k === 'e' && driving) vehicles.honk()`).
+// Missing buffers decode on demand (music.js's offline pattern) and are listed
+// but unheard until they land, so the frame never blocks on a fetch.
 import { CAR_TOP } from '../sim/vehicle.js';
 
 export const ENGINE = 'engine_loop';
@@ -155,32 +157,63 @@ export const VEHICLE_FILES = {
   [HORN]: 'assets/sounds/horn.mp3',
 };
 
-export async function loadVehicles(context, base = '') {
+export async function loadVehicles(context, base = '', names = Object.keys(VEHICLE_FILES)) {
   const buffers = {};
-  await Promise.all(Object.entries(VEHICLE_FILES).map(async ([name, path]) => {
+  await Promise.all(names.map(async (name) => {
+    const path = VEHICLE_FILES[name];
     const res = await fetch(base + path);
+    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
     buffers[name] = await context.decodeAudioData(await res.arrayBuffer());
   }));
   return buffers;
 }
 
+// A decode context that never reaches the speakers (engine.js owns the live
+// one), so a sound can be decoded without a second audible graph.
+let decoder = null;
+function offlineContext() {
+  if (decoder) return decoder;
+  const Ctor = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext : null;
+  if (!Ctor) throw new Error('no Web Audio to decode the vehicles');
+  decoder = new Ctor(1, 1, 44100);
+  return decoder;
+}
+
 // One engine loop, a one-shot per pass, a siren loop per on-duty unit; pose
 // { driving, speed|car, cars, units, px, pz, horn } (`units` = wanted.pursuit).
-// `buffers` is name -> decoded AudioBuffer; a missing one lists but is unheard.
+// `buffers` is name -> decoded AudioBuffer; a missing one is decoded on demand
+// and listed but unheard until it lands — a voice is claimed only with a real
+// sound, since engine.js materialises a voice once and never again.
 export function createVehicles(audio, buffers = {}) {
   let engine = null;
   let hornHeld = false;
+  let hornQueued = false;
   const passing = new Set();
   const sirens = new Map();
+  const loading = new Set();
+  let error = null;
+
+  async function ensure(name) {
+    if (buffers[name] || loading.has(name) || !VEHICLE_FILES[name]) return;
+    if (typeof audio.silent === 'function' && audio.silent()) return;
+    loading.add(name);
+    try {
+      Object.assign(buffers, await loadVehicles(offlineContext(), '', [name]));
+    } catch (err) {
+      error = String((err && err.message) || err);
+    }
+    loading.delete(name);
+  }
 
   function update(pose = {}) {
     const plan = vehicleSounds(pose);
     const spec = plan.find((s) => s.name === ENGINE) ?? null;
     if (spec) {
       if (engine) audio.update(engine, { gain: spec.gain, rate: spec.rate });
-      else engine = audio.play(spec.name, buffers[spec.name] ?? null, {
+      else if (buffers[spec.name]) engine = audio.play(spec.name, buffers[spec.name], {
         bus: spec.bus, loop: true, flat: true, gain: spec.gain, rate: spec.rate,
       });
+      else ensure(spec.name);
     } else if (engine) {
       audio.stop(engine);
       engine = null;
@@ -190,9 +223,10 @@ export function createVehicles(audio, buffers = {}) {
       if (p.name !== PASS) continue;
       live.add(p.key);
       if (passing.has(p.key)) continue;
-      audio.play(p.name, buffers[p.name] ?? null, {
+      if (buffers[p.name]) audio.play(p.name, buffers[p.name], {
         bus: p.bus, gain: p.gain, rate: p.rate, x: p.x, y: p.y, z: p.z,
       });
+      else ensure(p.name);
     }
     passing.clear();
     for (const key of live) passing.add(key);
@@ -203,20 +237,34 @@ export function createVehicles(audio, buffers = {}) {
       else if (buffers[s.name]) sirens.set(s.key, audio.play(s.name, buffers[s.name], {
         bus: s.bus, loop: true, gain: s.gain, x: s.x, y: s.y, z: s.z,
       }));
+      else ensure(s.name);
     }
     for (const [key, held] of sirens) {
       if (plan.some((p) => p.name === SIREN && p.key === key)) continue;
       audio.stop(held);
       sirens.delete(key);
     }
-    if (pose.horn && !hornHeld) honk();
+    // A held E honks once per press — but not into the void: if the buffer is
+    // still decoding on the first drive, the press stays queued and fires the
+    // moment the sound exists, so a captain's first tap is never swallowed.
+    if (pose.horn && !hornHeld) hornQueued = true;
+    if (hornQueued) {
+      const s = hornSound();
+      if (buffers[s.name]) {
+        audio.play(s.name, buffers[s.name], {
+          bus: s.bus, flat: s.flat, gain: s.gain, rate: s.rate,
+        });
+        hornQueued = false;
+      } else ensure(s.name);
+    }
     hornHeld = !!pose.horn;
     return plan;
   }
 
-  function honk() {
+  function horn() {
     const s = hornSound();
-    return audio.play(s.name, buffers[s.name] ?? null, {
+    if (!buffers[s.name]) { ensure(s.name); return null; }
+    return audio.play(s.name, buffers[s.name], {
       bus: s.bus, flat: s.flat, gain: s.gain, rate: s.rate,
     });
   }
@@ -228,7 +276,8 @@ export function createVehicles(audio, buffers = {}) {
     for (const held of sirens.values()) audio.stop(held);
     sirens.clear();
     hornHeld = false;
+    hornQueued = false;
   }
 
-  return { update, honk, stop, plan: vehicleSounds };
+  return { update, honk: horn, stop, plan: vehicleSounds, buffers, error: () => error };
 }

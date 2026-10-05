@@ -11,6 +11,10 @@
 // M7.T11: every action answers to its binding (ui/settings.js), not a literal
 // key. A rebind in the settings screen lands here at once through
 // onBindingsChange and survives the reload through the bindings store.
+//
+// M7.T15: a standard gamepad plays the street too (M7-8). It is read once a
+// fixed step, inside footInput/driveInput — the only reads the sim makes — and
+// those return before it in the city view, so D13 holds: overview stays keys.
 
 import { toggleDay } from '../sim/clock.js';
 import { STREET } from '../sim/interior.js';
@@ -20,6 +24,7 @@ import { bindCityView } from '../ui/cityview.js';
 import { toggleJournal } from '../render/arcui.js';
 import { cycleRadio } from '../audio/music.js';
 import { loadBindings, onBindingsChange } from '../ui/settings.js';
+import { askNewGame } from '../ui/title.js';
 
 // The reads the sim step gets while the overview owns the input: no movement.
 const HELD_FOOT = { mx: 0, mz: 0, hurry: false };
@@ -29,6 +34,14 @@ const HELD_CAR = { throttle: 0, steer: 0 };
 // canonical letter sim/cityview.js's cityKey expects per city action.
 const MOVE_TOKEN = { forward: 'w', back: 's', left: 'a', right: 'd', run: 'shift' };
 const CITY_CANON = { cityView: 'z', brushRes: 'r', brushCom: 'c', brushInd: 'i', brushErase: 'x' };
+
+// The pad's standard mapping (W3C): left stick moves and steers, right stick
+// looks, RT runs, A enters, X hacks, Y opens the journal. M29 adds layouts.
+const PAD = { enter: 0, hack: 2, journal: 3, run: 7 };
+const PAD_DEADZONE = 0.18, PAD_TRIGGER = 0.5;
+// Pixel-equivalents per step for the camera's own look; ~1.8 rad/s of yaw.
+const PAD_LOOK_PX = 18;
+const clamp1 = (v) => Math.max(-1, Math.min(1, v));
 
 // parts: canvas, cam, camera, city, cityRig, cityView, street, clock, interior,
 // arc, arcUI, look(dx, dy), dolly(deltaY), fireHack, toggleVehicle, enterDoor,
@@ -89,7 +102,8 @@ export function bindInput(parts) {
     if (action === 'hack') fireHack();
     if (action === 'vehicle') toggleVehicle();
     if (action === 'dayNight') toggleDay(clock);
-    if (action === 'newGame') newGame();
+    // N (M7-7): the ask comes first, in the page, whenever a save exists.
+    if (action === 'newGame') askNewGame(newGame);
     if (action === 'radio' && driving) radio = cycleRadio(radio);
     if (action === 'journal') toggleJournal(arcUI);
     if (action === 'choice1') arcChoose(arc, 1, street.time);
@@ -99,6 +113,45 @@ export function bindInput(parts) {
     if (action === 'door' && cityView.mode === 'street') enterDoor();
     if (CITY_CANON[action] && interior.space === STREET) cityKey(cityView, CITY_CANON[action], cam.yaw);
   });
+
+  // The gamepad, read once a step. Buttons fire on the press edge through the
+  // same action calls the keys use; the sticks land in `pad` for foot/drive.
+  // No pad clears every read, so unplugging mid-stride keeps no last stick.
+  const heldPad = new Array(17).fill(false);
+  const stick = (v) => {
+    const n = clamp1(Number(v) || 0);
+    return Math.abs(n) < PAD_DEADZONE ? 0 : clamp1((n - Math.sign(n) * PAD_DEADZONE) / (1 - PAD_DEADZONE));
+  };
+  const padDown = (p, i) => !!(p.buttons?.[i]?.pressed || (p.buttons?.[i]?.value ?? 0) > PAD_TRIGGER);
+  const pad = { x: 0, y: 0, lookX: 0, lookY: 0, run: false };
+
+  function pollPad() {
+    let p = null;
+    try {
+      const pads = globalThis.navigator?.getGamepads?.() ?? [];
+      for (const each of pads) if (each && each.connected !== false) { p = each; break; }
+    } catch { /* an embed can deny the API; then there is no pad */ }
+    if (!p) {
+      heldPad.fill(false);
+      pad.x = pad.y = pad.lookX = pad.lookY = 0; pad.run = false;
+      return;
+    }
+    if (padDown(p, PAD.enter) && !heldPad[PAD.enter]) { toggleVehicle(); enterDoor(); }
+    if (padDown(p, PAD.hack) && !heldPad[PAD.hack]) fireHack();
+    if (padDown(p, PAD.journal) && !heldPad[PAD.journal]) toggleJournal(arcUI);
+    for (let i = 0; i < heldPad.length; i++) heldPad[i] = padDown(p, i);
+    pad.x = stick(p.axes?.[0]);
+    pad.y = stick(p.axes?.[1]);
+    pad.lookX = stick(p.axes?.[2]);
+    pad.lookY = stick(p.axes?.[3]);
+    pad.run = padDown(p, PAD.run);
+    // Look goes through the camera's own drag path, and marks the drag clock so
+    // the driving camera does not snap back to the car's heading behind it.
+    if (pad.lookX || pad.lookY) {
+      look(pad.lookX * PAD_LOOK_PX, pad.lookY * PAD_LOOK_PX);
+      lastDragT = clock.elapsed;
+    }
+  }
 
   // Mouse: a press on the canvas starts a drag; its deltas go to the camera's
   // look, the wheel to its dolly. In the overview the city view's own binding
@@ -129,26 +182,29 @@ export function bindInput(parts) {
   function footInput() {
     driving = false;
     if (cityView.mode === 'city') return HELD_FOOT;
+    pollPad();
     const lx = Math.sin(cam.yaw);
     const lz = Math.cos(cam.yaw);
     const rx = -lz;
     const rz = lx;
-    let mx = 0;
-    let mz = 0;
+    // Keys and stick add before the normalize: one direction, not two.
+    let mx = lx * -pad.y + rx * pad.x;
+    let mz = lz * -pad.y + rz * pad.x;
     if (down('forward')) { mx += lx; mz += lz; }
     if (down('back')) { mx -= lx; mz -= lz; }
     if (down('left')) { mx -= rx; mz -= rz; }
     if (down('right')) { mx += rx; mz += rz; }
     const len = Math.hypot(mx, mz) || 1;
-    return { mx: mx / len, mz: mz / len, hurry: down('run') };
+    return { mx: mx / len, mz: mz / len, hurry: down('run') || pad.run };
   }
 
   function driveInput() {
     driving = true;
     if (cityView.mode === 'city') return HELD_CAR;
+    pollPad();
     return {
-      throttle: (down('forward') ? 1 : 0) + (down('back') ? -1 : 0),
-      steer: (down('left') ? -1 : 0) + (down('right') ? 1 : 0),
+      throttle: clamp1((down('forward') ? 1 : 0) + (down('back') ? -1 : 0) - pad.y),
+      steer: clamp1((down('left') ? -1 : 0) + (down('right') ? 1 : 0) + pad.x),
     };
   }
 

@@ -9,6 +9,7 @@
 // fixed once world.js has evaluated (src/sim/seedstore.js).
 import { mulberry32 } from '../sim/rng.js';
 import { SEED_LIMIT } from '../sim/newgame.js';
+import { activeSlot, handoffSlot, slotInfo, slotInfos } from '../savestore.js';
 
 // City names: a root and an ending, or a prefix and a root, picked from the
 // seed. The lists are wide enough that two cities rarely share a name, and the
@@ -113,13 +114,41 @@ function button(id, label, primary = false) {
   return b;
 }
 
-function buildContinue(seed, hasSave, lift) {
-  const b = button('title-continue', 'CONTINUE');
-  const line = el('div', 'margin-top:3px;font:11px ui-monospace,Menlo,monospace;opacity:0.65',
-    hasSave ? `${nameFor(seed)} · seed ${seed}` : 'no saved city yet');
-  b.appendChild(line);
-  if (hasSave) b.addEventListener('click', lift);
-  else b.disabled = true;
+// The save slots (M7.T14, criterion M7-7): one row per slot, named by the
+// city's name, its seed, its population and the time it was saved. The city
+// name is made from the seed here, as everywhere else on this screen.
+const SLOT = 'display:block;width:100%;margin:6px 0;padding:8px 10px;text-align:left;'
+  + 'font:12px/1.4 ui-monospace,Menlo,monospace;color:#e4e1da;background:rgba(255,255,255,0.05);'
+  + 'border:1px solid rgba(255,255,255,0.18);border-radius:5px;cursor:pointer';
+const SLOT_ON = 'display:block;width:100%;margin:6px 0;padding:8px 10px;text-align:left;'
+  + 'font:12px/1.4 ui-monospace,Menlo,monospace;color:#ffd9a0;background:rgba(255,177,78,0.13);'
+  + 'border:1px solid rgba(255,177,78,0.5);border-radius:5px;cursor:pointer';
+const ASK = 'position:fixed;inset:0;z-index:60;display:none;align-items:center;'
+  + 'justify-content:center;background:rgba(4,6,10,0.72);'
+  + 'font:13px/1.7 ui-monospace,Menlo,monospace;color:#e4e1da;letter-spacing:0.06em';
+
+function saveTime(ms) {
+  return ms > 0 ? new Date(ms).toLocaleString() : 'time unknown';
+}
+
+const slotName = (info) => (info.seed === null ? 'UNREADABLE' : nameFor(info.seed));
+
+function slotButton(info, isOn, pick) {
+  const name = info.hasSave ? slotName(info) : '';
+  const b = el('button', isOn ? SLOT_ON : SLOT);
+  b.id = `title-slot-${info.slot}`;
+  b.type = 'button';
+  b.dataset.slot = String(info.slot);
+  b.dataset.seed = info.seed === null ? '' : String(info.seed);
+  b.dataset.population = info.hasSave ? String(info.population) : '';
+  b.dataset.savedAt = info.hasSave ? String(info.savedAt) : '';
+  b.append(
+    el('div', 'font-weight:600;letter-spacing:0.12em',
+      info.hasSave ? name : `SLOT ${info.slot} · EMPTY`),
+    el('div', 'margin-top:2px;font-size:10px;opacity:0.65',
+      info.hasSave ? `seed ${info.seed ?? '?'} · pop ${info.population} · ${saveTime(info.savedAt)}` : 'new city'),
+  );
+  b.addEventListener('click', () => pick(info.slot));
   return b;
 }
 
@@ -157,6 +186,9 @@ function buildNewGame(seed, start) {
 
   const startBtn = button('title-start', 'START NEW CITY', true);
   panel.append(startBtn);
+  const back = button('title-newgame-back', 'BACK');
+  back.addEventListener('click', () => { panel.style.display = 'none'; });
+  panel.append(back);
 
   // Seed and name move together: a new seed gets the name made from it, and a
   // name the player typed sticks until the seed changes under it.
@@ -201,13 +233,73 @@ function buildSettings() {
   return panel;
 }
 
-function buildOverlay({ seed, hasSave, start }) {
+// The three slots and the buttons that act on the selected one. Continue on
+// the slot the page is already playing lifts the overlay; another slot is
+// handed to the next boot (savestore handoffSlot). New Game opens the panel on
+// an empty slot, and asks in the page first when the selected one holds a city.
+function buildSlots(seed, start, lift) {
+  const infos = slotInfos();
+  const boot = activeSlot();
+  let selected = infos.some((s) => s.slot === boot && s.hasSave)
+    ? boot : (infos.find((s) => s.hasSave) ?? infos[0]).slot;
+  const host = el('div', 'margin:4px 0');
+  const target = el('div', 'margin:2px 0 6px;font-size:10px;letter-spacing:0.14em;opacity:0.65', '');
+  target.id = 'title-slot-target';
+  const continueBtn = button('title-continue', 'CONTINUE');
+  const newBtn = button('title-newgame', 'NEW GAME');
+  const aside = el('div', 'display:flex;gap:8px');
+  aside.append(continueBtn, newBtn);
+  const ask = el('div', PANEL);
+  ask.id = 'title-replace';
+  const askText = el('div', 'font-size:11px;letter-spacing:0.1em;color:#ffd9a0', '');
+  const askYes = button('title-replace-yes', 'REPLACE SAVE', true);
+  const askNo = button('title-replace-no', 'CANCEL');
+  ask.append(askText, askYes, askNo);
+  const panel = buildNewGame(seed, (nextSeed, nextName) => start(selected, nextSeed, nextName));
+  panel.prepend(target);
+
+  const picked = (slot) => {
+    selected = slot;
+    panel.style.display = ask.style.display = 'none';
+    refresh();
+  };
+  function refresh() {
+    host.replaceChildren(...infos.map((info) => slotButton(info, info.slot === selected, picked)));
+    continueBtn.disabled = !slotInfo(selected).hasSave;
+  }
+  const openPanel = () => {
+    const info = slotInfo(selected);
+    target.textContent = info.hasSave
+      ? `SLOT ${selected} · REPLACES ${slotName(info)}`
+      : `SLOT ${selected} · NEW CITY`;
+    panel.style.display = 'block';
+  };
+  continueBtn.addEventListener('click', () => {
+    if (!slotInfo(selected).hasSave) return;
+    if (selected === boot) { lift(); return; }
+    handoffSlot(selected);
+    location.reload();
+  });
+  newBtn.addEventListener('click', () => {
+    ask.style.display = 'none';
+    const info = slotInfo(selected);
+    if (!info.hasSave) { openPanel(); return; }
+    askText.textContent = `REPLACE ${slotName(info)} IN SLOT ${selected}?`;
+    ask.style.display = 'block';
+  });
+  askYes.addEventListener('click', () => { ask.style.display = 'none'; openPanel(); });
+  askNo.addEventListener('click', () => { ask.style.display = 'none'; });
+  refresh();
+  return { host, aside, ask, panel };
+}
+
+function buildOverlay({ seed, start }) {
   const overlay = el('div', 'position:fixed;inset:0;z-index:40;display:flex;'
     + 'align-items:center;justify-content:center;'
     + 'background:radial-gradient(ellipse at 50% 38%,rgba(10,14,22,0.8),rgba(3,5,10,0.97) 78%);'
     + 'font:13px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace;color:#e4e1da;letter-spacing:0.06em');
   overlay.id = 'title';
-  const card = el('div', 'width:330px;padding:24px 28px;text-align:center;'
+  const card = el('div', 'width:360px;padding:24px 28px;text-align:center;'
     + 'background:rgba(5,8,14,0.85);border:1px solid rgba(255,255,255,0.14);border-radius:10px;'
     + 'box-shadow:0 24px 70px rgba(0,0,0,0.6)');
   card.append(
@@ -217,34 +309,94 @@ function buildOverlay({ seed, hasSave, start }) {
       'BUILD IT · LIVE IN IT'),
   );
   const lift = () => { overlay.style.display = 'none'; };
-  const panel = buildNewGame(seed, start);
-  const newGame = button('title-newgame', 'NEW GAME');
-  newGame.addEventListener('click', () => { panel.style.display = 'block'; });
+  const slots = buildSlots(seed, start, lift);
   const settingsPanel = buildSettings();
   const settings = button('title-settings', 'SETTINGS');
   settings.addEventListener('click', () => {
     settingsPanel.style.display = settingsPanel.style.display === 'block' ? 'none' : 'block';
   });
-  card.append(buildContinue(seed, hasSave, lift), newGame, panel, settings, settingsPanel);
+  card.append(slots.host, slots.aside, slots.ask, slots.panel, settings, settingsPanel);
   overlay.appendChild(card);
   document.body.appendChild(overlay);
 }
 
-// Called by boot.js once the world is picked. `saved` is the raw save string
-// (or null); `pending` is a New Game click this boot is fulfilling, which
-// starts straight into play. `show` is false for automated runs and capture.
-export function initTitle({ seed, show, pending, saved }) {
+// M7.T14: the pause menu (ui/pause.js) has no save of its own, so the front
+// door mounts the button the way the HUD name is kept in place: SAVE calls the
+// running game's own save entry — the autosave path — at once.
+function mountPauseSave() {
+  if (typeof document === 'undefined') return;
+  const hang = () => {
+    const card = document.getElementById('pause')?.firstElementChild;
+    if (!card || card.querySelector('#pause-save')) return;
+    const line = el('div', 'margin-top:6px;font:10px ui-monospace,Menlo,monospace;'
+      + 'letter-spacing:0.14em;opacity:0.65', '');
+    line.id = 'pause-saveline';
+    const save = button('pause-save', 'SAVE');
+    save.addEventListener('click', () => {
+      const slot = activeSlot();
+      const wrote = typeof globalThis.__game?.saveNow === 'function' && globalThis.__game.saveNow();
+      const info = slotInfo(slot);
+      line.textContent = wrote && info.hasSave
+        ? `SAVED · SLOT ${slot} · ${slotName(info)}`
+        : 'NO SAVE IN THIS RUN';
+    });
+    card.insertBefore(save, card.lastElementChild);
+    card.appendChild(line);
+  };
+  hang();
+  if (!document.getElementById('pause')) {
+    new MutationObserver(hang).observe(document.body, { childList: true });
+  }
+}
+
+// N (M7-7): a new game never replaces a save without asking, in the page.
+// Automated runs are not players, and boot.js hides the title for them, so
+// the gate drives N straight through; a real browser is asked first.
+export function askNewGame(onYes) {
+  if (typeof document === 'undefined' || navigator.webdriver) { onYes(); return null; }
+  const shown = document.getElementById('newgame-ask');
+  if (shown) return shown;
+  const info = slotInfo(activeSlot());
+  if (!info.hasSave) { onYes(); return null; }
+  const root = el('div', ASK);
+  root.id = 'newgame-ask';
+  const card = el('div', 'width:300px;padding:20px 24px;text-align:center;'
+    + 'background:rgba(5,8,14,0.94);border:1px solid rgba(255,255,255,0.16);border-radius:10px');
+  const close = (go) => { root.remove(); if (go) onYes(); };
+  const yes = button('newgame-yes', 'START NEW GAME', true);
+  const no = button('newgame-no', 'CANCEL');
+  yes.addEventListener('click', () => close(true));
+  no.addEventListener('click', () => close(false));
+  card.append(
+    el('div', 'font-size:16px;font-weight:600;letter-spacing:0.2em;color:#fff', 'START NEW GAME?'),
+    el('div', 'margin-top:8px;font-size:11px;opacity:0.7',
+      `SLOT ${info.slot} · ${slotName(info)} — its save will be replaced`),
+    yes, no,
+  );
+  root.appendChild(card);
+  root.style.display = 'flex';
+  document.body.appendChild(root);
+  return root;
+}
+
+// Called by boot.js once the world is picked. `pending` is a New Game click
+// this boot is fulfilling, which starts straight into play. `show` is false
+// for automated runs and capture; the pause menu's save button is mounted even
+// then, because the pause menu is the running game's, not the title's.
+export function initTitle({ seed, show, pending }) {
   const name = pending?.name || nameFor(seed);
   if (pending) {
     rememberName(seed, name);
     clearPending();
   }
   mountHudName(name, seed);
+  mountPauseSave();
   if (!show || pending) return;
-  const start = (nextSeed, nextName) => {
+  const start = (slot, nextSeed, nextName) => {
     rememberName(nextSeed, nextName);
+    handoffSlot(slot);
     writeJson(PENDING_KEY, { seed: nextSeed, name: nextName });
     location.assign(location.pathname);
   };
-  buildOverlay({ seed, hasSave: !!saved, start });
+  buildOverlay({ seed, start });
 }
