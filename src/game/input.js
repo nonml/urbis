@@ -43,6 +43,16 @@ const PAD_DEADZONE = 0.18, PAD_TRIGGER = 0.5;
 const PAD_LOOK_PX = 18;
 const clamp1 = (v) => Math.max(-1, Math.min(1, v));
 
+// A key typed into a field — the seed and city-name boxes up front, the
+// settings number fields — is text, never a bound action: without this, naming
+// a city "Northgate" would toggle the day, hack and open the new-game ask
+// behind the title (M7.T11).
+const TYPING_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
+const isTyping = (e) => {
+  const t = e.target;
+  return !!t && (TYPING_TAGS.has(t.tagName) || t.isContentEditable === true);
+};
+
 // parts: canvas, cam, camera, city, cityRig, cityView, street, clock, interior,
 // arc, arcUI, look(dx, dy), dolly(deltaY), fireHack, toggleVehicle, enterDoor,
 // newGame. Installs every listener once, in play's order, and returns the
@@ -75,6 +85,7 @@ export function bindInput(parts) {
   const down = (action) => held.has(bindings[action]);
 
   window.addEventListener('keydown', (e) => {
+    if (isTyping(e)) return;
     const k = e.key.toLowerCase();
     held.add(k);
     const token = MOVE_TOKEN[byKey.get(k)];
@@ -97,7 +108,7 @@ export function bindInput(parts) {
   // `down`, the city view's own keys through CITY_CANON. One key, one action:
   // setBinding swaps on a clash, so two of these can never match one press.
   window.addEventListener('keydown', (e) => {
-    if (e.repeat) return;
+    if (e.repeat || isTyping(e)) return;
     const action = byKey.get(e.key.toLowerCase());
     if (action === 'hack') fireHack();
     if (action === 'vehicle') toggleVehicle();
