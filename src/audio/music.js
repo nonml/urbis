@@ -130,18 +130,21 @@ function offlineContext() {
 // One looping bed at a time: the first update a pose asks for a track it is
 // decoded, and a later pose that wants another swaps it — start the new voice,
 // release the old, both fades owning in engine.js. A track not decoded yet is
-// listed but unheard until it lands, so no frame ever blocks on a fetch.
+// listed but unheard until it lands, so no frame ever blocks on a fetch; a
+// track that fails to decode is not fetched again this run.
 export function createMusic(audio, buffers = {}) {
   const decoded = { ...buffers };
   const loading = new Set();
+  const failed = new Set();
   let current = null, error = null;
 
   async function ensure(name) {
-    if (decoded[name] || loading.has(name) || !MUSIC_FILES[name]) return;
+    if (decoded[name] || loading.has(name) || failed.has(name) || !MUSIC_FILES[name]) return;
     loading.add(name);
     try {
       Object.assign(decoded, await loadMusic(offlineContext(), [name]));
     } catch (err) {
+      failed.add(name);
       error = String((err && err.message) || err);
     }
     loading.delete(name);
