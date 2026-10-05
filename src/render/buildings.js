@@ -1,17 +1,18 @@
-// Row shells pooled (M3.T22, M3-5). A row's shaft was merged geometry in
-// render/block.js: permanent, and a rebuild a load-time hitch exactly when a
-// building changes. Now it is one slot in a per-architecture InstancedMesh —
-// the render/zoning.js pattern, at city scale — so the wall costs one fixed
-// pool per architecture whatever the map does. Each slot carries the parcel it
+// Building shells pooled (M3.T22 rows, M3.T23 towers and caps, M3-5). A shaft
+// was merged geometry in render/block.js: permanent, and a rebuild a load-time
+// hitch exactly when a building changes. Now every building is one slot in a
+// per-architecture InstancedMesh — the render/zoning.js pattern, at city scale
+// — so the wall costs one fixed pool per architecture whatever the map does,
+// and no merged shell path is left (law 6). Each slot carries the parcel it
 // stands on and its district (float indexes into the pools' id tables) and the
 // blackout's power zone. ZONING.md's no-instancing line is superseded by M3.
 // The pools wear the tower facade materials; their instanced UV rescale
 // (materials.js) reads the instance matrix columns, so a unit shell tiles the
-// same FACADE_TILE window grid the merged towers bake in.
+// same FACADE_TILE window grid the merged towers baked in.
 import * as THREE from 'three';
 
 const SHELL_SLACK = 64; // headroom for a re-planned frontage (M3.T20)
-const NO_ID = -1; // the hand preset's rows are not map parcels
+const NO_ID = -1; // the hand preset's buildings are not map parcels
 function unitShell() {
   const g = new THREE.BoxGeometry(1, 1, 1);
   g.translate(0, 0.5, 0); // base on the ground: scale.y is the height
