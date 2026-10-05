@@ -18,6 +18,7 @@ import { HAND_PINNED, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS, vistasOf } from '../sim/vistas.js';
 import { MIDBLOCK } from '../sim/streetscape.js';
 import { midblockFor } from '../sim/streetscape.js';
+import { buildInstancePools, buildShellPools } from './buildings.js';
 
 // Where the city is comes from the map (sim/map.js): this file draws the road
 // graph the map returns, it does not get a second opinion about where the roads
@@ -460,16 +461,34 @@ function shopInteriorAtlas() {
   return tex;
 }
 
-// Point a pane's UVs at one atlas cell. Canvas row 0 is the top, and a
+// A pooled pane is one unit box instanced at every bay size, so the atlas cell
+// can no longer be baked into its UVs; the instance carries the cell (`cell`,
+// M3.T24) and this points the emissive UVs at it: the same half-scale window
+// into the 2x2 atlas, per instance. Canvas row 0 is the top, and a
 // CanvasTexture flips Y, so cells 0 and 1 live in the upper half of UV space.
-function uvCell(geo, kind) {
-  const uv = geo.attributes.uv;
-  const cu = (kind % 2) * 0.5;
-  const cv = kind < 2 ? 0.5 : 0;
-  for (let i = 0; i < uv.count; i += 1) {
-    uv.setXY(i, cu + uv.getX(i) * 0.5, cv + uv.getY(i) * 0.5);
-  }
-  return geo;
+function instancedShopCells(sh) {
+  sh.vertexShader = sh.vertexShader
+    .replace('#include <common>', '#include <common>\nattribute float cell;')
+    .replace('#include <uv_vertex>', `
+#ifdef USE_INSTANCING
+  vec2 cellUv = vec2( mod( cell, 2.0 ) * 0.5, cell < 2.0 ? 0.5 : 0.0 );
+  vec2 shopUv = cellUv + uv * 0.5;
+  #define uv shopUv
+#endif
+#include <uv_vertex>
+#ifdef USE_INSTANCING
+  #undef uv
+#endif`);
+  if (!sh.vertexShader.includes('shopUv')) console.error('[shop-glass] instanced cell patch missed');
+}
+
+function instancedShopGlass(mat) {
+  const own = mat.onBeforeCompile;
+  mat.onBeforeCompile = (sh, renderer) => {
+    own.call(mat, sh, renderer);
+    instancedShopCells(sh);
+  };
+  return mat;
 }
 
 // The city's own day/night facade maps, loaded once and shared: the tower
@@ -513,10 +532,10 @@ function towerMaterials(texLoader, maxAniso) {
   // still burning through a blackout is exactly the dishonesty VGA-007 was
   // opened for. Emissive is driven from main with the lamps.
   const interior = shopInteriorAtlas();
-  const shopGlass = zoneLit(new THREE.MeshStandardMaterial({
+  const shopGlass = instancedShopGlass(zoneLit(new THREE.MeshStandardMaterial({
     color: 0x11161d, emissive: 0xffffff, emissiveIntensity: 0, emissiveMap: interior,
     roughness: 0.12, metalness: 0.55, envMapIntensity: 1.6,
-  }), 'shop-glass');
+  }), 'shop-glass'));
   shopGlass.userData.baseTint = shopGlass.color.clone();
   // A tower's windows go dark at noon. A shop's do not — its lights stay on
   // all day, and without that floor the glazing reads as a black hole punched
@@ -599,7 +618,7 @@ function pavementFurniture(out, ax, side, map) {
 // gets the rhythm instead: pilasters, a corner downpipe with its hopper and
 // shoe, and a condenser where a back-of-house wall would carry one. All of
 // it merges into the podium and trim meshes that already exist.
-function podiumSkin(cx, cz, pw, pd, caps, pod) {
+function podiumSkin(cx, cz, pw, pd, caps, part) {
   for (const sx of [-1, 1]) {
     for (const sz of [-1, 1]) {
       const x = cx + sx * (pw / 2 + 0.16);
@@ -613,12 +632,12 @@ function podiumSkin(cx, cz, pw, pd, caps, pod) {
   // and 4.2 height the dressed face uses, so the block reads consistent.
   for (const sz of [-1, 1]) {
     for (const u of [-pw / 2 + 0.5, 0, pw / 2 - 0.5]) {
-      pod.push(box(0.55, 4.2, 0.22, cx + u, 2.1, cz + sz * (pd / 2 + 0.11)));
+      part(0.55, 4.2, 0.22, cx + u, 2.1, cz + sz * (pd / 2 + 0.11));
     }
   }
   for (const sx of [-1, 1]) {
     for (const u of [-pd / 2 + 0.5, 0, pd / 2 - 0.5]) {
-      pod.push(box(0.22, 4.2, 0.55, cx + sx * (pw / 2 + 0.11), 2.1, cz + u));
+      part(0.22, 4.2, 0.55, cx + sx * (pw / 2 + 0.11), 2.1, cz + u);
     }
   }
   caps.push(box(0.8, 0.62, 0.48, cx + pw / 2 + 0.34, 3.5, cz + pd * 0.28));
@@ -757,12 +776,19 @@ function roofline(caps, cx, cz, w, top, d, kind) {
 
 export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const avenueX = map.district.avenues.map((a) => a.x);
+  const districtId = map.district?.id ?? null;
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
-  const facades = mats.kinds.map(() => [[], []]);
-  const podiums = mats.podium.map(() => []);
+  // Podium parts and shop panes are parcel-keyed pool slots (M3.T24), like the
+  // shells: a bulldoze frees them with the shaft they dress.
+  const podSlots = [];
+  const glassSlots = [];
   const caps = [];
-  const shopGeos = [[], []];
+  // Every building's shaft is a pool slot (M3.T22 rows, M3.T23 towers and
+  // caps); the same boxes go into the mirror proxy merged, because a puddle
+  // reflects the wall.
+  const shellSlots = [];
+  const mirrorShells = [];
   const shopPools = [];
   const beaconPts = [];
   const posters = [];
@@ -772,15 +798,15 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   // The eye-level pass. A 4.2m plaster box with one narrow door is the single
   // biggest reason the street reads as a model: at walking distance a wall has
   // to have a base, a rhythm, a shopfront and something casting a shadow on it.
-  // Everything here merges into a mesh that already exists except the glazing,
-  // which needs its own material because it lights up — and its own per-zone
-  // twin, because a lit shopfront surviving a blackout is a lie.
+  // The podium pieces and the glazing are pool slots keyed to their parcel
+  // (M3.T24); the glazing lights up per zone, so it keeps its own material and
+  // a lit shopfront still dies in a blackout.
   const SHOP_SILL = 0.55;
   const SHOP_HEAD = 3.15;
   const SHOP_MARGIN = 1.5;     // solid pier each side of the glazing
   const AWNING_OUT = 0.85;
   const SPILL_OUT = 1.9;       // pool centre, just off the kerb side of the glass
-  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], pod, idx) {
+  function dressGroundFloor(cx, cz, w, d, zone, [fx, fz], part, idx, parcel) {
     const alongZ = fx !== 0;
     const pw = w + 1.2;
     const pd = d + 1.2;
@@ -813,7 +839,11 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
         // across both the block index and the bay index means no two
         // neighbours match and no block repeats the block before it.
         const kind = (idx * 3 + i) % SHOP_KINDS.length;
-        shopGeos[zone].push(uvCell(faceBox(bayW, gh, 0.08, gx, midY, gz, alongZ), kind));
+        const [gw, gd] = alongZ ? [0.08, bayW] : [bayW, 0.08];
+        glassSlots.push({
+          x: gx, y: midY - gh / 2, z: gz, w: gw, h: gh, d: gd,
+          kind: 0, zone, parcel, district: districtId, cell: kind,
+        });
         // Spill on the pavement. A lit window with dark ground under it is a
         // sticker; this rides the existing per-zone pool mesh, so it is free
         // and it dies in a blackout with everything else.
@@ -828,7 +858,8 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
         }
         if (i < bays - 1) {
           const [px, pz] = at(u + bayW / 2 + pier / 2, 0.08);
-          pod.push(faceBox(pier, gh + 0.5, 0.18, px, midY + 0.1, pz, alongZ));
+          const [fw, fd] = alongZ ? [0.18, pier] : [pier, 0.18];
+          part(fw, gh + 0.5, fd, px, midY + 0.1, pz);
         }
       }
       // Sill under the glass, awning over it: two horizontal shadow lines.
@@ -859,18 +890,24 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
     // Pilasters in podium plaster, so they self-shadow and the lamps rake them.
     for (const u of [-span / 2 + 0.45, span / 2 - 0.45]) {
       const [px, pz] = at(u, 0.11);
-      pod.push(faceBox(0.55, 4.2, 0.22, px, 2.1, pz, alongZ));
+      const [fw, fd] = alongZ ? [0.22, 0.55] : [0.55, 0.22];
+      part(fw, 4.2, fd, px, 2.1, pz);
     }
   }
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
   // `name` says which table row this is, so the overlap check can point at it;
   // `parcel` is the map parcel this building is (M3-3), null on the hand preset.
-  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % facades.length, door = true, parcel = null) {
+  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % mats.kinds.length, door = true, parcel = null) {
     const zone = cz < 0 ? 0 : 1;
-    const shaft = facades[kind][zone];
-    const pod = podiums[idx % podiums.length];
-    pod.push(box(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz));
-    podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, pod);
+    // This building's podium architecture, and a part of it as a pool slot: a
+    // unit box based at its own foot, keyed to the parcel it dresses.
+    const podKind = idx % mats.podium.length;
+    const part = (pw, ph, pd, px, py, pz) => podSlots.push({
+      x: px, y: py - ph / 2, z: pz, w: pw, h: ph, d: pd,
+      kind: podKind, zone, parcel, district: districtId,
+    });
+    part(w + 1.2, 4.2, d + 1.2, cx, 2.1, cz);
+    podiumSkin(cx, cz, w + 1.2, d + 1.2, caps, part);
     posterWall(posters, cx, cz, w + 1.2, d + 1.2, idx);
     // Stone trim course capping the podium — one thin ring, catches lamp light.
     caps.push(box(w + 1.5, 0.22, d + 1.5, cx, 4.3, cz));
@@ -883,14 +920,24 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       // Small canopy over the door.
       caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
     }
-    if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
-    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
+    if (face) dressGroundFloor(cx, cz, w, d, zone, face, part, idx, parcel);
+    // The shaft is a pool slot too (M3.T22/T23); the podium pieces and the
+    // glazing became slots in M3.T24. Caps and posters still merge (M3.T25).
+    const shellBox = (sw, sh, sd, baseY) => {
+      shellSlots.push({
+        x: cx, y: baseY, z: cz, w: sw, h: sh, d: sd, kind, zone, parcel, district: districtId,
+      });
+      mirrorShells.push(withZone(
+        worldUVs(box(sw, sh, sd, cx, baseY + sh / 2, cz), sw, sh, sd, FACADE_TILE), zone,
+      ));
+    };
+    shellBox(w, h, d, 0);
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * CROWN;
       const uh = h * 0.3;
       const ud = d * CROWN;
-      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, FACADE_TILE));
+      shellBox(uw, uh, ud, h);
       topY = h + uh;
     }
     if (door) {
@@ -943,27 +990,30 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
     });
   }
-  // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
-  // architecture lights both halves of the district.
-  for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
-  const batches = [
-    ...facades.map((zoned, kind) => [zoned.flat(), mats.kinds[kind]]),
-    ...podiums.map((geos, i) => [geos, mats.podium[i]]),
-  ];
-  for (const [geos, mat] of batches) {
-    if (!geos.length) throw new Error('buildTowers: empty batch would leave a material unlit');
-    const m = new THREE.Mesh(mergeGeometries(geos), mat);
-    m.castShadow = true;
-    m.receiveShadow = true;
-    group.add(m);
+  // Every building's shaft, one fixed-size pool per architecture: a bulldoze
+  // or a rezone is a matrix write, not a merge rebuild (M3.T22/T23).
+  const shells = buildShellPools(mats.kinds, shellSlots);
+  group.add(shells.group);
+  // Podiums and shop glass are pools too (M3.T24): a bulldoze frees their slots
+  // with the shell. The panes carry their atlas cell per instance; the glass is
+  // not a shadow caster, exactly as the merged mesh was not. A blackout must
+  // have glass to kill in both power zones (the merged path's old throw).
+  for (const zone of [0, 1]) {
+    if (!glassSlots.some((s) => s.zone === zone)) throw new Error('buildTowers: a zone has no shopfronts');
   }
+  const podiumPools = buildInstancePools(mats.podium, podSlots);
+  group.add(podiumPools.group);
+  const glassPool = buildInstancePools([mats.shopGlass], glassSlots, {
+    extra: ['cell'], castShadow: false, receiveShadow: false,
+  });
+  group.add(glassPool.group);
   // Mirror proxy (VGA-002): one merged copy of every facade, so the reflection
   // probe redraws the city in one pass instead of six. Water cannot tell glass
   // from concrete at reflection scale, so all six architectures borrow the
   // glass material — and each zone still dies with its own lights, because the
   // proxy carries the same zone stamp.
   const mirrorProxy = new THREE.Mesh(
-    mergeGeometries([0, 1].flatMap((zone) => facades.flatMap((zoned) => zoned[zone]))),
+    mergeGeometries(mirrorShells),
     mats.kinds[0],
   );
   mirrorProxy.castShadow = false;
@@ -980,16 +1030,11 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const capMesh = new THREE.Mesh(mergeGeometries(caps), capMat);
   capMesh.castShadow = true;
   group.add(capMesh);
-  // One draw for every shopfront in the district, both power zones.
-  shopGeos.forEach((geos, zone) => {
-    if (!geos.length) throw new Error('buildTowers: a zone has no shopfronts');
-    for (const g of geos) withZone(g, zone);
-  });
-  group.add(new THREE.Mesh(mergeGeometries(shopGeos.flat()), mats.shopGlass));
 
   return {
     group, beacons: beaconPts, facadeMats: mats.facadeMats,
     zoneMats: mats.zoneMats, kinds: mats.kinds, mirrorProxies, shopPools, footprints,
+    shells, podiumPools, glassPool,
   };
 }
 
