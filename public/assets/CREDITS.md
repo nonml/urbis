@@ -36,3 +36,16 @@ page below and checks its pinned sha256; `--check` verifies the committed bytes.
 - `sting_complete.mp3` — You've succeeded (game jingle) by Rolly-SFX — CC0 — https://freesound.org/people/Rolly-SFX/sounds/626259/
 - `hum_district.mp3` — Hum Loop by Smice_6 — CC0 — https://freesound.org/people/Smice_6/sounds/536527/
 - `traffic_pass.mp3` — TRANSPORTATION CAR PASS BY 01 by sengjinn — CC0 — https://freesound.org/people/sengjinn/sounds/176215/
+
+### Music (`public/assets/music/`, M7.T17)
+
+Five CC0 instrumental tracks for M7-10, mirrored from FreePD's public-domain
+library by [0lhi/FreePD](https://github.com/0lhi/FreePD) (LICENSE: CC0 1.0, no
+attribution required). `fetch.sh` downloads each from the pinned commit below
+and checks its sha256.
+
+- `music_title.mp3` — "Intro" (Zoned) — CC0 — https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Zoned/Intro.mp3 — the title theme
+- `music_calm.mp3` — "Slice of Life" (Scoring) — CC0 — https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Scoring/Slice%20of%20Life.mp3 — the score under the arc's missions
+- `music_urgent.mp3` — "City Run" (Scoring) — CC0 — https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Scoring/City%20Run.mp3 — the chase score
+- `music_radio_a.mp3` — "Backbeat" (Electronic) — CC0 — https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Electronic/Backbeat.mp3 — car-radio station A (M7.T18)
+- `music_radio_b.mp3` — "80s Smooth Rocker" (Zoned) — CC0 — https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Zoned/80s%20Smooth%20Rocker.mp3 — car-radio station B (M7.T18)
