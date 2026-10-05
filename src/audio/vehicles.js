@@ -1,12 +1,13 @@
 // Engines and the horn (M7.T4): the player's car and the traffic around it.
 //
-// Three sounds from the set M7.T2 pinned:
+// The sounds the set M7.T2 pinned:
 //
 //   engine_loop  — the hero car. Pitch and level rise with speed; flat, because
 //                  the listener rides inside the car and a panner would only
 //                  subtract it as the follow camera pulls back
 //   traffic_pass — one for a moving car that is about to sweep past the
 //                  listener, positional so it crosses the frame's stereo field
+//   siren_police — a loop on every on-duty cruiser in earshot (M7.T5)
 //   horn         — E behind the wheel, flat on the effects bus with the engine
 //
 // `vehicleSounds(pose)` is the whole decision as pure data, so a check can list
@@ -18,6 +19,7 @@ import { CAR_TOP } from '../sim/vehicle.js';
 
 export const ENGINE = 'engine_loop';
 export const PASS = 'traffic_pass';
+export const SIREN = 'siren_police';
 export const HORN = 'horn';
 
 export const EFFECTS_BUS = 'effects';
@@ -41,6 +43,11 @@ const PASS_Y = 1;
 // The pass sample's pitch tracks how fast the car is going, within a step.
 const PASS_RATE_BASE = 0.9;
 const PASS_RATE_PER_SPEED = 0.015;
+
+// Siren gain falls with the square of the distance still inside the earshot.
+export const SIREN_EARSHOT = 140;
+export const SIREN_GAIN = 0.7;
+const SIREN_Y = 1.5;
 
 const square = (v) => v * v;
 const round2 = (v) => Math.round(v * 100) / 100;
@@ -111,19 +118,40 @@ export function passSounds(pose = {}) {
   return out;
 }
 
-// What plays at this pose: the engine loop, the pass one-shots, the horn.
+// One looping siren per on-duty cruiser in earshot; a `leaving` unit is silent.
+export function sirenSounds(pose = {}) {
+  const px = pose.px ?? pose.x ?? 0, pz = pose.pz ?? pose.z ?? 0;
+  const units = pose.units ?? pose.pursuit ?? [];
+  const out = [];
+  for (let i = 0; i < units.length; i++) {
+    const u = units[i];
+    if (!u.active || u.leaving) continue;
+    const x = u.x ?? 0, z = u.z ?? 0;
+    const d2 = square(x - px) + square(z - pz);
+    if (d2 > SIREN_EARSHOT * SIREN_EARSHOT) continue;
+    const gain = round3(SIREN_GAIN * square(1 - Math.sqrt(d2) / SIREN_EARSHOT));
+    out.push({
+      key: i, name: SIREN, bus: EFFECTS_BUS, loop: true, flat: false, rate: 1,
+      x: round2(x), y: SIREN_Y, z: round2(z), gain,
+    });
+  }
+  return out;
+}
+
+// What plays at this pose: engine, passes, sirens, horn.
 export function vehicleSounds(pose = {}) {
   const list = passSounds(pose);
   const engine = engineSound(pose);
   if (engine) list.unshift(engine);
   if (pose.horn) list.push(hornSound());
-  return list;
+  return [...list, ...sirenSounds(pose)];
 }
 
-// The three files the set needs, for whoever owns the AudioContext.
+// The files the set needs, for whoever owns the AudioContext.
 export const VEHICLE_FILES = {
   [ENGINE]: 'assets/sounds/engine_loop.mp3',
   [PASS]: 'assets/sounds/traffic_pass.mp3',
+  [SIREN]: 'assets/sounds/siren_police.mp3',
   [HORN]: 'assets/sounds/horn.mp3',
 };
 
@@ -136,14 +164,14 @@ export async function loadVehicles(context, base = '') {
   return buffers;
 }
 
-// One engine loop for the life of the game; one one-shot per car per pass. The
-// pose: { driving, speed|car, cars, px, pz, horn }. `buffers` is name ->
-// decoded AudioBuffer (see loadVehicles); a missing buffer still lists, it just
-// cannot be heard until the caller loads the set.
+// One engine loop, a one-shot per pass, a siren loop per on-duty unit; pose
+// { driving, speed|car, cars, units, px, pz, horn } (`units` = wanted.pursuit).
+// `buffers` is name -> decoded AudioBuffer; a missing one lists but is unheard.
 export function createVehicles(audio, buffers = {}) {
   let engine = null;
   let hornHeld = false;
   const passing = new Set();
+  const sirens = new Map();
 
   function update(pose = {}) {
     const plan = vehicleSounds(pose);
@@ -168,6 +196,19 @@ export function createVehicles(audio, buffers = {}) {
     }
     passing.clear();
     for (const key of live) passing.add(key);
+    for (const s of plan) {
+      if (s.name !== SIREN) continue;
+      const held = sirens.get(s.key);
+      if (held) audio.update(held, { gain: s.gain, x: s.x, y: s.y, z: s.z });
+      else if (buffers[s.name]) sirens.set(s.key, audio.play(s.name, buffers[s.name], {
+        bus: s.bus, loop: true, gain: s.gain, x: s.x, y: s.y, z: s.z,
+      }));
+    }
+    for (const [key, held] of sirens) {
+      if (plan.some((p) => p.name === SIREN && p.key === key)) continue;
+      audio.stop(held);
+      sirens.delete(key);
+    }
     if (pose.horn && !hornHeld) honk();
     hornHeld = !!pose.horn;
     return plan;
@@ -184,6 +225,8 @@ export function createVehicles(audio, buffers = {}) {
     if (engine) audio.stop(engine);
     engine = null;
     passing.clear();
+    for (const held of sirens.values()) audio.stop(held);
+    sirens.clear();
     hornHeld = false;
   }
 

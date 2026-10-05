@@ -1,7 +1,47 @@
 // The police radio as subtitles: speaker, then the line, bottom-left, the last
 // few calls fading as they age. Its own element — it never touches #hud.
+// M7.T5: under the subtitles, a synthesized key-up crackle as each new line
+// lands (`d.said` is the cue). Noise, not a file, so nothing to credit.
+import { mulberry32 } from '../sim/rng.js';
+
 const LINE_SECS = 7;
 const FADE_SECS = 1.5;
+
+export const CRACKLE = 'radio_crackle';
+const CRACKLE_SECS = 0.13, CRACKLE_GAIN = 0.5;
+
+// Band-split noise, loud on the attack, gone in an eighth of a second.
+export function crackleBuffer(sampleRate = 44100) {
+  if (typeof AudioBuffer === 'undefined') return null;
+  const n = Math.max(1, Math.round(sampleRate * CRACKLE_SECS));
+  const buffer = new AudioBuffer({ length: n, sampleRate, numberOfChannels: 1 });
+  const out = buffer.getChannelData(0);
+  const noise = mulberry32(0x51ca7e);
+  let low = 0;
+  for (let i = 0; i < n; i++) {
+    low += (noise() * 2 - 1 - low) * 0.3;
+    out[i] = low * (1 - i / n) ** 2;
+  }
+  return buffer;
+}
+
+// One crackle per newly said line; `heard` is the last count played.
+export function dispatchSounds(d = {}, heard = 0) {
+  if (d.said <= heard) return [];
+  return [{ name: CRACKLE, bus: 'effects', loop: false, flat: true, gain: CRACKLE_GAIN }];
+}
+
+// The radio voice; `buffers[CRACKLE]` comes from crackleBuffer.
+export function createDispatchRadio(audio, buffers = {}) {
+  let heard = null;
+  function update(d) {
+    const plan = dispatchSounds(d, heard ?? d.said);
+    heard = d.said;
+    if (plan.length && buffers[CRACKLE]) audio.play(CRACKLE, buffers[CRACKLE], plan[0]);
+    return plan;
+  }
+  return { update, plan: dispatchSounds };
+}
 
 const BOX_STYLE = [
   'position:fixed', 'left:12px', 'bottom:40px', 'max-width:min(520px,70vw)', 'pointer-events:none',
