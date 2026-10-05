@@ -6,7 +6,9 @@
 // One positional voice per lot, gain falling with the square of the distance
 // inside earshot. `siteSounds(pose)` is the whole decision as pure data: a
 // check can list what plays per pose with no browser and no AudioContext
-// (M7-1); `createSites` makes that list one loop per site.
+// (M7-1); `createSites` makes that list one loop per site and decodes its own
+// file (ambience.js's pattern), so a working lot is heard without the caller
+// loading anything. A pose still lists what would play while the file lands.
 export const CRANE = 'crane_site';
 export const SITE_BUS = 'effects';
 
@@ -68,10 +70,39 @@ export async function loadSites(context, base = '') {
   return buffers;
 }
 
+// A decode context that never reaches the speakers (engine.js owns the live
+// one), so the crane's file loads without a second audible graph.
+let decoder = null;
+function offlineContext() {
+  if (decoder) return decoder;
+  const Ctor = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext : null;
+  if (!Ctor) throw new Error('no Web Audio to decode the sites');
+  decoder = new Ctor(1, 1, 44100);
+  return decoder;
+}
+
 // One loop per working lot in earshot; pose { parcels, px, pz, dark }.
-// `buffers` is name -> decoded AudioBuffer; a missing one lists but is unheard.
+// `buffers` is name -> decoded AudioBuffer; missing ones are decoded on demand,
+// so a pose lists a site before its file lands and the first update after it
+// arrives claims the voice. Nothing loads under `?capture=1`: the crew's
+// screenshots never pay for a fetch.
 export function createSites(audio, buffers = {}) {
+  const decoded = { ...buffers };
   const held = new Map();
+  let loading = false, error = null;
+
+  async function load() {
+    if (loading || decoded[CRANE]) return;
+    if (typeof audio.silent === 'function' && audio.silent()) return;
+    loading = true;
+    try {
+      Object.assign(decoded, await loadSites(offlineContext()));
+    } catch (err) {
+      error = String((err && err.message) || err);
+    }
+    loading = false;
+  }
+
   function update(pose = {}) {
     const plan = siteSounds(pose);
     const live = new Set();
@@ -79,9 +110,10 @@ export function createSites(audio, buffers = {}) {
       live.add(s.key);
       const voice = held.get(s.key);
       if (voice) audio.update(voice, { gain: s.gain, rate: s.rate, x: s.x, y: s.y, z: s.z });
-      else if (buffers[s.name]) held.set(s.key, audio.play(s.name, buffers[s.name], {
+      else if (decoded[s.name]) held.set(s.key, audio.play(s.name, decoded[s.name], {
         bus: s.bus, loop: true, gain: s.gain, rate: s.rate, x: s.x, y: s.y, z: s.z,
       }));
+      else load();
     }
     for (const [key, voice] of held) {
       if (live.has(key)) continue;
@@ -96,5 +128,5 @@ export function createSites(audio, buffers = {}) {
     held.clear();
   }
 
-  return { update, stop, plan: siteSounds };
+  return { update, stop, plan: siteSounds, buffers: decoded, error: () => error };
 }
