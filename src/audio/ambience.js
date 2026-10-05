@@ -7,12 +7,17 @@
 //   ambience_street — the crowd: rises with the walkers out near the player
 //   hum_district    — the traffic: rises with the commute flow and nearby cars
 //
+// An M7.T7 blackout kills both beds for the listener's zone: the district's
+// voice dies with its lamps and comes back when street.js restores them. The
+// other zone keeps humming — one hack, one side of the avenue (`zonePower`).
+//
 // `ambienceSounds(pose)` is the whole decision as pure data, so a check can
 // list what plays per pose with no browser and no AudioContext (the criterion's
 // "lists playing sounds per pose"). `createAmbience(audio)` turns that list into
 // two voices on engine.js and moves only their gain and rate after.
 import { nightOf } from '../sim/clock.js';
 import { shareOut } from '../sim/commute.js';
+import { zoneAt } from '../sim/street.js';
 
 export const BEDS = { street: 'ambience_street', hum: 'hum_district' };
 export const AMBIENCE_BUS = 'ambience';
@@ -43,6 +48,10 @@ const FLOW_FLOOR = 0.25;
 // Night is quieter but not silent: the city keeps breathing after dark.
 const NIGHT_FLOOR = 0.45;
 
+// What a zone's power does to its beds: the same 0.5 street.js's zoneGlow gives
+// the lamps mid-collapse, so sound and light cross the threshold together.
+const PHASE_POWER = { lit: 1, dying: 0.5, dark: 0, restoring: 0.5 };
+
 const square = (v) => v * v;
 const frac01 = (n, full) => Math.min(1, n / full);
 const round3 = (v) => Math.round(v * 1000) / 1000;
@@ -59,6 +68,21 @@ export function kindAt(city, x = 0, z = 0) {
   return best && KIND_MIX[best.use] ? best.use : 'downtown';
 }
 
+// How much of the district's voice survives at the listener's zone (M7.T7).
+// `dark` is the [zone0, zone1] pair `__game.dark()` returns and sites.js reads;
+// `phase` is street.js's zonePhase, so a caller that has the live collapse lets
+// the hum fade through it. `zone` picks the zone outright; a pose with none of
+// them is lit.
+export function zonePower(pose = {}, pz = 0) {
+  const zone = pose.zone ?? zoneAt(pz);
+  const phases = pose.phase ?? pose.phases;
+  const phase = Array.isArray(phases) ? phases[zone] : phases;
+  if (PHASE_POWER[phase] !== undefined) return PHASE_POWER[phase];
+  const dark = pose.dark ?? pose.darkZones;
+  if (dark === undefined || dark === null) return 1;
+  return (Array.isArray(dark) ? dark[zone] : dark) ? 0 : 1;
+}
+
 function countNear(list, x, z, r2, keep) {
   let n = 0;
   for (const o of list ?? []) {
@@ -70,7 +94,8 @@ function countNear(list, x, z, r2, keep) {
 // What plays at this pose, as two loops with a gain each. `pose` may carry:
 //   hour 0..24; walkers street.npcs; cars street.cars; px/pz the listener;
 //   kind 'res' | 'com' | 'ind' | 'downtown' (or city/px/pz to derive it);
-//   commute the flow 0..1, defaulting to the sim's own shareOut(hour).
+//   commute the flow 0..1, defaulting to the sim's own shareOut(hour);
+//   dark [zone0, zone1] out, or phase zonePhase per zone (M7.T7).
 export function ambienceSounds(pose = {}) {
   const hour = (((pose.hour ?? pose.clock?.hour ?? 12) % 24) + 24) % 24;
   const px = pose.px ?? pose.x ?? 0;
@@ -81,14 +106,15 @@ export function ambienceSounds(pose = {}) {
   const crowd = frac01(countNear(pose.walkers, px, pz, square(CROWD_RADIUS), (n) => n.out !== false), CROWD_FULL);
   const traffic = frac01(countNear(pose.cars, px, pz, square(TRAFFIC_RADIUS), (c) => !c.parked), CARS_FULL);
   const hourMix = NIGHT_FLOOR + (1 - NIGHT_FLOOR) * (1 - nightOf(hour));
+  const power = zonePower(pose, pz);
   return [
     {
       name: BEDS.street, bus: AMBIENCE_BUS, loop: true, flat: true, rate: mix.rate,
-      gain: round3(STREET_LEVEL * mix.street * hourMix * (CROWD_FLOOR + (1 - CROWD_FLOOR) * crowd)),
+      gain: round3(power * STREET_LEVEL * mix.street * hourMix * (CROWD_FLOOR + (1 - CROWD_FLOOR) * crowd)),
     },
     {
       name: BEDS.hum, bus: AMBIENCE_BUS, loop: true, flat: true, rate: 1,
-      gain: round3(HUM_LEVEL * mix.hum * flow * (FLOW_FLOOR + (1 - FLOW_FLOOR) * traffic)),
+      gain: round3(power * HUM_LEVEL * mix.hum * flow * (FLOW_FLOOR + (1 - FLOW_FLOOR) * traffic)),
     },
   ];
 }
