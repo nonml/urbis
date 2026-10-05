@@ -64,10 +64,17 @@ function history(map) {
 
 const NOOP = () => {};
 
-// The whole parcel as an undo needs it, `heights` by value: an op that edits
-// the profile in place must not change the snapshot taken before it.
+// The whole parcel as an undo needs it: every nested array or plain object is
+// copied by value, so an op that edits one in place cannot reach back through
+// the snapshot and change what the undo restores (M3-4).
 function snapshot(p) {
-  return Array.isArray(p.heights) ? { ...p, heights: p.heights.slice() } : { ...p };
+  const copy = { ...p };
+  for (const key of Object.keys(copy)) {
+    const value = copy[key];
+    if (Array.isArray(value)) copy[key] = value.slice();
+    else if (value && typeof value === 'object') copy[key] = { ...value };
+  }
+  return copy;
 }
 
 // Apply one change as an edit: snapshot the parcel, bump the version, mark the
