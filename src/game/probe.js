@@ -530,9 +530,9 @@ function pickPixel(parts, px, py, w = 1280, h = 720) {
   });
 }
 
-// The parcel id a picked surface was drawn as (M3-3): a grown lot's shell
-// carries its parcel index per instance (render/zoning.js), a street-wall
-// building carries its id on the footprint it was emitted with
+// The parcel id a picked surface was drawn as (M3-3): a grown lot's shell and
+// every piece of its kit carry the parcel index per instance (render/zoning.js),
+// a street-wall building carries its id on the footprint it was emitted with
 // (render/block.js). Ground, roads and the skyline ring are nobody's parcel.
 // Trim, posters and pilasters stand up to half a metre off the podium face the
 // footprint measures; a pick on any of them still names the building.

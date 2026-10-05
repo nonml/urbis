@@ -127,6 +127,7 @@ function kitBox(rig, hex, x, y, z, sx, sy, sz, yaw = 0, along = 0) {
   scale.set(sx, sy, sz);
   rig.kit.setMatrixAt(i, matrix.compose(pos, quat, scale));
   rig.kit.setColorAt(i, paint.setHex(hex));
+  rig.kit.geometry.attributes.parcel.setX(i, rig.parcel);
 }
 
 function fenceLot(rig, p) {
@@ -160,6 +161,10 @@ function raiseCrane(rig, p, i, h) {
 }
 
 function dressParcel(rig, p, i) {
+  // The parcel every piece this call draws belongs to: shells carry it on
+  // their own attribute, the kit (hoarding, crane, skip, netting) reads it
+  // here, so a pick on either names the same lot (M3-3).
+  rig.parcel = i;
   const h = builtHeight(p);
   const sw = p.w - SETBACK * 2;
   const sd = p.d - SETBACK * 2;
@@ -205,6 +210,9 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
     group.add(m);
     shells[kind] = m;
   }
+  // The parcel each piece of kit belongs to, so a pick on the hoarding or the
+  // crane names its lot (M3-3), not just a pick on the shell behind them.
+  geo.setAttribute('parcel', new THREE.InstancedBufferAttribute(new Float32Array(n * KIT_PER_PARCEL), 1));
   const kit = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: 0.82, metalness: 0.12, envMapIntensity: 0.5,
   }), n * KIT_PER_PARCEL);
