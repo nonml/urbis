@@ -104,30 +104,35 @@ export function bindInput(parts) {
   let radio = null;
   let driving = false;
 
-  // The action keys; WASD/Shift are read by footInput/driveInput through
-  // `down`, the city view's own keys through CITY_CANON. One key, one action:
-  // setBinding swaps on a clash, so two of these can never match one press.
-  window.addEventListener('keydown', (e) => {
-    if (e.repeat || isTyping(e)) return;
-    const action = byKey.get(e.key.toLowerCase());
+  // One action, one effect (M7.T15): the keyboard and the pad both fire through
+  // this table, so a rebind and a button can never drift apart. WASD/Shift are
+  // read by footInput/driveInput through `down`, the city view's own keys
+  // through CITY_CANON. One key, one action: setBinding swaps on a clash, so
+  // two of these can never match one press.
+  const fire = (action) => {
     if (action === 'hack') fireHack();
-    if (action === 'vehicle') toggleVehicle();
-    if (action === 'dayNight') toggleDay(clock);
+    else if (action === 'vehicle') toggleVehicle();
+    else if (action === 'dayNight') toggleDay(clock);
     // N (M7-7): the ask comes first, in the page, whenever a save exists — but
     // only in play; on the title the front door's own button asks.
-    if (action === 'newGame' && !titleShowing()) askNewGame(newGame);
-    if (action === 'radio' && driving) radio = cycleRadio(radio);
-    if (action === 'journal') toggleJournal(arcUI);
-    if (action === 'choice1') arcChoose(arc, 1, street.time);
-    if (action === 'choice2') arcChoose(arc, 2, street.time);
+    else if (action === 'newGame' && !titleShowing()) askNewGame(newGame);
+    else if (action === 'radio' && driving) radio = cycleRadio(radio);
+    else if (action === 'journal') toggleJournal(arcUI);
+    else if (action === 'choice1') arcChoose(arc, 1, street.time);
+    else if (action === 'choice2') arcChoose(arc, 2, street.time);
     // The overview lifts off the street, never out of a shop or off a roof, and a
     // door is used at street scale, never from the overview.
-    if (action === 'door' && cityView.mode === 'street') enterDoor();
-    if (CITY_CANON[action] && interior.space === STREET) cityKey(cityView, CITY_CANON[action], cam.yaw);
+    else if (action === 'door' && cityView.mode === 'street') enterDoor();
+    else if (CITY_CANON[action] && interior.space === STREET) cityKey(cityView, CITY_CANON[action], cam.yaw);
+  };
+
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat || isTyping(e)) return;
+    fire(byKey.get(e.key.toLowerCase()));
   });
 
   // The gamepad, read once a step. Buttons fire on the press edge through the
-  // same action calls the keys use; the sticks land in `pad` for foot/drive.
+  // same `fire` table the keys use; the sticks land in `pad` for foot/drive.
   // No pad clears every read, so unplugging mid-stride keeps no last stick.
   const heldPad = new Array(17).fill(false);
   const stick = (v) => {
@@ -148,9 +153,9 @@ export function bindInput(parts) {
       pad.x = pad.y = pad.lookX = pad.lookY = 0; pad.run = false;
       return;
     }
-    if (padDown(p, PAD.enter) && !heldPad[PAD.enter]) { toggleVehicle(); enterDoor(); }
-    if (padDown(p, PAD.hack) && !heldPad[PAD.hack]) fireHack();
-    if (padDown(p, PAD.journal) && !heldPad[PAD.journal]) toggleJournal(arcUI);
+    if (padDown(p, PAD.enter) && !heldPad[PAD.enter]) { fire('vehicle'); fire('door'); }
+    if (padDown(p, PAD.hack) && !heldPad[PAD.hack]) fire('hack');
+    if (padDown(p, PAD.journal) && !heldPad[PAD.journal]) fire('journal');
     for (let i = 0; i < heldPad.length; i++) heldPad[i] = padDown(p, i);
     pad.x = stick(p.axes?.[0]);
     pad.y = stick(p.axes?.[1]);
