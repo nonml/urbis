@@ -1,11 +1,15 @@
 #!/usr/bin/env bash
-# Fetch the M7-1 sound set (M7.T2): CC0 files from Freesound, each pinned to its
-# sha256, so a re-run repairs a corrupt download and `--check` proves the committed
-# set offline. Sources and licences: public/assets/CREDITS.md.
+# Fetch the M7-1 sound set (M7.T2) and the M7.T17 music: CC0 files from
+# Freesound and FreePD, each pinned to its sha256, so a re-run repairs a corrupt
+# download and `--check` proves the committed set offline. Music rows carry a
+# leading `music|` tag and land in public/assets/music/, apart from the sounds
+# directory M7.T2's roster owns whole. Sources and licences:
+# public/assets/CREDITS.md.
 #   bash tools/sounds/fetch.sh [--check]
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 OUT=public/assets/sounds
+MUSIC_OUT=public/assets/music
 # file|page|fetch-url|sha256
 MANIFEST='
 ambience_street.mp3|https://freesound.org/people/qubodup/sounds/223093/|https://cdn.freesound.org/previews/223/223093_71257-hq.mp3|f2ac02efee5250abf15b5bbff7ad7aae7a56c29d8b966f07281995b92c34a371
@@ -17,24 +21,42 @@ sting_complete.mp3|https://freesound.org/people/Rolly-SFX/sounds/626259/|https:/
 hum_district.mp3|https://freesound.org/people/Smice_6/sounds/536527/|https://cdn.freesound.org/previews/536/536527_5546157-hq.mp3|b02dcf0dd5ece221969f7e9f8871545fabddbe73672be81e73188b7c04e44521
 traffic_pass.mp3|https://freesound.org/people/sengjinn/sounds/176215/|https://cdn.freesound.org/previews/176/176215_2979997-hq.mp3|14450ac8b1b4779aa37c98eec4180ed7ffc6c074c7dc9b63988a55efaf2add1f
 '
+# music|file|page|fetch-url|sha256 — the tag keeps M7.T2's roster (every file
+# in public/assets/sounds/ is a sound) from swallowing the music.
+MUSIC='
+music|music_title.mp3|https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Zoned/Intro.mp3|https://raw.githubusercontent.com/0lhi/FreePD/cf011c7016595833b550a88ff127f089188b25f8/Zoned/Intro.mp3|9655bde0b1f7ab2eba95930d1925a8cceab2c173d80ee21c29ae0ab84d0e5d59
+music|music_calm.mp3|https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Scoring/Slice%20of%20Life.mp3|https://raw.githubusercontent.com/0lhi/FreePD/cf011c7016595833b550a88ff127f089188b25f8/Scoring/Slice%20of%20Life.mp3|39e0543fbeb06ced8a5f023daf7375385235238ea9063677f3ff71ab15bc04dc
+music|music_urgent.mp3|https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Scoring/City%20Run.mp3|https://raw.githubusercontent.com/0lhi/FreePD/cf011c7016595833b550a88ff127f089188b25f8/Scoring/City%20Run.mp3|69a845f45d876c4d4e7fa08eca576ee667f3fef5022b3a569b3d33a4faeefe7f
+music|music_radio_a.mp3|https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Electronic/Backbeat.mp3|https://raw.githubusercontent.com/0lhi/FreePD/cf011c7016595833b550a88ff127f089188b25f8/Electronic/Backbeat.mp3|576aa0268ab27ce486f9238df3845ce104c3e05bad015ea08048ba79e88ac79a
+music|music_radio_b.mp3|https://github.com/0lhi/FreePD/blob/cf011c7016595833b550a88ff127f089188b25f8/Zoned/80s%20Smooth%20Rocker.mp3|https://raw.githubusercontent.com/0lhi/FreePD/cf011c7016595833b550a88ff127f089188b25f8/Zoned/80s%20Smooth%20Rocker.mp3|e399be4db3707b8c8515e9d0cb2a094ad616ca27f1f403e83cf57551bb8c479e
+'
 HASH=sha256sum
 command -v sha256sum >/dev/null 2>&1 || HASH='shasum -a 256'
 hash() { $HASH "$1" | cut -d' ' -f1; }
-mkdir -p "$OUT"
 status=0
-while IFS='|' read -r name page url want; do
-  [ -n "$name" ] || continue
-  file="$OUT/$name"
-  if [ -f "$file" ] && [ "$(hash "$file")" = "$want" ]; then
-    echo "ok       $name"
-  elif [ -n "${1:-}" ]; then
-    echo "MISMATCH $name" >&2
-    status=1
-  else
-    echo "fetch    $name"
-    curl -fsSL "$url" -o "$file.part"
-    [ "$(hash "$file.part")" = "$want" ] || { echo "checksum failed: $name" >&2; rm -f "$file.part"; exit 1; }
-    mv "$file.part" "$file"
-  fi
-done <<< "$MANIFEST"
+CHECK="${1:-}"
+# rows are [tag|]file|page|fetch-url|sha256; a tagged set takes the leading
+# field off before the name.
+fetch_set() {
+  local out="$1" tagged="$2" a b c d e file name page url want
+  mkdir -p "$out"
+  while IFS='|' read -r a b c d e; do
+    [ -n "$a" ] || continue
+    if [ -n "$tagged" ]; then name="$b"; page="$c"; url="$d"; want="$e"; else name="$a"; page="$b"; url="$c"; want="$d"; fi
+    file="$out/$name"
+    if [ -f "$file" ] && [ "$(hash "$file")" = "$want" ]; then
+      echo "ok       $name"
+    elif [ -n "$CHECK" ]; then
+      echo "MISMATCH $name" >&2
+      status=1
+    else
+      echo "fetch    $name"
+      curl -fsSL "$url" -o "$file.part"
+      [ "$(hash "$file.part")" = "$want" ] || { echo "checksum failed: $name" >&2; rm -f "$file.part"; exit 1; }
+      mv "$file.part" "$file"
+    fi
+  done
+}
+fetch_set "$OUT" "" <<< "$MANIFEST"
+fetch_set "$MUSIC_OUT" mus <<< "$MUSIC"
 exit "$status"
