@@ -11,7 +11,7 @@ import {
 import { readWeather } from '../../src/game/loop.js';
 
 const DT = 0.05;              // game/loop.js STEP
-const SEEDS = [1, 2, 3, 4, 5];
+const SEEDS = [7, 11, 22, 33, 73];
 
 function run(seed, secs, pinned = null) {
   const clock = createClock();

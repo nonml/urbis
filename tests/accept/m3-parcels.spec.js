@@ -15,7 +15,7 @@ import { writeSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(import.meta.url);
-const SEEDS = [7, 11, 22];
+const SEEDS = [7, 11, 22, 33, 73];
 const DT = 0.05;
 const IDLE_SECS = 180;
 

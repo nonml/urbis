@@ -12,7 +12,7 @@ import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(import.meta.url);
-const SEEDS = [1, 2, 3, 4, 5];
+const SEEDS = [7, 11, 22, 33, 73];
 const OPS = 200;
 const OP_MS = 2;
 const TILE = 64;
