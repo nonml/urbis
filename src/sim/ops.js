@@ -12,7 +12,7 @@
 // An op is pure logic on the map (law 5) and deterministic given its state, so
 // the save's op log (M3.T38) replays.
 import {
-  STAGE, STAGES, USES, USE_BY_KIND, frontageRoad, markDirty, projectOnSegment,
+  STAGE, STAGES, USES, USE_BY_KIND, buildingParcel, frontageRoad, markDirty, projectOnSegment,
 } from './map.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
 
@@ -317,21 +317,29 @@ function meets(box, p) {
     && p.z - p.d / 2 <= box.maxZ && p.z + p.d / 2 >= box.minZ;
 }
 
-// Replan the lots a road op leaves in its dirty box (M3.T20). A lot the op left
-// without a road, or one the new road runs through, comes down; new lots are
-// planned along the roads the box now holds, with every standing footprint as
-// their keep-out. A parcel the box does not reach is not read, so it keeps its
-// id, and a lot that survives keeps its own: its footprint is part of the
-// keep-out, so the planner only fills free frontage. The frontage of every
-// surviving lot is already known here — `kept` hands it to reconcile, so no
-// parcel's frontage is computed twice in one op.
+// Replan the frontage a road op leaves in its dirty box (M3.T20). A lot or row
+// the op left without a road, or one the new road runs through, comes down; new
+// lots and rows are planned along the roads the box now holds, with every
+// standing footprint as their keep-out. A parcel the box does not reach is not
+// read, so it keeps its id, and one that survives keeps its own: its footprint
+// is part of the keep-out, so the planner only fills free frontage. The frontage
+// of every surviving lot is already known here — `kept` hands it to reconcile,
+// so no parcel's frontage is computed twice in one op.
 function replanFrontage(map, box, byId) {
   const kept = new Map();
   if (!Array.isArray(map.parcels) || !Array.isArray(map.lots)) return kept;
   for (let i = map.parcels.length - 1; i >= 0; i--) {
     const p = map.parcels[i];
-    if (p.kind !== 'lot' || !meets(box, p)) continue;
+    if (!meets(box, p)) continue;
     const road = frontageRoad(map, p, byId);
+    if (p.kind === 'row') {
+      if (road && road.gap > EPS) continue;
+      map.parcels.splice(i, 1);
+      const at = map.buildings ? map.buildings.findIndex((b) => b.id === p.id) : -1;
+      if (at >= 0) map.buildings.splice(at, 1);
+      continue;
+    }
+    if (p.kind !== 'lot') continue;
     if (road && road.gap > EPS) {
       kept.set(p, false);
       continue;
@@ -341,10 +349,16 @@ function replanFrontage(map, box, byId) {
     if (at >= 0) map.lots.splice(at, 1);
   }
   const blocked = map.parcels.filter((p) => meets(box, p)).map(parcelBox);
-  const { lots } = planNewFrontage(map.graph.edges, map.graph.nodes, box, blocked, map.seed);
+  const { lots, buildings } = planNewFrontage(
+    map.graph.edges, map.graph.nodes, box, blocked, map.seed, map.district,
+  );
   for (const { id, lot } of lots) {
     map.parcels.push(newLotParcel(id, lot));
     map.lots.push(lot);
+  }
+  for (const b of buildings) {
+    if (map.buildings) map.buildings.push(b);
+    map.parcels.push(buildingParcel(b));
   }
   return kept;
 }
@@ -379,6 +393,7 @@ function roadEdit(map, box, change) {
   const edgesBefore = map.graph.edges.slice();
   const parcelsBefore = map.parcels ? map.parcels.slice() : null;
   const lotsBefore = map.lots ? map.lots.slice() : null;
+  const buildingsBefore = map.buildings ? map.buildings.slice() : null;
   change();
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const kept = replanFrontage(map, box, byId);
@@ -397,6 +412,10 @@ function roadEdit(map, box, change) {
     if (lotsBefore) {
       map.lots.length = 0;
       map.lots.push(...lotsBefore);
+    }
+    if (buildingsBefore) {
+      map.buildings.length = 0;
+      map.buildings.push(...buildingsBefore);
     }
     for (const t of touched) {
       if (t.had) t.p.noRoad = t.value;

@@ -311,18 +311,75 @@ function hashText(text) {
   return hash >>> 0;
 }
 
+// The style a new row building takes on a span: a row on an avenue keeps the
+// avenue's own style; every other frontage (a connector or an op road) is brick,
+// the style a back street wears.
+function frontageStyle(district, span, at) {
+  if (district && span.vert && district.avenues.some((a) => a.x === span.x0)) {
+    return rowStyle(district, span.x0, at);
+  }
+  return BRICK_STYLE;
+}
+
+// One row building from a run: the same shape render/block.js draws and
+// buildingParcel wraps, sized as planBuildings sizes a row, but named from the
+// edge it fronts so its id survives a later op on another tile.
+function frontageBuilding(span, side, depth, at, front, h, kind, style) {
+  const back = (span.vert ? span.x0 : span.z0) + side * (BUILD_LINE + depth / 2);
+  const x = span.vert ? back : at;
+  const z = span.vert ? at : back;
+  return {
+    id: `row:${span.id}:${side}:${at}`,
+    kind: 'row', style, facade: kind,
+    x, z,
+    w: span.vert ? depth : front - 1.2,
+    d: span.vert ? front - 1.2 : depth,
+    h,
+    face: span.vert ? [-side, 0] : [0, -side],
+  };
+}
+
+// The row buildings one span's free runs take, sized as planBuildings sizes a
+// row and drawn from the span's own seeded stream, so one side's plan does not
+// depend on how many sides came before it. Every building joins `standing`, so
+// a later span cannot plan over it.
+function planSpanRows(span, side, depth, runs, seed, district, standing) {
+  const buildings = [];
+  const rand = mulberry32(seed ^ hashText(`${span.id}:${side}:row`));
+  for (const [r0, r1] of runs) {
+    let at = r0;
+    while (r1 - at >= MIN_RUN) {
+      const st = frontageStyle(district, span, at);
+      let front = st.front[0] + rand() * (st.front[1] - st.front[0]);
+      if (r1 - at - front < MIN_RUN) front = r1 - at;
+      const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
+      const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
+      const w = Math.min(10 + rand() * 2, depth);
+      const b = frontageBuilding(span, side, w, at + front / 2, front, h, kind, st.name);
+      buildings.push(b);
+      standing.push(lotBox([b.x, b.z, b.w, b.d]));
+      at += front;
+    }
+  }
+  return buildings;
+}
+
 // Plan the rows and lots a road op leaves in its dirty box. `edges` and `nodes`
 // are the map graph as it now stands; `box` the op's dirty box; `blocked` every
-// footprint already standing there (a lot that stays in the plan keeps its own
-// footprint in this list, so it is never planned twice); `seed` the map's. Each
-// lot is named from the edge it fronts, so the id does not depend on how many
-// ops ran before, and the same graph always plans the same lots.
-export function planNewFrontage(edges, nodes, box, blocked, seed) {
+// footprint already standing there (a lot or row that stays in the plan keeps
+// its own footprint in this list, so it is never planned twice); `seed` the
+// map's; `district` styles the new rows. Each lot and row is named from the edge
+// it fronts, so the id does not depend on how many ops ran before, and the same
+// graph always plans the same frontage. `rows` carries the new row runs and
+// `buildings` the row buildings cut from them, in the shape buildingParcel
+// wraps.
+export function planNewFrontage(edges, nodes, box, blocked, seed, district) {
   const byId = new Map(nodes.map((n) => [n.id, n]));
   const spans = edges.map((e) => edgeSpan(e, byId)).filter(Boolean);
   const standing = blocked.slice();
   const rows = [];
   const lots = [];
+  const buildings = [];
   for (const span of spans) {
     if (span.x1 < box.minX - EDGE_EPS || span.x0 > box.maxX + EDGE_EPS
       || span.z1 < box.minZ - EDGE_EPS || span.z0 > box.maxZ + EDGE_EPS) continue;
@@ -358,15 +415,12 @@ export function planNewFrontage(edges, nodes, box, blocked, seed) {
         standing.push(lotBox(lot));
       }
       const holes = state.placed.map((p) => [p.z - p.d / 2 - LOT_CLEAR, p.z + p.d / 2 + LOT_CLEAR]);
-      rows.push({
-        edge: span.id,
-        side,
-        depth,
-        runs: subtractRuns(runs, holes).filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EDGE_EPS),
-      });
+      const free = subtractRuns(runs, holes).filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EDGE_EPS);
+      rows.push({ edge: span.id, side, depth, runs: free });
+      buildings.push(...planSpanRows(span, side, depth, free, seed, district, standing));
     }
   }
-  return { rows, lots };
+  return { rows, lots, buildings };
 }
 
 // The style of the buildings on one row, read from the district plan: the
