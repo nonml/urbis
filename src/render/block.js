@@ -18,6 +18,7 @@ import { HAND_PINNED, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS, vistasOf } from '../sim/vistas.js';
 import { MIDBLOCK } from '../sim/streetscape.js';
 import { midblockFor } from '../sim/streetscape.js';
+import { buildShellPools } from './buildings.js';
 
 // Where the city is comes from the map (sim/map.js): this file draws the road
 // graph the map returns, it does not get a second opinion about where the roads
@@ -757,11 +758,16 @@ function roofline(caps, cx, cz, w, top, d, kind) {
 
 export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   const avenueX = map.district.avenues.map((a) => a.x);
+  const districtId = map.district?.id ?? null;
   const group = new THREE.Group();
   const mats = towerMaterials(texLoader, maxAniso);
   const facades = mats.kinds.map(() => [[], []]);
   const podiums = mats.podium.map(() => []);
   const caps = [];
+  // Row shafts leave the merged facades for their own pools (M3.T22); the same
+  // boxes go into the mirror proxy merged, because a puddle reflects the wall.
+  const shellSlots = [];
+  const mirrorRows = [];
   const shopGeos = [[], []];
   const shopPools = [];
   const beaconPts = [];
@@ -884,13 +890,28 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       caps.push(box(doorW + 0.6, 0.1, 0.8, cx, doorH + 0.15, faceZ + 0.35));
     }
     if (face) dressGroundFloor(cx, cz, w, d, zone, face, pod, idx);
-    shaft.push(worldUVs(box(w, h, d, cx, h / 2, cz), w, h, d, FACADE_TILE));
+    // A doorless building is a row: its shaft is a pool slot, not merged
+    // geometry (M3.T22). Everything else about it — podium, caps, posters,
+    // shopfront — stays merged until M3.T24 pools it.
+    const shellBox = (sw, sh, sd, baseY) => {
+      if (door) {
+        shaft.push(worldUVs(box(sw, sh, sd, cx, baseY + sh / 2, cz), sw, sh, sd, FACADE_TILE));
+      } else {
+        shellSlots.push({
+          x: cx, y: baseY, z: cz, w: sw, h: sh, d: sd, kind, zone, parcel, district: districtId,
+        });
+        mirrorRows.push(withZone(
+          worldUVs(box(sw, sh, sd, cx, baseY + sh / 2, cz), sw, sh, sd, FACADE_TILE), zone,
+        ));
+      }
+    };
+    shellBox(w, h, d, 0);
     let topY = h;
     if (h >= 30 && idx % 2 === 0) {
       const uw = w * CROWN;
       const uh = h * 0.3;
       const ud = d * CROWN;
-      shaft.push(worldUVs(box(uw, uh, ud, cx, h + uh / 2, cz), uw, uh, ud, FACADE_TILE));
+      shellBox(uw, uh, ud, h);
       topY = h + uh;
     }
     if (door) {
@@ -943,6 +964,10 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
       emitTower(x, z, w, h, d, idx++, [0, -1], `TERMINUS_TOWERS[${i}]`);
     });
   }
+  // The street wall's shafts, one fixed-size pool per architecture: a bulldoze
+  // or a rezone is a matrix write, not a merge rebuild (M3.T22).
+  const shells = buildShellPools(mats.kinds, shellSlots);
+  group.add(shells.group);
   // Zone 0's shafts then zone 1's, each stamped with its zone: one mesh per
   // architecture lights both halves of the district.
   for (const zoned of facades) zoned.forEach((geos, zone) => geos.forEach((g) => withZone(g, zone)));
@@ -951,7 +976,9 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
     ...podiums.map((geos, i) => [geos, mats.podium[i]]),
   ];
   for (const [geos, mat] of batches) {
-    if (!geos.length) throw new Error('buildTowers: empty batch would leave a material unlit');
+    // A facade kind the towers never wear can stand entirely in a row pool now
+    // (M3.T22): an empty merged batch is a material nothing merged draws.
+    if (!geos.length) continue;
     const m = new THREE.Mesh(mergeGeometries(geos), mat);
     m.castShadow = true;
     m.receiveShadow = true;
@@ -963,7 +990,10 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
   // glass material — and each zone still dies with its own lights, because the
   // proxy carries the same zone stamp.
   const mirrorProxy = new THREE.Mesh(
-    mergeGeometries([0, 1].flatMap((zone) => facades.flatMap((zoned) => zoned[zone]))),
+    mergeGeometries([
+      ...[0, 1].flatMap((zone) => facades.flatMap((zoned) => zoned[zone])),
+      ...mirrorRows,
+    ]),
     mats.kinds[0],
   );
   mirrorProxy.castShadow = false;
