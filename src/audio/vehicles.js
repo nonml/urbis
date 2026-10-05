@@ -237,6 +237,7 @@ export function createVehicles(audio, buffers = {}) {
       else if (buffers[s.name]) sirens.set(s.key, audio.play(s.name, buffers[s.name], {
         bus: s.bus, loop: true, gain: s.gain, x: s.x, y: s.y, z: s.z,
       }));
+      else ensure(s.name);
     }
     for (const [key, held] of sirens) {
       if (plan.some((p) => p.name === SIREN && p.key === key)) continue;
