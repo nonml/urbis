@@ -113,11 +113,21 @@ function buildGraph(district) {
   return { nodes: [...byId.values()], edges };
 }
 
-// A lot is a parcel of its own: the plan's footprint and the id the live city
-// gives it (sim/zoning.js `lot:<index>`), an empty stage the city fills in.
+// A lot is a parcel of its own: the plan's footprint, the id the live city
+// gives it (sim/zoning.js `lot:<index>`), and the whole empty-parcel shape the
+// city fills in. An unzoned lot on a fresh map is a well-formed parcel, not a
+// stub missing half its fields.
 function lotParcel(lot, index) {
   const [x, z, w, d] = lot;
-  return { id: `lot:${index}`, kind: 'lot', style: null, use: null, stage: STAGE.EMPTY, x, z, w, d };
+  return {
+    id: `lot:${index}`, kind: 'lot',
+    x, z, w, d,
+    use: null, zoned: null, painted: false,
+    stage: STAGE.EMPTY, progress: 0,
+    powerZone: 0, pace: 0,
+    heights: STAGES.map(() => 0),
+    building: false, trend: 0, why: null, vacancy: 0,
+  };
 }
 
 // A seed's whole map. `version` is the edit revision; ops (M3.T18) bump it, so
