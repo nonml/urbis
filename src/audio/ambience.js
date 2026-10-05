@@ -93,7 +93,8 @@ export function ambienceSounds(pose = {}) {
   ];
 }
 
-// The two files the beds need, for whoever owns the AudioContext.
+// The two files the beds need: for a caller that owns an AudioContext, or for
+// createAmbience's own decode below.
 export const AMBIENCE_FILES = {
   [BEDS.street]: 'assets/sounds/ambience_street.mp3',
   [BEDS.hum]: 'assets/sounds/hum_district.mp3',
@@ -103,27 +104,53 @@ export async function loadAmbience(context, base = '') {
   const buffers = {};
   await Promise.all(Object.entries(AMBIENCE_FILES).map(async ([name, path]) => {
     const res = await fetch(base + path);
+    if (!res.ok) throw new Error(`${path}: HTTP ${res.status}`);
     buffers[name] = await context.decodeAudioData(await res.arrayBuffer());
   }));
   return buffers;
 }
 
-// Two voices for the life of the game: the beds are created on the first
-// update and only their gain and rate move after. `buffers` is name -> decoded
-// AudioBuffer (see loadAmbience); a missing buffer still lists, it just cannot
-// be heard until the caller loads the set.
+// A decode context that never reaches the speakers. engine.js owns the live
+// context and hands out no way to decode against it, and an AudioBuffer is not
+// bound to the context that decoded it, so this is how the beds load without a
+// second audible graph.
+let decoder = null;
+function offlineContext() {
+  if (decoder) return decoder;
+  const Ctor = typeof OfflineAudioContext !== 'undefined' ? OfflineAudioContext : null;
+  if (!Ctor) throw new Error('no Web Audio to decode the ambience');
+  decoder = new Ctor(1, 1, 44100);
+  return decoder;
+}
+
+// Two voices for the life of the game: the beds are created the first update
+// after their buffers land, and only their gain and rate move after. `buffers`
+// lets a caller or a test hand over decoded AudioBuffers; left out, the module
+// decodes its own files, and a pose still lists what would play while they load.
 export function createAmbience(audio, buffers = {}) {
-  let beds = null;
+  const decoded = { ...buffers };
+  let beds = null, loading = false, error = null;
+
+  async function load() {
+    if (loading || (decoded[BEDS.street] && decoded[BEDS.hum])) return;
+    loading = true;
+    try {
+      Object.assign(decoded, await loadAmbience(offlineContext()));
+    } catch (err) {
+      error = String((err && err.message) || err);
+    }
+    loading = false;
+  }
 
   function update(pose = {}) {
     const plan = ambienceSounds(pose);
-    if (!beds) {
-      beds = plan.map((s) => audio.play(s.name, buffers[s.name] ?? null, {
+    if (!beds && decoded[BEDS.street] && decoded[BEDS.hum]) {
+      beds = plan.map((s) => audio.play(s.name, decoded[s.name], {
         bus: s.bus, loop: s.loop, flat: s.flat, gain: s.gain, rate: s.rate,
       }));
       return plan;
     }
-    plan.forEach((s, i) => audio.update(beds[i], { gain: s.gain, rate: s.rate }));
+    if (beds) plan.forEach((s, i) => audio.update(beds[i], { gain: s.gain, rate: s.rate }));
     return plan;
   }
 
@@ -133,5 +160,6 @@ export function createAmbience(audio, buffers = {}) {
     beds = null;
   }
 
-  return { update, stop, plan: ambienceSounds };
+  load();
+  return { update, stop, plan: ambienceSounds, state: () => ({ beds: !!beds, loading, error }) };
 }
