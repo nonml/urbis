@@ -171,6 +171,7 @@ function dressParcel(rig, p, i) {
     scale.set(sw, h, sd);
     shells.setMatrixAt(shells.count, matrix.compose(pos, quat.identity(), scale));
     shells.geometry.attributes.zone.setX(shells.count, p.powerZone);
+    shells.geometry.attributes.parcel.setX(shells.count, i);
     shells.geometry.attributes.litTop.setX(shells.count, litTop(p, h));
     shells.setColorAt(shells.count++, paint.setRGB(...TINT[p.use]));
     kitBox(rig, PAINT.plinth, p.x, 0, p.z, sw + 0.16, PAD_RISE + 0.12, sd + 0.16);
@@ -194,6 +195,8 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
     // one of each per instance.
     const shellGeo = withLitTop(unitBox(), n);
     shellGeo.setAttribute('zone', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
+    // The parcel this shell is drawn as, so a pick can name it (M3-3).
+    shellGeo.setAttribute('parcel', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
     const m = new THREE.InstancedMesh(shellGeo, emptyFloorsGoDark(kinds[kind]), n);
     // Colour from the first frame, or the program compiles without it.
     m.setColorAt(0, paint.setRGB(1, 1, 1));
@@ -244,6 +247,7 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
       m.instanceMatrix.needsUpdate = true;
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
       if (m.geometry.attributes.zone) m.geometry.attributes.zone.needsUpdate = true;
+      if (m.geometry.attributes.parcel) m.geometry.attributes.parcel.needsUpdate = true;
       if (m.geometry.attributes.litTop) m.geometry.attributes.litTop.needsUpdate = true;
       // The bounds grow with the buildings; stale ones cull a tower that is there.
       m.computeBoundingSphere();

@@ -863,8 +863,9 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
     }
   }
   // Every tower: podium base, shaft, optional setback crown, parapet lip, roof clutter.
-  // `name` says which table row this is, so the overlap check can point at it.
-  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % facades.length, door = true) {
+  // `name` says which table row this is, so the overlap check can point at it;
+  // `parcel` is the map parcel this building is (M3-3), null on the hand preset.
+  function emitTower(cx, cz, w, h, d, idx, face, name, kind = idx % facades.length, door = true, parcel = null) {
     const zone = cz < 0 ? 0 : 1;
     const shaft = facades[kind][zone];
     const pod = podiums[idx % podiums.length];
@@ -905,7 +906,7 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
     caps.push(box(1.4, 1.0, 1.2, cx - (idx % 2 ? 1 : -1) * w * 0.25, topY + 0.7, cz));
     if (topY >= 38) beaconPts.push([cx, topY + 0.7, cz]);
     // h: the follow camera stops at this box instead of entering the block.
-    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, h: topY, name });
+    footprints.push({ x: cx, z: cz, w: w + 1.2, d: d + 1.2, h: topY, name, parcel });
   }
   let idx = 0;
   if (map.buildings) {
@@ -914,11 +915,11 @@ export function buildTowers(texLoader, maxAniso, map = worldMap()) {
     const seen = { tower: 0, cap: 0 };
     for (const b of map.buildings) {
       if (b.kind === 'row') {
-        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, b.id, b.facade, false);
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, b.id, b.facade, false, b.id);
       } else if (b.kind === 'cap') {
-        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `CAPS[${seen.cap++}]`);
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `CAPS[${seen.cap++}]`, undefined, true, b.id);
       } else if (b.kind === 'tower') {
-        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `PINNED_TOWERS[${seen.tower++}]`, b.facade);
+        emitTower(b.x, b.z, b.w, b.h, b.d, idx++, b.face, `PINNED_TOWERS[${seen.tower++}]`, b.facade, true, b.id);
       }
     }
   } else {
