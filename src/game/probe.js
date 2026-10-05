@@ -97,6 +97,7 @@ export function bindProbe(parts) {
       time: +city.time.toFixed(2),
       demand: { ...city.demand },
       parcels: city.parcels.map((p) => ({
+        id: p.id, kind: p.kind,
         x: p.x, z: p.z, use: p.use, zone: p.powerZone, stage: STAGES[p.stage],
         progress: +p.progress.toFixed(4), height: +builtHeight(p).toFixed(2), building: p.building,
         trend: p.trend, why: p.why, vacancy: +p.vacancy.toFixed(3),
@@ -236,10 +237,14 @@ function bindStreamCapture(api, parts) {
   // Stand the player somewhere inside the walk box it could have walked to, and
   // let the ordinary follow cam frame it. Clamped to WALK_BOUNDS on purpose: a
   // shot from a place the player cannot reach proves nothing (AGENTS.md step 5).
+  // The camera is snapped to the pose here, not on the next frame: a pick or a
+  // readout that runs in the same tick as the pose must look through the posed
+  // lens, exactly as the play camera would once it eased there.
   api.pose = (x, z, yaw) => {
     ({ x: player.x, z: player.z } = clampToBounds(WALK_BOUNDS, x, z));
     snap(player);
     cam.yaw = yaw;
+    if (player.mode === 'foot') placeFollowCamera(parts);
   };
   // Walk into a grown lot by use, the way the door would: pose the body on the
   // street spot, then use the door. Capture-only so nothing in play moves a
@@ -302,14 +307,18 @@ function bindZoningCapture(api, parts) {
 }
 
 function bindScorecard(api, parts) {
+  const card = scorecardProbe(parts);
   api.police = policeProbe(parts);
   api.policeOnScreen = (w, h) => policeOnScreen(parts, w, h);
   api.frameCheck = (near) => frameCheck(parts, near);
   api.pick = (x, y, w, h) => pickPixel(parts, x, y, w, h);
+  // Every drawn footprint with the parcel it belongs to (M3-3), so a pick test
+  // can aim at a building instead of a coordinate.
+  api.footprints = () => card.footprints();
   // The pillar scorecard's probes (scripts/scorecard.mjs), capture-only like the
   // rest of this block: they read sim state and call the frame loop's own tick
   // functions, never draw, and are invisible to a player.
-  api.scorecard = scorecardProbe(parts);
+  api.scorecard = card;
 }
 
 function scorecardProbe(parts) {
@@ -330,7 +339,9 @@ function scorecardProbe(parts) {
       return { id: e.id, kind: e.kind, a: { x: a.x, z: a.z }, b: { x: b.x, z: b.z } };
     }),
     footprints: () => [
-      ...towers.footprints.map((f) => ({ x: f.x, z: f.z, w: f.w, d: f.d, name: f.name })),
+      ...towers.footprints.map((f) => ({
+        x: f.x, z: f.z, w: f.w, d: f.d, h: f.h, name: f.name, parcel: f.parcel ?? null,
+      })),
       ...skyline.footprints.map((f) => ({ x: f.x, z: f.z, w: f.w, d: f.d, name: f.name })),
       ...city.parcels.map((p, i) => ({ x: p.x, z: p.z, w: p.w, d: p.d, name: `lot:${i}` })),
     ],
@@ -514,8 +525,35 @@ function pickPixel(parts, px, py, w = 1280, h = 720) {
       path: path.join('/'), mat: mat?.type, color: mat?.color?.getHexString(), see: seeThrough(hit.object),
       dist: +hit.distance.toFixed(1), at: hit.point.toArray().map((v) => +v.toFixed(1)),
       geo: hit.object.geometry?.type, inst: hit.object.isInstancedMesh ? hit.instanceId : undefined,
+      parcel: parcelOf(parts, hit),
     };
   });
+}
+
+// The parcel id a picked surface was drawn as (M3-3): a grown lot's shell
+// carries its parcel index per instance (render/zoning.js), a street-wall
+// building carries its id on the footprint it was emitted with
+// (render/block.js). Ground, roads and the skyline ring are nobody's parcel.
+// Trim, posters and pilasters stand up to half a metre off the podium face the
+// footprint measures; a pick on any of them still names the building.
+const WALL_SLACK = 0.6;
+function parcelOf(parts, hit) {
+  if (inGroup(hit.object, parts.growth?.group)) {
+    const attr = hit.object.geometry?.attributes?.parcel;
+    if (!attr || hit.instanceId === undefined) return null;
+    return parts.city?.parcels[attr.getX(hit.instanceId)]?.id ?? null;
+  }
+  if (!inGroup(hit.object, parts.towers?.group)) return null;
+  const f = parts.towers.footprints.find((f) => f.parcel
+    && Math.abs(hit.point.x - f.x) <= f.w / 2 + WALL_SLACK
+    && Math.abs(hit.point.z - f.z) <= f.d / 2 + WALL_SLACK);
+  return f?.parcel ?? null;
+}
+
+function inGroup(object, group) {
+  if (!group) return false;
+  for (let o = object; o; o = o.parent) if (o === group) return true;
+  return false;
 }
 
 // Glows, light pools and rain are drawn see-through; they never hide the street.
