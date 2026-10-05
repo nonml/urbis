@@ -5,7 +5,7 @@
 // Pure sim (law 5): no three.js, no DOM. A map is built in a process booted on
 // its seed: planLayout still reads its own load-time towers (M3.T14 removes it).
 import { generateDistrict } from './citygen.js';
-import { buildingsOf, planLayout } from './layout.js';
+import { BUILD_LINE, buildingsOf, planLayout } from './layout.js';
 import { HAND_PINNED, placePinned } from './landmarks.js';
 import { planFurniture } from './furniture.js';
 import { planDressing } from './dressing.js';
@@ -48,7 +48,7 @@ export function buildingParcel(b) {
   return {
     id: b.id, kind: b.kind,
     x: b.x, z: b.z, w: b.w, d: b.d, h: b.h,
-    use, zoned: use, painted: false,
+    use, zoned: use, painted: false, noRoad: false,
     stage: STAGE.HIGH, progress: 0,
     powerZone: 0, pace: 0,
     // The drawn height at every stage: a building already high stays high.
@@ -123,7 +123,7 @@ function lotParcel(lot, index) {
   return {
     id: `lot:${index}`, kind: 'lot',
     x, z, w, d,
-    use: null, zoned: null, painted: false,
+    use: null, zoned: null, painted: false, noRoad: false,
     stage: STAGE.EMPTY, progress: 0,
     powerZone: 0, pace: 0,
     heights: STAGES.map(() => 0),
@@ -181,7 +181,7 @@ export function nodeAt(map, x, z) {
   return best;
 }
 
-function projectOnSegment(x, z, a, b) {
+export function projectOnSegment(x, z, a, b) {
   const dx = b.x - a.x;
   const dz = b.z - a.z;
   const len2 = dx * dx + dz * dz;
@@ -202,6 +202,49 @@ export function edgesNear(map, x, z, radius = Infinity) {
     if (hit.dist <= radius) hits.push({ edge, ...hit });
   }
   return hits.sort((p, q) => p.dist - q.dist);
+}
+
+// ---------------------------------------------------------------------------
+// Frontage. A parcel fronts a road when an edge centre-line comes within the
+// building line of its footprint — the 7.5 m every lot, row and pinned tower
+// stands off its avenue (landmarks.js BUILD_LINE). A parcel the road ops leave
+// with no road in reach is marked `noRoad` (sim/ops.js), the reason it will
+// decline with (M5.T6).
+export const FRONTAGE_MAX = BUILD_LINE;
+
+function indexNodes(map) {
+  return new Map(map.graph.nodes.map((n) => [n.id, n]));
+}
+
+// The gap between two spans on one axis, 0 when they overlap.
+function spanGap(lo0, hi0, lo1, hi1) {
+  return Math.max(0, Math.max(lo0 - hi1, lo1 - hi0));
+}
+
+// Every road runs along one axis (D2), so the gap between a parcel's footprint
+// and an edge centre-line is one axis gap per direction.
+function boxEdgeGap(box, a, b) {
+  if (Math.abs(a.x - b.x) < 1e-9) {
+    return Math.hypot(spanGap(a.x, a.x, box.minX, box.maxX),
+      spanGap(Math.min(a.z, b.z), Math.max(a.z, b.z), box.minZ, box.maxZ));
+  }
+  return Math.hypot(spanGap(Math.min(a.x, b.x), Math.max(a.x, b.x), box.minX, box.maxX),
+    spanGap(a.z, a.z, box.minZ, box.maxZ));
+}
+
+// The nearest road a parcel fronts, as { edge, gap }, or null. `byId` lets an
+// editor sweep many parcels without re-indexing the graph for each.
+export function frontageRoad(map, p, byId = indexNodes(map)) {
+  const box = { minX: p.x - p.w / 2, maxX: p.x + p.w / 2, minZ: p.z - p.d / 2, maxZ: p.z + p.d / 2 };
+  let best = null;
+  for (const edge of map.graph.edges) {
+    const a = byId.get(edge.a);
+    const b = byId.get(edge.b);
+    if (!a || !b) continue;
+    const gap = boxEdgeGap(box, a, b);
+    if (gap <= FRONTAGE_MAX + 1e-6 && (!best || gap < best.gap)) best = { edge, gap };
+  }
+  return best;
 }
 
 // Every building whose footprint meets the box { minX, maxX, minZ, maxZ }.

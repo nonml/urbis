@@ -4,9 +4,16 @@
 // restores the parcel and the version and leaves the same tiles dirty, so a run
 // of ops can be walked backwards to the map it started on (M3-4).
 //
+// The road ops (M3.T19) work the same way on the graph: addRoad cuts the new
+// road and every edge it crosses at each junction, removeRoad takes one edge
+// out, and both re-check the frontage of the parcels the road touched — one
+// with no road in reach takes `noRoad` (map.js FRONTAGE_MAX).
+//
 // An op is pure logic on the map (law 5) and deterministic given its state, so
-// the save's op log (M3.T38) replays. Road ops join these in M3.T19.
-import { STAGE, USES, USE_BY_KIND, markDirty } from './map.js';
+// the save's op log (M3.T38) replays.
+import {
+  FRONTAGE_MAX, STAGE, USES, USE_BY_KIND, frontageRoad, markDirty, projectOnSegment,
+} from './map.js';
 
 // A placed building is sized from its footprint with the rule the city rolls
 // for a lot (zoning.js makeParcel): three storeys at the least, slender enough
@@ -123,6 +130,233 @@ export function place(map, kind, ref) {
     q.use = USE_BY_KIND[kind] ?? USES[0];
     q.zoned = q.use;
     q.painted = false;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Road ops (M3.T19). Roads run straight along one axis on the half-metre grid
+// (D2), so `axis` is the coordinate that varies: 'x' for an east-west road,
+// 'z' for a north-south one. A laid road is kind 'street'; every piece cut out
+// of an existing edge keeps that edge's own kind and lanes.
+const GRID = 0.5;
+const ROAD_KIND = 'street';
+const ROAD_LANES = 2;
+const EPS = 1e-6;
+
+function onGrid(v) {
+  return Math.round(v / GRID) * GRID;
+}
+
+// A road point: a node, a node id ("x,z"), or { x, z } / [x, z]. Coordinates
+// snap to the grid the graph is built on; anything else is not a road.
+function roadPoint(ref) {
+  let x;
+  let z;
+  if (Array.isArray(ref)) [x, z] = ref;
+  else if (ref && typeof ref === 'object') ({ x, z } = ref);
+  else if (typeof ref === 'string') [x, z] = ref.split(',').map(Number);
+  else return null;
+  if (!Number.isFinite(Number(x)) || !Number.isFinite(Number(z))) return null;
+  return { x: onGrid(Number(x)), z: onGrid(Number(z)) };
+}
+
+function edgeOf(map, ref) {
+  if (typeof ref === 'string') return map.graph.edges.find((e) => e.id === ref) ?? null;
+  if (ref && typeof ref === 'object' && map.graph.edges.includes(ref)) return ref;
+  const id = ref && typeof ref === 'object' ? ref.id : ref;
+  return map.graph.edges.find((e) => e.id === id) ?? null;
+}
+
+// Where the new road a->b meets an existing edge c->d, as parameters along
+// each. A collinear overlap longer than a point is the same road twice: the
+// caller refuses it. A shared endpoint is left to the node pass.
+function segmentHit(a, b, c, d) {
+  const rx = b.x - a.x;
+  const rz = b.z - a.z;
+  const sx = d.x - c.x;
+  const sz = d.z - c.z;
+  const den = rx * sz - rz * sx;
+  const qx = c.x - a.x;
+  const qz = c.z - a.z;
+  if (Math.abs(den) < EPS) {
+    if (Math.abs(qx * rz - qz * rx) > EPS) return null;
+    const len2 = rx * rx + rz * rz;
+    const p0 = (qx * rx + qz * rz) / len2;
+    const p1 = ((d.x - a.x) * rx + (d.z - a.z) * rz) / len2;
+    const lo = Math.max(0, Math.min(p0, p1));
+    const hi = Math.min(1, Math.max(p0, p1));
+    if (hi - lo <= EPS) return null;
+    return { overlap: true };
+  }
+  const t = (qx * sz - qz * sx) / den;
+  const u = (qx * rz - qz * rx) / den;
+  if (t < -EPS || t > 1 + EPS || u < -EPS || u > 1 + EPS) return null;
+  return { t, u, x: a.x + rx * t, z: a.z + rz * t };
+}
+
+function ensureNode(byId, nodes, x, z) {
+  const id = `${x},${z}`;
+  let node = byId.get(id);
+  if (!node) {
+    node = { id, x, z, y: 0 };
+    byId.set(id, node);
+    nodes.push(node);
+  }
+  return node;
+}
+
+// The nodes the new road runs through, in order: its ends, every existing edge
+// it crosses and every existing node it passes over, snapped and deduped.
+function chainOf(from, to, cuts, byId, nodes) {
+  const key = Math.abs(from.x - to.x) < EPS ? 'z' : 'x';
+  const points = [...cuts].sort((p, q) => p[key] - q[key]);
+  const chain = [ensureNode(byId, nodes, from.x, from.z)];
+  for (const p of points) chain.push(ensureNode(byId, nodes, p.x, p.z));
+  chain.push(ensureNode(byId, nodes, to.x, to.z));
+  return chain.filter((node, i) => node !== chain[i - 1]);
+}
+
+// A road piece between two nodes: a cut out of an existing edge keeps that
+// edge's own kind and lanes; a newly laid piece is a street.
+function connect(template, from, to) {
+  return { ...template, id: `road:${from.id}:${to.id}`, a: from.id, b: to.id };
+}
+
+// The graph addRoad would leave: the road itself plus every edge it meets, cut
+// at the junction. Null when it doubles an existing edge or goes nowhere.
+function planRoad(map, from, to, axis) {
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const nodes = map.graph.nodes.slice();
+  const cuts = [];
+  const splits = new Map();
+  for (const edge of map.graph.edges) {
+    const a = byId.get(edge.a);
+    const b = byId.get(edge.b);
+    if (!a || !b) continue;
+    const hit = segmentHit(from, to, a, b);
+    if (!hit) continue;
+    if (hit.overlap) return null;
+    if (hit.t > EPS && hit.t < 1 - EPS) cuts.push({ x: onGrid(hit.x), z: onGrid(hit.z) });
+    if (hit.u > EPS && hit.u < 1 - EPS) {
+      const list = splits.get(edge) ?? [];
+      list.push({ t: hit.u, x: onGrid(hit.x), z: onGrid(hit.z) });
+      splits.set(edge, list);
+    }
+  }
+  for (const node of map.graph.nodes) {
+    const hit = projectOnSegment(node.x, node.z, from, to);
+    if (hit.dist <= EPS && hit.t > EPS && hit.t < 1 - EPS) cuts.push({ x: node.x, z: node.z });
+  }
+  const chain = chainOf(from, to, cuts, byId, nodes);
+  if (chain.length < 2) return null;
+  const edges = [];
+  for (const edge of map.graph.edges) {
+    const list = splits.get(edge);
+    if (!list) {
+      edges.push(edge);
+      continue;
+    }
+    const stops = [{ t: 0, node: byId.get(edge.a) }];
+    for (const c of list.sort((p, q) => p.t - q.t)) stops.push({ t: c.t, node: ensureNode(byId, nodes, c.x, c.z) });
+    stops.push({ t: 1, node: byId.get(edge.b) });
+    for (let i = 1; i < stops.length; i++) edges.push(connect(edge, stops[i - 1].node, stops[i].node));
+  }
+  const laid = { lanes: ROAD_LANES, kind: ROAD_KIND, axis, district: map.district?.id ?? null, way: 'op' };
+  for (let i = 1; i < chain.length; i++) edges.push(connect(laid, chain[i - 1], chain[i]));
+  return { nodes, edges };
+}
+
+// The tiles a road op reaches: the road plus the frontage band either side, so
+// a parcel whose `noRoad` flips lies on a tile the renderer rebuilds.
+function roadBox(a, b) {
+  return {
+    minX: Math.min(a.x, b.x) - FRONTAGE_MAX,
+    maxX: Math.max(a.x, b.x) + FRONTAGE_MAX,
+    minZ: Math.min(a.z, b.z) - FRONTAGE_MAX,
+    maxZ: Math.max(a.z, b.z) + FRONTAGE_MAX,
+  };
+}
+
+// Recompute `noRoad` for every parcel the road touched: one with an edge
+// centre-line inside FRONTAGE_MAX of its footprint has frontage, one without
+// does not. Returns the parcels that changed, with enough to put them back.
+function reconcileFrontage(map, box) {
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const touched = [];
+  for (const p of map.parcels) {
+    const pb = parcelBox(p);
+    const meets = pb.minX <= box.maxX && pb.maxX >= box.minX && pb.minZ <= box.maxZ && pb.maxZ >= box.minZ;
+    if (!meets) continue;
+    const next = frontageRoad(map, p, byId) === null;
+    const current = Object.hasOwn(p, 'noRoad') ? p.noRoad : false;
+    if (current === next) continue;
+    touched.push({ p, had: Object.hasOwn(p, 'noRoad'), value: p.noRoad });
+    p.noRoad = next;
+  }
+  return touched;
+}
+
+// Apply a graph change as an edit: snapshot the graph, run the change, re-check
+// frontage over the road's tiles, bump the version and return the closure that
+// puts the graph, the flags, the version and the tiles back. A snapshot of the
+// arrays makes the undo exact, so 200 ops walk back to the golden map (M3-4).
+function roadEdit(map, box, change) {
+  const version = map.version;
+  const nodesBefore = map.graph.nodes.slice();
+  const edgesBefore = map.graph.edges.slice();
+  change();
+  const touched = reconcileFrontage(map, box);
+  map.version = version + 1;
+  markDirty(map, box);
+  const reverse = () => {
+    map.graph.nodes.length = 0;
+    map.graph.nodes.push(...nodesBefore);
+    map.graph.edges.length = 0;
+    map.graph.edges.push(...edgesBefore);
+    for (const t of touched) {
+      if (t.had) t.p.noRoad = t.value;
+      else delete t.p.noRoad;
+    }
+    map.version = version;
+    markDirty(map, box);
+  };
+  history(map).push(reverse);
+  return reverse;
+}
+
+// Lay a road from one point to another. Both ends snap to the half-metre grid
+// and the road runs along x or z; a diagonal, a zero-length road or one that
+// would double an existing edge is refused. Every edge the road crosses is cut
+// at the junction, so the crossing is a node like any other.
+export function addRoad(map, a, b) {
+  const from = roadPoint(a);
+  const to = roadPoint(b);
+  if (!from || !to) return NOOP;
+  if (from.x === to.x && from.z === to.z) return NOOP;
+  const axis = Math.abs(from.z - to.z) < EPS ? 'x' : Math.abs(from.x - to.x) < EPS ? 'z' : null;
+  if (!axis) return NOOP;
+  const plan = planRoad(map, from, to, axis);
+  if (!plan) return NOOP;
+  return roadEdit(map, roadBox(from, to), () => {
+    map.graph.nodes.length = 0;
+    map.graph.nodes.push(...plan.nodes);
+    map.graph.edges.length = 0;
+    map.graph.edges.push(...plan.edges);
+  });
+}
+
+// Take one edge out of the graph, by object or id, and re-check the frontage
+// of the parcels it used to serve. Nodes stay: a dead end is still a place.
+export function removeRoad(map, ref) {
+  const edge = edgeOf(map, ref);
+  if (!edge) return NOOP;
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const a = byId.get(edge.a);
+  const b = byId.get(edge.b);
+  if (!a || !b) return NOOP;
+  return roadEdit(map, roadBox(a, b), () => {
+    const at = map.graph.edges.indexOf(edge);
+    if (at >= 0) map.graph.edges.splice(at, 1);
   });
 }
 
