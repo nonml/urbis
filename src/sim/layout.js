@@ -216,6 +216,159 @@ export function planLayout(district, seed, pinned = PINNED_TOWERS) {
   return { district, seed, lots: picked.map((p) => p.lot), rows };
 }
 
+// ---------------------------------------------------------------------------
+// New frontage (M3.T20). A road op names a dirty box; inside it the rows and
+// lots are planned again from the graph as it now stands, while every parcel
+// the box does not reach keeps its id. It is districtLots' own geometry — the
+// same front range, depth rule and clearances — restricted to one box and
+// driven by the graph's edges instead of a district's avenues.
+
+const EDGE_EPS = 1e-6;
+
+// One graph edge as an axis-aligned span. `vert` marks a road along z; `p` is
+// its cross coordinate, the varying one runs p..p1.
+function edgeSpan(edge, byId) {
+  const a = byId.get(edge.a);
+  const b = byId.get(edge.b);
+  if (!a || !b) return null;
+  return {
+    id: edge.id,
+    vert: Math.abs(a.x - b.x) < EDGE_EPS,
+    x0: Math.min(a.x, b.x), x1: Math.max(a.x, b.x),
+    z0: Math.min(a.z, b.z), z1: Math.max(a.z, b.z),
+  };
+}
+
+// The depth a lot may take on one side of a span: half the gap to the nearest
+// parallel road that overlaps it, less the building line and back gap, capped
+// as rowDepth does. A side with no neighbour takes the full ROW_DEPTH_MAX.
+function spanDepth(spans, span, side) {
+  const coord = span.vert ? span.x0 : span.z0;
+  let nearest = null;
+  for (const other of spans) {
+    if (other === span || other.vert !== span.vert) continue;
+    const away = ((other.vert ? other.x0 : other.z0) - coord) * side;
+    if (away <= EDGE_EPS) continue;
+    const overlaps = span.vert
+      ? other.z1 > span.z0 + EDGE_EPS && other.z0 < span.z1 - EDGE_EPS
+      : other.x1 > span.x0 + EDGE_EPS && other.x0 < span.x1 - EDGE_EPS;
+    if (!overlaps) continue;
+    if (nearest === null || away < nearest) nearest = away;
+  }
+  if (nearest === null) return ROW_DEPTH_MAX;
+  return Math.min(ROW_DEPTH_MAX, nearest / 2 - BUILD_LINE - BACK_GAP);
+}
+
+// The bands where a crossing road cuts this side's frontage, in the varying
+// coordinate: rowRuns' cuts, read from the graph.
+function crossingCuts(spans, span, band0, band1) {
+  const clear = CROSSING_BAND + ROW_END_GAP;
+  const cuts = [];
+  for (const other of spans) {
+    if (other === span || other.vert === span.vert) continue;
+    const lo = span.vert ? other.x0 : other.z0;
+    const hi = span.vert ? other.x1 : other.z1;
+    if (lo >= band1 + ROW_END_GAP || hi <= band0 - ROW_END_GAP) continue;
+    const at = other.vert ? other.x0 : other.z0;
+    cuts.push([at - clear, at + clear]);
+  }
+  return cuts;
+}
+
+// The runs left after every footprint already standing in the box is taken
+// out, widened by LOT_CLEAR, as planLayout holes out its row runs.
+function runsClearOf(runs, blocked, vert, band0, band1) {
+  const holes = [];
+  for (const b of blocked) {
+    const b0 = vert ? b.minX : b.minZ;
+    const b1 = vert ? b.maxX : b.maxZ;
+    if (b1 + LOT_CLEAR <= band0 || b0 - LOT_CLEAR >= band1) continue;
+    holes.push([
+      (vert ? b.minZ : b.minX) - LOT_CLEAR,
+      (vert ? b.maxZ : b.maxX) + LOT_CLEAR,
+    ]);
+  }
+  return subtractRuns(runs, holes);
+}
+
+function lotFootprint(span, side, depth, at, front) {
+  const p = (span.vert ? span.x0 : span.z0) + side * (BUILD_LINE + depth / 2);
+  return span.vert ? [p, at, depth, front] : [at, p, front, depth];
+}
+
+function lotBox([x, z, w, d]) {
+  return { minX: x - w / 2, maxX: x + w / 2, minZ: z - d / 2, maxZ: z + d / 2 };
+}
+
+// A stable small hash of an edge id, so one side's front rolls do not depend on
+// how many sides came before it.
+function hashText(text) {
+  let hash = 2166136261;
+  for (let i = 0; i < text.length; i++) {
+    hash ^= text.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+// Plan the rows and lots a road op leaves in its dirty box. `edges` and `nodes`
+// are the map graph as it now stands; `box` the op's dirty box; `blocked` every
+// footprint already standing there (a lot that stays in the plan keeps its own
+// footprint in this list, so it is never planned twice); `seed` the map's. Each
+// lot is named from the edge it fronts, so the id does not depend on how many
+// ops ran before, and the same graph always plans the same lots.
+export function planNewFrontage(edges, nodes, box, blocked, seed) {
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+  const spans = edges.map((e) => edgeSpan(e, byId)).filter(Boolean);
+  const standing = blocked.slice();
+  const rows = [];
+  const lots = [];
+  for (const span of spans) {
+    if (span.x1 < box.minX - EDGE_EPS || span.x0 > box.maxX + EDGE_EPS
+      || span.z1 < box.minZ - EDGE_EPS || span.z0 > box.maxZ + EDGE_EPS) continue;
+    for (const side of [-1, 1]) {
+      const depth = spanDepth(spans, span, side);
+      if (depth < ROW_DEPTH_MIN) continue;
+      const lo = Math.max(span.vert ? span.z0 : span.x0, span.vert ? box.minZ : box.minX);
+      const hi = Math.min(span.vert ? span.z1 : span.x1, span.vert ? box.maxZ : box.maxX);
+      if (hi - lo < MIN_RUN) continue;
+      const band0 = (span.vert ? span.x0 : span.z0) + side * BUILD_LINE;
+      const band1 = band0 + side * depth;
+      const b0 = Math.min(band0, band1);
+      const b1 = Math.max(band0, band1);
+      const pb0 = span.vert ? box.minX : box.minZ;
+      const pb1 = span.vert ? box.maxX : box.maxZ;
+      // A lot must stand wholly on the op's tiles: a side whose depth reaches
+      // past the box is left open rather than planned half outside it.
+      if (b0 < pb0 - EDGE_EPS || b1 > pb1 + EDGE_EPS) continue;
+      const runs = runsClearOf(
+        subtractRuns([[lo, hi]], crossingCuts(spans, span, b0, b1)), standing, span.vert, b0, b1,
+      ).filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EDGE_EPS);
+      if (!runs.length) continue;
+      const state = { runs, placed: [] };
+      const rand = mulberry32(seed ^ hashText(`${span.id}:${side}`));
+      for (let guard = 0; guard < 64; guard++) {
+        const front = LOT_FRONT[0] + rand() * (LOT_FRONT[1] - LOT_FRONT[0]);
+        const ranges = lotRanges(state, front, -Infinity, Infinity);
+        if (!ranges.length) break;
+        const at = ranges[0][0];
+        state.placed.push({ z: at, d: front });
+        const lot = lotFootprint(span, side, depth, at, front);
+        lots.push({ id: `lot:${span.id}:${side}:${at}`, lot });
+        standing.push(lotBox(lot));
+      }
+      const holes = state.placed.map((p) => [p.z - p.d / 2 - LOT_CLEAR, p.z + p.d / 2 + LOT_CLEAR]);
+      rows.push({
+        edge: span.id,
+        side,
+        depth,
+        runs: subtractRuns(runs, holes).filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EDGE_EPS),
+      });
+    }
+  }
+  return { rows, lots };
+}
+
 // The style of the buildings on one row, read from the district plan: the
 // avenue's place in the district's own order and the building's distance from
 // the district's first crossing. Nothing here knows the hand map's coordinates

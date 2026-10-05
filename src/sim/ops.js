@@ -12,8 +12,9 @@
 // An op is pure logic on the map (law 5) and deterministic given its state, so
 // the save's op log (M3.T38) replays.
 import {
-  FRONTAGE_MAX, STAGE, USES, USE_BY_KIND, frontageRoad, markDirty, projectOnSegment,
+  STAGE, STAGES, USES, USE_BY_KIND, frontageRoad, markDirty, projectOnSegment,
 } from './map.js';
+import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
 
 // A placed building is sized from its footprint with the rule the city rolls
 // for a lot (zoning.js makeParcel): three storeys at the least, slender enough
@@ -63,10 +64,16 @@ function history(map) {
 
 const NOOP = () => {};
 
+// The whole parcel as an undo needs it, `heights` by value: an op that edits
+// the profile in place must not change the snapshot taken before it.
+function snapshot(p) {
+  return Array.isArray(p.heights) ? { ...p, heights: p.heights.slice() } : { ...p };
+}
+
 // Apply one change as an edit: snapshot the parcel, bump the version, mark the
 // touched tiles and return the closure that puts all three back.
 function edit(map, p, change) {
-  const before = { ...p };
+  const before = snapshot(p);
   const version = map.version;
   change(p);
   map.version = version + 1;
@@ -266,15 +273,67 @@ function planRoad(map, from, to, axis) {
   return { nodes, edges };
 }
 
-// The tiles a road op reaches: the road plus the frontage band either side, so
-// a parcel whose `noRoad` flips lies on a tile the renderer rebuilds.
+// The tiles a road op reaches: the road, the frontage band either side (so a
+// parcel whose `noRoad` flips lies on a tile the renderer rebuilds) and the
+// depth a replanned lot runs back from the building line, so every lot the op
+// plans stands on a tile it dirties.
+const REPLAN_REACH = BUILD_LINE + ROW_DEPTH_MAX;
+
 function roadBox(a, b) {
   return {
-    minX: Math.min(a.x, b.x) - FRONTAGE_MAX,
-    maxX: Math.max(a.x, b.x) + FRONTAGE_MAX,
-    minZ: Math.min(a.z, b.z) - FRONTAGE_MAX,
-    maxZ: Math.max(a.z, b.z) + FRONTAGE_MAX,
+    minX: Math.min(a.x, b.x) - REPLAN_REACH,
+    maxX: Math.max(a.x, b.x) + REPLAN_REACH,
+    minZ: Math.min(a.z, b.z) - REPLAN_REACH,
+    maxZ: Math.max(a.z, b.z) + REPLAN_REACH,
   };
+}
+
+// The parcel shape sim/map.js gives a lot (lotParcel), for a lot a road op
+// plans: a whole empty parcel, not a stub. map.js is not imported for it
+// because map.js imports this module's layout, so the shape is kept in step by
+// hand.
+function newLotParcel(id, [x, z, w, d]) {
+  return {
+    id, kind: 'lot',
+    x, z, w, d,
+    use: null, zoned: null, painted: false, noRoad: false,
+    stage: STAGE.EMPTY, progress: 0,
+    powerZone: 0, pace: 0,
+    heights: STAGES.map(() => 0),
+    building: false, trend: 0, why: null, vacancy: 0,
+  };
+}
+
+// True when a parcel's footprint meets a box.
+function meets(box, p) {
+  return p.x - p.w / 2 <= box.maxX && p.x + p.w / 2 >= box.minX
+    && p.z - p.d / 2 <= box.maxZ && p.z + p.d / 2 >= box.minZ;
+}
+
+// Replan the lots a road op leaves in its dirty box (M3.T20). A lot the op left
+// without a road, or one the new road runs through, comes down; new lots are
+// planned along the roads the box now holds, with every standing footprint as
+// their keep-out. A parcel the box does not reach is not read, so it keeps its
+// id, and a lot that survives keeps its own: its footprint is part of the
+// keep-out, so the planner only fills free frontage.
+function replanFrontage(map, box) {
+  if (!Array.isArray(map.parcels) || !Array.isArray(map.lots)) return;
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  for (let i = map.parcels.length - 1; i >= 0; i--) {
+    const p = map.parcels[i];
+    if (p.kind !== 'lot' || !meets(box, p)) continue;
+    const road = frontageRoad(map, p, byId);
+    if (road && road.gap > EPS) continue;
+    map.parcels.splice(i, 1);
+    const at = map.lots.findIndex((l) => l[0] === p.x && l[1] === p.z && l[2] === p.w && l[3] === p.d);
+    if (at >= 0) map.lots.splice(at, 1);
+  }
+  const blocked = map.parcels.filter((p) => meets(box, p)).map(parcelBox);
+  const { lots } = planNewFrontage(map.graph.edges, map.graph.nodes, box, blocked, map.seed);
+  for (const { id, lot } of lots) {
+    map.parcels.push(newLotParcel(id, lot));
+    map.lots.push(lot);
+  }
 }
 
 // Recompute `noRoad` for every parcel the road touched: one with an edge
@@ -296,15 +355,18 @@ function reconcileFrontage(map, box) {
   return touched;
 }
 
-// Apply a graph change as an edit: snapshot the graph, run the change, re-check
-// frontage over the road's tiles, bump the version and return the closure that
-// puts the graph, the flags, the version and the tiles back. A snapshot of the
-// arrays makes the undo exact, so 200 ops walk back to the golden map (M3-4).
+// Apply a graph change as an edit: snapshot the graph and the parcels, run the
+// change, plan the new frontage and re-check noRoad over the road's tiles, bump
+// the version and return the closure that puts it all back. Snapshots of the
+// arrays make the undo exact, so 200 ops walk back to the golden map (M3-4).
 function roadEdit(map, box, change) {
   const version = map.version;
   const nodesBefore = map.graph.nodes.slice();
   const edgesBefore = map.graph.edges.slice();
+  const parcelsBefore = map.parcels ? map.parcels.slice() : null;
+  const lotsBefore = map.lots ? map.lots.slice() : null;
   change();
+  replanFrontage(map, box);
   const touched = reconcileFrontage(map, box);
   map.version = version + 1;
   markDirty(map, box);
@@ -313,6 +375,14 @@ function roadEdit(map, box, change) {
     map.graph.nodes.push(...nodesBefore);
     map.graph.edges.length = 0;
     map.graph.edges.push(...edgesBefore);
+    if (parcelsBefore) {
+      map.parcels.length = 0;
+      map.parcels.push(...parcelsBefore);
+    }
+    if (lotsBefore) {
+      map.lots.length = 0;
+      map.lots.push(...lotsBefore);
+    }
     for (const t of touched) {
       if (t.had) t.p.noRoad = t.value;
       else delete t.p.noRoad;
