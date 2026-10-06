@@ -1,7 +1,6 @@
 // Living-street sim: sidewalk walkers, lane traffic, lamp-zone blackout hack.
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
-import { ROAD_HALF_WIDTH, wayLength } from './world.js';
 import { WORLD_FURNITURE } from './furniture.js';
 import { worldMap } from './patrol.js';
 // Cars are traffic's (M3.T30): trips on the graph, not a wrap at the tarmac end.
@@ -9,6 +8,11 @@ import { worldMap } from './patrol.js';
 // renderer still reads street.cars, so spawns and goings are invisible only
 // because traffic re-tasks a car in place where the camera cannot see it.
 import { createTraffic, tick as tickTraffic } from './traffic.js';
+// Walkers are walkers' (M3.T33): trips on the graph, not a wrap at the
+// pavement's end. street.js owns the bodies' paint and shape and hands the
+// sim its walkers; the renderer still reads street.npcs, so trip changes are
+// invisible only because walkers cross junctions through an interpolation.
+import { createWalkers, tick as tickWalkers } from './walkers.js';
 // Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is called
 // here so every walker and car carries the pose the last step started from.
 import { snap } from '../game/loop.js';
@@ -16,16 +20,8 @@ import { snap } from '../game/loop.js';
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
 
-// Parked cars sit just inside the kerb, and walkers keep two lines each side of
-// an avenue: one off the kerb, one up against the shopfronts.
+// Parked cars sit just inside the kerb.
 const PARKED_LANE_OUT = 3.4;
-const KERB_LANE_OUT = ROAD_HALF_WIDTH + 2.2;
-const WALL_LANE_OUT = ROAD_HALF_WIDTH + 2.7;
-// A walker on a crossing's footway, and how far short of the junction mouth
-// they turn back.
-const SOUTH_WALK_OUT = 5.5;
-const PLAZA_WALK_OUT = 5.2;
-const WALK_INSET = 2;
 
 // Curb parking slots for the hand preset: [avenue, side, z], the avenue by its
 // index in the district's list (main, east, west — world.js's order). Static,
@@ -93,36 +89,6 @@ function makeBody(rng, i) {
   return body;
 }
 
-function makeNSWalker(rng, i, npcSpots, half) {
-  return {
-    axis: 'z',
-    x: npcSpots[Math.floor(rng.sim() * npcSpots.length)],
-    z: (rng.sim() - 0.5) * half * 2,
-    ...makeBody(rng, i),
-  };
-}
-
-function makeEWWalker(rng, i, crossings) {
-  // Cross-street walkers: stroll the connector sidewalks (E-W), not the avenues.
-  const onSouth = i >= 56;
-  const plaza = crossings[0];
-  const south = crossings[crossings.length - 1];
-  const z = onSouth
-    ? south.z + SOUTH_WALK_OUT
-    : plaza.z + (rng.sim() < 0.5 ? -PLAZA_WALK_OUT : PLAZA_WALK_OUT);
-  const cross = onSouth ? south : plaza;
-  const xMin = cross.x0 + WALK_INSET;
-  const xMax = cross.x1 - WALK_INSET;
-  return {
-    axis: 'x',
-    x: xMin + rng.sim() * (xMax - xMin),
-    z: z + (rng.sim() - 0.5) * 1.2,
-    xMin,
-    xMax,
-    ...makeBody(rng, i),
-  };
-}
-
 // The parked plan: the map's own on a generated world. WORLD_FURNITURE is the
 // same plan built at load and stays the fallback until M3.T14 deletes it; the
 // hand preset has no plan, so its table stands, its avenue x read off the map.
@@ -134,23 +100,11 @@ function parkedSlots(map, avenues) {
 
 export function createStreet(seed, map = worldMap()) {
   const rng = createStreams(seed);
-  const { avenues, crossings } = map.district;
-  // Half an avenue's run. Walkers wrap here, so their loop is exactly as long
-  // as the tarmac is (until M3.T33); cars route the graph instead (M3.T30).
-  const half = wayLength(avenues[0]) / 2;
-  const avenueXs = avenues.map((a) => a.x);
-  const npcSpots = [];
-  for (const baseX of avenueXs) {
-    npcSpots.push(
-      baseX - WALL_LANE_OUT, baseX - KERB_LANE_OUT,
-      baseX + KERB_LANE_OUT, baseX + WALL_LANE_OUT
-    );
-  }
-  const npcs = [];
-  for (let i = 0; i < NPC_COUNT; i++) {
-    if (i < 48 || i >= 60) npcs.push(makeNSWalker(rng, i, npcSpots, half));
-    else npcs.push(makeEWWalker(rng, i, crossings));
-  }
+  const { avenues } = map.district;
+  const bodies = [];
+  for (let i = 0; i < NPC_COUNT; i++) bodies.push(makeBody(rng, i));
+  const walkers = createWalkers(map, seed, bodies);
+  const npcs = [...walkers.walkers];
   const traffic = createTraffic(map, seed, CAR_COUNT);
   const cars = [...traffic.cars];
   cars.forEach((c, i) => {
@@ -171,10 +125,10 @@ export function createStreet(seed, map = worldMap()) {
   });
   return {
     time: 0,
-    half,
     npcs,
     cars,
     traffic,
+    walkers,
     zones: [
       { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
       { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
@@ -257,21 +211,15 @@ export function tickStreet(state, dt) {
     }
   }
   const hurrying = state.time < state.hurryUntil;
+  // Walkers freeze in a blackout and hurry after one; walkers' tick walks
+  // each one along its route at the v set here, so nobody moves in the dark.
   for (const n of state.npcs) {
     snap(n);
     const dark = isDark(state, zoneAt(n.z));
     let v = dark ? 0 : n.speed;
     if (hurrying && !dark) v *= 1.6;
-    if (n.axis === 'x') {
-      n.x += n.dir * v * dt;
-      if (n.x > n.xMax) n.x = n.xMin;
-      if (n.x < n.xMin) n.x = n.xMax;
-    } else {
-      n.z += n.dir * v * dt;
-      if (n.z > state.half) n.z = -state.half;
-      if (n.z < -state.half) n.z = state.half;
-    }
-    n.phase += dt * (dark ? 0 : v * 4);
+    n.v = v;
   }
+  tickWalkers(state.walkers, dt);
   tickTraffic(state.traffic, dt);
 }
