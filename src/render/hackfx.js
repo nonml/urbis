@@ -25,7 +25,7 @@ export function buildHackFx() {
   pulse.visible = false;
   group.add(pulse);
 
-  // Substation cabinets: one merged body, slits as one 2-instance mesh dimmed per zone.
+  // Substation cabinets: one merged body, slits as one mesh dimmed per district.
   const bodies = [];
   const slitGeo = new THREE.PlaneGeometry(0.9, 0.12);
   const slitMesh = new THREE.InstancedMesh(slitGeo, new THREE.MeshBasicMaterial({ color: 0xffffff }), SUBSTATIONS.length);
@@ -80,11 +80,17 @@ export function buildHackFx() {
 }
 
 const _slitTint = new THREE.Color();
+// One slit per substation, dimmed by its own district's light: a blackout
+// kills the hacked district's cabinet and leaves the rest burning. Districts
+// without a cabinet (a 6-district map on two cabinets) have no slit to dim.
 export function setSlit(fx, zone, v) {
-  const si = SUBSTATIONS.findIndex((s) => s.zone === zone);
-  if (si < 0) return;
-  fx.slits.setColorAt(si, _slitTint.setScalar(0.06 + 0.94 * v));
-  fx.slits.instanceColor.needsUpdate = true;
+  let touched = false;
+  SUBSTATIONS.forEach((s, si) => {
+    if (s.zone !== zone || si >= fx.slits.count) return;
+    fx.slits.setColorAt(si, _slitTint.setScalar(0.06 + 0.94 * v));
+    touched = true;
+  });
+  if (touched) fx.slits.instanceColor.needsUpdate = true;
 }
 
 export function firePulse(fx, x, z) {
