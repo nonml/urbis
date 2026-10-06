@@ -18,6 +18,7 @@ were copied (no preview renders). Each folder keeps its upstream `info.json`.
 - Poly Haven Yellow Brick — CC0 — https://polyhaven.com/a/yellow_brick — tower facade (VGA-084.2a)
 - Poly Haven Sandstone Blocks 08 — CC0 — https://polyhaven.com/a/sandstone_blocks_08 — tower facade (VGA-084.2a)
 - Poly Haven Street Lamp 01 / fire hydrant / metal trash can (GLTF, CC0, Josh Dean + authors in per-folder info.json) — vendored under models/, unwired: GLB→instanced pipeline lands in its own slice
+- `models/car/car.glb` — generated: trellis.cpp (MIT) from its showcase AI racer reference (no trademark), cleaned by `tools/models/clean_car.py` (6,806 tris, 4.41 × 1.82 m, wheels as separate nodes) — hero/traffic car body (M2.T3)
 
 Technique mined alongside (from their `AssetLoader.js` + buildings materials):
 albedo/emissive maps in sRGB, data maps (normal/rough/metal) linear, RepeatWrapping,
