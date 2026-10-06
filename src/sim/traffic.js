@@ -360,8 +360,10 @@ function reweight(state, f, parcels) {
   state.flowByDistrict = out;
 }
 
-// A few pairs a tick toward a ready flow; counts re-lay on the hour. tick()
-// already re-indexed, so this only rebuilds on a version or parcel change.
+// A few pairs a tick toward a ready flow. The match rebuilds on a version or
+// parcel change, and again on the hour: lots grow under it, and an hourly
+// re-match picks the growth up within half a minute and keeps a restored save
+// converging with the run it left (both rebuild at the same hour boundary).
 function tickFlow(state) {
   const parcels = state.map.parcels ?? [];
   let f = state.flow;
@@ -378,7 +380,9 @@ function tickFlow(state) {
     if (f.pending.length === 0) { f.stage = 'ready'; reweight(state, f, parcels); }
     return;
   }
-  if (Math.floor(hourOf(state.time)) !== f.bucket) reweight(state, f, parcels);
+  if (Math.floor(hourOf(state.time)) !== f.bucket) {
+    f = state.flow = beginFlow(state, parcels);
+  }
 }
 
 // This hour's travellers on one edge, for the traffic overlay (M5.T21).

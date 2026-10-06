@@ -199,11 +199,6 @@ function makeDistrict(id, parcels, rand, calm, heightOf) {
     darkFor: 0,
     chase: 0,
     chaseFor: 0,
-    // What the commute costs the district right now (M3.T35): the share of
-    // its residents running late, the trade their shops lose with them, and
-    // the mean drive in minutes. Read off the flow every tick; zeros until
-    // traffic publishes its first hour.
-    commute: { late: 0, lost: 0, mins: 0 },
     // Firms that have given up and leave at `at`: { at, jobs, cause }, oldest first.
     flights: [],
     lots: perUse(() => 0),
@@ -252,13 +247,13 @@ function measureFloors(economy, parcels, heightOf) {
 // sell, plus works wanting floor. A measured district's jobs are every
 // non-residential floor it has (M3.T16); the hand preset shipped with its
 // balanced base standing in for them through base.res.
-function price(d) {
+function price(d, lost = 0) {
   for (const use of USES) d.have[use] = d.base[use] + d.floor[use];
   d.homes = d.have.res;
   d.jobs = d.calm ? d.have.com + d.have.ind : d.base.res + d.floor.com + d.floor.ind;
   const commerce = d.calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND;
   d.need.res = d.jobs;
-  d.need.com = d.homes * d.wealth * commerce * (1 - d.commute.lost) + d.firms.com;
+  d.need.com = d.homes * d.wealth * commerce * (1 - lost) + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
   const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
   for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
@@ -367,9 +362,9 @@ function scare(economy, d, dt) {
   d.chase = 0;
 }
 
-function earn(d, dt) {
+function earn(d, dt, late = 0) {
   const employment = Math.min(d.jobs, d.homes) / d.homes;
-  const target = d.dark ? 0 : employment * (1 - d.commute.late);
+  const target = d.dark ? 0 : employment * (1 - late);
   const secs = d.dark ? DARK_DRAIN_SECS : target > d.wealth ? WEALTH_RISE_SECS : WEALTH_FALL_SECS;
   d.wealth += (target - d.wealth) * Math.min(1, dt / secs);
 }
@@ -407,13 +402,24 @@ function creditRezone(d, time) {
   }
 }
 
-// The district's commute this tick, from the flow traffic laid (M3.T35).
-// Without a flow — a stub street in a Node test, or traffic's first hour —
-// there is no lateness and no loss, and the district reads as before.
-function readCommute(d, street) {
+// What the commute costs each district right now (M3.T35): the share of its
+// residents running late, and the trade their shops lose with them. Read off
+// the flow every tick; zeros until traffic publishes its first hour. It lives
+// beside the districts, never on them, so a save that holds the districts
+// holds the commute's causes and not its values.
+const COMMUTE = new WeakMap();
+const NO_COMMUTE = { late: 0, lost: 0 };
+
+function readCommute(economy, d, street) {
   const flow = street?.traffic?.flowByDistrict?.[d.id];
   const late = Math.min(1, (flow?.late ?? 0) + (d.dark ? DARK_LATE : 0));
-  d.commute = { late, lost: late, mins: flow?.mins ?? 0 };
+  let by = COMMUTE.get(economy);
+  if (!by) COMMUTE.set(economy, (by = {}));
+  return (by[d.id] = { late, lost: late });
+}
+
+function commuteOf(economy, id) {
+  return COMMUTE.get(economy)?.[id] ?? NO_COMMUTE;
 }
 
 // `heightOf(parcel)` is how tall it stands now (zoning's builtHeight), passed in
@@ -423,11 +429,11 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
     d.dark = isDark(street, d.id);
-    readCommute(d, street);
+    const commute = readCommute(economy, d, street);
     flee(economy, d, dt);
     if (economy.time >= d.nextMove) moveFirm(economy, d);
-    price(d);
-    earn(d, dt);
+    price(d, commute.lost);
+    earn(d, dt, commute.late);
     react(d, dt);
     creditRezone(d, economy.time);
   }
@@ -456,7 +462,7 @@ export function districtReport(city) {
     wealth: +d.wealth.toFixed(3),
     firms: { com: Math.round(d.firms.com), ind: Math.round(d.firms.ind) },
     demand: { ...d.demand },
-    commute: { ...d.commute },
+    commute: { ...commuteOf(economy, d.id) },
     lots: { ...d.lots },
     trend: { ...d.trend },
     need: perUse((use) => Math.round(d.need[use])),
