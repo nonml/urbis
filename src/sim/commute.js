@@ -1,14 +1,19 @@
 // The street follows the clock: how many walkers are out at this hour, and
-// which way the commuters among them walk. Walker i stands for person
+// where the commuters among them walk. Walker i stands for person
 // people.list[i % people.list.length], the same person the profiler shows for
-// it (main.js), so at the morning rush a walker heads for its person's job lot
-// and at the evening rush for its home lot, and at 3am most of the street has
-// gone indoors. Pure (law 5): main ticks it after tickStreet; render/npcs.js
-// hides a walker whose `out` is false.
-//
-// Milestone 3 skeleton: the constants are final; shareOut, threshold,
-// commuteGoal, commuteLabel and tickCommute are stubs with their test in
-// tests/commute.todo.js.
+// it (main.js): at the morning rush the walker walks door to door from its
+// person's home parcel to its job's, at the evening rush the way back, tasked
+// through walkers.js sendTo() — the route adopted on the walker's own
+// pavement — and stays inside at either end until the next trip walks it out,
+// so at 3am most of the street has gone indoors. Pure
+// (law 5): main ticks it after tickStreet; render/npcs.js hides a walker
+// whose `out` is false.
+import { parcelSpot, sendTo, ROAM_SECS } from './walkers.js';
+
+// The z-steer radius for a street with no graph to route on — the harness
+// street in tests/commute.spec.js, which owns the import. In the game a
+// commuter's trip is routed by walkers.js sendTo() and this never steers.
+export const ARRIVE = 4;
 
 // The rushes, as [from, to) in hours.
 export const RUSH_AM = [7, 9.5];
@@ -29,8 +34,6 @@ export const GOLDEN = 0.6180339887498949;
 // A walker only goes in or comes out this far (straight-line, metres) from the
 // player, so nobody pops in or out of sight in front of them.
 export const HIDE_DIST = 40;
-// A commuter this near its goal's z stops steering and walks on as it was.
-export const ARRIVE = 4;
 
 // The share of walkers out at `hour` (0 <= hour < 24), from SHARE.
 export function shareOut(hour) {
@@ -66,18 +69,56 @@ export function commuteLabel(person, hour) {
 // - want = threshold(i) < shareOut(hour). When n.out is undefined (the first
 //   tick) n.out = want. Otherwise n.out becomes want only when the walker is at
 //   least HIDE_DIST from the player (Math.hypot(n.x - px, n.z - pz) >= HIDE_DIST).
-// - A walker on axis 'z' with people.list non-empty steers: goal =
-//   commuteGoal(people.list[i % people.list.length], city.parcels, hour); when
-//   goal is not null and Math.abs(goal.z - n.z) > ARRIVE, n.dir = Math.sign(goal.z - n.z).
-//   Every other walker keeps its dir.
+// - A walker held indoors stays out for its shift; a new goal elsewhere walks
+//   it back out, tasked below, while its shift over sends it out strolling for
+//   an errand instead. The same goal, or none, keeps it where it arrived.
+// - At the rushes the walker walks its resident's commute: goal =
+//   commuteGoal(people.list[i % people.list.length], city.parcels, hour); the
+//   trip ends on the goal's doorstep (walkers.js sendTo), adopted on the
+//   walker's own pavement and chained from there. Off-rush, or with no people
+//   yet, the walker is stood down to random trips. A street carrying no graph
+//   (street.walkers null — the tests' bare harness) keeps the old z-steer,
+//   which is the only commute it can express.
 export function tickCommute(street, people, city, hour, px, pz) {
   const share = shareOut(hour);
+  const walkers = street.walkers ?? null;
   street.npcs.forEach((n, i) => {
     const want = threshold(i) < share;
     if (n.out === undefined) n.out = want;
     else if (Math.hypot(n.x - px, n.z - pz) >= HIDE_DIST) n.out = want;
-    if (n.axis !== 'z' || people.list.length === 0) return;
-    const goal = commuteGoal(people.list[i % people.list.length], city.parcels, hour);
-    if (goal !== null && Math.abs(goal.z - n.z) > ARRIVE) n.dir = Math.sign(goal.z - n.z);
+    const goal = people.list.length === 0 ? null
+      : commuteGoal(people.list[i % people.list.length], city.parcels, hour);
+    if (!walkers) {
+      // No graph: the old z-steer is all the commute this street can express
+      // (tests/commute.spec.js pins it); the routed game below never steers.
+      if (n.axis === 'z' && goal !== null && Math.abs(goal.z - n.z) > ARRIVE) {
+        n.dir = Math.sign(goal.z - n.z);
+      }
+      if (n.hold !== null && n.hold !== undefined) { n.hold = null; n.out = want; }
+      return;
+    }
+    if (people.list.length === 0) {
+      if (n.hold !== null && n.hold !== undefined) { n.hold = null; n.out = want; }
+      return;
+    }
+    if (n.hold !== null && n.hold !== undefined) {
+      const outing = goal === null ? -1 : city.parcels.indexOf(goal);
+      if (outing !== -1 && outing !== n.hold) {
+        n.hold = null; n.out = want;
+      } else if (walkers.time >= (n.freeAfter ?? Infinity)) {
+        n.hold = null; n.out = want; n.roamUntil = walkers.time + ROAM_SECS;
+        sendTo(walkers, n, null);
+        return;
+      } else {
+        n.out = false;
+        return;
+      }
+    }
+    // Out for an errand: strolling, not tasked, until the stroll ends.
+    if (walkers.time < (n.roamUntil ?? 0)) return;
+    if (goal === null) { sendTo(walkers, n, null); return; }
+    const dest = city.parcels.indexOf(goal);
+    if (!parcelSpot(walkers, dest)) return;
+    sendTo(walkers, n, dest);
   });
 }
