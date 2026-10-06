@@ -5,11 +5,12 @@
 import { isDark } from './street.js';
 import { worldMap } from './patrol.js';
 
-// A district is a power zone (zoneAt in street.js): the grid is what a player
-// can cut, so it is the unit a consequence lands on. Indexed by zone; the names
-// are the readout's, not a map field — the map holds districts, the grid holds
-// zones, and the two meet again at M3.T7.
-const ZONE_NAMES = ['south', 'north'];
+// A district is a power area (districtAt in street.js, areas from
+// map.districts): the grid is what a player can cut, so it is the unit a
+// consequence lands on. Indexed by area id; the names are the map's, not
+// code's — the hand preset predates map.districts and keeps the shipped names
+// until M4.T15 deletes it with the preset.
+const PRESET_NAMES = ['south', 'north'];
 const USES = ['res', 'com', 'ind'];
 
 // A resident or a worker for every 25 m² of floor, on the 3.5 m storey the lots
@@ -175,13 +176,13 @@ function districtSize(parcels, heightOf, calm) {
   return built.reduce((sum, p) => sum + floorPeople(p, heightOf), 0) / mix;
 }
 
-function makeDistrict(id, parcels, rand, calm, heightOf) {
+function makeDistrict(id, name, parcels, rand, calm, heightOf) {
   const size = districtSize(parcels, heightOf, calm);
   const shops = size * (calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND);
   const firms = size * (calm ? FIRMS_USUAL : FIRMS_USUAL_HAND) * BOOT_FIRMS;
   return {
     id,
-    name: ZONE_NAMES[id],
+    name,
     calm,
     size,
     // The established district. Its jobs match its homes.
@@ -268,11 +269,13 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
   // sizes each district from the buildings on it. The grown lots arrive in
   // `parcels` and stay the margin measured in `d.floor`.
   const all = map.parcels ?? parcels;
+  // One district per map area, in map order, named by the map (M3.T36, M3-7).
+  const defs = map.districts ?? PRESET_NAMES.map((name, id) => ({ id, name }));
   const economy = {
     time: 0,
     rand,
     calm,
-    districts: ZONE_NAMES.map((_, id) => makeDistrict(id, all.filter((p) => p.powerZone === id), rand, calm, heightOf)),
+    districts: defs.map((def) => makeDistrict(def.id, def.name, all.filter((p) => p.powerZone === def.id), rand, calm, heightOf)),
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {

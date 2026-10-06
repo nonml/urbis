@@ -326,6 +326,16 @@ function headFile(dir, ...files) {
 
 function bringTest(dir, test) {
   const todo = todoOf(test);
+  // A Node test (.test.js) is not a director todo: todoOf is the identity and
+  // there is no rename to do, only the file to bring if the lane branched early.
+  if (todo === test) {
+    if (!fs.existsSync(path.join(dir, test))) {
+      try {
+        sh('git', ['checkout', 'main', '--', test], dir);
+      } catch { /* not on main either: the task writes its own check */ }
+    }
+    return;
+  }
   // A task queued after the lane branched has its test on main only: bring it over.
   if (!fs.existsSync(path.join(dir, todo)) && !fs.existsSync(path.join(dir, test))) {
     try {

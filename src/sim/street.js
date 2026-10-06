@@ -101,6 +101,10 @@ function parkedSlots(map, avenues) {
 export function createStreet(seed, map = worldMap()) {
   const rng = createStreams(seed);
   const { avenues } = map.district;
+  // The power areas (M3.T36, M3-7): one zone per map district, in map order.
+  // A map without districts (the hand preset) keeps the two halves.
+  const areas = map.districts?.map((d) => ({ id: d.id, name: d.name, walk: { ...d.walk } })) ?? null;
+  const zoneCount = areas?.length ?? LAMP_ZONES;
   const bodies = [];
   for (let i = 0; i < NPC_COUNT; i++) bodies.push(makeBody(rng, i));
   const walkers = createWalkers(map, seed, bodies);
@@ -129,17 +133,36 @@ export function createStreet(seed, map = worldMap()) {
     cars,
     traffic,
     walkers,
-    zones: [
-      { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
-      { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
-    ],
+    // The bounds districtAt reads; null on a map without districts.
+    districts: areas,
+    zones: Array.from({ length: zoneCount }, () => (
+      { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 }
+    )),
     hurryUntil: 0,
     lastHack: null,
   };
 }
 
+// The halves zoneAt drew. Deprecated: areas (districtAt) replaced it, but the
+// zoning, HUD and main still assign and read powerZone through it (M3.T37
+// moves them). On today's two-area map it agrees with districtAt everywhere
+// except the exact seam z = 0, which belongs to the south area.
 export function zoneAt(z) {
   return z < 0 ? 0 : 1;
+}
+
+// The district a point stands in, as its power-zone id. This replaces
+// zoneAt(z): zones are areas with bounds from the map, not halves of z. H
+// blacks out the district the player stands in through this. Without stored
+// areas (a save from before districts) it falls back to the halves.
+export function districtAt(state, x, z) {
+  const areas = state.districts;
+  if (areas) {
+    const hit = areas.find((d) => x >= d.walk.minX && x <= d.walk.maxX
+      && z >= d.walk.minZ && z <= d.walk.maxZ);
+    if (hit) return hit.id;
+  }
+  return zoneAt(z);
 }
 
 // Zone power phase: lit → dying (collapse flicker) → dark → restoring → lit.
@@ -215,7 +238,7 @@ export function tickStreet(state, dt) {
   // each one along its route at the v set here, so nobody moves in the dark.
   for (const n of state.npcs) {
     snap(n);
-    const dark = isDark(state, zoneAt(n.z));
+    const dark = isDark(state, districtAt(state, n.x, n.z));
     let v = dark ? 0 : n.speed;
     if (hurrying && !dark) v *= 1.6;
     n.v = v;
