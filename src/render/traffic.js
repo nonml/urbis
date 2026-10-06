@@ -342,29 +342,39 @@ const CAR_SHAPES = [
   [1.07, 0.87, 1.03],  // coupe
 ];
 
-function placeOnCar(dummy, car, yOff, roundWheels = false) {
+// Every car is placed from the traffic pose — x, z and yaw, the fields
+// sim/traffic.js writes (M3.T30, M3.T32). The old axis/dir fallback is gone:
+// street.js's static curb plan is resolved to the same pose by curbPose.
+function placeOnCar(dummy, car, yOff) {
   const [sx, sy, sz] = CAR_SHAPES[car.shape ?? 0];
-  dummy.position.set(car.x ?? car.lane, yOff, car.z);
-  if (car.yaw !== undefined) dummy.rotation.set(0, car.yaw, 0);
-  else if (car.axis === 'x') dummy.rotation.set(0, car.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
-  else dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
-  // Wheels widen their track with the body but never squash: an ellipse
-  // where a tyre should be is worse than no variety at all.
-  dummy.scale.set(sx, roundWheels ? 1 : sy, sz);
+  dummy.position.set(car.x, yOff, car.z);
+  dummy.rotation.set(0, car.yaw, 0);
+  dummy.scale.set(sx, sy, sz);
   dummy.updateMatrix();
   return dummy.matrix;
 }
 
 // The shaped bodies carry their own dimensions, so they are never scaled. The
-// beams and pools keep riding placeOnCar's old stretch untouched.
+// beams and pools keep riding placeOnCar's stretch untouched.
 function placeShape(dummy, car, yOff) {
-  dummy.position.set(car.x ?? car.lane, yOff, car.z);
-  if (car.yaw !== undefined) dummy.rotation.set(0, car.yaw, 0);
-  else if (car.axis === 'x') dummy.rotation.set(0, car.dir > 0 ? Math.PI / 2 : -Math.PI / 2, 0);
-  else dummy.rotation.set(0, car.dir > 0 ? 0 : Math.PI, 0);
+  dummy.position.set(car.x, yOff, car.z);
+  dummy.rotation.set(0, car.yaw, 0);
   dummy.scale.set(1, 1, 1);
   dummy.updateMatrix();
   return dummy.matrix;
+}
+
+// street.js's static curb plan speaks lane + axis + dir; the moving fleet
+// speaks x/z/yaw. Resolve the plan to the traffic pose so the frame path is one
+// shape for every car on screen (M3.T32). Parked cars never move.
+function curbPose(car, out) {
+  out.x = car.lane;
+  out.z = car.z;
+  out.yaw = car.axis === 'x'
+    ? (car.dir > 0 ? Math.PI / 2 : -Math.PI / 2)
+    : (car.dir > 0 ? 0 : Math.PI);
+  out.v = 0;
+  return out;
 }
 
 export function buildTraffic(street) {
@@ -436,15 +446,13 @@ export function updateTraffic(rig, street, camera = null) {
   const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, poses } = rig;
   const alpha = drawAlpha();
   street.cars.forEach((c, i) => {
-    const p = blend(c, alpha, poses[i]);
-    p.axis = c.axis;
-    p.parked = c.parked;
+    const p = c.parked ? curbPose(c, poses[i]) : blend(c, alpha, poses[i]);
     bodies.setMatrixAt(i, placeShape(dummy, p, 0));
     glass.setMatrixAt(i, placeShape(dummy, p, 0));
     trim.setMatrixAt(i, placeShape(dummy, p, 0));
     wheels.setMatrixAt(i, placeShape(dummy, p, 0));
     const m = placeOnCar(dummy, p, 0);
-    if (p.parked) {
+    if (c.parked) {
       // Dark and quiet: parked cars wear no headlight glow.
       dummy.scale.set(0, 0, 0);
       dummy.updateMatrix();
@@ -459,15 +467,11 @@ export function updateTraffic(rig, street, camera = null) {
     // The pool rides the car's heading, not the world axis: before this,
     // connector traffic threw its light across the street it was crossing.
     placeOnCar(dummy, p, POOL_Y);
-    const fade = poolFade(p.x ?? p.lane, p.z, camera);
-    dummy.scale.set(fade, 1, throwScale(p.speed) * fade);
+    const fade = poolFade(p.x, p.z, camera);
+    dummy.scale.set(fade, 1, throwScale(p.v) * fade);
     dummy.updateMatrix();
     pools.setMatrixAt(i, dummy.matrix);
-    if (p.axis === 'x') {
-      dummy.position.set(p.x + p.dir * 2.3, 0.7, p.z);
-    } else {
-      dummy.position.set(p.x ?? p.lane, 0.7, p.z + p.dir * 2.3);
-    }
+    dummy.position.set(p.x + Math.sin(p.yaw) * 2.3, 0.7, p.z + Math.cos(p.yaw) * 2.3);
     if (camera) dummy.quaternion.copy(camera.quaternion);
     else dummy.rotation.set(0, 0, 0);
     // The same near-camera fade as the throw: a headlight glare the lens is
