@@ -24,7 +24,9 @@
 // branch and sends a fail back with the gate's own output. A pass lands on main at
 // once (main merged in, the short gate green, then a fast-forward), so a task in
 // another lane that `needs` it can start; a task that fails for good is parked and
-// its lane moves on. The operator can sleep through it. It runs unattended:
+// its lane moves on. The operator can sleep through it. Before it hands out
+// anything, the board proves main is green with the full suite once; a red main
+// stops the board instead of burning tasks on it. It runs unattended:
 //   nohup node scripts/crew.mjs run docs/tasks/<milestone>.json >> ../.urbis-crew.log 2>&1 &
 // Run one supervisor (`run` or `watch`) at a time; both own the state file.
 //
@@ -557,6 +559,22 @@ async function runQueue(state, files) {
     const open = qs.filter((q) => q.tasks.some((t) => state.tasks?.[t.id]?.status !== 'merged'));
     return { milestone: open.map((q) => q.milestone).join(' + ') || 'the board', tasks: qs.flatMap((q) => q.tasks) };
   };
+  // The board's first act: prove main is green with the whole suite, once. A red
+  // main is infrastructure, not a task; handing tasks out would burn them on
+  // failures they did not cause. The fast landing gate cannot see this class:
+  // browser-tagged tests sit outside it (the 2026-10-06 economy.spec.js red).
+  if (!files.length) {
+    log('checking main with the full gate before the board starts');
+    try {
+      await shAsync('npm', ['run', 'gate'], ROOT, { GATE_FULL: '1', GATE_PORT: '4199' });
+      log('main is green; the board starts');
+    } catch (e) {
+      const tail = `${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n');
+      log(`main is red: the full gate failed before the board started:\n${tail}`);
+      log('board not started; fix main and run again');
+      return;
+    }
+  }
   let queue = read();
   state.tasks ??= {};
   // A check belongs to the process that started it; a restart starts it again.
@@ -569,7 +587,12 @@ async function runQueue(state, files) {
     } catch (e) {
       log(`queue unreadable, keeping the last good one: ${e.message}`);
     }
-    for (const lane of new Set(queue.tasks.map((t) => t.lane))) {
+    const lanes = new Set(queue.tasks.map((t) => t.lane));
+    // A live worker must be tended even when its lane's queue is held away: its task
+    // is in no visible queue, and without this it would never land (the 2026-10-06
+    // m3b hold wedged T27/T32 exactly so).
+    for (const w of Object.values(state.workers)) if (w.live) lanes.add(w.name);
+    for (const lane of lanes) {
       try {
         for (const news of await stepLane(state, queue, lane)) log(news);
       } catch (e) {
