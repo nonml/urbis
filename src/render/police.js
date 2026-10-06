@@ -3,10 +3,11 @@
 // and the red/blue wash they throw on the street. Render only — it reads the
 // wanted sim and never writes it.
 //
-// Law 4, and the top tier's budget: every police body in the street is one
-// instanced draw (policekit.js) and every police lamp another, at any tier,
-// and neither draws while the city is clean. The two per-car pursuit meshes
-// this replaced cost eight draws a cruiser.
+// Law 4, and the top tier's budget: cruisers ride one pool per model material,
+// every other police body in the street is one instanced draw (policekit.js)
+// and every police lamp another, at any tier, and none draws while the city
+// is clean. The two per-car pursuit meshes this replaced cost eight draws
+// a cruiser.
 import * as THREE from 'three';
 import { blend, drawAlpha } from '../game/loop.js';
 import { fireSparks } from './hackfx.js';
@@ -25,10 +26,11 @@ const MAX_LIGHTS = 96;
 const SHADOWLESS_NIGHT = 0.5;
 const ROTOR_SPIN = 2 * Math.PI * 1.7;
 
-// Where a cruiser's lamps sit, in its own frame: [x, y, z, w, h, d].
+// Where a cruiser's lamps sit, in its own frame: [x, y, z, w, h, d]. The bar
+// rides the pipeline body's roof (1.11 m) plus its housing.
 const HEAD = [[-0.55, 0.7, 2.12, 0.34, 0.16, 0.03], [0.55, 0.7, 2.12, 0.34, 0.16, 0.03]];
 const TAIL = [[-0.55, 0.75, -2.12, 0.3, 0.12, 0.03], [0.55, 0.75, -2.12, 0.3, 0.12, 0.03]];
-const BAR = [[-0.3, 1.55, -0.2, 0.5, 0.13, 0.26], [0.3, 1.55, -0.2, 0.5, 0.13, 0.26]];
+const BAR = [[-0.3, 1.24, -0.2, 0.5, 0.13, 0.26], [0.3, 1.24, -0.2, 0.5, 0.13, 0.26]];
 
 // Linear, a little over 1 so the lamps read as sources. Not much over: ACES
 // bleaches a saturated colour toward white as it climbs, and a light bar that
@@ -83,7 +85,7 @@ export function buildPolice(scene) {
   const wash = new THREE.PointLight(0xff2a1c, 0, 32, 2);
   wash.position.set(0, -50, 0);
   const heli = buildHeli();
-  group.add(kit.mesh, lights, wash, heli.group);
+  group.add(kit.mesh, kit.cruisers.group, lights, wash, heli.group);
   scene.add(group);
   return {
     group, kit, lights, wash, heli,

@@ -39,8 +39,42 @@ import { buildArcMarker, updateArcMarker } from '../render/arc.js';
 import { hideFaded } from '../render/faded.js';
 import { createAudioEngine } from '../audio/engine.js';
 
-// The zone light the city mirror was last shot under, 1 lit or 0 dead.
-const MIRRORED = [1, 1];
+// The district light the city mirror was last shot under, 1 lit or 0 dead.
+// Sized to the street's district count on the first frame it is known, so a
+// 6-district map re-shoots per district exactly as the 2-district town does.
+const MIRRORED = [];
+
+// One district's window light, for every zoned facade at once. The builders
+// still hand scene two zone views; the uniforms behind them hold 16 districts,
+// so writing the slot directly lights districts no view was made for.
+function driveTowerDistrict(towers, district, b, nf) {
+  const seen = new Set();
+  for (const views of towers.zoneMats) {
+    for (const v of views) {
+      const ud = v.userData;
+      if (seen.has(ud)) continue;
+      seen.add(ud);
+      const floor = ud.dayFloor ?? 0;
+      const lit = floor + (1 - floor) * nf;
+      ud.zoneEmissive.value[district] = 0.75 * lit * b * (ud.emissiveScale ?? 1);
+      const base = ud.baseTint;
+      const slot = ud.zoneDiffuse.value[district];
+      if (base && slot) slot.copy(base).multiplyScalar(1 - 0.3 * (1 - b));
+    }
+  }
+}
+
+// The grown lots' street doors ride their own district the same way.
+function driveParcelDistrict(parcel, district, b, nf) {
+  const ud = parcel.mat?.userData ?? parcel.views[0]?.userData;
+  if (!ud?.zoneEmissive) {
+    if (parcel.views[district]) {
+      parcel.views[district].emissiveIntensity = (0.3 + 0.7 * nf) * b;
+    }
+    return;
+  }
+  ud.zoneEmissive.value[district] = (0.3 + 0.7 * nf) * b;
+}
 
 // ctx: `scene`, `renderer`, `texLoader`, `maxAniso`, and the sim state the
 // builders read — `city`, `street`, `heroCar`, `cityView`.
@@ -221,41 +255,44 @@ export function updateScene(ctx, frame) {
   const hx = driving ? carDraw.x : playerDraw.x;
   const hz = driving ? carDraw.z : playerDraw.z;
   const hy = driving ? carDraw.y : playerDraw.y;
-  const glows = [zoneGlow(street, 0), zoneGlow(street, 1)];
+  const zoneCount = street.zones.length;
+  const glows = street.zones.map((_, z) => zoneGlow(street, z));
+  if (MIRRORED.length !== zoneCount) {
+    MIRRORED.length = zoneCount;
+    MIRRORED.fill(1);
+  }
   const nf = clock.nightFactor;
-  for (let z = 0; z < 2; z++) {
-    // Re-shoot the mirror once a zone has settled, dead or lit, not the instant
-    // the hack lands: the collapse and the relight both flicker, and a face shot
-    // mid-flicker holds a half-lit street in the water until the next re-shoot.
+  for (let z = 0; z < zoneCount; z++) {
+    // Re-shoot the mirror once a district has settled, dead or lit, not the
+    // instant the hack lands: the collapse and the relight both flicker, and
+    // a face shot mid-flicker holds a half-lit street in the water.
     if ((glows[z] === 0 || glows[z] === 1) && glows[z] !== MIRRORED[z]) {
       MIRRORED[z] = glows[z];
       requestCityMirror(mirror, street.time, camera.position.x, camera.position.z);
     }
     const b = glows[z] >= 1 ? 1 : glows[z] <= 0 ? 0 : blink(street.time, z * 3.7);
     lamps.setZoneLight(z, glows[z]);
-    spots[z].visible = b > 0.02;
-    lampPoolMeshes[z].material.opacity = 0.5 * nf * b;
-    signPoolMeshes[z].material.opacity = 0.5 * nf * b;
-    spots[z].intensity = 45 * nf * b;
-    for (const m of towers.zoneMats[z]) {
-      // dayFloor: a tower's windows go dark at noon, but a shop keeps its
-      // lights on, and without that the glazing reads as a black hole in a
-      // sunlit wall. Zero for everything that isn't a shopfront.
-      const floor = m.userData.dayFloor ?? 0;
-      const lit = floor + (1 - floor) * nf;
-      m.emissiveIntensity = 0.75 * lit * b * (m.userData.emissiveScale ?? 1);
-      m.color.copy(m.userData.baseTint).multiplyScalar(1 - 0.3 * (1 - b));
+    if (spots[z]) {
+      spots[z].visible = b > 0.02;
+      spots[z].intensity = 45 * nf * b;
     }
-    setPuddleGlow(puddles, z, b);
+    if (lampPoolMeshes[z]) lampPoolMeshes[z].material.opacity = 0.5 * nf * b;
+    if (signPoolMeshes[z]) signPoolMeshes[z].material.opacity = 0.5 * nf * b;
+    // dayFloor lives in driveTowerDistrict: a tower's windows go dark at noon
+    // but a shop keeps its lights on, or the glazing reads as a black hole.
+    driveTowerDistrict(towers, z, b, nf);
+    if (puddles.mats[z]) setPuddleGlow(puddles, z, b);
     setSlit(fx, z, b);
-    // The grown lots' street doors: their lit fascias and glazing ride their
-    // own zone, so a blackout kills one side of the street and not the other.
-    interiors.parcel.views[z].emissiveIntensity = (0.3 + 0.7 * nf) * b;
-    streakMeshes[z].material.opacity = 0.55 * nf * b;
+    // The grown lots' street doors ride their own district, so a blackout
+    // kills the hacked district's doors and not the others'.
+    driveParcelDistrict(interiors.parcel, z, b, nf);
+    if (streakMeshes[z]) streakMeshes[z].material.opacity = 0.55 * nf * b;
     const mk = markingMats[z];
-    mk.color.setScalar((0.25 + 0.75 * nf) * (0.05 + 0.95 * b));
-    mk.envMapIntensity = 0.1 + 0.6 * nf * b;
-    mk.emissiveIntensity = 0.015 * nf * b;
+    if (mk) {
+      mk.color.setScalar((0.25 + 0.75 * nf) * (0.05 + 0.95 * b));
+      mk.envMapIntensity = 0.1 + 0.6 * nf * b;
+      mk.emissiveIntensity = 0.015 * nf * b;
+    }
   }
   updateCarStreaks(carStreaks, carDraw, driving, wanted.pursuit, nf, street.time);
   signs.tick(signs.zoneMats, signs.zoneSprites, glows, street.time, nf);
