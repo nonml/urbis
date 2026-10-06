@@ -23,12 +23,16 @@
 //   minus that row's KEEP_OUT gaps (lots, the promenade, the roof-stair yard).
 //   Runs shorter than MIN_RUN are not counted. Ratchet MIN_FRONTAGE: it fails
 //   if the worst row drops below it, and asks to be raised when it climbs.
+//   The same ratchet holds on the five seeds (FIVE_SEEDS below), measured
+//   against each seed's own plan runs from WORLD_PLAN.
 //   These tables are the brief's (docs/handoff/VGA-084-2b.md), kept here on
 //   purpose: the checker must not read the generator's own idea of the gaps.
 //
 // The stubs are the ones scripts/dump_geometry.mjs uses: canvases only paint
 // atlases and the loader only returns textures, so neither moves a vertex.
 import { registerHooks } from 'node:module';
+import { spawnSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
 import { setWorldSeed } from '../src/sim/seedstore.js';
 
 const MAX_OVERLAPS = 0;
@@ -54,6 +58,9 @@ const KEEP_OUT = [
 const TOUCH = 0.01;
 // The seed main.js boots the city with; lot geometry does not depend on it.
 const SEED = 20260916;
+// "Five seeds" always means these (tests/golden.test.js): the hand map plus
+// these five are the M2-3 frontage check.
+const FIVE_SEEDS = [7, 11, 22, 33, 73];
 
 registerHooks({
   resolve(spec, ctx, next) {
@@ -90,10 +97,12 @@ globalThis.document = {
   },
 };
 
-// --seed N measures a generated layout. The ratchets are locked to the shipped
-// hand layout, so here the same numbers print and the script always exits 0.
-// world.js reads this on its first evaluation, so it must be set before any
-// src/ module is imported.
+// --seed N measures a generated layout against its own plan runs. Overlap and
+// road stay print-only there: their ratchets are locked to the shipped hand
+// layout. Frontage is enforced: the M2-3 ratchet holds on every seed, so a row
+// that falls under it fails here and gets its gaps closed in planBuildings
+// (src/sim/layout.js). world.js reads this on its first evaluation, so it
+// must be set before any src/ module is imported.
 const seedFlag = process.argv.indexOf('--seed');
 const genSeed = seedFlag === -1 ? null : Number(process.argv[seedFlag + 1]);
 if (genSeed !== null) setWorldSeed(genSeed, true);
@@ -179,7 +188,15 @@ const worst = Math.min(...rows.map((r) => r.built));
 console.log(`frontage: ${rows.map((r) => `${r.name} ${(r.built * 100).toFixed(0)}%`).join(', ')}`);
 console.log(`frontage: worst row ${(worst * 100).toFixed(1)}% (ratchet ${(MIN_FRONTAGE * 100).toFixed(1)}%)`);
 
-if (genSeed === null) {
+const floor = Math.floor(worst * 1000) / 1000;
+
+if (genSeed !== null) {
+  if (floor < MIN_FRONTAGE) {
+    console.error(`frontage FAIL — seed ${genSeed} worst row fell below ${MIN_FRONTAGE}.`
+      + ' Close the gaps in planBuildings; never lower MIN_FRONTAGE.');
+    process.exit(1);
+  }
+} else {
   let failed = false;
   if (onRoad.length > MAX_ROAD) {
     console.error(`road FAIL — ${onRoad.length - MAX_ROAD} new. Fix the placement; never raise MAX_ROAD.`);
@@ -188,7 +205,6 @@ if (genSeed === null) {
     console.error(`road FAIL — good news: lower MAX_ROAD in scripts/check_overlap.mjs to ${onRoad.length}.`);
     failed = true;
   }
-  const floor = Math.floor(worst * 1000) / 1000;
   if (floor < MIN_FRONTAGE) {
     console.error(`frontage FAIL — worst row fell below ${MIN_FRONTAGE}. Never lower MIN_FRONTAGE.`);
     failed = true;
@@ -196,5 +212,24 @@ if (genSeed === null) {
     console.error(`frontage FAIL — good news: raise MIN_FRONTAGE in scripts/check_overlap.mjs to ${floor}.`);
     failed = true;
   }
+  // The hand map is not the only city: the same frontage ratchet holds on all
+  // five seeds. worldSeed is read at import, so each seed runs in a child that
+  // enforces it on its own plan (above) and this only reports the worst row.
+  const self = fileURLToPath(import.meta.url);
+  let seedsWorst = 1;
+  for (const seed of FIVE_SEEDS) {
+    const run = spawnSync(process.execPath, [self, '--seed', String(seed)], { encoding: 'utf8' });
+    const line = /^frontage: worst row ([\d.]+)%/m.exec(run.stdout ?? '')?.[1] ?? null;
+    const w = line === null ? NaN : Number(line) / 100;
+    if (line === null || run.status !== 0 || Number.isNaN(w)) {
+      console.error(`seeds FAIL — seed ${seed} did not pass frontage.${run.stderr ? `\n${run.stderr}` : ''}`);
+      failed = true;
+    } else {
+      console.log(`seed ${seed}: worst row ${line}%`);
+      seedsWorst = Math.min(seedsWorst, w);
+    }
+  }
+  console.log(`seeds: worst row ${(seedsWorst * 100).toFixed(1)}%`
+    + ` across ${FIVE_SEEDS.join(', ')} (ratchet ${(MIN_FRONTAGE * 100).toFixed(1)}%)`);
   if (failed) process.exit(1);
 }
