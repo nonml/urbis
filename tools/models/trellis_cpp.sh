@@ -4,7 +4,8 @@
 # Builds trellis.cpp from source, fetches the Q8 GGUF set outside the repo,
 # generates one car from a pre-cut RGBA reference at --res 512 --seed 42, then
 # measures wall time, peak RSS and disk and renders the GLB. Idempotent; every
-# artifact and log lands in tools/models/evidence/.
+# artifact and log lands in tools/models/evidence/. Python for the reference cut
+# and the renders is $URBIS_MODELS_DIR/tools-venv (numpy, pillow, scipy).
 #   usage: bash tools/models/trellis_cpp.sh
 #   TRELLIS_FORCE=1   regenerate even if evidence/car.glb already exists
 set -euo pipefail
@@ -17,10 +18,13 @@ GGUF_DIR="$ROOT_DIR/trellis2-gguf/q8"
 Q8=(birefnet.gguf dinov3.gguf shape_dec.gguf shape_flow_512.gguf shape_flow_1024.gguf
     ss_dec.gguf ss_flow.gguf tex_dec.gguf tex_flow_512.gguf tex_flow_1024.gguf)
 REF_URL="https://raw.githubusercontent.com/pwilkin/trellis.cpp/main/assets/showcase/racer/racer.png"
-PY="$ROOT_DIR/trellis2mlx/.venv/bin/python"; [ -x "$PY" ] || PY="$(command -v python3)"
+PY="$ROOT_DIR/tools-venv/bin/python"
+[ -x "$PY" ] || PY="$ROOT_DIR/trellis2mlx/.venv/bin/python"
+[ -x "$PY" ] || PY="$(command -v python3)"
 HF="$ROOT_DIR/trellis2mlx/.venv/bin/hf"; [ -x "$HF" ] || HF="$(command -v hf)"
 free_gb() { df -Pk / | awk 'NR==2 {printf "%.1f", $4/1048576}'; }
 log() { printf '[trellis_cpp] %s\n' "$*"; }
+have_q8() { for f in "${Q8[@]}"; do [ -s "$GGUF_DIR/$f" ] || return 1; done; }
 
 mkdir -p "$EVID"
 log "free disk before: $(free_gb) GB"
@@ -38,8 +42,13 @@ log "trellis.cpp $(git -C "$SRC" rev-parse --short HEAD) / ggml $(git -C "$SRC/t
 # 2. Q8 GGUF set, outside the repo. birefnet.gguf is fetched but never run: a
 # pre-matted RGBA input makes auto background removal keep its alpha.
 mkdir -p "$GGUF_DIR"
-"$HF" download ilintar/trellis2-gguf --include 'q8/*.gguf' --local-dir "$ROOT_DIR/trellis2-gguf"
-for f in "${Q8[@]}"; do [ -s "$GGUF_DIR/$f" ] || { log "missing $GGUF_DIR/$f"; exit 1; }; done
+if have_q8; then
+  log "Q8 weights already present in $GGUF_DIR"
+else
+  [ -x "$HF" ] || { log "hf not found and Q8 weights missing; install huggingface_hub first"; exit 1; }
+  "$HF" download ilintar/trellis2-gguf --include 'q8/*.gguf' --local-dir "$ROOT_DIR/trellis2-gguf"
+  have_q8 || { log "missing $GGUF_DIR file after download"; exit 1; }
+fi
 log "Q8 weights: $(du -sh "$ROOT_DIR/trellis2-gguf" | cut -f1) in $ROOT_DIR/trellis2-gguf"
 
 # 3. Reference. No pre-cut, trademark-free CC0 car photo exists in the free

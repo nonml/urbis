@@ -291,8 +291,8 @@ from a kit. The six facade materials, rooflines and cornices already built move 
 the pools with the buildings (M3.T22-T25); M2-3 adds the rest of the kit.
 
 **Where the models come from: made by an agent, on this Mac** (MacBook Air M3, 16 GB
-memory, 39.2 GB free disk measured 2026-10-06, after the installs and the M2.E1
-evaluation). Researched 2026-10-03, settled 2026-10-06 by M2.E1:
+memory, 57.0 GB free disk measured 2026-10-06, after the trellis2mlx fallback was
+deleted). Researched 2026-10-03, settled 2026-10-06 by M2.E1:
 
 - **Image to 3D runs on this Mac.** `ASSETS.md`'s tools are CUDA-only, but community
   Apple-Silicon ports exist. **The pipeline is
@@ -303,12 +303,12 @@ evaluation). Researched 2026-10-03, settled 2026-10-06 by M2.E1:
   **16 min 35 s wall, 2.81 GB peak RSS**, a 5.3 MB GLB
   (`tools/models/README.md`, `tools/models/evidence/`). The alternative,
   [trellis2mlx](https://github.com/lyonsno/trellis2mlx) (Microsoft's TRELLIS.2 in
-  Apple's MLX), is installed and measured — **18.1 GB** of weights, 6.75 GB peak on a
+  Apple's MLX), was installed and measured — **18.1 GB** of weights, 6.75 GB peak on a
   16 GB M2 Pro, about 21 minutes a model — but it is blocked on gated DINOv3 and has
-  never produced an image-conditioned model here. **It stays installed as the A/B
-  fallback** until trellis.cpp's GLB passes the M2-1 draw budget and the M2-6
-  play-camera check. The original TRELLIS.2 is not used, because its NVIDIA renderer
-  (`nvdiffrast`) is non-commercial.
+  never produced an image-conditioned model here; the operator deleted it on
+  2026-10-06 to free 18.8 GB, and re-installing needs gated DINOv3 access. The
+  original TRELLIS.2 is not used, because its NVIDIA renderer (`nvdiffrast`) is
+  non-commercial.
 - **Not used:** the Hunyuan3D 2.1 Mac ports. They work in 16 GB, but Tencent's licence
   excludes the EU, the UK and South Korea, outputs included, which matters for a game
   sold worldwide. The trellis-mac PyTorch port wants 24 GB.
@@ -330,10 +330,12 @@ evaluation). Researched 2026-10-03, settled 2026-10-06 by M2.E1:
   trademark gets into the game. Images come from CC0 sources or from a text-to-image
   model; which one runs on this Mac is part of M2-0.
 - **Disk:** the trellis.cpp route costs **9.6 GB** (9.3 GB Q8 weights plus a 46 MB
-  native build); the trellis2mlx stack — Blender 0.9 GB, Python env 0.8 GB, weights
-  18.1 GB, **21.6 GB** — stays installed as the fallback. M2-0 and M2.E1 measured both
-  (2026-10-06, `tools/models/README.md`); the machine had 68.5 GB free before the
-  installs, not the 16 GB this section first assumed, and 39.2 GB after.
+  native build); the trellis2mlx stack — Python env 0.8 GB and weights 18.1 GB — was
+  deleted on 2026-10-06 to free **18.8 GB**. Blender (0.9 GB) stays, and the tools'
+  Python is a 161 MB `tools-venv` (numpy, pillow, scipy) for the reference cut and the
+  renders. M2-0 and M2.E1 measured both stacks (2026-10-06,
+  `tools/models/README.md`); the machine had 68.5 GB free before the installs, not the
+  16 GB this section first assumed.
 - **People cost draws.** 72 walkers as separate rigged meshes would be 72 draws of the
   175. So only the player is a rigged mesh; the walkers' walk is baked into a texture
   that one instanced pool plays, at most 2 draws for all of them.
