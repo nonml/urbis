@@ -69,8 +69,6 @@ async function scanJumps(page, kind, steps) {
 test.setTimeout(300000);
 
 test('M3-6: every car holds its trips and nothing leaps on the graph', async ({ page }) => {
-  // M3.T28's red check: routed cars are M3.T30. Drop this when they land.
-  test.fail(true, 'M3-6 red: cars loop the lanes and wrap at the tarmac end (street.js:308-313)');
   await page.goto('/?capture=1&gen=1&seed=7');
   await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
   const r = await scanJumps(page, 'cars', 600);

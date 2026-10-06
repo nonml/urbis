@@ -32,6 +32,11 @@ const HELD = 1e-4;
 // blend() snaps a step that moved a body past this: a wrap at the street's end
 // or a unit entering at distance. Those are drawn where they land.
 const TELEPORT = 5;
+// A step smaller than this draws less than HELD between two frames: at 60 fps
+// the frame's alpha moves a third of a step at most, so a mover creeping to a
+// stop line cannot be held, and asking its draw to move HELD would fail an
+// honest one.
+const RESOLVABLE = HELD * 3;
 
 function stepLen(m) {
   return Math.hypot(m.x - m.prev.x, m.z - m.prev.z, (m.y ?? 0) - (m.prev.y ?? 0));
@@ -115,8 +120,10 @@ test('M0-9: every mover is drawn between its last two sim steps, every frame', a
     const was = last[kind].get(i);
     const step = entity.prev ? stepLen(entity) : 0;
     // fixed.total > 1 skips the first step's alpha-0 frame; warps skip the
-    // frame a wrap or a spawn landed on and the one it settles on.
-    if (was && fixed.total > 1 && step > 0 && step <= TELEPORT && !warps[kind].has(i)) {
+    // frame a wrap or a spawn landed on and the one it settles on. An alpha-0
+    // frame draws the step's start pose by definition, so no change can be
+    // asked of it — a mover resuming from a stop draws there one more frame.
+    if (was && fixed.total > 1 && step > RESOLVABLE && step <= TELEPORT && fixed.alpha > 0.01 && !warps[kind].has(i)) {
       checked[kind] += 1;
       const d = Math.hypot(m[12] - was[0], m[14] - was[1]);
       if (d < HELD) held.push(`${key} frame ${frame} d ${d} at ${was}->${[m[12], m[14]]}`);
@@ -149,7 +156,7 @@ test('M0-9: every mover is drawn between its last two sim steps, every frame', a
       if (fixed.total === 0) continue;
       if (!m.prev) { missing.push(`${key} frame ${f}`); continue; }
       const moved = stepLen(m);
-      if (moved === 0 || moved > TELEPORT) continue;
+      if (moved <= RESOLVABLE || moved > TELEPORT) continue;
       const pose = blend(m, fixed.alpha, {});
       const was = last.blend.get(key);
       if (was) {

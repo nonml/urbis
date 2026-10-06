@@ -291,25 +291,33 @@ from a kit. The six facade materials, rooflines and cornices already built move 
 the pools with the buildings (M3.T22-T25); M2-3 adds the rest of the kit.
 
 **Where the models come from: made by an agent, on this Mac** (MacBook Air M3, 16 GB
-memory, 16 GB free disk). Researched 2026-10-03:
+memory, 57.0 GB free disk measured 2026-10-06, after the trellis2mlx fallback was
+deleted). Researched 2026-10-03, settled 2026-10-06 by M2.E1:
 
 - **Image to 3D runs on this Mac.** `ASSETS.md`'s tools are CUDA-only, but community
-  Apple-Silicon ports exist. The one that fits is
-  [trellis2mlx](https://github.com/lyonsno/trellis2mlx): Microsoft's TRELLIS.2 in
-  Apple's MLX, no NVIDIA library, about **5 GB** of weights, **6.75 GB** peak memory
-  measured on a 16 GB M2 Pro, a textured GLB with built-in simplification to a target
-  face count. It is slow: **21 minutes** a model on that M2 Pro, likely more on a
-  fanless Air, so generation runs in overnight batches. Licence: TRELLIS.2 weights MIT,
-  port MIT. The original TRELLIS.2 is not used, because its NVIDIA renderer
-  (`nvdiffrast`) is non-commercial.
+  Apple-Silicon ports exist. **The pipeline is
+  [trellis.cpp](https://github.com/pwilkin/trellis.cpp)** (pwilkin's C++/GGML port of
+  TRELLIS.2, MIT): built from source, **9.3 GB** of ungated Q8 GGUF weights (DINOv3
+  comes from the same mirror, so nothing waits on a Hugging Face access request),
+  natively Metal, no Python at runtime. M2.E1 measured one car end to end on this Mac:
+  **16 min 35 s wall, 2.81 GB peak RSS**, a 5.3 MB GLB
+  (`tools/models/README.md`, `tools/models/evidence/`). The alternative,
+  [trellis2mlx](https://github.com/lyonsno/trellis2mlx) (Microsoft's TRELLIS.2 in
+  Apple's MLX), was installed and measured — **18.1 GB** of weights, 6.75 GB peak on a
+  16 GB M2 Pro, about 21 minutes a model — but it is blocked on gated DINOv3 and has
+  never produced an image-conditioned model here; the operator deleted it on
+  2026-10-06 to free 18.8 GB, and re-installing needs gated DINOv3 access. The
+  original TRELLIS.2 is not used, because its NVIDIA renderer (`nvdiffrast`) is
+  non-commercial.
 - **Not used:** the Hunyuan3D 2.1 Mac ports. They work in 16 GB, but Tencent's licence
   excludes the EU, the UK and South Korea, outputs included, which matters for a game
   sold worldwide. The trellis-mac PyTorch port wants 24 GB.
 - **Where each kind of model comes from:**
   - **Cars, street kit, props, police kit:** a reference image goes through
-    trellis2mlx, then a Blender script made by DeepSeek cuts it to a game budget,
-    sets metres, Y-up and the origin at the base (`ASSETS.md` rule 5), and exports the
-    GLB. A model that comes out wrong is made directly as a Blender script instead.
+    trellis.cpp (`tools/models/trellis_cpp.sh`), then a Blender script made by DeepSeek
+    cuts it to a game budget, sets metres, Y-up and the origin at the base
+    (`ASSETS.md` rule 5), and exports the GLB. A model that comes out wrong is made
+    directly as a Blender script instead.
   - **People:** generated meshes come out as one fused statue with no skeleton, which
     cannot walk. So **MPFB**, MakeHuman's Blender add-on, builds the bodies (realistic,
     rigged, output CC0), and the walk comes from the CMU motion-capture library (free
@@ -321,8 +329,13 @@ memory, 16 GB free disk). Researched 2026-10-03:
 - **Reference images:** photos of real cars and branded things are not used, so no
   trademark gets into the game. Images come from CC0 sources or from a text-to-image
   model; which one runs on this Mac is part of M2-0.
-- **Disk is the tight part:** Blender (about 1.5 GB), trellis2mlx (about 5 GB) and its
-  Python setup leave little of the 16 GB free. M2-0 measures it.
+- **Disk:** the trellis.cpp route costs **9.6 GB** (9.3 GB Q8 weights plus a 46 MB
+  native build); the trellis2mlx stack — Python env 0.8 GB and weights 18.1 GB — was
+  deleted on 2026-10-06 to free **18.8 GB**. Blender (0.9 GB) stays, and the tools'
+  Python is a 161 MB `tools-venv` (numpy, pillow, scipy) for the reference cut and the
+  renders. M2-0 and M2.E1 measured both stacks (2026-10-06,
+  `tools/models/README.md`); the machine had 68.5 GB free before the installs, not the
+  16 GB this section first assumed.
 - **People cost draws.** 72 walkers as separate rigged meshes would be 72 draws of the
   175. So only the player is a rigged mesh; the walkers' walk is baked into a texture
   that one instanced pool plays, at most 2 draws for all of them.
@@ -332,14 +345,14 @@ memory, 16 GB free disk). Researched 2026-10-03:
 
 | ID | Pass when | Checked by | Today |
 |---|---|---|---|
-| M2-0 | **The pipeline works on this Mac before anything depends on it:** one car through trellis2mlx and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used | `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png` | red: nothing installed |
+| M2-0 | **The pipeline works on this Mac before anything depends on it:** one car through trellis.cpp and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used | `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png` | partial: the car is made and measured (M2.E1 — 16 min 35 s, 2.81 GB peak, 5.3 MB GLB, `tools/models/README.md`); nothing is loaded in the game yet; the person is not started |
 | M2-1 | **Cars:** the hero car, traffic and police cruisers render from model files listed in `public/assets/CREDITS.md`; no box geometry in any car body; traffic and parked cars together at most 11 draws (today's), the hero car at most 9 | `tests/accept/m2-cars.spec.js` | red: traffic re-bodied, hero car still a slab (D16), cruisers are kit primitives |
 | M2-2 | **People:** the player is a rigged model; pedestrians are one instanced pool with a baked walk (a vertex animation texture), **at most 2 draws for every walker**; the limbs of both move between frames while they walk | `tests/accept/m2-people.spec.js` | red: "a person" of parts (`7d6d599`); walkers cost 12 draws |
 | M2-3 | **Buildings** (after M3-5): on all five seeds, every facade has window reveals at least 0.15 m deep, at least 3 facade materials appear, and frontage stays at or above `check:overlap`'s ratchet (98.2%); the kit's pooled parts (frames, shopfronts, roof plant) cost no more than 12 draws | `tests/accept/m2-streetwall.spec.js`; `npm run check:overlap` | red: no window reveals. Built: six facade materials (`render/block.js:476-486`), rooflines and cornices (`05daf90`), a seed-derived street wall (`c9260f8`); frontage 98.3% worst row on the hand map; generated seeds not measured |
 | M2-4 | **Landscape:** trees render from a model; no icosahedron or cone in any tree or mountain | `tests/accept/m2-landscape.spec.js` | red: icosahedron trees |
 | M2-5 | **Street kit and rooms:** `street_lamp_01` is the street lamp; benches, bins and bus stops are models; the grown-lot rooms use models, not `box()`; no street prop over 5,000 triangles, and the frame's triangles at the spawn drop under 600 k | `tests/accept/m2-kit.spec.js` | red: `box()` everywhere but the hydrant and bin; the hydrant model is 86 k triangles; 1.14 M triangles a frame |
 | M2-6 | **VGA-084's done-when:** the sweep finds no building, car, person, mountain or tree in the play frame made of a raw box, cone, sphere, cylinder or icosahedron, at night, by day and in a blackout, on all five seeds | the sweep, which lists every picked building, car, person, tree or prop mesh without `userData.model` (set by the pool loader, M2.T2); `docs/shots/m2-real-<seed>-night/day/blackout.png` | red |
-| M2-7 | **Weather changes:** each game day has at least two weather states out of clear, overcast and rain, drawn from the seed; the roads are dry in clear weather, wet in rain, and dry over 2 game minutes once it stops (VGA-005's wet grade becomes a 0-1 wetness that the rain, the puddle mirrors and the road gloss all read); no new draws; the sweep shoots every state | `tests/accept/m2-weather.test.js` (the schedule and the wetness, in Node); `tests/accept/m2-weather.spec.js` (shots) | red: it rains in every outdoor frame (`main.js:1102` hides the rain only indoors), so rain is the signature `AGENTS.md` says weather must not be |
+| M2-7 | **Weather changes:** each game day has at least two weather states out of clear, overcast and rain, drawn from the seed; the roads are dry in clear weather, wet in rain, and dry over 2 game minutes once it stops (VGA-005's wet grade becomes a 0-1 wetness that the rain, the puddle mirrors and the road gloss all read); no new draws; the sweep shoots every state | `tests/accept/m2-weather.test.js` (the schedule and the wetness, in Node); `tests/accept/m2-weather.spec.js` (shots) | green: `29a223b` (sim), `0d28621` (drawn); six state shots judged in `REVIEW.md`; D19 open (clear vs overcast at the spawn reads weak) |
 
 **Weather (M2-7)** is the one M2 criterion that is not a model. It is here because it is
 a look: the visual target says weather is variety, not a signature, and today it never
