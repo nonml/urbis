@@ -4,6 +4,7 @@
 // plus a real headlight spot so wet asphalt answers the beams.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { blend, drawAlpha } from '../game/loop.js';
 import { getGlowTex } from './signs.js';
 
@@ -402,19 +403,25 @@ export function buildTraffic(street) {
   const iShape = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
   for (const g of [fleetBodyGeo, fleetGlassGeo, fleetTrimGeo, fleetWheelGeo]) g.setAttribute('iShape', iShape);
   const wheels = new THREE.InstancedMesh(fleetWheelGeo, patchCarShape(wheelMaterial(), 'car-wheel'), N);
+  wheels.name = 'fleet-wheels';
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
+  beams.name = 'fleet-beams';
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), N);
+  tails.name = 'fleet-tails';
   const glass = new THREE.InstancedMesh(fleetGlassGeo, patchCarShape(new THREE.MeshStandardMaterial({
     color: 0x0b1119, metalness: 0.55, roughness: 0.12, envMapIntensity: 0.22, side: THREE.DoubleSide,
   }), 'car-glass'), N);
+  glass.name = 'fleet-glass';
   const trim = new THREE.InstancedMesh(fleetTrimGeo, patchCarShape(new THREE.MeshStandardMaterial({
     color: 0x15171b, roughness: 0.62, metalness: 0.25, envMapIntensity: 1.1,
   }), 'car-trim'), N);
+  trim.name = 'fleet-trim';
   const poolMat = new THREE.MeshBasicMaterial({
     map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending, depthWrite: false,
   });
   const pools = new THREE.InstancedMesh(poolGeo, poolMat, N + POOL_EXTRA);
+  pools.name = 'fleet-pools';
   const glows = new THREE.InstancedMesh(
     new THREE.PlaneGeometry(2.4, 1.4),
     new THREE.MeshBasicMaterial({
@@ -423,6 +430,7 @@ export function buildTraffic(street) {
     }),
     N
   );
+  glows.name = 'fleet-glows';
   glows.frustumCulled = false;
   group.add(glows);
   street.cars.forEach((c, i) => {
@@ -505,24 +513,81 @@ export function updateCarPools(rig, cars, camera = null) {
   pools.instanceMatrix.needsUpdate = true;
 }
 
-// --- Hero car (player-driven): own materials, brake lights, real headlight spot.
+// --- Hero car (player-driven): M2.T3 model body, kept lights, brake, spot.
+// The slab is gone (D16): paint, trim and wheels come from car.glb — the body
+// carries its own glass, so the old canopy and box trim are deleted with it.
+// Beams, tails, glows, beacon and the real headlight spot stay exactly where
+// the saloon tuned them; the model is 4.41 m on the same +Z nose.
+export const HERO_MODEL = 'assets/models/car/car.glb';
+
+// Sort one loaded mesh into paint, body trim or wheels. Paint wears the baked
+// atlas (it has a map); trim and wheels share the dark material, told apart
+// by the separate wheel nodes clean_car.py left for a later spin.
+function heroSort(mesh, out) {
+  const baked = mesh.geometry.clone().applyMatrix4(mesh.matrixWorld);
+  if (/wheel/i.test(mesh.name)) {
+    out.wheelGeos.push(baked);
+    out.wheelMat = out.wheelMat ?? mesh.material;
+  } else if (mesh.material?.map) {
+    out.paintGeos.push(baked);
+    out.paintMat = out.paintMat ?? mesh.material;
+  } else {
+    out.trimGeos.push(baked);
+    out.trimMat = out.trimMat ?? mesh.material;
+  }
+}
+
+function heroBodyMesh(geos, mat, name, shadow) {
+  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  mesh.name = name;
+  mesh.userData.model = HERO_MODEL;
+  mesh.castShadow = shadow;
+  return mesh;
+}
+
+// Fill the rig's body once the GLB lands; the lights exist from frame one so
+// the car never loses its beams. Paint alone casts: the shadow reads from the
+// shell, and the second shadow pass stays off the budget.
+function loadHeroBody(rig) {
+  const credit = fetch('assets/CREDITS.md').then((r) => r.text()).catch(() => '');
+  new GLTFLoader().loadAsync(HERO_MODEL).then(async (gltf) => {
+    gltf.scene.updateMatrixWorld(true);
+    const out = { paintGeos: [], trimGeos: [], wheelGeos: [] };
+    gltf.scene.traverse((o) => { if (o.isMesh) heroSort(o, out); });
+    if (!out.paintGeos.length) return;
+    const paint = heroBodyMesh(out.paintGeos, out.paintMat, 'hero-body', true);
+    rig.group.add(paint);
+    rig.paint = paint;
+    if (out.trimGeos.length) {
+      const trim = heroBodyMesh(out.trimGeos, out.trimMat, 'hero-trim', false);
+      rig.group.add(trim);
+      rig.trim = trim;
+    }
+    if (out.wheelGeos.length) {
+      const wheels = heroBodyMesh(out.wheelGeos, out.wheelMat, 'hero-wheels', false);
+      rig.group.add(wheels);
+      rig.wheels = wheels;
+    }
+    rig.credited = (await credit).includes('models/car/car.glb');
+    rig.modelReady = true;
+  }).catch(() => {});
+}
+
 export function buildPlayerCar(scene, car) {
   const group = new THREE.Group();
-  const paint = new THREE.Mesh(bodyGeo, new THREE.MeshStandardMaterial({
-    color: 0x8f4a0c, roughness: 0.30, metalness: 0.16, envMapIntensity: 1.1,
-  }));
-  paint.castShadow = true;
-  const wheels = new THREE.Mesh(wheelGeo, wheelMaterial());
+  group.name = 'hero-car';
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4ff }));
+  beams.name = 'hero-beams';
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_DIM.clone() });
   const tails = new THREE.Mesh(tailGeo, tailMat);
-  const canopy = new THREE.Mesh(canopyGeo, glassMat);
+  tails.name = 'hero-tails';
   const glows = [];
   for (const sx of [-0.55, 0.55]) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({
       map: getGlowTex(), color: 0xd8ecff, transparent: true, opacity: 0.65,
       blending: THREE.AdditiveBlending, depthWrite: false,
     }));
+    s.name = 'hero-glow';
     s.scale.set(1.6, 1.0, 1);
     s.userData.sx = sx;
     group.add(s);
@@ -537,10 +602,35 @@ export function buildPlayerCar(scene, car) {
     map: getGlowTex(), color: 0xe8dcc6, transparent: true, opacity: 0.3,
     blending: THREE.AdditiveBlending, depthWrite: false,
   }));
+  beacon.name = 'hero-beacon';
   beacon.scale.set(1.6, 3.2, 1);
   group.add(beacon);
-  group.add(paint, wheels, beams, tails, canopy, carTrimMesh());
-  const rig = { group, paint, wheels, beams, tails, tailMat, glows, spot, beacon };
+  group.add(beams, tails);
+  // Wheels arrive with the model; a flat-tyre sag needs the handle from frame
+  // one, so a bare holder stands in until the mesh lands (police.js drawFlats).
+  const rig = {
+    group, paint: null, trim: null, wheels: new THREE.Object3D(), beams, tails, tailMat,
+    glows, spot, beacon, model: HERO_MODEL, modelReady: false, credited: false,
+    inspect() {
+      const bodies = [rig.paint, rig.trim, rig.wheels].filter((m) => m?.isMesh);
+      return {
+        model: rig.model, credits: rig.credited,
+        geoTypes: bodies.map((m) => m.geometry.type),
+        meshes: bodies.length,
+      };
+    },
+    lights() {
+      return {
+        beams: !!rig.beams, tails: !!rig.tails,
+        glows: rig.glows.length, spot: rig.spot?.isSpotLight === true,
+      };
+    },
+    tailHex() {
+      return rig.tailMat.color.getHexString();
+    },
+  };
+  if (typeof window !== 'undefined') window.__heroRig = rig;
+  loadHeroBody(rig);
   updatePlayerCar(rig, car, false);
   return rig;
 }

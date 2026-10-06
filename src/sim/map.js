@@ -131,6 +131,21 @@ function lotParcel(lot, index) {
   };
 }
 
+// Districts are areas (M3.T36, M3-7): the map's power districts with bounds
+// and names. Today's town is one district, so the areas are its two power
+// halves — the same split zoneAt drew at z = 0, now as data the sim, the
+// hacks and the economy read instead of code. Ids are 0-based in order, so an
+// area's id is its index in street.zones and the economy's districts.
+function splitDistricts(district) {
+  const { walk, drive } = district;
+  const south = (box) => ({ ...box, maxZ: Math.min(box.maxZ, 0) });
+  const north = (box) => ({ ...box, minZ: Math.max(box.minZ, 0) });
+  return [
+    { id: 0, name: 'south', walk: south(walk), drive: south(drive) },
+    { id: 1, name: 'north', walk: north(walk), drive: north(drive) },
+  ];
+}
+
 // A seed's whole map. `version` is the edit revision; ops (M3.T18) bump it, so
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
@@ -147,6 +162,7 @@ export function createMap(seed) {
     // Render state, not map content: mapHash ignores it by design.
     dirty: new Set(),
     district,
+    districts: splitDistricts(district),
     graph: buildGraph(district),
     buildings,
     // Every building the renderer draws, and every lot, is one parcel with an
