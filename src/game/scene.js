@@ -28,6 +28,8 @@ import { buildAtmosphere, updateDaylight } from '../render/atmosphere.js';
 import { buildGrassGround, buildGrassTufts, buildMountains } from '../render/landscape.js';
 import { createChunkManager } from '../render/chunks.js';
 import { buildOutskirts } from '../render/outskirts.js';
+import { worldMap } from '../sim/patrol.js';
+import { drainDirty } from '../sim/map.js';
 import { buildZoning } from '../render/zoning.js';
 import { buildVacant } from '../render/vacant.js';
 import { buildDecline } from '../render/decline.js';
@@ -44,6 +46,10 @@ const MIRRORED = [1, 1];
 // builders read — `city`, `street`, `heroCar`, `cityView`.
 export function buildScene(ctx) {
   const { scene, renderer, texLoader, maxAniso, city, street, heroCar, cityView } = ctx;
+  // The one live map (M3.T27): the chunk manager's tiles and the road pools are
+  // rewritten from it whenever an op (sim/ops.js) bumps its version.
+  const map = worldMap();
+  const mapState = { version: map.version };
 
   // Audio (M7.T1): the graph starts on the first input inside the engine and is
   // driven from updateScene. A capture run is silent unless it asks with
@@ -174,6 +180,7 @@ export function buildScene(ctx) {
     lamps, streakMeshes, carStreaks, lampPoolMeshes, fadedDraws, growth, vacant,
     decline, arcMarker, npcRig, traffic, heroRig, police, avatar, shops,
     interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig, audio,
+    roads: ground.roads, map, mapState,
   };
 }
 
@@ -189,8 +196,19 @@ export function updateScene(ctx, frame) {
     fx, interiors, streakMeshes, markingMats, signs, shops, rain, lamps, env, groundMats,
     skyline, stars, beacons, growth, decline, npcRig, traffic, blobs, heroKey, police,
     arcMarker, vacant, fadedDraws, heroRig, avatar, carStreaks, mirror, audio,
+    chunks, roads, map, mapState,
   } = ctx;
   const { driving, braking, playerDraw, carDraw } = frame;
+
+  // A map edit (sim/ops.js) bumps the version and marks the 64 m tiles it
+  // touched. The dirty keys go to the chunk manager, which reclaims their slots
+  // now and rebuilds them inside its 1.5 ms a frame (M3.T27); the road pools
+  // rewrite their slots the same frame, because a new road is not a tile.
+  if (map.version !== mapState.version) {
+    mapState.version = map.version;
+    if (map.dirty) chunks.invalidate(drainDirty(map));
+    roads.update(map);
+  }
 
   // Audio follows the lens, and the probe lists what plays. The probe surface
   // binds after buildScene and has no audio part, so the listing is hung here,

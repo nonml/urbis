@@ -32,6 +32,8 @@ export const ACCEL = 2.5;
 export const BRAKE = 6;
 export const GAP_MIN = 2.5;
 export const TURN_SECS = 0.6;
+// Lanes this close at a node share its point: there is no turn to carry.
+const TURN_MIN = 0.5;
 const FOLLOW_GAIN = 1.5;
 
 export const SIGNAL_GREEN = 8;
@@ -430,20 +432,25 @@ export function tick(state, dt) {
 }
 
 // Leave the edge's lane for the next edge's lane through the node. The car is
-// carried by a 0.6 s interpolation; it keeps the speed it arrived with.
+// carried by a 0.6 s interpolation; it keeps the speed it arrived with. A route
+// that runs straight through the node ends and starts on the same point: there
+// is no turn to carry, and interpolating it would park the car at the junction
+// for the whole 0.6 s (M0-9), so it takes the next edge in the same step.
 function beginTurn(state, c, edge, len) {
   const node = c.dir > 0 ? edge.b : edge.a;
   const next = state.edgeById.get(c.route[c.leg + 1]);
   const dir = next.a === node ? 1 : -1;
-  c.turn = {
-    from: pointOn(state.byId, edge, c.dir, len),
-    to: pointOn(state.byId, next, dir, 0),
-    t: 0,
-  };
+  const from = pointOn(state.byId, edge, c.dir, len);
+  const to = pointOn(state.byId, next, dir, 0);
   c.leg += 1;
   c.dir = dir;
   c.s = 0;
   c.axis = next.axis;
+  // The car reaches the lane's end in the step that crosses it; leaving the
+  // pose at the overshoot point holds the drawn car for a frame (M0-9).
+  Object.assign(c, from);
+  if (Math.hypot(to.x - from.x, to.z - from.z) < TURN_MIN) return;
+  c.turn = { from, to, t: 0 };
 }
 
 function advanceTurn(c, dt) {

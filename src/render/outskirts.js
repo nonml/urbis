@@ -20,7 +20,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { displaceToTerrain } from './landscape.js';
-import { heightAt } from '../sim/world.js';
+import { heightAt, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from '../sim/world.js';
 import { vistasOf } from '../sim/vistas.js';
 import { worldMap } from '../sim/patrol.js';
 import { tileSeed } from './chunks.js';
@@ -422,6 +422,53 @@ function laneStepsOf(lanes) {
   });
 }
 
+// The roads the player has laid since boot (M3.T27). The lanes above are
+// world-static, but the map's graph is live: every edge is stepped once per map
+// version — an op bumps it — and bucketed by tile, so a tile build reads only
+// its own neighbourhood and the cache holds until the map actually changes.
+const ROAD_BUCKET = 64;
+const ROAD_PAD = 12;    // metres of halo a tile reads past its own edge
+// Carriageway plus footway, and a metre of verge: a prop inside this of a road
+// centre-line is standing in the road.
+const ROAD_CLEAR = ROAD_HALF_WIDTH + WALKWAY_WIDTH + 1;
+
+function roadBucketsOf(map) {
+  const buckets = new Map();
+  if (!map?.graph) return buckets;
+  const nodes = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  for (const edge of map.graph.edges) {
+    const a = nodes.get(edge.a);
+    const b = nodes.get(edge.b);
+    if (!a || !b) continue;
+    walkLane([[a.x, a.z], [b.x, b.z]], LANE_STEP, (x, z) => {
+      const key = `${Math.floor(x / ROAD_BUCKET)},${Math.floor(z / ROAD_BUCKET)}`;
+      let bucket = buckets.get(key);
+      if (!bucket) buckets.set(key, (bucket = []));
+      bucket.push({ x, z, clear: ROAD_CLEAR });
+    });
+  }
+  return buckets;
+}
+
+function nearbyRoadSteps(bounds, buckets) {
+  const steps = [];
+  const x0 = bounds.minX - ROAD_PAD;
+  const x1 = bounds.maxX + ROAD_PAD;
+  const z0 = bounds.minZ - ROAD_PAD;
+  const z1 = bounds.maxZ + ROAD_PAD;
+  for (let tx = Math.floor(x0 / ROAD_BUCKET); tx <= Math.floor(x1 / ROAD_BUCKET); tx++) {
+    for (let tz = Math.floor(z0 / ROAD_BUCKET); tz <= Math.floor(z1 / ROAD_BUCKET); tz++) {
+      const bucket = buckets.get(`${tx},${tz}`);
+      if (!bucket) continue;
+      for (const s of bucket) {
+        if (s.x < x0 || s.x > x1 || s.z < z0 || s.z > z1) continue;
+        steps.push(s);
+      }
+    }
+  }
+  return steps;
+}
+
 // Half-open on the high side: two rects that share an edge must not both place
 // the thing standing on it.
 const inRect = (r, x, z) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1;
@@ -452,7 +499,8 @@ function nearbyLaneSteps(rect, laneSteps) {
 
 function nearLane(near, x, z, radius) {
   for (const s of near) {
-    if (Math.abs(s.x - x) < radius && Math.abs(s.z - z) < radius) return true;
+    const clear = s.clear ?? radius;
+    if (Math.abs(s.x - x) < clear && Math.abs(s.z - z) < clear) return true;
   }
   return false;
 }
@@ -461,14 +509,18 @@ function nearLane(near, x, z, radius) {
 // Emitters. Each takes the claim it fills and returns nothing: a pool that runs
 // out simply stops placing, which is the only failure mode worth having.
 
-function emitLanes(claim, pools, near) {
+function emitLanes(claim, pools, near, roads) {
   for (const s of near) {
     if (!s.own) continue;
+    // A road laid across a lane takes its piece: no dirt track poking through
+    // the asphalt, no pole standing in the carriageway (M3.T27).
+    if (nearLane(roads, s.x, s.z, ROAD_CLEAR)) continue;
     claim.place(pools.track, onGround(s.x, s.z, s.dx, s.dz, LANE_LIFT),
       _tint.setScalar(0.82 + r01(s.i, 7, FIELD_SEED) * 0.36));
     if (s.i % POLE_EVERY !== 0) continue;
     const px = s.x + s.dz * POLE_OFFSET;
     const pz = s.z - s.dx * POLE_OFFSET;
+    if (nearLane(roads, px, pz, ROAD_CLEAR)) continue;
     claim.place(pools.pole, upright(px, pz, r01(s.i, 3, FIELD_SEED) * Math.PI, 1),
       _tint.setScalar(0.85 + r01(s.i, 4, FIELD_SEED) * 0.3));
     const next = s.steps[s.i + POLE_EVERY];
@@ -703,14 +755,27 @@ export function buildOutskirts(map = worldMap()) {
   const ground = buildOutskirtGround(bands);
   const meshes = [ground, ...Object.values(pools).map((p) => p.mesh)];
 
+  // The live graph, cached by version: a tile rebuilt after an op has to see
+  // the road the op laid, and a version that changes nothing re-reads nothing.
+  let roadsVersion = -1;
+  let roadBuckets = new Map();
+  function roadsNow() {
+    if (map.version !== roadsVersion) {
+      roadsVersion = map.version;
+      roadBuckets = roadBucketsOf(map);
+    }
+    return roadBuckets;
+  }
+
   function build(bounds) {
     const rects = eligibleRects(bounds, bands);
     if (!rects.length) return null;
+    const roadSteps = nearbyRoadSteps(bounds, roadsNow());
     const claim = createClaim();
     rects.forEach((rect, i) => {
       const rand = mulberry32(tileSeed(i, bounds.tz, bounds.seed ^ YARD_SEED_SALT));
-      const near = nearbyLaneSteps(rect, laneSteps);
-      emitLanes(claim, pools, near);
+      const near = [...nearbyLaneSteps(rect, laneSteps), ...roadSteps];
+      emitLanes(claim, pools, near, roadSteps);
       emitFields(claim, pools, rect, near);
       emitYards(claim, pools, rect, near, rand);
       emitScrub(claim, pools, rect, near, rand);

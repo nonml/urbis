@@ -161,6 +161,14 @@ function snapshotStreet(street) {
     // the traffic would come back to a different street.
     npcs: copyList(street.npcs ?? []),
     cars: copyList(street.cars ?? []),
+    // Traffic's own clock and stream: the signal phase is pure in time, and
+    // the next trip is drawn from the stream, so both must come back exact.
+    traffic: {
+      time: street.traffic.time,
+      nextId: street.traffic.nextId,
+      want: street.traffic.want,
+      rand: street.traffic.rng.dump(),
+    },
   };
 }
 
@@ -302,6 +310,14 @@ function applyStreet(street, s) {
   street.lastHack = s.lastHack === null ? null : { zone: num(s.lastHack?.zone), at: num(s.lastHack?.at) };
   street.npcs = restoreList(s.npcs, 'npc');
   street.cars = restoreList(s.cars, 'car');
+  // The fleet the sim ticks must be the records the render draws: createStreet
+  // made a fresh fleet, and without this the restored cars would sit frozen
+  // while the fresh ones drove unseen.
+  street.traffic.time = num(s.traffic.time);
+  street.traffic.nextId = num(s.traffic.nextId);
+  street.traffic.want = num(s.traffic.want);
+  street.traffic.rng.load(num(s.traffic.rand));
+  street.traffic.cars = street.cars.filter((c) => !c.parked);
   return street;
 }
 

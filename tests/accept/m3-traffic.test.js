@@ -45,8 +45,6 @@ function firstSpan(pred, secs) {
 }
 
 test('M3-6: a car drives its route along the graph and never jumps', async () => {
-  // M3.T28's red check: sim/traffic.js is M3.T29-T30. Drop this when they land.
-  test.fail(true, 'M3-6 red: sim/traffic.js does not exist; street.js still wraps cars at the tarmac end (street.js:308-313)');
   const { createTraffic, tick } = await api();
   const rows = [];
   for (const seed of SEEDS) {
@@ -86,8 +84,6 @@ test('M3-6: a car drives its route along the graph and never jumps', async () =>
 });
 
 test('M3-6: a car holds at the line while its light is red and crosses on green', async () => {
-  // M3.T28's red check: signals are M3.T31. Drop this when they land.
-  test.fail(true, 'M3-6 red: no signals exist and no car holds a route edge (sim/traffic.js is M3.T29-T31)');
   const { createTraffic, tick, signalGreen, lanePoint } = await api();
   const map = createMap(SEEDS[0]);
   const byId = nodesOf(map);
@@ -124,8 +120,6 @@ test('M3-6: a car holds at the line while its light is red and crosses on green'
 });
 
 test('M3-6: after removeRoad no car is on that road within 10 game seconds', async () => {
-  // M3.T28's red check: cars follow the graph in M3.T30. Drop this when it lands.
-  test.fail(true, 'M3-6 red: cars loop the tarmac (street.js:302-314), so removeRoad cannot empty a road of them');
   const { createTraffic, tick } = await api();
   const rows = [];
   for (const seed of SEEDS) {
@@ -151,8 +145,11 @@ test('M3-6: after removeRoad no car is on that road within 10 game seconds', asy
 });
 
 test('M3-6: after addRoad a car drives it within 60 game seconds', async () => {
-  // M3.T28's red check: trips on the graph are M3.T30. Drop this when it lands.
-  test.fail(true, 'M3-6 red: cars do not follow the map graph, so none can drive a newly laid road');
+  // Measured 2026-10-06: within 60 s a car is routed over the new road
+  // (900/1200 frames, seed 73) but the first arrival is ~120 s; the old pass
+  // was cars crossing the junction geometry, no route held the new edge.
+  // M3.T40 makes nearby cars take trips over a new road and drops this marker.
+  test.fail(true, 'M3-6 red: a new road is routed but not driven within 60 s (first arrival ~120 s, seed 73)');
   const { createTraffic, tick } = await api();
   const rows = [];
   for (const seed of SEEDS) {

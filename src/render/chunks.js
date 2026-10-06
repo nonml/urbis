@@ -244,6 +244,25 @@ export function createChunkManager(options = {}) {
     for (const claim of tile.claims) claim.release();
   }
 
+  // A map edit's dirty tiles (M3.T27). The tile is dropped now, so the slots it
+  // borrowed in the world's pools are back on the free list the instant the op
+  // lands, and queued for rebuild against the map as it now stands — the same
+  // queue, the same 1.5 ms a frame, nearest first. A tile that is only queued
+  // needs nothing: it has not been built from the old map yet. A tile that is
+  // not resident needs nothing either: its next build reads the live map. The
+  // return is how many resident tiles actually had to be reclaimed.
+  function invalidate(keys) {
+    let reclaimed = 0;
+    for (const key of typeof keys === 'string' ? [keys] : keys) {
+      if (queued.has(key) || !tiles.has(key)) continue;
+      dropTile(key);
+      const { tx, tz } = parseTileKey(key);
+      queued.set(key, tileBounds(tx, tz, tileSize, seed));
+      reclaimed++;
+    }
+    return reclaimed;
+  }
+
   // Nearest first. The tile the player is about to drive into is worth more than
   // the one behind the fog, and a queue drained in plan order does not know that.
   function nextQueued(x, z) {
@@ -321,6 +340,7 @@ export function createChunkManager(options = {}) {
     },
     update,
     warm,
+    invalidate,
     // Runtime knob, so the cost of having a budget at all can be measured
     // against not having one on the same running frame loop.
     budget(budgetTiles, budgetMs) {
