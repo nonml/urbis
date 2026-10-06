@@ -1,6 +1,6 @@
-// Traffic: instanced bodies, wheels, head/taillights, one moving pool set.
+// Traffic: fleet bodies from the M2.T3 pipeline model, lights in one pool set.
 // Cars run headlights-on through blackouts — the contrast sells the hack.
-// The hero (player) car reuses the same geometries with its own materials
+// The hero (player) car reuses the same model file with its own materials
 // plus a real headlight spot so wet asphalt answers the beams.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -332,22 +332,103 @@ const poolGeo = mergeGeometries([lensGeo(-POOL_LENS_X), lensGeo(POOL_LENS_X)]);
 const TAIL_DIM = new THREE.Color(0x7a140e);
 const TAIL_BRAKE = new THREE.Color(0xff2a20);
 
-// The shaped bodies carry their own dimensions; only the light quads and the
-// road pools still take a per-shape stretch, so this table survives for them.
-// Index matches SHAPE_COUNT in sim/street.js.
-const CAR_SHAPES = [
-  [1.00, 1.00, 1.00],  // saloon
-  [1.05, 1.24, 1.14],  // van
-  [0.93, 0.95, 0.84],  // compact
-  [1.02, 1.05, 1.21],  // wagon
-  [1.07, 0.87, 1.03],  // coupe
+// Five fleet shapes, all cut from the M2.T3 pipeline body (car.glb, credited
+// in public/assets/CREDITS.md): the saloon tub baked at five scales — van
+// taller and longer, compact shorter, wagon longer, coupe lower — so the
+// street keeps its five silhouettes from one model file. Index matches
+// SHAPE_COUNT in sim/street.js. Bodies carry their baked size (placeShape
+// sets scale 1); the light quads and road pools still take the per-shape
+// stretch, so the table serves them and the model bake alike. Parked and
+// moving cars share these pools: N covers street.cars, parked included.
+export const FLEET_MODEL = 'assets/models/car/car.glb';
+const FLEET_SHAPES = [
+  { s: [1.00, 1.00, 1.00] },  // saloon
+  { s: [1.05, 1.24, 1.14] },  // van
+  { s: [0.93, 0.95, 0.84] },  // compact
+  { s: [1.02, 1.05, 1.21] },  // wagon
+  { s: [1.07, 0.87, 1.03] },  // coupe
 ];
+
+const _n = new THREE.Vector3();
+
+// One model part cleaned to what the fleet merges: indexed or not, every
+// part must carry the same attributes or mergeGeometries returns null.
+function fleetPart(geo) {
+  const g = geo.index ? geo.toNonIndexed() : geo.clone();
+  for (const k of Object.keys(g.attributes)) {
+    if (!['position', 'normal', 'uv'].includes(k)) g.deleteAttribute(k);
+  }
+  return g;
+}
+
+// A baked variant: the pipeline part at one fleet scale, normals fixed for
+// the non-uniform stretch (divide by the scale, renormalise) so the paint
+// keeps the model's own shading instead of going flat or blotchy.
+function fleetVariant(base, s) {
+  const g = base.clone();
+  g.scale(s[0], s[1], s[2]);
+  const n = g.attributes.normal;
+  if (n) {
+    for (let i = 0; i < n.count; i++) {
+      _n.set(n.getX(i) / s[0], n.getY(i) / s[1], n.getZ(i) / s[2]).normalize();
+      n.setXYZ(i, _n.x, _n.y, _n.z);
+    }
+    n.needsUpdate = true;
+  }
+  return g;
+}
+
+// The five variants folded into one geometry, the policekit.js way: every
+// vertex carries aShape, every instance carries iShape, and the patched
+// material folds the other four shapes onto a point. One draw per material
+// for the whole fleet, whatever the body count (law 4).
+function foldFleetVariants(partGeos) {
+  const clean = partGeos.map(fleetPart);
+  const base = mergeGeometries(clean);
+  if (!base) return null;
+  return mergeGeometries(FLEET_SHAPES.map((f, i) => tagShape(fleetVariant(base, f.s), i)));
+}
+
+// Fill the fleet's bodies once the GLB lands; the procedural shells below
+// stand in until then so the street is never empty. Paint, trim and wheels
+// each keep their pool — same meshes, same draws — and the separate glass
+// band retires, its glazing baked into the paint atlas. Parked cars ride the
+// same swap: they are slots in the same pools, not a second fleet.
+function loadFleetModels(rig) {
+  new GLTFLoader().loadAsync(FLEET_MODEL).then(async (gltf) => {
+    gltf.scene.updateMatrixWorld(true);
+    const out = { paintGeos: [], trimGeos: [], wheelGeos: [] };
+    gltf.scene.traverse((o) => { if (o.isMesh) heroSort(o, out); });
+    if (!out.paintGeos.length || (!out.trimGeos.length && !out.wheelGeos.length)) return;
+    const paint = foldFleetVariants(out.paintGeos);
+    const trim = out.trimGeos.length ? foldFleetVariants(out.trimGeos) : null;
+    const wheels = out.wheelGeos.length ? foldFleetVariants(out.wheelGeos) : null;
+    if (!paint || !trim || !wheels) return;
+    for (const g of [paint, trim, wheels]) g.setAttribute('iShape', rig.iShape);
+    rig.bodies.geometry.dispose();
+    rig.bodies.geometry = paint;
+    rig.bodies.material = patchCarShape(out.paintMat, 'car-fleet-body');
+    rig.bodies.userData.model = FLEET_MODEL;
+    rig.trim.geometry.dispose();
+    rig.trim.geometry = trim;
+    rig.trim.material = patchCarShape(out.trimMat, 'car-fleet-trim');
+    rig.trim.userData.model = FLEET_MODEL;
+    rig.wheels.geometry.dispose();
+    rig.wheels.geometry = wheels;
+    rig.wheels.material = patchCarShape(out.wheelMat ?? out.trimMat, 'car-fleet-wheel');
+    rig.wheels.userData.model = FLEET_MODEL;
+    rig.glass.visible = false;
+    rig.credited = (await fetch('assets/CREDITS.md').then((r) => r.text()).catch(() => ''))
+      .includes('models/car/car.glb');
+    rig.modelReady = true;
+  }).catch(() => {});
+}
 
 // Every car is placed from the traffic pose — x, z and yaw, the fields
 // sim/traffic.js writes (M3.T30, M3.T32). The old axis/dir fallback is gone:
 // street.js's static curb plan is resolved to the same pose by curbPose.
 function placeOnCar(dummy, car, yOff) {
-  const [sx, sy, sz] = CAR_SHAPES[car.shape ?? 0];
+  const [sx, sy, sz] = FLEET_SHAPES[car.shape ?? 0].s;
   dummy.position.set(car.x, yOff, car.z);
   dummy.rotation.set(0, car.yaw, 0);
   dummy.scale.set(sx, sy, sz);
@@ -441,10 +522,22 @@ export function buildTraffic(street) {
   iShape.needsUpdate = true;
   group.add(bodies, wheels, beams, tails, glass, trim, pools);
   const rig = {
-    bodies, wheels, beams, tails, glass, trim, pools, glows, dummy,
+    bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, iShape,
+    model: FLEET_MODEL, modelReady: false, credited: false,
     // One blended pose per car, reused every frame (M0-9).
     poses: street.cars.map(() => ({})),
+    inspect() {
+      const fleet = [rig.bodies, rig.trim, rig.wheels].filter((m) => m?.isMesh);
+      return {
+        model: rig.model, credits: rig.credited, ready: rig.modelReady,
+        files: FLEET_SHAPES.length,
+        geoTypes: fleet.map((m) => m.geometry.type),
+        meshes: fleet.length,
+      };
+    },
   };
+  if (typeof window !== 'undefined') window.__fleetRig = rig;
+  loadFleetModels(rig);
   updateCarPools(rig, [0, 0, 0].map(() => ({ x: 0, z: 0, yaw: 0, speed: 0, on: false })));
   updateTraffic(rig, street);
   return { group, rig };
@@ -518,7 +611,7 @@ export function updateCarPools(rig, cars, camera = null) {
 // carries its own glass, so the old canopy and box trim are deleted with it.
 // Beams, tails, glows, beacon and the real headlight spot stay exactly where
 // the saloon tuned them; the model is 4.41 m on the same +Z nose.
-export const HERO_MODEL = 'assets/models/car/car.glb';
+export const HERO_MODEL = FLEET_MODEL;
 
 // Sort one loaded mesh into paint, body trim or wheels. Paint wears the baked
 // atlas (it has a map); trim and wheels share the dark material, told apart
