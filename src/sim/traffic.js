@@ -13,6 +13,14 @@
 // through the ordinary turn, so a car never stops dead and never jumps. Only a
 // boot car is placed where the camera cannot see it (60 m out, off axis); cars
 // are mutated in place, never spliced, because street.js renders these objects.
+//
+// M3.T31 adds signals. Every junction where two ways meet runs one two-phase
+// light: z ways move in the even phase, x ways in the odd, each with
+// SIGNAL_GREEN of green in a SIGNAL_PHASE half-cycle. A car stops at the line
+// while its axis is not green, held by the same arrival curve that paces it
+// behind a leader, so a queue forms behind the line and clears on green.
+// signalGreen is pure in the axis and the clock, so sim and render read the
+// same state and the accept test can ask about any instant.
 // T29's tests place cars by hand, in the shape this module reads and writes.
 import { mulberry32 } from './rng.js';
 import { frontageRoad } from './map.js';
@@ -25,6 +33,70 @@ export const BRAKE = 6;
 export const GAP_MIN = 2.5;
 export const TURN_SECS = 0.6;
 const FOLLOW_GAIN = 1.5;
+
+export const SIGNAL_GREEN = 8;
+export const SIGNAL_PHASE = 10;
+export const SIGNAL_CYCLE = SIGNAL_PHASE * 2;
+// A car holds with its centre this far short of the junction, its nose just
+// inside the stop line; the test reads the held position against it.
+export const STOP_LINE = 4.5;
+// The kerb a head stands on, and how far short of the junction it stands.
+const SIGNAL_POLE_OUT = 4.2;
+const SIGNAL_BACK = 1.2;
+
+// True while `axis` has green at sim time `t`. Two phases share the cycle:
+// phase 0 is the z ways, phase 1 the x ways, and the rest of each half is an
+// all-red clearance before the cross traffic is released.
+export function signalGreen(axis, t) {
+  const cycle = ((t % SIGNAL_CYCLE) + SIGNAL_CYCLE) % SIGNAL_CYCLE;
+  const phase = Math.floor(cycle / SIGNAL_PHASE);
+  return cycle % SIGNAL_PHASE < SIGNAL_GREEN && phase === (axis === 'x' ? 1 : 0);
+}
+
+// One head per approach to every junction of two ways: on the right kerb
+// SIGNAL_BACK short of the junction, facing back at the cars it stops. The sim
+// and the render pool derive from the same node test, so a light cannot exist
+// without a car obeying it.
+export function signalHeads(map) {
+  const junctions = signalNodes(map);
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const heads = [];
+  for (const n of map.graph.nodes) {
+    if (!junctions.has(n.id)) continue;
+    const incident = map.graph.edges.filter((e) => e.a === n.id || e.b === n.id);
+    for (const e of incident) {
+      const dir = e.b === n.id ? 1 : -1;
+      const from = byId.get(dir > 0 ? e.a : e.b);
+      const dx = n.x - from.x;
+      const dz = n.z - from.z;
+      const len = Math.hypot(dx, dz) || 1;
+      const ux = dx / len;
+      const uz = dz / len;
+      const s = Math.max(0, len - SIGNAL_BACK);
+      heads.push({
+        x: from.x + ux * s + uz * SIGNAL_POLE_OUT,
+        z: from.z + uz * s - ux * SIGNAL_POLE_OUT,
+        yaw: Math.atan2(-ux, -uz),
+        axis: e.axis,
+      });
+    }
+  }
+  return heads;
+}
+
+// The nodes a light runs at: every one a z way and an x way both touch.
+function signalNodes(map) {
+  const axes = new Map();
+  for (const e of map.graph.edges) {
+    if (!axes.has(e.a)) axes.set(e.a, new Set());
+    if (!axes.has(e.b)) axes.set(e.b, new Set());
+    axes.get(e.a).add(e.axis);
+    axes.get(e.b).add(e.axis);
+  }
+  const ids = new Set();
+  for (const [id, set] of axes) if (set.size >= 2) ids.add(id);
+  return ids;
+}
 
 // M3-6's appear/go allowance, with margin: the follow cam rides 4.5 m behind the
 // player, so a spot this far past 60 m clears the camera too. VIEW_DOT is cos 53
@@ -75,6 +147,7 @@ function indexes(state) {
   state.edgeById = new Map(state.map.graph.edges.map((e) => [e.id, e]));
   state.links = linksOf(state);
   state.spots = spotsOf(state);
+  state.signals = signalNodes(state.map);
   state.indexVersion = state.map.version;
   return true;
 }
@@ -128,7 +201,7 @@ export function createTraffic(map, seed, count = 0) {
   const state = {
     map, seed, time: 0, cars: [], indexVersion: null,
     want: count, nextId: 1, rng: mulberry32(seed ^ TRIP_SEED), cam: null,
-    links: new Map(), spots: [],
+    links: new Map(), spots: [], signals: new Set(),
   };
   indexes(state);
   for (let i = 0; i < count; i++) state.cars.push(makeCar(state));
@@ -322,8 +395,20 @@ export function tick(state, dt) {
       const clear = Math.max(0, leader.s - c.s - CAR_LEN - GAP_MIN);
       target = Math.min(target, clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear));
     }
+    // The stop line is a stationary leader at the junction. A car already past
+    // it is in the junction and must clear, not stop dead in the crossing; a
+    // car behind it eases onto the line and is held there while its axis is
+    // not green, so it cannot creep into the crossing.
+    const far = c.dir > 0 ? edge.b : edge.a;
+    const line = len - STOP_LINE;
+    const hold = state.signals.has(far) && c.s <= line && !signalGreen(edge.axis, state.time);
+    if (hold) {
+      const clear = line - c.s;
+      target = Math.min(target, clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear));
+    }
     c.v = Math.max(0, Math.max(c.v - BRAKE * dt, Math.min(c.v + ACCEL * dt, target)));
     c.s += c.v * dt;
+    if (hold && c.s > line) { c.s = line; c.v = 0; }
     c.speed = c.v;
     c.axis = edge.axis;
     if (c.s < len) {
