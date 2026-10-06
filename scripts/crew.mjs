@@ -587,7 +587,12 @@ async function runQueue(state, files) {
     } catch (e) {
       log(`queue unreadable, keeping the last good one: ${e.message}`);
     }
-    for (const lane of new Set(queue.tasks.map((t) => t.lane))) {
+    const lanes = new Set(queue.tasks.map((t) => t.lane));
+    // A live worker must be tended even when its lane's queue is held away: its task
+    // is in no visible queue, and without this it would never land (the 2026-10-06
+    // m3b hold wedged T27/T32 exactly so).
+    for (const w of Object.values(state.workers)) if (w.live) lanes.add(w.name);
+    for (const lane of lanes) {
       try {
         for (const news of await stepLane(state, queue, lane)) log(news);
       } catch (e) {
