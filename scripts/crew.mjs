@@ -40,10 +40,15 @@ const { ensureServer, createClient, readServerRegistry, isServerRunning } = awai
 
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
-const TIERS = ['opencode-go/deepseek-v4.1-flash', 'opencode-go/glm-5.3-flash'];
+// CREW_TIERS overrides the ladder, e.g. an A/B of a challenger above the incumbent.
+const TIERS = (process.env.CREW_TIERS
+  ?? 'opencode-go/muse-spark-1.3-contributor,opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
-const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' } : {});
-const STALL_MIN = 10;
+// Muse Spark's thinking levels top out at xhigh.
+const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
+  : model.includes('muse') ? { variant: 'xhigh' } : {});
+// Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
+const STALL_MIN = Number(process.env.CREW_STALL_MIN ?? 10);
 const POLL_MS = 30_000;
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
 // One block per live worker, gate block*100+73, shot +91, score +95. Clear of
@@ -246,9 +251,14 @@ async function abort(w) {
   await fetch(`${url}/session/${w.session}/abort`, { method: 'POST' });
 }
 
+// macOS writes .DS_Store into a worktree whenever Finder looks at it. It is nobody's
+// task change, but `git status` in a lane whose HEAD predates .gitignore's entry lists
+// it, and every judge round flagged it as a stray file (Muse's whole T33/T34 record).
+const OS_NOISE = /(^|\/)\.DS_Store$/;
 function changedPaths(dir) {
   return sh('git', ['status', '--porcelain', '-uall'], dir).split('\n').filter(Boolean)
-    .map((line) => line.slice(3).split(' -> ').at(-1));
+    .map((line) => line.slice(3).split(' -> ').at(-1))
+    .filter((f) => !OS_NOISE.test(f));
 }
 
 const changed = (w) => changedPaths(w.dir).length;
@@ -414,7 +424,7 @@ function subjectOf(t) {
 
 function commitTask(w) {
   const t = w.task;
-  sh('git', ['add', '-A'], w.dir);
+  sh('git', ['add', '-A', '--', '.', ':(exclude,glob)**/.DS_Store'], w.dir);
   const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: task checks green, draws ${w.draws ?? 'not printed'}.`;
   sh('git', ['commit', '-q', '-m', t.commit ?? subjectOf(t), '-m', why], w.dir);
   return sh('git', ['rev-parse', '--short', 'HEAD'], w.dir).trim();
@@ -446,7 +456,7 @@ function setAside(w) {
   const dir = path.join(ROOT, '..', 'urbis-parked');
   fs.mkdirSync(dir, { recursive: true });
   try {
-    sh('git', ['add', '-A'], w.dir);
+    sh('git', ['add', '-A', '--', '.', ':(exclude,glob)**/.DS_Store'], w.dir);
     fs.writeFileSync(path.join(dir, `${w.task.id}.patch`), sh('git', ['diff', '--cached', 'main'], w.dir));
   } catch (e) {
     log(`${w.name}: could not save ${w.task.id}'s patch: ${e.message}`);
