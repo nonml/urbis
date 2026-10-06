@@ -289,6 +289,9 @@ function scrubGeometry() {
 function createPool(name, geometry, material, capacity) {
   const mesh = new THREE.InstancedMesh(geometry, material, capacity);
   mesh.name = `outskirts ${name}`;
+  // Countryside kit for the VGA-084 sweep (M2-6): sheds, fences, hedges and
+  // poles read as models, the way the street trees do.
+  mesh.userData.model = `outskirts-${name}`;
   mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
   // Its instances span the whole world, so its bounds would cover the whole
   // world too: culling can only ever say yes, and computing it is stale the

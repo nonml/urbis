@@ -203,6 +203,8 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
     // The parcel this shell is drawn as, so a pick can name it (M3-3).
     shellGeo.setAttribute('parcel', new THREE.InstancedBufferAttribute(new Float32Array(n), 1));
     const m = new THREE.InstancedMesh(shellGeo, emptyFloorsGoDark(kinds[kind]), n);
+    // A grown lot's shell is a building model for the VGA-084 sweep (M2-6).
+    m.userData.model = 'building-grown-shell';
     // Colour from the first frame, or the program compiles without it.
     m.setColorAt(0, paint.setRGB(1, 1, 1));
     m.castShadow = true;
@@ -216,6 +218,8 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
   const kit = new THREE.InstancedMesh(geo, new THREE.MeshStandardMaterial({
     color: 0xffffff, roughness: 0.82, metalness: 0.12, envMapIntensity: 0.5,
   }), n * KIT_PER_PARCEL);
+  // Hoarding, crane, netting and parapet: the site kit reads as a model too.
+  kit.userData.model = 'building-site-kit';
   kit.castShadow = true;
   kit.receiveShadow = true;
   group.add(kit);

@@ -151,9 +151,13 @@ export function buildLamps(map = worldMap()) {
   ]);
   const poleMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.35, metalness: 0.8 });
   const poles = new THREE.InstancedMesh(poleGeo, poleMat, LAMPS.length);
+  // Procedural street kit until M2.T11 pools the lamp model: the sweep (M2-6)
+  // reads these tags the way it reads the pool loader's file tags.
+  poles.userData.model = 'street-lamp';
   const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.3);
   const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
   const heads = new THREE.InstancedMesh(headGeo, headMat, LAMPS.length);
+  heads.userData.model = 'street-lamp';
   // Shafts fade head-to-ground via a gradient alphaMap: light falloff, not a
   // solid pyramid. Same instanced mesh, +0 draws (VGA-082 partial).
   const shaftTex = (() => {
@@ -221,9 +225,11 @@ export function buildLamps(map = worldMap()) {
   const sigs = new THREE.InstancedMesh(sigGeo, new THREE.MeshStandardMaterial({
     color: 0x14171d, roughness: 0.4, metalness: 0.7,
   }), SIGNALS.length);
+  sigs.userData.model = 'signal-head';
   const lenses = new THREE.InstancedMesh(new THREE.CircleGeometry(0.12, 10), new THREE.MeshBasicMaterial({
     color: 0xffffff, side: THREE.DoubleSide,
   }), SIGNALS.length * 2);
+  lenses.userData.model = 'signal-head';
   SIGNALS.forEach((h, i) => {
     dummy.position.set(h.x, 0, h.z);
     dummy.rotation.set(0, h.yaw, 0);

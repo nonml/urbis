@@ -475,6 +475,7 @@ export function buildTraffic(street) {
   }), 'car-body');
   const bodies = new THREE.InstancedMesh(fleetBodyGeo, paintMat, N);
   bodies.name = 'fleet-car-body';
+  bodies.userData.model = FLEET_MODEL;
   bodies.castShadow = true;
   bodies.customDepthMaterial = patchCarShape(
     new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'car-body-depth'
@@ -485,18 +486,23 @@ export function buildTraffic(street) {
   for (const g of [fleetBodyGeo, fleetGlassGeo, fleetTrimGeo, fleetWheelGeo]) g.setAttribute('iShape', iShape);
   const wheels = new THREE.InstancedMesh(fleetWheelGeo, patchCarShape(wheelMaterial(), 'car-wheel'), N);
   wheels.name = 'fleet-wheels';
+  wheels.userData.model = FLEET_MODEL;
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
   beams.name = 'fleet-beams';
+  beams.userData.model = FLEET_MODEL;
   const tails = new THREE.InstancedMesh(tailGeo, new THREE.MeshBasicMaterial({ color: 0xff2a20 }), N);
   tails.name = 'fleet-tails';
+  tails.userData.model = FLEET_MODEL;
   const glass = new THREE.InstancedMesh(fleetGlassGeo, patchCarShape(new THREE.MeshStandardMaterial({
     color: 0x0b1119, metalness: 0.55, roughness: 0.12, envMapIntensity: 0.22, side: THREE.DoubleSide,
   }), 'car-glass'), N);
   glass.name = 'fleet-glass';
+  glass.userData.model = FLEET_MODEL;
   const trim = new THREE.InstancedMesh(fleetTrimGeo, patchCarShape(new THREE.MeshStandardMaterial({
     color: 0x15171b, roughness: 0.62, metalness: 0.25, envMapIntensity: 1.1,
   }), 'car-trim'), N);
   trim.name = 'fleet-trim';
+  trim.userData.model = FLEET_MODEL;
   const poolMat = new THREE.MeshBasicMaterial({
     map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
     blending: THREE.AdditiveBlending, depthWrite: false,
@@ -671,9 +677,11 @@ export function buildPlayerCar(scene, car) {
   group.name = 'hero-car';
   const beams = new THREE.Mesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xe8f4ff }));
   beams.name = 'hero-beams';
+  beams.userData.model = HERO_MODEL;
   const tailMat = new THREE.MeshBasicMaterial({ color: TAIL_DIM.clone() });
   const tails = new THREE.Mesh(tailGeo, tailMat);
   tails.name = 'hero-tails';
+  tails.userData.model = HERO_MODEL;
   const glows = [];
   for (const sx of [-0.55, 0.55]) {
     const s = new THREE.Sprite(new THREE.SpriteMaterial({

@@ -194,6 +194,8 @@ export function buildDecline(city, maxAniso) {
   const cells = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 2), 2);
   geo.setAttribute('cell', cells);
   const mesh = new THREE.InstancedMesh(geo, panelMaterial(maxAniso), capacity);
+  // Shutter and notice boards on declining lots (M2-6): lot dressing, tagged.
+  mesh.userData.model = 'lot-boards';
   mesh.receiveShadow = true;
   mesh.count = 0;
   const rig = { mesh, cells, count: 0 };

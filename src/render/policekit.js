@@ -339,6 +339,9 @@ export function buildKit() {
     vertexColors: true, roughness: 0.4, metalness: 0.18, envMapIntensity: 1.0,
   }), 'police-kit', true);
   const mesh = new THREE.InstancedMesh(kitGeo(), mat, MAX_KIT);
+  // Barricade, stinger and helicopter fold into one mesh (M2-6): the sweep
+  // reads the kit tag, the way it reads the cruiser pool's model file.
+  mesh.userData.model = 'police-kit';
   mesh.customDepthMaterial = patchKit(
     new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'police-kit-depth', false
   );

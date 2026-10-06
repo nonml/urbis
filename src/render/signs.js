@@ -233,10 +233,15 @@ export function buildSigns(map = worldMap()) {
   });
   const faceGeo = mergeGeometries(faces);
   faceGeo.setAttribute('color', faceAttr);
-  group.add(new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(SIGNS, ATLAS_ROWS), vertexColors: true })));
+  // Street signage is a prop model for the VGA-084 sweep (M2-6).
+  const faceMesh = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(SIGNS, ATLAS_ROWS), vertexColors: true }));
+  faceMesh.userData.model = 'street-sign';
+  group.add(faceMesh);
   const glows = buildGlows(glowPlacements);
   group.add(glows);
-  group.add(new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 })));
+  const armMesh = new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 }));
+  armMesh.userData.model = 'street-sign';
+  group.add(armMesh);
   const alleys = buildAlleyGlows(zoneMats);
   if (alleys.mesh) group.add(alleys.mesh);
   const tick = makeTick(faceAttr, alleys.attr, glows);

@@ -80,6 +80,9 @@ export function buildInstancePools(materials, slots, {
     mesh.castShadow = castShadow;
     mesh.receiveShadow = receiveShadow;
     mesh.userData.kind = kind;
+    // The VGA-084 sweep (M2-6) reads this tag to tell a building model from
+    // a raw box: every shell and kit part carries it, like the pool loader's.
+    mesh.userData.model = `building-${shape}`;
     mesh.count = 0;
     byKind.set(kind, mesh);
     capacity.set(kind, n + slack);
