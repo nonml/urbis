@@ -1,5 +1,6 @@
 // Street props: CC0 GLBs (hydrant, trash can) through the model pool loader
-// (M2.T2), instanced down the sidewalks, plus procedural street trees (2 draws).
+// (M2.T2), instanced down the sidewalks, plus three procedural street-tree
+// models (M2.T10: trunk, one canopy pool per model, branch — five draws).
 // Static decor — positions are authored constants, not sim.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
@@ -20,6 +21,26 @@ const CANOPY_CLUMPS = [
 const CANOPY_LOW = 2.3;      // shaded underside
 const CANOPY_HIGH = 5.3;     // the face the sky actually reaches
 const CANOPY_FLOOR = 0.42;   // how dark the underside goes
+// Three street-tree models (M2.T10): one spreading oak, one columnar lime,
+// one broad plane. Same leaf-card technique in each — the silhouettes differ,
+// so a block reads as planted trees rather than one clone stamped down it.
+const CANOPY_TALL = [
+  [0, 3.10, 0, 0.95], [0.40, 3.50, 0.20, 0.70], [-0.35, 3.40, -0.20, 0.68],
+  [0.15, 4.10, -0.30, 0.62], [-0.15, 4.20, 0.30, 0.60], [0.25, 4.70, 0.10, 0.50],
+  [-0.25, 4.65, -0.10, 0.48], [0.05, 5.20, 0.05, 0.42], [0.50, 3.00, -0.25, 0.45],
+  [-0.50, 3.10, 0.25, 0.48],
+];
+const CANOPY_WIDE = [
+  [0, 2.90, 0, 1.25], [1.00, 3.10, 0.30, 0.80], [-0.95, 3.05, -0.35, 0.84],
+  [0.30, 3.60, -0.80, 0.70], [-0.40, 3.70, 0.75, 0.66], [0.60, 4.10, 0.20, 0.55],
+  [-0.65, 4.05, -0.20, 0.52], [0.05, 4.50, 0.05, 0.45], [1.30, 2.70, -0.55, 0.50],
+  [-1.25, 2.80, 0.55, 0.54],
+];
+const TREE_CANOPIES = [
+  { model: 'tree-canopy-oak', clumps: CANOPY_CLUMPS, seed: 79 },
+  { model: 'tree-canopy-lime', clumps: CANOPY_TALL, seed: 179 },
+  { model: 'tree-canopy-plane', clumps: CANOPY_WIDE, seed: 279 },
+];
 // Summer greens, plus one ochre and one rust: a street of identical green is
 // the other half of the moulded look. Index picked per tree, so a whole block
 // can turn — see the autumn run in buildTrees().
@@ -126,18 +147,12 @@ function leafTexture() {
   return tex;
 }
 
-export function buildTrees() {
-  const group = new THREE.Group();
-  const rand = mulberry32(77);
-  // Tapered trunk with slight bend — reads as wood, not a pipe.
-  const trunkGeo = new THREE.CylinderGeometry(0.06, 0.16, 3.0, 8);
-  trunkGeo.translate(0, 1.5, 0);
-  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2c251c, roughness: 0.95 });
-  // Canopy as leaf cards, not solid volumes: 18 small alpha-cut quads seeded
-  // inside each leaf mass. The cut outline breaks the silhouette and lets sky
-  // through, so it reads as foliage instead of green balls.
-  const cardRng = mulberry32(79);
-  const canopyGeo = mergeGeometries(CANOPY_CLUMPS.flatMap(([x, y, z, r]) => {
+// One canopy model: 18 small alpha-cut quads seeded inside each leaf mass.
+// The cut outline breaks the silhouette and lets sky through, so it reads as
+// foliage instead of green balls. 10 masses x 18 cards = 360 triangles.
+function buildCanopyGeo(clumps, seed) {
+  const cardRng = mulberry32(seed);
+  const geo = mergeGeometries(clumps.flatMap(([x, y, z, r]) => {
     const cards = [];
     for (let i = 0; i < 18; i++) {
       const g = new THREE.PlaneGeometry(1.1 * r, 1.1 * r);
@@ -156,6 +171,27 @@ export function buildTrees() {
     }
     return cards;
   }));
+  // Baked sky occlusion down the canopy. Foliage is dark underneath and bright
+  // where the sky reaches it; without that gradient a green shell is just a
+  // shape, however broken its outline. Costs nothing at runtime.
+  const p = geo.attributes.position;
+  const shade = new Float32Array(p.count * 3);
+  for (let i = 0; i < p.count; i++) {
+    const t = (p.getY(i) - CANOPY_LOW) / (CANOPY_HIGH - CANOPY_LOW);
+    const v = CANOPY_FLOOR + (1 - CANOPY_FLOOR) * Math.max(0, Math.min(1, t)) ** 0.8;
+    shade[i * 3] = shade[i * 3 + 1] = shade[i * 3 + 2] = v;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(shade, 3));
+  return geo;
+}
+
+export function buildTrees() {
+  const group = new THREE.Group();
+  const rand = mulberry32(77);
+  // Tapered trunk with slight bend — reads as wood, not a pipe.
+  const trunkGeo = new THREE.CylinderGeometry(0.06, 0.16, 3.0, 8);
+  trunkGeo.translate(0, 1.5, 0);
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x2c251c, roughness: 0.95 });
   // Branch stubs: 2–3 short limbs poking from the trunk into the canopy.
   const branchGeo = mergeGeometries([
     (() => { const g = new THREE.CylinderGeometry(0.03, 0.06, 1.0, 5); g.rotateZ(0.6); g.translate(0.35, 2.6, 0); return g; })(),
@@ -184,33 +220,31 @@ export function buildTrees() {
       geo.computeVertexNormals();
     }
   }
-  // Baked sky occlusion down the canopy. Foliage is dark underneath and bright
-  // where the sky reaches it; without that gradient a green shell is just a
-  // shape, however broken its outline. Costs nothing at runtime.
-  {
-    const p = canopyGeo.attributes.position;
-    const shade = new Float32Array(p.count * 3);
-    for (let i = 0; i < p.count; i++) {
-      const t = (p.getY(i) - CANOPY_LOW) / (CANOPY_HIGH - CANOPY_LOW);
-      const v = CANOPY_FLOOR + (1 - CANOPY_FLOOR) * Math.max(0, Math.min(1, t)) ** 0.8;
-      shade[i * 3] = shade[i * 3 + 1] = shade[i * 3 + 2] = v;
-    }
-    canopyGeo.setAttribute('color', new THREE.BufferAttribute(shade, 3));
-  }
   const canopyMat = new THREE.MeshStandardMaterial({
     roughness: 1.0, envMapIntensity: 0.55, vertexColors: true,
     map: leafTexture(), alphaTest: 0.5, side: THREE.DoubleSide,
   });
   const branchMat = new THREE.MeshStandardMaterial({ color: 0x1a1410, roughness: 0.95 });
   const spots = treeSpots();
+  // Dealt round-robin, so no street is all one model.
+  const dealt = spots.map((_, i) => i % TREE_CANOPIES.length);
+  const counts = TREE_CANOPIES.map((_, v) => dealt.filter((d) => d === v).length);
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
-  const canopies = new THREE.InstancedMesh(canopyGeo, canopyMat, spots.length);
+  trunks.userData.model = 'tree-trunk';
   const branches = new THREE.InstancedMesh(branchGeo, branchMat, spots.length);
+  branches.userData.model = 'tree-branch';
+  const canopyMeshes = TREE_CANOPIES.map(({ model, clumps, seed }, v) => {
+    const m = new THREE.InstancedMesh(buildCanopyGeo(clumps, seed), canopyMat, counts[v]);
+    m.userData.model = model;
+    m.name = model;
+    m.castShadow = true;
+    return m;
+  });
   trunks.castShadow = true;
-  canopies.castShadow = true;
   branches.castShadow = true;
   const dummy = new THREE.Object3D();
   const leaf = new THREE.Color();
+  const placed = TREE_CANOPIES.map(() => 0);
   spots.forEach(([x, z], i) => {
     const s = 0.8 + rand() * 0.5;
     dummy.position.set(x, 0, z);
@@ -219,16 +253,20 @@ export function buildTrees() {
     dummy.scale.set(s * (0.88 + rand() * 0.26), s, s * (0.88 + rand() * 0.26));
     dummy.updateMatrix();
     trunks.setMatrixAt(i, dummy.matrix);
-    canopies.setMatrixAt(i, dummy.matrix);
     branches.setMatrixAt(i, dummy.matrix);
+    const v = dealt[i];
+    canopyMeshes[v].setMatrixAt(placed[v], dummy.matrix);
     // The east avenue has turned; every other street is still in leaf.
     const palette = x > 30 && x < 55 ? LEAF_AUTUMN : LEAF_GREENS;
-    canopies.setColorAt(i, leaf.setHex(palette[Math.floor(rand() * palette.length)]));
+    canopyMeshes[v].setColorAt(placed[v], leaf.setHex(palette[Math.floor(rand() * palette.length)]));
+    placed[v]++;
   });
-  canopies.instanceColor.needsUpdate = true;
+  for (const m of canopyMeshes) {
+    m.instanceColor.needsUpdate = true;
+    m.instanceMatrix.needsUpdate = true;
+  }
   trunks.instanceMatrix.needsUpdate = true;
-  canopies.instanceMatrix.needsUpdate = true;
   branches.instanceMatrix.needsUpdate = true;
-  group.add(trunks, canopies, branches);
+  group.add(trunks, ...canopyMeshes, branches);
   return group;
 }

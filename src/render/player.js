@@ -2,7 +2,26 @@
 // Matches NPC fidelity — same silhouette language, hero-specific details.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mulberry32 } from '../sim/rng.js';
+
+// M2.T4: the MPFB/CMU person (tools/models/make_person.py) as one SkinnedMesh
+// with its walk clip on an animation mixer.
+export const PERSON_MODEL = 'assets/models/person.glb';
+
+export function loadPersonAvatar(avatar) {
+  new GLTFLoader().loadAsync(PERSON_MODEL).then((gltf) => {
+    const skinned = gltf.scene.getObjectByProperty('isSkinnedMesh', true);
+    const clip = (gltf.animations ?? []).find((c) => /walk/i.test(c.name));
+    if (!skinned || !clip) return;
+    avatar.mixer = new THREE.AnimationMixer(skinned);
+    avatar.mixer.clipAction(clip).play();
+    for (const m of [...avatar.group.children]) avatar.group.remove(m);
+    skinned.castShadow = true;
+    skinned.userData.model = PERSON_MODEL;
+    avatar.group.add(skinned);
+  }).catch(() => {});
+}
 
 function heroFaceTexture() {
   const c = document.createElement('canvas');
@@ -223,7 +242,9 @@ export function buildPlayer() {
     })
   );
   group.add(coat, head, legL, legR, armL, armR, backpack);
-  return { group, legL, legR, armL, armR };
+  const avatar = { group, legL, legR, armL, armR };
+  loadPersonAvatar(avatar);
+  return avatar;
 }
 
 export function updatePlayer(avatar, player) {
@@ -235,4 +256,10 @@ export function updatePlayer(avatar, player) {
   avatar.armL.rotation.x = -swing * 0.7;
   avatar.armR.rotation.x = swing * 0.7;
   avatar.group.position.y = player.y + Math.abs(Math.sin(player.walkPhase)) * 0.03 * Math.min(1, player.speed / 3);
+  // The clip loops one gait cycle a second; the phase delta drives it, so the
+  // rig's limbs track the sim with no clock of their own.
+  if (avatar.mixer) {
+    avatar.mixer.update((player.walkPhase - (avatar.lastPhase ?? 0)) / (Math.PI * 2));
+    avatar.lastPhase = player.walkPhase;
+  }
 }

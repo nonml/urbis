@@ -23,6 +23,7 @@
 // same state and the accept test can ask about any instant.
 // T29's tests place cars by hand, in the shape this module reads and writes.
 import { mulberry32 } from './rng.js';
+import { DAY_SECS, START_HOUR } from './clock.js';
 import { frontageRoad } from './map.js';
 
 export const CAR_LEN = 4.5;
@@ -37,6 +38,16 @@ const TURN_MIN = 0.5;
 const FOLLOW_GAIN = 1.5;
 
 export const SIGNAL_GREEN = 8;
+// M3.T35: the commute flow lays every resident's trip on edges for the hour;
+// cars ending trips head where commuters go; economy reads flowByDistrict.
+export const GAME_HOUR_SECS = DAY_SECS / 24;
+export const RUSH_AM = [7, 9.5];
+export const RUSH_PM = [17, 19.5];
+const OFFPEAK_SHARE = 0.15;
+const MATCH_PER_TICK = 60;
+const ROUTES_PER_TICK = 8;
+const FLOW_PREF = 0.4;
+const FLOW_TRIES = 8;
 export const SIGNAL_PHASE = 10;
 export const SIGNAL_CYCLE = SIGNAL_PHASE * 2;
 // A car holds with its centre this far short of the junction, its nose just
@@ -109,6 +120,7 @@ const CAM_MARGIN = 10;
 const VIEW_DOT = 0.6;
 const TRIP_TRIES = 40;
 const TRIP_SEED = 0x51ed2701;
+const FLOW_SEED = 0x51ed3501;
 
 // The lane a car drives: `dir` is the sign of travel along the edge's own a->b
 // order, and the lane sits LANE_OFF to the right of that travel. Right of
@@ -199,11 +211,192 @@ function nearestNode(state, x, z) {
   return best;
 }
 
+// --- The commute flow (M3.T35): every resident's trip on edges by hour ---
+export function hourOf(t) {
+  return (START_HOUR + t / GAME_HOUR_SECS) % 24;
+}
+
+function flowDir(hour) {
+  if (hour >= RUSH_AM[0] && hour < RUSH_AM[1]) return 'am';
+  if (hour >= RUSH_PM[0] && hour < RUSH_PM[1]) return 'pm';
+  return null;
+}
+
+function flowShare(hour) {
+  return flowDir(hour) ? 1 : OFFPEAK_SHARE;
+}
+
+// Economy's density (25 m2 floor, 3.5 m storey), copied to avoid a sim cycle.
+const PER_PERSON = 25 * 3.5;
+function floorOf(p) {
+  return Math.round(((p.heights?.[p.stage] ?? 0) * p.w * p.d) / PER_PERSON * (1 - (p.vacancy ?? 0)));
+}
+
+function residentsOf(p) {
+  return p.use === 'res' ? floorOf(p) : 0;
+}
+
+function workersOf(p) {
+  return p.use === 'com' || p.use === 'ind' ? floorOf(p) : 0;
+}
+
+function routeLen(state, route) {
+  let len = 0;
+  for (const id of route) {
+    const e = state.edgeById.get(id);
+    if (e) len += lengthOf(state.byId, e);
+  }
+  return len;
+}
+
+// Match runs a slice a tick so 2,000 parcels never pay at once (M3-9).
+function beginFlow(state, parcels) {
+  const jobs = [];
+  const queue = [];
+  parcels.forEach((p, i) => {
+    if (workersOf(p) > 0) jobs.push({ i, free: workersOf(p) });
+    else if (residentsOf(p) > 0) queue.push(i);
+  });
+  return {
+    version: state.map.version, count: parcels.length, jobs, queue, cursor: 0,
+    match: new Map(), pairs: [], pending: [], load: new Map(),
+    dest: [], destTotal: 0, by: {}, bucket: -1, stage: 'match',
+  };
+}
+
+// Each home takes the nearest job parcel with room, like people.js matchJobs.
+function matchSlice(f, parcels) {
+  const end = Math.min(f.queue.length, f.cursor + MATCH_PER_TICK);
+  for (; f.cursor < end; f.cursor++) {
+    const i = f.queue[f.cursor];
+    const home = parcels[i];
+    const r = residentsOf(home);
+    if (r <= 0) continue;
+    let at = -1;
+    let bestD = Infinity;
+    for (let j = 0; j < f.jobs.length; j++) {
+      const jb = f.jobs[j];
+      if (jb.free <= 0) continue;
+      const q = parcels[jb.i];
+      const d = Math.hypot(q.x - home.x, q.z - home.z);
+      if (d < bestD) { bestD = d; at = j; }
+    }
+    if (at < 0) continue;
+    const take = Math.min(r, f.jobs[at].free);
+    f.jobs[at].free -= take;
+    f.match.set(home.id ?? i, { i, j: f.jobs[at].i, take });
+  }
+}
+
+// Matched pairs become node pairs; routes solve a few a tick. Same node is a
+// walk (no edges); null route is a cut graph, late in the economy.
+function queueRoutes(state, f) {
+  const seen = new Set();
+  for (const m of f.match.values()) {
+    const a = state.spots[m.i]?.node;
+    const b = state.spots[m.j]?.node;
+    if (!a || !b) continue;
+    const pair = { m, a, b, route: undefined };
+    f.pairs.push(pair);
+    if (a === b) { pair.route = []; continue; }
+    const key = `${a}>${b}`;
+    if (!seen.has(key)) { seen.add(key); f.pending.push(pair); }
+    else pair.route = 'dup';
+  }
+}
+
+function routeSlice(state, f) {
+  for (let n = 0; n < ROUTES_PER_TICK && f.pending.length > 0; n++) {
+    const p = f.pending.pop();
+    p.route = findRoute(state, p.a, p.b);
+    for (const q of f.pairs) if (q.route === 'dup' && q.a === p.a && q.b === p.b) q.route = p.route;
+  }
+}
+
+// Lay trips on edges for the hour (reversed homeward in the evening) and
+// publish the per-district summary the economy reads.
+function reweight(state, f, parcels) {
+  const hour = hourOf(state.time);
+  const dir = flowDir(hour) ?? (hour < 12 ? 'am' : 'pm');
+  const share = flowShare(hour);
+  const load = new Map();
+  const attract = new Map();
+  const by = {};
+  for (const p of f.pairs) {
+    if (p.route === 'dup') continue;
+    const home = parcels[p.m.i];
+    const job = parcels[p.m.j];
+    if (!home || home.use !== 'res' || !job || (job.use !== 'com' && job.use !== 'ind')) continue;
+    const r = Math.min(residentsOf(home), p.m.take);
+    if (r <= 0) continue;
+    const zone = home.powerZone ?? 0;
+    const d = by[zone] ??= { residents: 0, late: 0, len: 0 };
+    d.residents += r;
+    if (!p.route) { d.late += r; continue; }
+    if (p.route.length === 0) continue;
+    d.len += r * routeLen(state, p.route);
+    const edges = dir === 'am' ? p.route : [...p.route].reverse();
+    for (const id of edges) load.set(id, (load.get(id) ?? 0) + r * share);
+    const node = dir === 'am' ? p.b : p.a;
+    attract.set(node, (attract.get(node) ?? 0) + r * share);
+  }
+  f.load = load;
+  f.dest = [];
+  f.destTotal = 0;
+  for (const [node, w] of attract) {
+    if (w <= 0) continue;
+    f.dest.push({ node, cum: (f.destTotal += w) });
+  }
+  f.by = by;
+  f.bucket = Math.floor(hour);
+  const out = {};
+  for (const [zone, d] of Object.entries(by)) {
+    out[zone] = {
+      residents: d.residents,
+      late: d.residents > 0 ? d.late / d.residents : 0,
+      mins: d.residents > 0 ? d.len / d.residents / VMAX / 60 : 0,
+    };
+  }
+  state.flowByDistrict = out;
+}
+
+// A few pairs a tick toward a ready flow. The match rebuilds on a version or
+// parcel change, and again on the hour: lots grow under it, and an hourly
+// re-match picks the growth up within half a minute and keeps a restored save
+// converging with the run it left (both rebuild at the same hour boundary).
+function tickFlow(state) {
+  const parcels = state.map.parcels ?? [];
+  let f = state.flow;
+  if (!f || f.version !== state.map.version || f.count !== parcels.length) {
+    f = state.flow = beginFlow(state, parcels);
+  }
+  if (f.stage === 'match') {
+    matchSlice(f, parcels);
+    if (f.cursor >= f.queue.length) { queueRoutes(state, f); f.stage = 'routes'; }
+    return;
+  }
+  if (f.stage === 'routes') {
+    routeSlice(state, f);
+    if (f.pending.length === 0) { f.stage = 'ready'; reweight(state, f, parcels); }
+    return;
+  }
+  if (Math.floor(hourOf(state.time)) !== f.bucket) {
+    f = state.flow = beginFlow(state, parcels);
+  }
+}
+
+// This hour's travellers on one edge, for the traffic overlay (M5.T21).
+export function edgeLoad(state, edgeId) {
+  return state.flow?.load.get(edgeId) ?? 0;
+}
+
 export function createTraffic(map, seed, count = 0) {
   const state = {
     map, seed, time: 0, cars: [], indexVersion: null,
     want: count, nextId: 1, rng: mulberry32(seed ^ TRIP_SEED), cam: null,
+    flowRng: mulberry32(seed ^ FLOW_SEED),
     links: new Map(), spots: [], signals: new Set(),
+    flow: null, flowByDistrict: {},
   };
   indexes(state);
   for (let i = 0; i < count; i++) state.cars.push(makeCar(state));
@@ -272,10 +465,46 @@ function freeStart(state, c, edge, dir) {
   return null;
 }
 
+// The next trip, chained through the usual turn; false when blocked.
+function chainRoute(state, c, route, dest) {
+  const edge = state.edgeById.get(route[0]);
+  if (!edge) return false;
+  const dir = edge.a === c.goal ? 1 : -1;
+  if (!clearAt(state, c, edge.id, dir, 0)) return false;
+  c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, dir, 0), t: 0 };
+  c.id = state.nextId;
+  state.nextId += 1;
+  c.route = route; c.leg = 0; c.dir = dir; c.s = 0;
+  c.goal = dest; c.axis = edge.axis;
+  return true;
+}
+
+// A trip where the commuters go: arrival-weighted, so cars sample the flow.
+// Draws on its own stream so sampling never shifts the trip stream (M3-6).
+function flowTrip(state, c) {
+  const f = state.flow;
+  if (!f || f.stage !== 'ready' || f.destTotal <= 0) return false;
+  for (let tries = 0; tries < FLOW_TRIES; tries++) {
+    const r = state.flowRng() * f.destTotal;
+    let node = null;
+    for (const d of f.dest) if (r < d.cum) { node = d.node; break; }
+    node ??= f.dest.length > 0 ? f.dest[f.dest.length - 1].node : null;
+    if (!node || node === c.goal) continue;
+    const route = findRoute(state, c.goal, node);
+    if (!route) continue;
+    if (chainRoute(state, c, route, node)) return true;
+  }
+  return false;
+}
+
 // The next trip for a car standing at its destination: a new far parcel, driven
 // from here. The car turns out of its arrival lane into the new one over the
-// usual 0.6 s, so it never stops dead at the node and never jumps.
+// usual 0.6 s, so it never stops dead at the node and never jumps. Two trips
+// in five head where the commuters go instead (M3.T35). The random pick runs
+// first on the trip stream exactly as before, so sampling the flow never
+// shifts the random trips (M3-6); the flow choice draws on its own stream.
 function rollTrip(state, c) {
+  let fallback = null;
   for (let tries = 0; tries < TRIP_TRIES; tries++) {
     const to = pick(state.rng, state.spots);
     if (!to || to.node === c.goal) continue;
@@ -284,14 +513,12 @@ function rollTrip(state, c) {
     const edge = state.edgeById.get(route[0]);
     const dir = edge.a === c.goal ? 1 : -1;
     if (!clearAt(state, c, edge.id, dir, 0)) continue;
-    c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, dir, 0), t: 0 };
-    c.id = state.nextId;
-    state.nextId += 1;
-    c.route = route; c.leg = 0; c.dir = dir; c.s = 0;
-    c.goal = to.node; c.axis = edge.axis;
-    return true;
+    fallback = { route, node: to.node };
+    break;
   }
-  return false;
+  if (state.flowRng() < FLOW_PREF && flowTrip(state, c)) return true;
+  if (!fallback) return false;
+  return chainRoute(state, c, fallback.route, fallback.node);
 }
 
 function pick(rng, arr) {
@@ -363,6 +590,7 @@ function revalidate(state) {
 export function tick(state, dt) {
   state.time += dt;
   if (indexes(state)) revalidate(state);
+  tickFlow(state);
   const lanes = new Map();
   for (const c of state.cars) {
     if (c.turn || c.route.length === 0) continue;

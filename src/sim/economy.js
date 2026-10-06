@@ -92,6 +92,16 @@ const WEALTH_RISE_SECS = 25;
 const WEALTH_FALL_SECS = 15;
 const DARK_DRAIN_SECS = 60;
 
+// The commute a district's residents drive (M3.T35): traffic lays every
+// resident's trip on the graph's edges for the hour and publishes the
+// per-district summary on street.traffic.flowByDistrict — the residents, the
+// share with no route, and their mean drive in minutes. A blackout jams what
+// is left: with the signals out, DARK_LATE of the district's commuters run
+// late on top of the ones no road reaches. Late workers earn nothing while
+// they are late, and lost trade is what their shops never see. Both default
+// to nothing, so a routed, lit district reads exactly what it did before.
+export const DARK_LATE = 0.5;
+
 // A firm that sat through a power cut gives up on the district (milestone 4: a
 // poke sets off a chain the player can watch, sized to the act). FLIGHT_SECS
 // after the power comes back, jobs worth FLIGHT_PER_DARK_SEC of the district for
@@ -237,13 +247,13 @@ function measureFloors(economy, parcels, heightOf) {
 // sell, plus works wanting floor. A measured district's jobs are every
 // non-residential floor it has (M3.T16); the hand preset shipped with its
 // balanced base standing in for them through base.res.
-function price(d) {
+function price(d, lost = 0) {
   for (const use of USES) d.have[use] = d.base[use] + d.floor[use];
   d.homes = d.have.res;
   d.jobs = d.calm ? d.have.com + d.have.ind : d.base.res + d.floor.com + d.floor.ind;
   const commerce = d.calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND;
   d.need.res = d.jobs;
-  d.need.com = d.homes * d.wealth * commerce + d.firms.com;
+  d.need.com = d.homes * d.wealth * commerce * (1 - lost) + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
   const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
   for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
@@ -352,9 +362,9 @@ function scare(economy, d, dt) {
   d.chase = 0;
 }
 
-function earn(d, dt) {
+function earn(d, dt, late = 0) {
   const employment = Math.min(d.jobs, d.homes) / d.homes;
-  const target = d.dark ? 0 : employment;
+  const target = d.dark ? 0 : employment * (1 - late);
   const secs = d.dark ? DARK_DRAIN_SECS : target > d.wealth ? WEALTH_RISE_SECS : WEALTH_FALL_SECS;
   d.wealth += (target - d.wealth) * Math.min(1, dt / secs);
 }
@@ -392,6 +402,26 @@ function creditRezone(d, time) {
   }
 }
 
+// What the commute costs each district right now (M3.T35): the share of its
+// residents running late, and the trade their shops lose with them. Read off
+// the flow every tick; zeros until traffic publishes its first hour. It lives
+// beside the districts, never on them, so a save that holds the districts
+// holds the commute's causes and not its values.
+const COMMUTE = new WeakMap();
+const NO_COMMUTE = { late: 0, lost: 0 };
+
+function readCommute(economy, d, street) {
+  const flow = street?.traffic?.flowByDistrict?.[d.id];
+  const late = Math.min(1, (flow?.late ?? 0) + (d.dark ? DARK_LATE : 0));
+  let by = COMMUTE.get(economy);
+  if (!by) COMMUTE.set(economy, (by = {}));
+  return (by[d.id] = { late, lost: late });
+}
+
+function commuteOf(economy, id) {
+  return COMMUTE.get(economy)?.[id] ?? NO_COMMUTE;
+}
+
 // `heightOf(parcel)` is how tall it stands now (zoning's builtHeight), passed in
 // so the economy never imports zoning and the two stay one-way.
 export function tickEconomy(economy, parcels, heightOf, street, dt) {
@@ -399,10 +429,11 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {
     d.dark = isDark(street, d.id);
+    const commute = readCommute(economy, d, street);
     flee(economy, d, dt);
     if (economy.time >= d.nextMove) moveFirm(economy, d);
-    price(d);
-    earn(d, dt);
+    price(d, commute.lost);
+    earn(d, dt, commute.late);
     react(d, dt);
     creditRezone(d, economy.time);
   }
@@ -431,6 +462,7 @@ export function districtReport(city) {
     wealth: +d.wealth.toFixed(3),
     firms: { com: Math.round(d.firms.com), ind: Math.round(d.firms.ind) },
     demand: { ...d.demand },
+    commute: { ...commuteOf(economy, d.id) },
     lots: { ...d.lots },
     trend: { ...d.trend },
     need: perUse((use) => Math.round(d.need[use])),

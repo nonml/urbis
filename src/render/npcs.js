@@ -185,7 +185,9 @@ export function updateNPCs(rig, street) {
       for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) m.setMatrixAt(i, dummy.matrix);
       return;
     }
-    const yaw = p.axis === 'x' ? (p.dir > 0 ? Math.PI / 2 : -Math.PI / 2) : (p.dir > 0 ? 0 : Math.PI);
+    // The sim owns facing: position and yaw come off the walker's route
+    // (M3.T34), blended between the last two sim steps above (M0-9).
+    const yaw = typeof p.yaw === 'number' ? p.yaw : 0;
     const moving = !isDark(street, zoneAt(p.z));
     const bob = moving ? Math.abs(Math.sin(p.phase)) * 0.05 : 0;
     const swing = moving ? Math.sin(p.phase) * 0.5 : 0;

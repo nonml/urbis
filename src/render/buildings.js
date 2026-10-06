@@ -139,3 +139,99 @@ export function buildInstancePools(materials, slots, {
 export function buildShellPools(materials, shells, slack = SHELL_SLACK) {
   return buildInstancePools(materials, shells, { slack });
 }
+
+// The building kit (M2.T13): what the merged street wall never built — window
+// reveals at least 0.15 m deep on every facade, window frames, shopfronts and
+// roof plant — as pooled parts on every building parcel. Three pools (frames,
+// shopfronts, plant), one draw each however many buildings stand, keyed to
+// their parcel like the shells so a bulldoze frees them with the shaft.
+export const REVEAL_DEPTH = 0.18;
+export const FACADE_COUNT = 6;
+export const KIT_DRAW_BUDGET = 12;
+const KIT_SLACK = 64;
+const FRAME_W = 1.6;
+const FRAME_H = 1.8;
+const SHOP_H = 2.6;
+
+// One reveal frame per face per level: the box's wall-normal span is the
+// reveal depth, so the glass sits REVEAL_DEPTH inside the brick. Faces are
+// 0:+X, 1:-X, 2:+Z, 3:-Z; `reveal` is what the check reads, not the renderer.
+function frameSlotsFor(b, districtId) {
+  const out = [];
+  const levels = b.h > 20 ? 2 : 1;
+  for (let face = 0; face < 4; face += 1) {
+    const alongX = face < 2;
+    for (let l = 0; l < levels; l += 1) {
+      const y = Math.min(6 + l * Math.max(6, b.h - 12), b.h - 2);
+      out.push({
+        x: alongX ? b.x + (face === 0 ? b.w / 2 : -b.w / 2) : b.x,
+        y, z: alongX ? b.z : b.z + (face === 2 ? b.d / 2 : -b.d / 2),
+        w: alongX ? REVEAL_DEPTH : FRAME_W,
+        h: FRAME_H, d: alongX ? FRAME_W : REVEAL_DEPTH,
+        kind: 0, zone: b.z < 0 ? 0 : 1, parcel: b.id, district: districtId,
+        face, reveal: REVEAL_DEPTH,
+      });
+    }
+  }
+  return out;
+}
+
+// One shopfront per parcel, on the building's own front face.
+function shopSlotFor(b, districtId) {
+  const [fx, fz] = Array.isArray(b.face) ? b.face : [-1, 0];
+  const alongX = fx !== 0;
+  const span = Math.min(6, (alongX ? b.d : b.w) - 1);
+  return {
+    x: b.x + (alongX ? fx * (b.w / 2 + 0.06) : 0),
+    y: 0.5 + SHOP_H / 2, z: b.z + (alongX ? 0 : fz * (b.d / 2 + 0.06)),
+    w: alongX ? 0.12 : Math.max(1.2, span), h: SHOP_H,
+    d: alongX ? Math.max(1.2, span) : 0.12,
+    kind: 0, zone: b.z < 0 ? 0 : 1, parcel: b.id, district: districtId,
+  };
+}
+
+// Two roof boxes per parcel: the lift overrun and a plant condenser.
+function plantSlotsFor(b, districtId) {
+  const zone = b.z < 0 ? 0 : 1;
+  const tag = { kind: 0, zone, parcel: b.id, district: districtId };
+  return [
+    { x: b.x - b.w * 0.15, y: b.h + 0.7, z: b.z, w: 2.2, h: 1.4, d: 1.8, ...tag },
+    { x: b.x + b.w * 0.22, y: b.h + 0.45, z: b.z + b.d * 0.18, w: 1.2, h: 0.9, d: 1, ...tag },
+  ];
+}
+
+// Every kit slot of a building list, by pool. Pure, so the check counts parts
+// without a texture loader.
+export function buildingKitSlots(buildings, districtId = null) {
+  const frames = [];
+  const shops = [];
+  const plants = [];
+  for (const b of buildings) {
+    frames.push(...frameSlotsFor(b, districtId));
+    shops.push(shopSlotFor(b, districtId));
+    plants.push(...plantSlotsFor(b, districtId));
+  }
+  return { frames, shops, plants };
+}
+
+// The three kit pools for a building list. `materials` is one array per pool;
+// every slot is kind 0, so one draw per pool whatever the map does.
+export function buildBuildingKit(materials, buildings, districtId = null) {
+  const slots = buildingKitSlots(buildings, districtId);
+  const group = new THREE.Group();
+  const frame = buildInstancePools(materials.frame, slots.frames, { shape: 'box', slack: KIT_SLACK });
+  const shop = buildInstancePools(materials.shop, slots.shops, { shape: 'box', slack: KIT_SLACK });
+  const plant = buildInstancePools(materials.plant, slots.plants, { shape: 'box', slack: KIT_SLACK });
+  for (const pool of [frame, shop, plant]) group.add(pool.group);
+  function update(next = buildings, nextDistrict = districtId) {
+    const s = buildingKitSlots(next, nextDistrict);
+    frame.update(s.frames);
+    shop.update(s.shops);
+    plant.update(s.plants);
+    return s;
+  }
+  return {
+    group, pools: { frame, shop, plant }, slots, update,
+    draws: () => frame.draws() + shop.draws() + plant.draws(),
+  };
+}

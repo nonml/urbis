@@ -151,6 +151,18 @@ function compactOps(map, ops) {
 // data; this keeps any future render-only object from leaking into it.
 const copyList = (list) => list.map((q) => JSON.parse(JSON.stringify(q)));
 
+// The commute-flow build carries two Maps (match, load); a save is plain JSON,
+// so they travel as entry lists and come back as Maps.
+function flowSnapshot(f) {
+  if (!f) return null;
+  return { ...f, match: [...f.match], load: [...f.load] };
+}
+
+function flowRestore(s) {
+  if (!isPlain(s)) return null;
+  return { ...s, match: new Map(s.match ?? []), load: new Map(s.load ?? []) };
+}
+
 function snapshotStreet(street) {
   return {
     time: street.time,
@@ -168,6 +180,19 @@ function snapshotStreet(street) {
       nextId: street.traffic.nextId,
       want: street.traffic.want,
       rand: street.traffic.rng.dump(),
+      // The commute flow is a build sliced across ticks (M3.T35): restoring the
+      // finished value but not the half-built process makes the loaded economy
+      // read a cold flow for its first minutes and drift from the run it left.
+      flow: flowSnapshot(street.traffic.flow),
+      flowByDistrict: { ...street.traffic.flowByDistrict },
+      flowRand: street.traffic.flowRng.dump(),
+    },
+    // The walker system's own clock and stream (M3.T33): its trips after a load
+    // are drawn from this stream, so without it the loaded city walks a
+    // different street than the one it saved.
+    walkers: {
+      time: street.walkers.time,
+      rng: street.walkers.rng.dump(),
     },
   };
 }
@@ -310,6 +335,15 @@ function applyStreet(street, s) {
   street.lastHack = s.lastHack === null ? null : { zone: num(s.lastHack?.zone), at: num(s.lastHack?.at) };
   street.npcs = restoreList(s.npcs, 'npc');
   street.cars = restoreList(s.cars, 'car');
+  // tickStreet ticks street.walkers and the render draws street.npcs; in a live
+  // game they are the same records (M3.T33). Point the system at the restored
+  // records and bring back its clock and stream, or the loaded city ticks fresh
+  // walkers nobody draws while the saved ones stand still.
+  street.walkers.walkers = street.npcs;
+  if (isPlain(s.walkers)) {
+    street.walkers.time = num(s.walkers.time);
+    street.walkers.rng.load(num(s.walkers.rng));
+  }
   // The fleet the sim ticks must be the records the render draws: createStreet
   // made a fresh fleet, and without this the restored cars would sit frozen
   // while the fresh ones drove unseen.
@@ -317,6 +351,11 @@ function applyStreet(street, s) {
   street.traffic.nextId = num(s.traffic.nextId);
   street.traffic.want = num(s.traffic.want);
   street.traffic.rng.load(num(s.traffic.rand));
+  // The flow process resumes exactly where it was saved: the loaded economy
+  // reads the same commute the run it left was reading, tick for tick.
+  street.traffic.flow = flowRestore(s.traffic.flow);
+  street.traffic.flowByDistrict = isPlain(s.traffic.flowByDistrict) ? { ...s.traffic.flowByDistrict } : {};
+  if (s.traffic.flowRand !== undefined) street.traffic.flowRng.load(num(s.traffic.flowRand));
   street.traffic.cars = street.cars.filter((c) => !c.parked);
   return street;
 }
