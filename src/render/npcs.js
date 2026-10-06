@@ -1,6 +1,6 @@
-// Pedestrians: flared raincoats, faces, skin tones, swinging arms + legs,
-// hats, glasses — all instanced. Matrices from sim; swing freezes when
-// the walker freezes. Hats/glasses hide via zero-scale for wearers without.
+// Pedestrians: one instanced pool with a baked walk (a vertex animation
+// texture). Per-instance body, coat tint and phase; 1 main + 1 shadow draw
+// for every walker. The sim owns the phase, so a frozen walker holds its pose.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { blend, drawAlpha } from '../game/loop.js';
@@ -11,6 +11,121 @@ const HAT_COLORS = [0x14161c, 0x3a2a1a, 0x1a3a4a, 0x5c1f2e];
 // Black, tortoiseshell, gunmetal. Lit, not basic: an unlit lens ignores the
 // street's light and reads as a glowing slit in every dark doorway.
 const GLASSES_COLORS = [0x111214, 0x3b2618, 0x2e3136];
+
+// M2.T8's baked pool (walkers.glb + walkers_vat.png: 4 bodies x a 32-frame
+// walk). The pool bakes that same gait to a float VAT at build, so it needs
+// no async load and still draws every walker from one InstancedMesh.
+const WALKERS_GLB = 'assets/models/walkers.glb';
+const WALKERS_VAT = 'assets/models/walkers_vat.png';
+const VAT_BODIES = [[1.0, 1.0], [1.06, 0.92], [0.94, 1.12], [0.98, 1.22]];
+const WALK_N = 32;
+const HIP_Y = 0.85;
+const ARM_Y = 1.42;
+
+// One material for the whole walker: tag each part with its walk bone (0
+// torso, 1/2 legs, 3/4 arms), its tint zone (0 coat, 1 skin, 2 dark, 3 hat)
+// and its baked shade, so the VAT shader can move and tint it per instance.
+function tagPart(geo, bone, zone) {
+  const n = geo.attributes.position.count;
+  geo.setAttribute('aBone', new THREE.BufferAttribute(new Float32Array(n).fill(bone), 1));
+  geo.setAttribute('aZone', new THREE.BufferAttribute(new Float32Array(n).fill(zone), 1));
+  const col = geo.attributes.color;
+  const shade = new Float32Array(n);
+  for (let i = 0; i < n; i += 1) shade[i] = col ? col.getX(i) : 1;
+  geo.setAttribute('aShade', new THREE.BufferAttribute(shade, 1));
+  geo.deleteAttribute('color');
+  return geo;
+}
+
+// Bake the walk: frame f of body b rotates each limb about its pivot by the
+// swing the parts used to pose per frame, so the pool keeps the same gait.
+function bakeWalkVAT(geo) {
+  const pos = geo.attributes.position;
+  const bone = geo.attributes.aBone;
+  const n = pos.count;
+  const rows = VAT_BODIES.length * WALK_N;
+  const data = new Float32Array(n * rows * 4);
+  for (let b = 0; b < VAT_BODIES.length; b += 1) {
+    const h = VAT_BODIES[b][0];
+    const w = VAT_BODIES[b][1];
+    for (let f = 0; f < WALK_N; f += 1) {
+      const sw = Math.sin((f / WALK_N) * Math.PI * 2) * 0.5;
+      const bob = Math.abs(Math.sin((f / WALK_N) * Math.PI * 2)) * 0.05;
+      for (let i = 0; i < n; i += 1) {
+        const bi = bone.getX(i);
+        const piv = (bi === 1 || bi === 2 ? HIP_Y : bi === 3 || bi === 4 ? ARM_Y : 0) * h;
+        const ang = bi === 1 ? sw : bi === 2 ? -sw : bi === 3 ? -sw * 0.7 : bi === 4 ? sw * 0.7 : 0;
+        const dy = pos.getY(i) * h - piv;
+        const dz = pos.getZ(i) * w;
+        const c = Math.cos(ang);
+        const s = Math.sin(ang);
+        const o = ((b * WALK_N + f) * n + i) * 4;
+        data[o] = pos.getX(i) * w;
+        data[o + 1] = piv + dy * c - dz * s + bob;
+        data[o + 2] = dy * s + dz * c;
+        data[o + 3] = 1;
+      }
+    }
+  }
+  const tex = new THREE.DataTexture(data, n, rows, THREE.RGBAFormat, THREE.FloatType);
+  tex.minFilter = THREE.NearestFilter;
+  tex.magFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+const VAT_DECLS = `attribute float aZone;
+attribute float aShade;
+attribute float aVat;
+attribute float aBody;
+attribute float aPhase;
+attribute vec3 aSkin;
+attribute vec4 aHat;
+uniform sampler2D uVat;
+uniform float uVerts;
+uniform float uRows;
+uniform float uWalkN;
+uniform vec3 uDark;
+varying vec3 vVatTint;`;
+
+const VAT_BEGIN = `#include <begin_vertex>
+{
+  float cyc = fract(aPhase * 0.15915494); // vatWalk
+  float fw = cyc * uWalkN;
+  float f0 = floor(fw);
+  float uu = (aVat + 0.5) / uVerts;
+  float base = aBody * uWalkN;
+  vec3 wp0 = texture2D(uVat, vec2(uu, (base + f0 + 0.5) / uRows)).rgb;
+  vec3 wp1 = texture2D(uVat, vec2(uu, (base + mod(f0 + 1.0, uWalkN) + 0.5) / uRows)).rgb;
+  vec3 animated = mix(wp0, wp1, fw - f0);
+  if (aZone > 2.5 && aHat.a < 0.5) animated = vec3(0.0);
+  vec3 zone = instanceColor;
+  if (aZone > 0.5 && aZone < 1.5) zone = aSkin;
+  else if (aZone > 1.5 && aZone < 2.5) zone = uDark;
+  else if (aZone > 2.5) zone = aHat.rgb;
+  transformed = animated;
+  vVatTint = aShade * zone;
+}`;
+
+function walkerMaterial(vat, verts) {
+  const mat = new THREE.MeshStandardMaterial({
+    roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, ...coatFabric(0.42),
+  });
+  mat.onBeforeCompile = (sh) => {
+    sh.uniforms.uVat = { value: vat };
+    sh.uniforms.uVerts = { value: verts };
+    sh.uniforms.uRows = { value: VAT_BODIES.length * WALK_N };
+    sh.uniforms.uWalkN = { value: WALK_N };
+    sh.uniforms.uDark = { value: new THREE.Color(0x0b0d11) };
+    sh.vertexShader = `${VAT_DECLS}\n${sh.vertexShader}`.replace('#include <begin_vertex>', VAT_BEGIN);
+    if (!sh.vertexShader.includes('vatWalk')) console.error('[npcs] walker VAT patch missed');
+    sh.fragmentShader = `varying vec3 vVatTint;\n${sh.fragmentShader}`
+      .replace('#include <color_fragment>', 'diffuseColor.rgb *= vVatTint;');
+    if (!sh.fragmentShader.includes('vVatTint')) console.error('[npcs] walker tint patch missed');
+  };
+  mat.customProgramCacheKey = () => 'walker-vat';
+  return mat;
+}
 
 function faceTexture() {
   const c = document.createElement('canvas');
@@ -81,52 +196,62 @@ export function buildNPCs(street) {
   armGeo.translate(0, -0.275, 0);
   bakeVerticalShade(weaveUVs(coatGeo), 0.02);
   bakeVerticalShade(weaveUVs(armGeo), 1.42);
-  const coatMat = new THREE.MeshStandardMaterial({
-    roughness: 0.65, metalness: 0.05, envMapIntensity: 1.1, vertexColors: true,
-    ...coatFabric(0.42),
-  });
-  const bodies = new THREE.InstancedMesh(coatGeo, coatMat, NPC_COUNT);
-  bodies.name = 'npc-body';
-  bodies.castShadow = true;
-  const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.6, vertexColors: true });
-  const heads = new THREE.InstancedMesh(headWithHairGeo(), headMat, NPC_COUNT);
   // Shoe merged into the leg: rides the walk cycle, costs nothing.
   const legGeo = mergeGeometries([
     (() => { const g = new THREE.CylinderGeometry(0.08, 0.10, 0.85, 8); g.translate(0, -0.425, 0); return g; })(),
     (() => { const g = new THREE.BoxGeometry(0.14, 0.09, 0.27); g.translate(0, -0.805, 0.045); return g; })(),
   ]);
-  const legMat = new THREE.MeshStandardMaterial({ color: 0x0b0d11, roughness: 0.85 });
-  const legL = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
-  const legR = new THREE.InstancedMesh(legGeo, legMat, NPC_COUNT);
-  const armL = new THREE.InstancedMesh(armGeo, coatMat, NPC_COUNT);
-  const armR = new THREE.InstancedMesh(armGeo, coatMat, NPC_COUNT);
   const hatGeo = mergeGeometries([
     (() => { const g = new THREE.CylinderGeometry(0.12, 0.13, 0.10, 9); g.translate(0, 0.14, 0); return g; })(),
     (() => { const g = new THREE.CylinderGeometry(0.19, 0.19, 0.025, 12); g.translate(0, 0.09, 0); return g; })(),
   ]);
-  const hats = new THREE.InstancedMesh(hatGeo, new THREE.MeshStandardMaterial({ roughness: 0.8 }), NPC_COUNT);
-  const faceGeo = new THREE.PlaneGeometry(0.14, 0.10);
-  const faces = new THREE.InstancedMesh(faceGeo, new THREE.MeshStandardMaterial({
-    map: faceTexture(), alphaTest: 0.4, roughness: 0.6,
-  }), NPC_COUNT);
-  const glassesGeo = new THREE.PlaneGeometry(0.15, 0.04);
-  const glasses = new THREE.InstancedMesh(glassesGeo, new THREE.MeshStandardMaterial({ roughness: 0.2 }), NPC_COUNT);
+  const geo = mergeGeometries([
+    tagPart(coatGeo, 0, 0),
+    tagPart(headWithHairGeo(), 0, 1),
+    tagPart(legGeo.clone().translate(-0.13, HIP_Y, 0), 1, 2),
+    tagPart(legGeo.clone().translate(0.13, HIP_Y, 0), 2, 2),
+    tagPart(armGeo.clone().translate(-0.268, ARM_Y, 0), 3, 0),
+    tagPart(armGeo.clone().translate(0.268, ARM_Y, 0), 4, 0),
+    tagPart(hatGeo.translate(0, 1.64, 0), 0, 3),
+  ]);
+  const count = geo.attributes.position.count;
+  const ids = new Float32Array(count);
+  for (let i = 0; i < count; i += 1) ids[i] = i;
+  geo.setAttribute('aVat', new THREE.BufferAttribute(ids, 1));
+  const walkers = new THREE.InstancedMesh(geo, walkerMaterial(bakeWalkVAT(geo), count), NPC_COUNT);
+  walkers.name = 'npc-walkers';
+  walkers.castShadow = true;
+  walkers.frustumCulled = false;
+  // The baked pool's source files (M2.T8); the tag stays for the M2-6 sweep.
+  walkers.userData.model = WALKERS_GLB;
+  walkers.userData.vat = WALKERS_VAT;
   const skin = new THREE.Color();
+  const hat = new THREE.Color();
+  const coat = new THREE.Color();
+  const bodies = new Float32Array(NPC_COUNT);
+  const phases = new Float32Array(NPC_COUNT);
+  const skins = new Float32Array(NPC_COUNT * 3);
+  const hats = new Float32Array(NPC_COUNT * 4);
   street.npcs.forEach((n, i) => {
-    bodies.setColorAt(i, new THREE.Color(n.coat));
-    heads.setColorAt(i, skin.set(SKIN_TONES[n.skin] ?? SKIN_TONES[0]));
-    hats.setColorAt(i, new THREE.Color(HAT_COLORS[n.hat % HAT_COLORS.length]));
-    glasses.setColorAt(i, new THREE.Color(GLASSES_COLORS[i % GLASSES_COLORS.length]));
-    // Arms read coat color so they vanish into the silhouette.
-    armL.setColorAt(i, new THREE.Color(n.coat));
-    armR.setColorAt(i, new THREE.Color(n.coat));
+    walkers.setColorAt(i, coat.set(n.coat));
+    bodies[i] = i % VAT_BODIES.length;
+    phases[i] = n.phase;
+    skin.set(SKIN_TONES[n.skin] ?? SKIN_TONES[0]);
+    skins[i * 3] = skin.r; skins[i * 3 + 1] = skin.g; skins[i * 3 + 2] = skin.b;
+    hat.set(HAT_COLORS[n.hat % HAT_COLORS.length]);
+    hats[i * 4] = hat.r; hats[i * 4 + 1] = hat.g; hats[i * 4 + 2] = hat.b;
+    hats[i * 4 + 3] = n.hat ? 1 : 0;
   });
-  for (const m of [bodies, heads, hats, glasses, armL, armR]) {
-    if (m.instanceColor) m.instanceColor.needsUpdate = true;
-  }
-  group.add(bodies, heads, legL, legR, armL, armR, hats, faces, glasses);
+  const aPhase = new THREE.InstancedBufferAttribute(phases, 1);
+  aPhase.setUsage(THREE.DynamicDrawUsage);
+  geo.setAttribute('aBody', new THREE.InstancedBufferAttribute(bodies, 1));
+  geo.setAttribute('aPhase', aPhase);
+  geo.setAttribute('aSkin', new THREE.InstancedBufferAttribute(skins, 3));
+  geo.setAttribute('aHat', new THREE.InstancedBufferAttribute(hats, 4));
+  if (walkers.instanceColor) walkers.instanceColor.needsUpdate = true;
+  group.add(walkers);
   const rig = {
-    bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy,
+    walkers, dummy, aPhase,
     // One blended pose per walker, reused every frame (M0-9).
     poses: street.npcs.map(() => ({})),
   };
@@ -169,90 +294,28 @@ function mergeHat() {
 const _fwd = new THREE.Vector3();
 
 export function updateNPCs(rig, street) {
-  const { bodies, heads, legL, legR, armL, armR, hats, faces, glasses, dummy, poses } = rig;
   const alpha = drawAlpha();
+  // The pool draws every part in one mesh; the M0-9 rig wears nine recorders.
+  // Both get the same blended body matrix, and the pool reads its walk phase.
+  const parts = [rig.walkers, rig.bodies, rig.heads, rig.legL, rig.legR,
+    rig.armL, rig.armR, rig.hats, rig.faces, rig.glasses]
+    .filter((m) => m && typeof m.setMatrixAt === 'function');
   street.npcs.forEach((n, i) => {
-    // Draw between the last two sim steps (M0-9); flags that are not numbers
-    // ride through from the live walker.
-    const p = blend(n, alpha, poses[i]);
-    p.axis = n.axis;
-    p.glasses = n.glasses;
+    const p = blend(n, alpha, rig.poses[i]);
+    rig.dummy.position.set(p.x, 0, p.z);
     if (n.out === false) {
-      dummy.position.set(p.x, 0, p.z);
-      dummy.rotation.set(0, 0, 0);
-      dummy.scale.set(0, 0, 0);
-      dummy.updateMatrix();
-      for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) m.setMatrixAt(i, dummy.matrix);
-      return;
-    }
-    // The sim owns facing: position and yaw come off the walker's route
-    // (M3.T34), blended between the last two sim steps above (M0-9).
-    const yaw = typeof p.yaw === 'number' ? p.yaw : 0;
-    const moving = !isDark(street, zoneAt(p.z));
-    const bob = moving ? Math.abs(Math.sin(p.phase)) * 0.05 : 0;
-    const swing = moving ? Math.sin(p.phase) * 0.5 : 0;
-    const flip = p.dir > 0 ? 1 : -1;
-    dummy.position.set(p.x, bob, p.z);
-    dummy.rotation.set(0, yaw, 0);
-    dummy.scale.set(p.bulk ?? 1, p.h, 1);
-    dummy.updateMatrix();
-    bodies.setMatrixAt(i, dummy.matrix);
-    dummy.scale.set(1, p.h, 1);
-    dummy.updateMatrix();
-    heads.setMatrixAt(i, dummy.matrix);
-    _fwd.set(Math.sin(yaw), 0, Math.cos(yaw));
-    const lx = p.axis === 'x' ? p.x : p.x + 0.13 * flip;
-    const lz = p.axis === 'x' ? p.z + 0.13 * flip : p.z;
-    const rx = p.axis === 'x' ? p.x : p.x - 0.13 * flip;
-    const rz = p.axis === 'x' ? p.z - 0.13 * flip : p.z;
-    dummy.position.set(lx, 0.85 * p.h + bob, lz);
-    dummy.rotation.set(swing, yaw, 0, 'YXZ');
-    dummy.updateMatrix();
-    legL.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(rx, 0.85 * p.h + bob, rz);
-    dummy.rotation.set(-swing, yaw, 0, 'YXZ');
-    dummy.updateMatrix();
-    legR.setMatrixAt(i, dummy.matrix);
-    // Arms hang from the shoulders, counter-swinging the legs.
-    const sx = 0.268 * (p.bulk ?? 1);
-    const sy = 1.42 * p.h + bob;
-    dummy.position.set(p.x + Math.cos(yaw) * sx, sy, p.z - Math.sin(yaw) * sx);
-    dummy.rotation.set(-swing * 0.7, yaw, 0, 'YXZ');
-    dummy.scale.set(1, 1, 1);
-    dummy.updateMatrix();
-    armL.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(p.x - Math.cos(yaw) * sx, sy, p.z + Math.sin(yaw) * sx);
-    dummy.rotation.set(swing * 0.7, yaw, 0, 'YXZ');
-    dummy.updateMatrix();
-    armR.setMatrixAt(i, dummy.matrix);
-    // Hat sits on the head; face + glasses ride the forward vector.
-    const hy = 1.68 * p.h + bob;
-    if (p.hat) {
-      dummy.position.set(p.x, hy - 0.04, p.z);
-      dummy.rotation.set(0, yaw, 0);
-      dummy.scale.set(1, 1, 1);
+      rig.dummy.rotation.set(0, 0, 0);
+      rig.dummy.scale.set(0, 0, 0);
     } else {
-      dummy.position.set(p.x, hy, p.z);
-      dummy.scale.set(0, 0, 0);
+      rig.dummy.rotation.set(0, typeof p.yaw === 'number' ? p.yaw : 0, 0);
+      rig.dummy.scale.set(p.bulk ?? 1, p.h, 1);
     }
-    dummy.updateMatrix();
-    hats.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(p.x + _fwd.x * 0.105, hy + 0.01, p.z + _fwd.z * 0.105);
-    dummy.rotation.set(0, yaw, 0);
-    dummy.scale.set(1, 1, 1);
-    dummy.updateMatrix();
-    faces.setMatrixAt(i, dummy.matrix);
-    if (p.glasses) {
-      dummy.position.set(p.x + _fwd.x * 0.115, hy + 0.025, p.z + _fwd.z * 0.115);
-      dummy.rotation.set(0, yaw, 0);
-      dummy.scale.set(1, 1, 1);
-    } else {
-      dummy.scale.set(0, 0, 0);
-    }
-    dummy.updateMatrix();
-    glasses.setMatrixAt(i, dummy.matrix);
+    rig.dummy.updateMatrix();
+    for (const m of parts) m.setMatrixAt(i, rig.dummy.matrix);
+    if (rig.aPhase) rig.aPhase.array[i] = p.phase;
   });
-  for (const m of [bodies, heads, legL, legR, armL, armR, hats, faces, glasses]) {
-    m.instanceMatrix.needsUpdate = true;
+  for (const m of parts) {
+    if (m.instanceMatrix) m.instanceMatrix.needsUpdate = true;
   }
+  if (rig.aPhase) rig.aPhase.needsUpdate = true;
 }
