@@ -78,8 +78,6 @@ test('M3-6: every car holds its trips and nothing leaps on the graph', async ({ 
 });
 
 test('M3-6: walkers travel the pavements and never leap', async ({ page }) => {
-  // M3.T28's red check: walkers on the graph are M3.T33. Drop this when it lands.
-  test.fail(true, 'M3-6 red: walkers loop the pavements and wrap at the end (street.js:286-299)');
   await page.goto('/?capture=1&gen=1&seed=7');
   await page.waitForFunction(() => window.__game?.draws() > 0, null, { timeout: 30000 });
   const r = await scanJumps(page, 'walkers', 600);
