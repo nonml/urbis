@@ -1,0 +1,602 @@
+-- The ASM compiler identification is AppleClang
+-- Found assembler: /usr/bin/cc
+-- ccache found, compilation results will be cached. Disable with GGML_CCACHE=OFF.
+-- CMAKE_SYSTEM_PROCESSOR: arm64
+-- GGML_SYSTEM_ARCH: ARM
+-- Could NOT find OpenMP_C (missing: OpenMP_C_FLAGS OpenMP_C_LIB_NAMES) 
+-- Could NOT find OpenMP_CXX (missing: OpenMP_CXX_FLAGS OpenMP_CXX_LIB_NAMES) 
+-- Could NOT find OpenMP (missing: OpenMP_C_FOUND OpenMP_CXX_FOUND) 
+CMake Warning at thirdparty/ggml/src/CMakeLists.txt:347 (message):
+  OpenMP not found
+
+
+-- Including CPU backend
+-- Accelerate framework found
+-- ARM detected
+-- Performing Test GGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E
+-- Performing Test GGML_COMPILER_SUPPORTS_FP16_FORMAT_I3E - Failed
+CMake Warning at thirdparty/ggml/src/ggml-cpu/CMakeLists.txt:140 (message):
+  ARM -march/-mcpu not found, -mcpu=native will be used
+Call Stack (most recent call first):
+  thirdparty/ggml/src/CMakeLists.txt:586 (ggml_add_cpu_backend_variant_impl)
+
+
+-- Performing Test GGML_MACHINE_SUPPORTS_dotprod
+-- Performing Test GGML_MACHINE_SUPPORTS_dotprod - Success
+-- Performing Test GGML_MACHINE_SUPPORTS_i8mm
+-- Performing Test GGML_MACHINE_SUPPORTS_i8mm - Success
+-- Performing Test GGML_MACHINE_SUPPORTS_sve
+-- Performing Test GGML_MACHINE_SUPPORTS_sve - Failed
+-- Performing Test GGML_MACHINE_SUPPORTS_nosve
+-- Performing Test GGML_MACHINE_SUPPORTS_nosve - Success
+-- Performing Test GGML_MACHINE_SUPPORTS_sme
+-- Performing Test GGML_MACHINE_SUPPORTS_sme - Failed
+-- Performing Test GGML_MACHINE_SUPPORTS_nosme
+-- Performing Test GGML_MACHINE_SUPPORTS_nosme - Success
+-- Checking for ARM features using flags:
+--   -U__ARM_FEATURE_SVE
+--   -U__ARM_FEATURE_SME
+--   -mcpu=native+dotprod+i8mm+nosve+nosme
+-- Performing Test HAVE_DOTPROD
+-- Performing Test HAVE_DOTPROD - Success
+-- Performing Test HAVE_SVE
+-- Performing Test HAVE_SVE - Failed
+-- Performing Test HAVE_MATMUL_INT8
+-- Performing Test HAVE_MATMUL_INT8 - Success
+-- Performing Test HAVE_FMA
+-- Performing Test HAVE_FMA - Success
+-- Performing Test HAVE_FP16_VECTOR_ARITHMETIC
+-- Performing Test HAVE_FP16_VECTOR_ARITHMETIC - Success
+-- Performing Test HAVE_SME
+-- Performing Test HAVE_SME - Failed
+-- Adding CPU backend variant ggml-cpu: -U__ARM_FEATURE_SVE;-U__ARM_FEATURE_SME;-mcpu=native+dotprod+i8mm+nosve+nosme 
+-- Looking for dgemm_
+-- Looking for dgemm_ - found
+-- Found BLAS: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework
+-- BLAS found, Libraries: /Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/System/Library/Frameworks/Accelerate.framework
+-- BLAS found, Includes: 
+-- Including BLAS backend
+-- Metal framework found
+-- Including METAL backend
+-- ggml version: 0.24.0
+-- ggml commit:  f8697b33
+-- Performing Test WEBP_HAVE_FLAG_SSE41
+-- Performing Test WEBP_HAVE_FLAG_SSE41 - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE41
+-- Performing Test WEBP_HAVE_FLAG_SSE41 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE2
+-- Performing Test WEBP_HAVE_FLAG_SSE2 - Failed
+-- Performing Test WEBP_HAVE_FLAG_SSE2
+-- Performing Test WEBP_HAVE_FLAG_SSE2 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS32
+-- Performing Test WEBP_HAVE_FLAG_MIPS32 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS32
+-- Performing Test WEBP_HAVE_FLAG_MIPS32 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2 - Failed
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2
+-- Performing Test WEBP_HAVE_FLAG_MIPS_DSP_R2 - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- Performing Test WEBP_HAVE_FLAG_NEON
+-- Performing Test WEBP_HAVE_FLAG_NEON - Success
+-- Performing Test WEBP_HAVE_FLAG_MSA
+-- Performing Test WEBP_HAVE_FLAG_MSA - Failed
+-- Performing Test WEBP_HAVE_FLAG_MSA
+-- Performing Test WEBP_HAVE_FLAG_MSA - Failed
+-- Performing Test HAS_COMPILE_FLAG
+-- Performing Test HAS_COMPILE_FLAG - Failed
+-- trellis.cpp: WebP texture encoding enabled
+-- trellis.cpp: Metal backend enabled
+-- Configuring done (6.6s)
+-- Generating done (0.1s)
+-- Build files have been written to: /Users/nonmaxlife/urbis-models/trellis.cpp/build
+[1/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-threading.cpp.o
+[2/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-alloc.c.o
+[3/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml.cpp.o
+[4/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-opt.cpp.o
+[5/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.cpp.o
+[6/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/hbm.cpp.o
+[7/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml.c.o
+[8/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-backend.cpp.o
+[9/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ggml-cpu.c.o
+[10/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/iqp.cpp.o
+[11/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/traits.cpp.o
+[12/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/mmq.cpp.o
+[13/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/amx/amx.cpp.o
+[14/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/quants.c.o
+[15/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/gguf.cpp.o
+[16/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-backend-meta.cpp.o
+[17/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_sse2.c.o
+[18/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_neon.c.o
+[19/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_cpu.c.o
+[20/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/quants.c.o
+[21/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_csp.c.o
+[22/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_dsp.c.o
+[23/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv_gamma.c.o
+[24/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/alpha_dec.c.o
+[25/377] Building C object _deps/libwebp-build/CMakeFiles/sharpyuv.dir/sharpyuv/sharpyuv.c.o
+[26/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/buffer_dec.c.o
+[27/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/frame_dec.c.o
+[28/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/idec_dec.c.o
+[29/377] Building C object thirdparty/ggml/src/CMakeFiles/ggml-base.dir/ggml-quants.c.o
+[30/377] Linking CXX shared library libggml-base.0.24.0.dylib
+[31/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/io_dec.c.o
+[32/377] Creating library symlink libggml-base.0.dylib libggml-base.dylib
+[33/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/quant_dec.c.o
+[34/377] Generate embedded Metal library for fa
+[35/377] Generate embedded Metal library for mul_mv
+[36/377] Generate embedded Metal library for mul_mm
+[37/377] Generate embedded Metal library for quantize
+[38/377] Generate embedded Metal library for softmax
+[39/377] Generate embedded Metal library for norm
+[40/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/arch/arm/repack.cpp.o
+[41/377] Generate embedded Metal library for unary
+[42/377] Generate embedded Metal library for binbcast
+[43/377] Generate embedded Metal library for tri
+[44/377] Generate embedded Metal library for reduce
+[45/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/vec.cpp.o
+[46/377] Generate embedded Metal library for ssm
+[47/377] Generate embedded Metal library for wkv
+[48/377] Generate embedded Metal library for solve_tri
+[49/377] Generate embedded Metal library for gated_delta_net
+[50/377] Generate embedded Metal library for rope
+[51/377] Generate embedded Metal library for conv
+[52/377] Generate embedded Metal library for upscale
+[53/377] Generate embedded Metal library for argsort
+[54/377] Generate embedded Metal library for pool
+[55/377] Generate embedded Metal library for misc
+[56/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/tree_dec.c.o
+[57/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/vp8_dec.c.o
+[58/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/repack.cpp.o
+[59/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/vp8l_dec.c.o
+[60/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/unary-ops.cpp.o
+[61/377] Building CXX object thirdparty/ggml/src/ggml-blas/CMakeFiles/ggml-blas.dir/ggml-blas.cpp.o
+[62/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/binary-ops.cpp.o
+[63/377] Building C object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-device.m.o
+[64/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal.cpp.o
+[65/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-fa.s.o
+[66/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-mul_mv.s.o
+[67/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-mul_mm.s.o
+[68/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-quantize.s.o
+[69/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-softmax.s.o
+[70/377] Linking C static library _deps/libwebp-build/libsharpyuv.a
+[71/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-norm.s.o
+[72/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-unary.s.o
+[73/377] Building C object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-context.m.o
+[74/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-reduce.s.o
+[75/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-binbcast.s.o
+[76/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-tri.s.o
+[77/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-ssm.s.o
+[78/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-wkv.s.o
+[79/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-gated_delta_net.s.o
+[80/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-rope.s.o
+[81/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-solve_tri.s.o
+[82/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-common.cpp.o
+[83/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-conv.s.o
+[84/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-upscale.s.o
+[85/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-argsort.s.o
+[86/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-pool.s.o
+[87/377] Building ASM object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/autogenerated/ggml-metal-embed-misc.s.o
+[88/377] Linking CXX shared library libggml-blas.0.24.0.dylib
+[89/377] Creating library symlink libggml-blas.0.dylib libggml-blas.dylib
+[90/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-device.cpp.o
+[91/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/alpha_enc.c.o
+[92/377] Building C object _deps/libwebp-build/CMakeFiles/webpdecode.dir/src/dec/webp_dec.c.o
+[93/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/config_enc.c.o
+[94/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/analysis_enc.c.o
+[95/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/cost_enc.c.o
+[96/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/backward_references_cost_enc.c.o
+[97/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/filter_enc.c.o
+[98/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-tuning.cpp.o
+[99/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-fusion.cpp.o
+[100/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/iterator_enc.c.o
+[101/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/near_lossless_enc.c.o
+[102/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/picture_enc.c.o
+[103/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/frame_enc.c.o
+[104/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/backward_references_enc.c.o
+[105/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/picture_psnr_enc.c.o
+[106/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/picture_rescale_enc.c.o
+[107/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/histogram_enc.c.o
+[108/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/syntax_enc.c.o
+[109/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/picture_csp_enc.c.o
+[110/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/token_enc.c.o
+[111/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/tree_enc.c.o
+[112/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/alpha_processing.c.o
+[113/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/webp_enc.c.o
+[114/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/predictor_enc.c.o
+[115/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cpu.c.o
+[116/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml.dir/ggml-backend-dl.cpp.o
+[117/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_clip_tables.c.o
+[118/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec.c.o
+[119/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/picture_tools_enc.c.o
+[120/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/quant_enc.c.o
+[121/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/filters.c.o
+[122/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler.c.o
+[123/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/alpha_processing_sse41.c.o
+[124/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_sse41.c.o
+[125/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_sse41.c.o
+[126/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling_sse41.c.o
+[127/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv_sse41.c.o
+[128/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling.c.o
+[129/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/alpha_processing_sse2.c.o
+[130/377] Building C object _deps/libwebp-build/CMakeFiles/webpencode.dir/src/enc/vp8l_enc.c.o
+[131/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_sse2.c.o
+[132/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless.c.o
+[133/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/filters_sse2.c.o
+[134/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_sse2.c.o
+[135/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler_sse2.c.o
+[136/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling_sse2.c.o
+[137/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv_sse2.c.o
+[138/377] Building CXX object thirdparty/ggml/src/ggml-metal/CMakeFiles/ggml-metal.dir/ggml-metal-ops.cpp.o
+[139/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/alpha_processing_neon.c.o
+[140/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler_neon.c.o
+[141/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/filters_neon.c.o
+[142/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv.c.o
+[143/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_msa.c.o
+[144/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_msa.c.o
+[145/377] Linking CXX shared library libggml-metal.0.24.0.dylib
+[146/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/filters_msa.c.o
+[147/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler_msa.c.o
+[148/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_neon.c.o
+[149/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_neon.c.o
+[150/377] Creating library symlink libggml-metal.0.dylib libggml-metal.dylib
+[151/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling_msa.c.o
+[152/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_mips32.c.o
+[153/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv_neon.c.o
+[154/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler_mips32.c.o
+[155/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv_mips32.c.o
+[156/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/alpha_processing_mips_dsp_r2.c.o
+[157/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/dec_mips_dsp_r2.c.o
+[158/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/filters_mips_dsp_r2.c.o
+[159/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_mips_dsp_r2.c.o
+[160/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/rescaler_mips_dsp_r2.c.o
+[161/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling_mips_dsp_r2.c.o
+[162/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/yuv_mips_dsp_r2.c.o
+[163/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cost.c.o
+[164/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cost_sse2.c.o
+[165/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_sse2.c.o
+[166/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_sse2.c.o
+[167/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/ssim.c.o
+[168/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/ssim_sse2.c.o
+[169/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc.c.o
+[170/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_sse41.c.o
+[171/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_sse41.c.o
+[172/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml.dir/ggml-backend-reg.cpp.o
+[173/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_msa.c.o
+[174/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cost_mips32.c.o
+[175/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_msa.c.o
+[176/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_mips32.c.o
+[177/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_mips32.c.o
+[178/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cost_mips_dsp_r2.c.o
+[179/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_mips_dsp_r2.c.o
+[180/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/cost_neon.c.o
+[181/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_mips_dsp_r2.c.o
+[182/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc_neon.c.o
+[183/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/color_cache_utils.c.o
+[184/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/bit_reader_utils.c.o
+[185/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/huffman_utils.c.o
+[186/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/filters_utils.c.o
+[187/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/lossless_enc.c.o
+[188/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/upsampling_neon.c.o
+[189/377] Building C object _deps/libwebp-build/CMakeFiles/webpdsp.dir/src/dsp/enc_neon.c.o
+[190/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/quant_levels_dec_utils.c.o
+[191/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/rescaler_utils.c.o
+[192/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/random_utils.c.o
+[193/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/palette.c.o
+[194/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/thread_utils.c.o
+[195/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/utils.c.o
+[196/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/quant_levels_utils.c.o
+[197/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/bit_writer_utils.c.o
+[198/377] Building C object _deps/libwebp-build/CMakeFiles/webputils.dir/src/utils/huffman_encode_utils.c.o
+[199/377] Building CXX object CMakeFiles/trellis_core.dir/src/trellis_sched.cpp.o
+[200/377] Building CXX object CMakeFiles/trellis_core.dir/src/dinov3.cpp.o
+[201/377] Building CXX object CMakeFiles/trellis_core.dir/src/ss_decoder.cpp.o
+[202/377] Building CXX object CMakeFiles/trellis_core.dir/src/dit.cpp.o
+/Users/nonmaxlife/urbis-models/trellis.cpp/src/dit.cpp:222:27: warning: 'ggml_flash_attn_ext_set_prec' is deprecated: use ggml_prec_set_acc() instead [-Wdeprecated-declarations]
+  222 |             if (!fa_fast) ggml_flash_attn_ext_set_prec(o, GGML_PREC_F32);
+      |                           ^
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/ggml/include/ggml.h:2497:5: note: 'ggml_flash_attn_ext_set_prec' has been explicitly marked deprecated here
+ 2497 |     GGML_DEPRECATED(GGML_API void ggml_flash_attn_ext_set_prec(
+      |     ^
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/ggml/include/ggml.h:192:61: note: expanded from macro 'GGML_DEPRECATED'
+  192 | #    define GGML_DEPRECATED(func, hint) func __attribute__((deprecated(hint)))
+      |                                                             ^
+1 warning generated.
+[203/377] Building CXX object CMakeFiles/trellis_core.dir/src/trellis_debug.cpp.o
+[204/377] Building CXX object CMakeFiles/trellis_core.dir/src/pixal3d.cpp.o
+[205/377] Building CXX object CMakeFiles/trellis_core.dir/src/flow_runner.cpp.o
+[206/377] Building CXX object CMakeFiles/trellis_core.dir/src/trellis_model.cpp.o
+[207/377] Building CXX object CMakeFiles/trellis_core.dir/src/mesh_glb.cpp.o
+In file included from /Users/nonmaxlife/urbis-models/trellis.cpp/src/mesh_glb.cpp:21:
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_write.h:780:13: warning: 'sprintf' is deprecated: This function is provided for compatibility reasons only.  Due to security concerns inherent in the design of sprintf(3), it is highly recommended that you use snprintf(3) instead. [-Wdeprecated-declarations]
+  780 |       len = sprintf(buffer, "EXPOSURE=          1.0000000000000\n\n-Y %d +X %d\n", y, x);
+      |             ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/_stdio.h:278:1: note: 'sprintf' has been explicitly marked deprecated here
+  278 | __deprecated_msg("This function is provided for compatibility reasons only.  Due to security concerns inherent in the design of sprintf(3), it is highly recommended that you use snprintf(3) instead.")
+      | ^
+/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs/MacOSX.sdk/usr/include/sys/cdefs.h:227:48: note: expanded from macro '__deprecated_msg'
+  227 |         #define __deprecated_msg(_msg) __attribute__((__deprecated__(_msg)))
+      |                                                       ^
+1 warning generated.
+[208/377] Building CXX object CMakeFiles/trellis_core.dir/src/dual_grid.cpp.o
+[209/377] Building CXX object CMakeFiles/trellis_core.dir/src/shape_decoder.cpp.o
+[210/377] Building CXX object CMakeFiles/trellis_core.dir/src/uv_overlap_cover.cpp.o
+[211/377] Building CXX object CMakeFiles/trellis_core.dir/src/naf.cpp.o
+[212/377] Building CXX object CMakeFiles/trellis_core.dir/src/sparse.cpp.o
+[213/377] Building CXX object CMakeFiles/trellis_core.dir/thirdparty/meshoptimizer/simplifier.cpp.o
+[214/377] Building CXX object CMakeFiles/trellis_core.dir/src/tri_bvh.cpp.o
+[215/377] Building CXX object CMakeFiles/trellis_core.dir/src/birefnet.cpp.o
+[216/377] Building CXX object CMakeFiles/trellis_core.dir/src/decimate_qem.cpp.o
+[217/377] Building CXX object CMakeFiles/trellis_core.dir/src/remesh_dc.cpp.o
+[218/377] Building CXX object thirdparty/ggml/src/CMakeFiles/ggml-cpu.dir/ggml-cpu/ops.cpp.o
+[219/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_refinement_gates.cpp.o
+[220/377] Linking CXX shared library libggml-cpu.0.24.0.dylib
+[221/377] Creating library symlink libggml-cpu.0.dylib libggml-cpu.dylib
+[222/377] Linking CXX shared library libggml.0.24.0.dylib
+[223/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_refinement_io.cpp.o
+[224/377] Creating library symlink libggml.0.dylib libggml.dylib
+[225/377] Linking C static library _deps/libwebp-build/libwebp.a
+[226/377] Building CXX object CMakeFiles/trellis_core.dir/src/mesh_shape.cpp.o
+[227/377] Building CXX object CMakeFiles/trellis_core.dir/src/preprocess.cpp.o
+In file included from /Users/nonmaxlife/urbis-models/trellis.cpp/src/preprocess.cpp:12:
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:760:31: warning: expression result unused [-Wunused-value]
+  760 |     STBIR__DEBUG_ASSERT(scale <= 1);
+      |                         ~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:778:31: warning: expression result unused [-Wunused-value]
+  778 |     STBIR__DEBUG_ASSERT(scale <= 1);
+      |                         ~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1041:56: warning: expression result unused [-Wunused-value]
+ 1041 |     STBIR__DEBUG_ASSERT(in_last_pixel - in_first_pixel <= (int)ceil(stbir__filter_info_table[filter].support(1/scale) * 2)); // Taken directly from stbir__get_coefficient_width() which we can't call because we don't know if we're horizontal or vertical.
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1046:41: warning: expression result unused [-Wunused-value]
+ 1046 |     STBIR__DEBUG_ASSERT(contributor->n1 >= contributor->n0);
+      |                         ~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1064:128: warning: expression result unused [-Wunused-value]
+ 1064 |     STBIR__DEBUG_ASSERT(stbir__filter_info_table[filter].kernel((float)(in_last_pixel + 1) + 0.5f - in_center_of_out, 1/scale) == 0);
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1066:38: warning: expression result unused [-Wunused-value]
+ 1066 |     STBIR__DEBUG_ASSERT(total_filter > 0.9);
+      |                         ~~~~~~~~~~~~ ^ ~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1067:38: warning: expression result unused [-Wunused-value]
+ 1067 |     STBIR__DEBUG_ASSERT(total_filter < 1.1f); // Make sure it's not way off.
+      |                         ~~~~~~~~~~~~ ^ ~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1089:59: warning: expression result unused [-Wunused-value]
+ 1089 |      STBIR__DEBUG_ASSERT(out_last_pixel - out_first_pixel <= (int)ceil(stbir__filter_info_table[filter].support(scale_ratio) * 2)); // Taken directly from stbir__get_coefficient_width() which we can't call because we don't know if we're horizontal or vertical.
+      |                          ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1094:41: warning: expression result unused [-Wunused-value]
+ 1094 |     STBIR__DEBUG_ASSERT(contributor->n1 >= contributor->n0);
+      |                         ~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1103:133: warning: expression result unused [-Wunused-value]
+ 1103 |     STBIR__DEBUG_ASSERT(stbir__filter_info_table[filter].kernel((float)(out_last_pixel + 1) + 0.5f - out_center_of_in, scale_ratio) == 0);
+      |                         ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1138:35: warning: expression result unused [-Wunused-value]
+ 1138 |         STBIR__DEBUG_ASSERT(total > 0.9f);
+      |                             ~~~~~ ^ ~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1139:35: warning: expression result unused [-Wunused-value]
+ 1139 |         STBIR__DEBUG_ASSERT(total < 1.1f);
+      |                             ~~~~~ ^ ~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1427:47: warning: expression result unused [-Wunused-value]
+ 1427 |         STBIR__DEBUG_ASSERT(ring_buffer_index != stbir_info->ring_buffer_begin_index);
+      |                             ~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1459:32: warning: expression result unused [-Wunused-value]
+ 1459 |         STBIR__DEBUG_ASSERT(n1 >= n0);
+      |                             ~~ ^  ~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1460:32: warning: expression result unused [-Wunused-value]
+ 1460 |         STBIR__DEBUG_ASSERT(n0 >= -stbir_info->horizontal_filter_pixel_margin);
+      |                             ~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1461:32: warning: expression result unused [-Wunused-value]
+ 1461 |         STBIR__DEBUG_ASSERT(n1 >= -stbir_info->horizontal_filter_pixel_margin);
+      |                             ~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1462:32: warning: expression result unused [-Wunused-value]
+ 1462 |         STBIR__DEBUG_ASSERT(n0 < stbir_info->input_w + stbir_info->horizontal_filter_pixel_margin);
+      |                             ~~ ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1463:32: warning: expression result unused [-Wunused-value]
+ 1463 |         STBIR__DEBUG_ASSERT(n1 < stbir_info->input_w + stbir_info->horizontal_filter_pixel_margin);
+      |                             ~~ ^ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1471:53: warning: expression result unused [-Wunused-value]
+ 1471 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1480:53: warning: expression result unused [-Wunused-value]
+ 1480 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1490:53: warning: expression result unused [-Wunused-value]
+ 1490 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1501:53: warning: expression result unused [-Wunused-value]
+ 1501 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1514:53: warning: expression result unused [-Wunused-value]
+ 1514 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1537:25: warning: expression result unused [-Wunused-value]
+ 1537 |     STBIR__DEBUG_ASSERT(!stbir__use_width_upsampling(stbir_info));
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1555:53: warning: expression result unused [-Wunused-value]
+ 1555 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1576:53: warning: expression result unused [-Wunused-value]
+ 1576 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1598:53: warning: expression result unused [-Wunused-value]
+ 1598 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1621:53: warning: expression result unused [-Wunused-value]
+ 1621 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:1646:53: warning: expression result unused [-Wunused-value]
+ 1646 |                     STBIR__DEBUG_ASSERT(coefficient != 0);
+      |                                         ~~~~~~~~~~~ ^  ~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2005:25: warning: expression result unused [-Wunused-value]
+ 2005 |     STBIR__DEBUG_ASSERT(!stbir__use_height_upsampling(stbir_info));
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2079:66: warning: expression result unused [-Wunused-value]
+ 2079 |         STBIR__DEBUG_ASSERT(in_last_scanline - in_first_scanline <= stbir_info->vertical_filter_pixel_width);
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2171:25: warning: expression result unused [-Wunused-value]
+ 2171 |     STBIR__DEBUG_ASSERT(!stbir__use_height_upsampling(stbir_info));
+      |                         ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2180:68: warning: expression result unused [-Wunused-value]
+ 2180 |         STBIR__DEBUG_ASSERT(out_last_scanline - out_first_scanline <= stbir_info->vertical_filter_pixel_width);
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2382:92: warning: expression result unused [-Wunused-value]
+ 2382 |         STBIR__DEBUG_ASSERT((size_t)STBIR__NEXT_MEMPTR(info->encode_buffer, unsigned char) == (size_t)tempmem + tempmem_size_in_bytes);
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+/Users/nonmaxlife/urbis-models/trellis.cpp/thirdparty/stb/stb_image_resize.h:2390:90: warning: expression result unused [-Wunused-value]
+ 2390 |         STBIR__DEBUG_ASSERT((size_t)STBIR__NEXT_MEMPTR(info->ring_buffer, unsigned char) == (size_t)tempmem + tempmem_size_in_bytes);
+      |                             ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~ ^  ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+35 warnings generated.
+[228/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_components.cpp.o
+[229/377] Building CXX object CMakeFiles/trellis_core.dir/src/deform_conv_cpu.cpp.o
+[230/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_component_cover.cpp.o
+[231/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_topology.cpp.o
+[232/377] Building CXX object CMakeFiles/trellis_core.dir/src/quad_refinement.cpp.o
+[233/377] Building CXX object CMakeFiles/trellis-refine-core.dir/tools/mesh_quad_matching/selective_refinement_core.cpp.o
+[234/377] Building CXX object CMakeFiles/trellis_core.dir/thirdparty/xatlas/xatlas.cpp.o
+[235/377] Building CXX object CMakeFiles/trellis-chart-quads.dir/tools/mesh_quad_matching/chart_quad_uv.cpp.o
+[236/377] Building CXX object CMakeFiles/trellis-select-uv-overlap-cover.dir/tools/mesh_quad_matching/select_uv_overlap_cover.cpp.o
+[237/377] Building CXX object CMakeFiles/trellis-audit-quad-uv.dir/tools/mesh_quad_matching/audit_quad_uv_core.cpp.o
+[238/377] Building CXX object CMakeFiles/trellis-repack-uv.dir/tools/mesh_quad_matching/repack_uv.cpp.o
+[239/377] Building CXX object CMakeFiles/trellis-test-quad-component-cover.dir/src/test_quad_component_cover.cpp.o
+[240/377] Building CXX object CMakeFiles/trellis-devices.dir/src/list_devices.cpp.o
+[241/377] Building CXX object CMakeFiles/trellis-audit-quad-topology.dir/tools/mesh_quad_matching/audit_quad_topology.cpp.o
+[242/377] Building CXX object CMakeFiles/trellis-filter-quads.dir/tools/mesh_quad_matching/filter_quad_components_core.cpp.o
+[243/377] Building CXX object CMakeFiles/trellis-bake-quads.dir/tools/mesh_quad_matching/bake_current_quad_probe.cpp.o
+[244/377] Building CXX object CMakeFiles/trellis-test-quad-topology.dir/src/test_quad_topology.cpp.o
+[245/377] Building CXX object CMakeFiles/trellis-smoke.dir/src/smoke_test.cpp.o
+[246/377] Building CXX object CMakeFiles/trellis_core.dir/src/uv_bake.cpp.o
+[247/377] Building CXX object CMakeFiles/trellis-decode-replay.dir/src/decode_replay.cpp.o
+[248/377] Linking CXX static library libtrellis_core.a
+[249/377] Building CXX object CMakeFiles/trellis-test-preprocess.dir/src/test_preprocess.cpp.o
+[250/377] Building CXX object CMakeFiles/trellis-test-deform.dir/src/test_deform.cpp.o
+[251/377] Building CXX object CMakeFiles/trellis-test-ss-flow.dir/src/test_ss_flow.cpp.o
+[252/377] Building CXX object CMakeFiles/trellis-test-ss-sample.dir/src/test_ss_sample.cpp.o
+[253/377] Building CXX object CMakeFiles/trellis-test-birefnet.dir/src/test_birefnet.cpp.o
+[254/377] Building CXX object CMakeFiles/trellis-test-shape-flow.dir/src/test_shape_flow.cpp.o
+[255/377] Building CXX object CMakeFiles/trellis-test-ss-dec.dir/src/test_ss_dec.cpp.o
+[256/377] Building CXX object CMakeFiles/trellis-test-quad-quality.dir/src/test_quad_quality.cpp.o
+[257/377] Building CXX object CMakeFiles/trellis-test-slat-shape.dir/src/test_slat_shape.cpp.o
+[258/377] Building CXX object CMakeFiles/trellis-test-uv-chart-density.dir/src/test_uv_chart_density.cpp.o
+[259/377] Building CXX object CMakeFiles/trellis-test-uv-overlap-cover.dir/src/test_uv_overlap_cover.cpp.o
+[260/377] Building CXX object CMakeFiles/trellis-test-uv-preset.dir/src/test_uv_preset.cpp.o
+[261/377] Building CXX object CMakeFiles/trellis-test-uv-normal-margin.dir/src/tri_bvh.cpp.o
+[262/377] Building CXX object CMakeFiles/trellis-test-voxel-pbr.dir/src/tri_bvh.cpp.o
+[263/377] Building CXX object CMakeFiles/trellis-audit-bake-fidelity.dir/tools/mesh_quad_matching/audit_bake_fidelity.cpp.o
+[264/377] Building CXX object CMakeFiles/trellis-test-uv-normal-margin.dir/src/test_uv_normal_margin.cpp.o
+[265/377] Building CXX object CMakeFiles/trellis-test-voxel-pbr.dir/src/test_voxel_pbr.cpp.o
+[266/377] Building CXX object CMakeFiles/trellis-test-dinov3.dir/src/test_dinov3.cpp.o
+[267/377] Building CXX object CMakeFiles/trellis-cli.dir/src/trellis_cli_main.cpp.o
+[268/377] Building CXX object CMakeFiles/trellis-test-pixal3d.dir/src/trellis_args.cpp.o
+[269/377] Building CXX object CMakeFiles/trellis-test-pixal3d.dir/src/test_pixal3d.cpp.o
+[270/377] Building CXX object CMakeFiles/trellis-test-sparse-conv.dir/src/test_sparse_conv.cpp.o
+[271/377] Building CXX object CMakeFiles/trellis-test-sparse-degenerate.dir/src/test_sparse_degenerate.cpp.o
+[272/377] Building CXX object CMakeFiles/trellis-cli.dir/src/trellis_args.cpp.o
+[273/377] Building CXX object CMakeFiles/trellis-server.dir/src/trellis_args.cpp.o
+[274/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/alpha_processing.c.o
+[275/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/cpu.c.o
+[276/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec.c.o
+[277/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_clip_tables.c.o
+[278/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/filters.c.o
+[279/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless.c.o
+[280/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler.c.o
+[281/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling.c.o
+[282/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv.c.o
+[283/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/alpha_processing_sse41.c.o
+[284/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_sse41.c.o
+[285/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless_sse41.c.o
+[286/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling_sse41.c.o
+[287/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv_sse41.c.o
+[288/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/alpha_processing_sse2.c.o
+[289/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_sse2.c.o
+[290/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/filters_sse2.c.o
+[291/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless_sse2.c.o
+[292/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler_sse2.c.o
+[293/377] Building CXX object CMakeFiles/trellis-test-bigop.dir/src/test_bigop.cpp.o
+[294/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling_sse2.c.o
+[295/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv_sse2.c.o
+[296/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/alpha_processing_neon.c.o
+[297/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_neon.c.o
+[298/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/filters_neon.c.o
+[299/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless_neon.c.o
+[300/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling_neon.c.o
+[301/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler_neon.c.o
+[302/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv_neon.c.o
+[303/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_msa.c.o
+[304/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/filters_msa.c.o
+[305/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless_msa.c.o
+[306/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler_msa.c.o
+[307/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling_msa.c.o
+[308/377] Building CXX object CMakeFiles/trellis-test-c2s.dir/src/test_c2s.cpp.o
+[309/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler_mips32.c.o
+[310/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_mips32.c.o
+[311/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv_mips32.c.o
+[312/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/alpha_processing_mips_dsp_r2.c.o
+[313/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/lossless_mips_dsp_r2.c.o
+[314/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/filters_mips_dsp_r2.c.o
+[315/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/dec_mips_dsp_r2.c.o
+[316/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/rescaler_mips_dsp_r2.c.o
+[317/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/upsampling_mips_dsp_r2.c.o
+[318/377] Building C object _deps/libwebp-build/CMakeFiles/webpdspdecode.dir/src/dsp/yuv_mips_dsp_r2.c.o
+[319/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/bit_reader_utils.c.o
+[320/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/color_cache_utils.c.o
+[321/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/palette.c.o
+[322/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/filters_utils.c.o
+[323/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/huffman_utils.c.o
+[324/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/quant_levels_dec_utils.c.o
+[325/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/rescaler_utils.c.o
+[326/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/random_utils.c.o
+[327/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/thread_utils.c.o
+[328/377] Building C object _deps/libwebp-build/CMakeFiles/webputilsdecode.dir/src/utils/utils.c.o
+[329/377] Linking CXX executable trellis-chart-quads
+[330/377] Building CXX object CMakeFiles/trellis-test-shape-dec.dir/src/test_shape_dec.cpp.o
+[331/377] Linking CXX executable trellis-refine-core
+[332/377] Building C object _deps/libwebp-build/CMakeFiles/webpdemux.dir/src/demux/anim_decode.c.o
+[333/377] Linking CXX executable trellis-repack-uv
+[334/377] Linking CXX executable trellis-bake-quads
+[335/377] Linking CXX executable trellis-audit-quad-uv
+[336/377] Linking CXX executable trellis-audit-bake-fidelity
+[337/377] Building C object _deps/libwebp-build/CMakeFiles/webpdemux.dir/src/demux/demux.c.o
+[338/377] Linking CXX executable trellis-select-uv-overlap-cover
+[339/377] Linking CXX executable trellis-filter-quads
+[340/377] Linking CXX executable trellis-test-quad-component-cover
+[341/377] Linking CXX executable trellis-audit-quad-topology
+[342/377] Linking CXX executable trellis-test-quad-topology
+[343/377] Linking CXX executable trellis-smoke
+[344/377] Linking CXX executable trellis-devices
+[345/377] Linking CXX executable trellis-decode-replay
+[346/377] Linking CXX executable trellis-test-ss-flow
+[347/377] Linking CXX executable trellis-test-birefnet
+[348/377] Linking CXX executable trellis-test-shape-flow
+[349/377] Linking CXX executable trellis-test-ss-sample
+[350/377] Linking CXX executable trellis-test-deform
+[351/377] Linking CXX executable trellis-test-preprocess
+[352/377] Linking CXX executable trellis-test-uv-chart-density
+[353/377] Linking CXX executable trellis-test-ss-dec
+[354/377] Linking CXX executable trellis-test-slat-shape
+[355/377] Linking CXX executable trellis-test-uv-normal-margin
+[356/377] Linking CXX executable trellis-test-voxel-pbr
+[357/377] Linking CXX executable trellis-test-uv-overlap-cover
+[358/377] Linking CXX executable trellis-test-uv-preset
+[359/377] Linking CXX executable trellis-test-quad-quality
+[360/377] Linking CXX executable trellis-test-sparse-conv
+[361/377] Linking CXX executable trellis-test-dinov3
+[362/377] Linking CXX executable trellis-test-c2s
+[363/377] Linking CXX executable trellis-test-bigop
+[364/377] Linking CXX executable trellis-test-sparse-degenerate
+[365/377] Linking CXX executable trellis-test-pixal3d
+[366/377] Linking CXX executable trellis-test-shape-dec
+[367/377] Linking C static library _deps/libwebp-build/libwebpdecoder.a
+[368/377] Linking C static library _deps/libwebp-build/libwebpdemux.a
+[369/377] Building CXX object CMakeFiles/trellis-test-ss-full.dir/src/test_ss_full.cpp.o
+[370/377] Linking CXX executable trellis-test-ss-full
+[371/377] Building CXX object CMakeFiles/post-replay.dir/src/post_replay.cpp.o
+[372/377] Linking CXX executable post-replay
+[373/377] Building CXX object CMakeFiles/trellis-cli.dir/src/trellis_cli.cpp.o
+[374/377] Linking CXX executable trellis-cli
+[375/377] Building CXX object CMakeFiles/trellis-server.dir/src/trellis_cli.cpp.o
+[376/377] Building CXX object CMakeFiles/trellis-server.dir/src/trellis-server.cpp.o
+[377/377] Linking CXX executable trellis-server
