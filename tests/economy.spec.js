@@ -161,9 +161,10 @@ test('when the firms leave, offices and works go first, and homes follow the job
 
     run(world, 60);
     workplaces.forEach((p) => expect(builtHeight(p)).toBeLessThan(before.get(p)));
-    // There are still as many jobs as homes, so for now the homes hold.
+    // There are still as many jobs as homes, so for now the homes hold: a home
+    // already under construction may finish its current stage, but none empties.
     expect(districtReport(world.city)[SOUTH].jobs).toBeGreaterThanOrEqual(districtReport(world.city)[SOUTH].homes);
-    homes.forEach((p) => expect(builtHeight(p)).toBe(before.get(p)));
+    homes.forEach((p) => expect(builtHeight(p)).toBeGreaterThanOrEqual(before.get(p) - 1e-9));
 
     // Then the jobs fall below the homes, and the homes empty after them.
     run(world, 120);

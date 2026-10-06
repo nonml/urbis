@@ -1,9 +1,14 @@
 // Living-street sim: sidewalk walkers, lane traffic, lamp-zone blackout hack.
 // Pure data in, pure data out. Render reads state; only main ticks it.
 import { createStreams } from './rng.js';
-import { ROAD_HALF_WIDTH, LANE_OFFSET, wayLength } from './world.js';
+import { ROAD_HALF_WIDTH, wayLength } from './world.js';
 import { WORLD_FURNITURE } from './furniture.js';
 import { worldMap } from './patrol.js';
+// Cars are traffic's (M3.T30): trips on the graph, not a wrap at the tarmac end.
+// street.js owns the fleet's paint and shape and hands the sim its cars; the
+// renderer still reads street.cars, so spawns and goings are invisible only
+// because traffic re-tasks a car in place where the camera cannot see it.
+import { createTraffic, tick as tickTraffic } from './traffic.js';
 // Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is called
 // here so every walker and car carries the pose the last step started from.
 import { snap } from '../game/loop.js';
@@ -118,40 +123,6 @@ function makeEWWalker(rng, i, crossings) {
   };
 }
 
-function makeNSCar(rng, i, avenueXs, half) {
-  const dir = i % 2 === 0 ? 1 : -1;
-  const avenue = avenueXs[i % avenueXs.length];
-  return {
-    axis: 'z',
-    lane: avenue + dir * LANE_OFFSET,
-    dir,
-    z: -half + ((i * 37) % 12) / 12 * half * 2,
-    speed: 7 + rng.sim() * 3,
-    paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
-    shape: (i * 3 + 1) % SHAPE_COUNT,
-  };
-}
-
-function makeEWCar(rng, i, crossings) {
-  // Cross-street traffic: run the plaza connector + south road E-W.
-  const onSouth = i >= 15;
-  const cross = onSouth ? crossings[crossings.length - 1] : crossings[0];
-  const dir = i % 2 === 0 ? 1 : -1;
-  const xMin = cross.x0;
-  const xMax = cross.x1;
-  return {
-    axis: 'x',
-    x: xMin + ((i * 53) % 10) / 10 * (xMax - xMin),
-    z: cross.z + dir * LANE_OFFSET,
-    dir,
-    speed: 7 + rng.sim() * 3,
-    paint: CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length],
-    shape: (i * 3 + 2) % SHAPE_COUNT,
-    xMin,
-    xMax,
-  };
-}
-
 // The parked plan: the map's own on a generated world. WORLD_FURNITURE is the
 // same plan built at load and stays the fallback until M3.T14 deletes it; the
 // hand preset has no plan, so its table stands, its avenue x read off the map.
@@ -164,8 +135,8 @@ function parkedSlots(map, avenues) {
 export function createStreet(seed, map = worldMap()) {
   const rng = createStreams(seed);
   const { avenues, crossings } = map.district;
-  // Half an avenue's run. Walkers and traffic wrap here, so the loop is
-  // exactly as long as the tarmac is.
+  // Half an avenue's run. Walkers wrap here, so their loop is exactly as long
+  // as the tarmac is (until M3.T33); cars route the graph instead (M3.T30).
   const half = wayLength(avenues[0]) / 2;
   const avenueXs = avenues.map((a) => a.x);
   const npcSpots = [];
@@ -180,10 +151,12 @@ export function createStreet(seed, map = worldMap()) {
     if (i < 48 || i >= 60) npcs.push(makeNSWalker(rng, i, npcSpots, half));
     else npcs.push(makeEWWalker(rng, i, crossings));
   }
-  const cars = [];
-  for (let i = 0; i < CAR_COUNT; i++) {
-    cars.push(i < 12 ? makeNSCar(rng, i, avenueXs, half) : makeEWCar(rng, i, crossings));
-  }
+  const traffic = createTraffic(map, seed, CAR_COUNT);
+  const cars = [...traffic.cars];
+  cars.forEach((c, i) => {
+    c.paint = CAR_PAINTS[(i * 5 + 1) % CAR_PAINTS.length];
+    c.shape = (i * 3 + 1) % SHAPE_COUNT;
+  });
   parkedSlots(map, avenues).forEach(([ax, side, z], k) => {
     cars.push({
       axis: 'z',
@@ -201,6 +174,7 @@ export function createStreet(seed, map = worldMap()) {
     half,
     npcs,
     cars,
+    traffic,
     zones: [
       { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
       { darkUntil: 0, coolUntil: 0, collapseUntil: 0, restoreUntil: 0 },
@@ -299,17 +273,5 @@ export function tickStreet(state, dt) {
     }
     n.phase += dt * (dark ? 0 : v * 4);
   }
-  for (const c of state.cars) {
-    if (c.parked) continue;
-    snap(c);
-    if (c.axis === 'x') {
-      c.x += c.dir * c.speed * dt;
-      if (c.x > c.xMax + 3) c.x = c.xMin - 3;
-      if (c.x < c.xMin - 3) c.x = c.xMax + 3;
-    } else {
-      c.z += c.dir * c.speed * dt;
-      if (c.z > state.half + 5) c.z = -state.half - 5;
-      if (c.z < -state.half - 5) c.z = state.half + 5;
-    }
-  }
+  tickTraffic(state.traffic, dt);
 }
