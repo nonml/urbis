@@ -1,0 +1,56 @@
+{
+ "generator": "bake_vat.py (M2.T8)",
+ "verts": 468,
+ "tris": 156,
+ "bodies": [
+  {
+   "name": "average",
+   "height": 1.0,
+   "width": 1.0
+  },
+  {
+   "name": "tall",
+   "height": 1.06,
+   "width": 0.92
+  },
+  {
+   "name": "stocky",
+   "height": 0.94,
+   "width": 1.12
+  },
+  {
+   "name": "heavy",
+   "height": 0.98,
+   "width": 1.22
+  }
+ ],
+ "clips": {
+  "walk": {
+   "start": 0,
+   "n": 32,
+   "fps": 30
+  },
+  "idle": {
+   "start": 32,
+   "n": 16,
+   "fps": 30
+  }
+ },
+ "rowsPerBody": 48,
+ "rows": 192,
+ "bounds": {
+  "min": [
+   -0.4209,
+   -0.024371896820491012,
+   -0.5180858908460566
+  ],
+  "max": [
+   0.4209,
+   1.938700463983292,
+   0.771783244982131
+  ]
+ },
+ "texture": "walkers_vat.png",
+ "baseMesh": "walkers.glb",
+ "decode": "pos = min + texel * (max - min); u = (TEXCOORD_1.x * (verts - 1) + 0.5) / verts; v = (body * rowsPerBody + clip.start + frame + 0.5) / rows; texture: linear values, NearestFilter, flipY = false"
+}
