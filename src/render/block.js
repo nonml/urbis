@@ -10,15 +10,14 @@ import { displaceToTerrain } from './landscape.js';
 import { mulberry32 } from '../sim/rng.js';
 import { worldMap } from '../sim/patrol.js';
 import { WORLD_PLAN } from '../sim/layout.js';
-import {
-  ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH, isAvenue, wayCenter, wayLength,
-} from '../sim/world.js';
+import { ROAD_HALF_WIDTH as ROAD_HALF } from '../sim/world.js';
 import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
 import { HAND_PINNED, BUILD_LINE, towerCentreX } from '../sim/landmarks.js';
 import { WORLD_VISTAS, vistasOf } from '../sim/vistas.js';
 import { MIDBLOCK } from '../sim/streetscape.js';
 import { midblockFor } from '../sim/streetscape.js';
 import { buildInstancePools, buildShellPools } from './buildings.js';
+import { buildRoads, markSlot, WALK_RISE } from './roads.js';
 
 // Where the city is comes from the map (sim/map.js): this file draws the road
 // graph the map returns, it does not get a second opinion about where the roads
@@ -52,85 +51,58 @@ function worldUVs(geo, w, h, d, tile) {
   return geo;
 }
 
-// The carriageways of a map, in the order the street was merged in: avenues
-// north-south, then the crossings east-west.
-function streetsOf(map) {
-  return [...map.district.avenues, ...map.district.crossings];
+// A hand-authored box as a pool slot: its own span, centred where it stands.
+function pieceOf(geo) {
+  geo.computeBoundingBox();
+  const { min, max } = geo.boundingBox;
+  return {
+    x: (min.x + max.x) / 2, y: (min.y + max.y) / 2, z: (min.z + max.z) / 2,
+    w: max.x - min.x, h: max.y - min.y, d: max.z - min.z, kind: 0,
+  };
 }
 
-// A way's tarmac as one quad: full width across, its own span along.
-function carriageway(w) {
-  const len = wayLength(w);
-  const geo = isAvenue(w)
-    ? new THREE.PlaneGeometry(ROAD_HALF * 2, len)
-    : new THREE.PlaneGeometry(len, ROAD_HALF * 2);
-  const c = wayCenter(w);
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(c.x, 0, c.z);
-  return geo;
+// The hand preset's river promenade slab and parapet have no way of their own;
+// they ride the walk and kerb pools as extra pieces.
+const EXTRA_WALKS = [
+  ...(WORLD_PLAN ? [] : [box(22, WALK_RISE, 9, -17, 0.0, -32)]),
+].map(pieceOf);
+const EXTRA_KERBS = [
+  ...(WORLD_PLAN ? [] : [box(0.35, 1.0, 9, -27.8, 0.5, -32)]),
+].map(pieceOf);
+
+// Crosswalk stripes: 35 cm wide, tight 70 cm pitch. One mid-block crossing per
+// avenue, each at its own z so they do not line up across the district
+// (sim/streetscape.js places them; a generated world's come from its map).
+function midblockPieces(map) {
+  const out = [];
+  const paint = (x, cz) => {
+    for (let i = -3; i <= 3; i++) out.push(markSlot(x, cz + i * 0.7, ROAD_HALF * 2 - 1, 0.35));
+  };
+  if (map.dressing) {
+    for (const { x, z: cz } of midblockFor(map)) paint(x, cz);
+  } else {
+    for (const { x, z: cz } of MIDBLOCK) paint(x, cz);
+  }
+  return out;
 }
 
-// A pair of slabs flanking a way, one per side, sitting just off the kerb face.
-function flankingSlabs(w, width, height, y) {
-  const len = wayLength(w);
-  const c = wayCenter(w);
-  const off = ROAD_HALF + width / 2;
-  return [-1, 1].map((side) => (isAvenue(w)
-    ? box(width, height, len, c.x + side * off, y, c.z)
-    : box(len, height, width, c.x, y, c.z + side * off)));
+// What the ground wires into the road pools for a map: the hand preset's own
+// pieces and the mid-block crossings (tests/streetscape-wire.spec.js).
+function streetExtras(map) {
+  return { walks: EXTRA_WALKS, kerbs: EXTRA_KERBS, markings: midblockPieces(map) };
 }
 
-const WALK_RISE = 0.24;
-// The plaza's footways are narrower than the standard: they give the width back
-// to the 104 m of carriageway they flank.
-const PLAZA_WALK_WIDTH = 2.4;
-const KERB_WIDTH = 0.22;
-const KERB_RISE = 0.15;
-// The painted edge line, measured out from the centre-line like every other
-// marking. It lands on the kerb face rather than beside it — inherited, and not
-// this refactor's to move.
-const EDGE_LINE_OUT = ROAD_HALF + 0.2;
-
+// The carriageways, walks, kerbs and markings are pooled per edge and junction
+// in render/roads.js (M3.T26); the ground here adds what is not a road piece:
+// the curb clutter, the terrain base and the group that carries them all.
 export function buildGround(texLoader, maxAniso, map = worldMap()) {
   const { avenues, crossings } = map.district;
   const plaza = crossings[0];
-  const south = crossings[crossings.length - 1];
   const avenueX = avenues.map((a) => a.x);
   const furniture = furnitureOf(map);
   const group = new THREE.Group();
-  const mats = {};
-  const asphalt = loadPBRMaps(texLoader, maxAniso, 'asphalt', 'albedo', 2, 30);
-  const roadMat = standardFromMaps(asphalt, { roughness: 0.38, envMapIntensity: 1.4, color: 0x7e838d });
-  const roadMesh = new THREE.Mesh(mergeGeometries(streetsOf(map).map(carriageway)), roadMat);
-  roadMesh.receiveShadow = true;
-  group.add(roadMesh);
-  mats.road = roadMat;
-
-  const paving = loadPBRMaps(texLoader, maxAniso, 'paving_slabs', 'albedo', 1.5, 60);
-  const walkMat = standardFromMaps(paving, { roughness: 0.6, envMapIntensity: 0.7, color: 0x9aa0ab });
-  const walks = mergeGeometries([
-    ...avenues.flatMap((av) => flankingSlabs(av, WALKWAY_WIDTH, WALK_RISE, 0.0)),
-    ...flankingSlabs(plaza, PLAZA_WALK_WIDTH, WALK_RISE, 0.0),
-    ...flankingSlabs(south, WALKWAY_WIDTH, WALK_RISE, 0.0),
-    ...(WORLD_PLAN ? [] : [box(22, WALK_RISE, 9, -17, 0.0, -32)]),   // river promenade slab, hand preset only
-  ]);
-  const walkMesh = new THREE.Mesh(walks, walkMat);
-  walkMesh.receiveShadow = true;
-  group.add(walkMesh);
-  mats.walk = walkMat;
-
-  const concrete = loadPBRMaps(texLoader, maxAniso, 'concrete', 'albedo', 1, 40);
-  const curbMat = standardFromMaps(concrete, { roughness: 0.75, envMapIntensity: 0.4, color: 0x7d828c });
-  const kerbRails = (w) => flankingSlabs(w, KERB_WIDTH, KERB_RISE, KERB_RISE / 2);
-  const curbs = mergeGeometries([
-    ...avenues.flatMap(kerbRails),
-    ...kerbRails(south),
-    ...kerbRails(plaza),
-    ...(WORLD_PLAN ? [] : [box(0.35, 1.0, 9, -27.8, 0.5, -32)]),     // river promenade parapet, hand preset only
-  ]);
-  const curbMesh = new THREE.Mesh(curbs, curbMat);
-  curbMesh.receiveShadow = true;
-  group.add(curbMesh);
+  const roads = buildRoads(texLoader, maxAniso, map, streetExtras);
+  group.add(roads.group);
 
   // Curb clutter: bollards, drain grates, utility boxes — all merged, +0 draws.
   const clutter = [];
@@ -180,9 +152,7 @@ export function buildGround(texLoader, maxAniso, map = worldMap()) {
   group.add(clutterMesh);
 
   group.add(terrainBase());
-  const markings = buildMarkings(map);
-  group.add(markings.group);
-  return { group, mats, markings: markings.mats };
+  return { group, mats: roads.mats, markings: roads.markings, roads };
 }
 
 function terrainBase() {
@@ -196,111 +166,6 @@ function terrainBase() {
   mesh.position.y = -0.08;
   mesh.receiveShadow = true;
   return mesh;
-}
-
-function buildMarkings(map) {
-  const { avenues, crossings } = map.district;
-  const plaza = crossings[0];
-  const south = crossings[crossings.length - 1];
-  const avenueX = avenues.map((a) => a.x);
-  // Every avenue runs the same span today, and the markings that straddle the
-  // zone boundary at z = 0 are cut against it.
-  const streetLen = wayLength(avenues[0]);
-  const furniture = furnitureOf(map);
-  const quads = [[], []];
-  const push = (q, z) => quads[z < 0 ? 0 : 1].push(q);
-  // Center dashes: 10cm wide, 3m long, 6m gap (real road standard).
-  const dash = new THREE.PlaneGeometry(0.10, 3);
-  for (const av of avenues) {
-    for (let z = av.z0 + 3; z < av.z1 - 3; z += 6) {
-      const q = dash.clone();
-      q.rotateX(-Math.PI / 2);
-      q.translate(av.x, 0.02, z);
-      push(q, z);
-    }
-  }
-  // Along a crossing, stopping short of the junction mouth at either end.
-  const dashX = new THREE.PlaneGeometry(2, 0.10);
-  const crossDashes = (cr, inset) => {
-    for (let x = cr.x0 + inset; x <= cr.x1 - inset; x += 5) {
-      const q = dashX.clone();
-      q.rotateX(-Math.PI / 2);
-      q.translate(x, 0.02, cr.z);
-      push(q, cr.z);
-    }
-  };
-  crossDashes(south, 3);
-  crossDashes(plaza, 2);
-  // Crosswalk stripes: 35cm wide, tight 70cm pitch. One mid-block crossing per
-  // avenue, each at its own z so they do not line up across the district
-  // (sim/streetscape.js places them; a generated world's come from its map).
-  const stripe = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  const paintZebra = (x, cz) => {
-    for (let i = -3; i <= 3; i++) {
-      const q = stripe.clone();
-      q.rotateX(-Math.PI / 2);
-      q.rotateY(Math.PI / 2);
-      q.translate(x, 0.02, cz + i * 0.7);
-      push(q, cz);
-    }
-  };
-  if (map.dressing) {
-    for (const { x, z: cz } of midblockFor(map)) paintZebra(x, cz);
-  } else {
-    for (const { x, z: cz } of MIDBLOCK) paintZebra(x, cz);
-  }
-  // Zebra crossings over the plaza connector at each avenue on the hand preset;
-  // a generated world stripes every junction the map names.
-  const stripeC = new THREE.PlaneGeometry(0.35, ROAD_HALF * 2 - 1);
-  const junctions = furniture
-    ? furniture.junctions
-    : [...avenueX].sort((a, b) => a - b).map((ax) => ({ x: ax, z: plaza.z }));
-  for (const j of junctions) {
-    for (let i = -3; i <= 3; i++) {
-      const q = stripeC.clone();
-      q.rotateX(-Math.PI / 2);
-      q.translate(j.x + i * 0.7, 0.02, j.z);
-      push(q, j.z);
-    }
-  }
-  // Edge lines split at the zone boundary — same look, two draws.
-  const edge = new THREE.PlaneGeometry(0.10, streetLen / 2);
-  for (const ax of avenueX) {
-    for (const ex of [ax - EDGE_LINE_OUT, ax + EDGE_LINE_OUT]) {
-      for (const [zc, zs] of [[-streetLen / 4, 0], [streetLen / 4, 1]]) {
-        const q = edge.clone();
-        q.rotateX(-Math.PI / 2);
-        q.translate(ex, 0.02, zc);
-        quads[zs].push(q);
-      }
-    }
-  }
-  const mats = [];
-  const meshes = quads.map((list) => {
-    const mat = new THREE.MeshStandardMaterial({
-      color: 0xb8bcc2, emissive: 0x6a7078, emissiveIntensity: 0.015, roughness: 0.6,
-    });
-    mats.push(mat);
-    return new THREE.Mesh(mergeGeometries(list), mat);
-  });
-  const manholes = [];
-  const mh = new THREE.CircleGeometry(0.55, 14);
-  for (const ax of avenueX) {
-    for (const z of rhythm(ax, -48, 48, 24, map)) {
-      const q = mh.clone();
-      q.rotateX(-Math.PI / 2);
-      q.translate(ax + (z % 48 === 0 ? -1.8 : 1.8), 0.022, z);
-      manholes.push(q);
-    }
-  }
-  const mhMesh = new THREE.Mesh(
-    mergeGeometries(manholes),
-    new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.7, metalness: 0.4 })
-  );
-  const g = new THREE.Group();
-  for (const m of meshes) g.add(m);
-  g.add(mhMesh);
-  return { group: g, mats };
 }
 
 // HAND_PINNED and BUILD_LINE live in sim/landmarks.js, shared with the
