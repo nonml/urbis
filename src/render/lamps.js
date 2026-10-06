@@ -6,6 +6,7 @@ import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
 import { worldMap } from '../sim/patrol.js';
 import { WORLD_FURNITURE } from '../sim/furniture.js';
+import { signalGreen, signalHeads } from '../sim/traffic.js';
 
 // Which street a fixture belongs to comes from the map's district; how it
 // stands on that street is this file's business.
@@ -84,6 +85,18 @@ const GLOW_COLOR = 0xffc98a;
 const GLOW_SIZE = 3.2;
 const GLOW_OPACITY = 0.38;
 
+// Signals (M3.T31): a two-lamp head on every junction approach, built from the
+// sim's own placements so lights and the stopping rule cannot drift apart. Two
+// instanced draws for the whole city — pole+arm+housing, then the lenses, whose
+// instanceColor carries red/green.
+const SIGNAL_Y = 5.6;
+const SIGNAL_ARM = 1.7;
+const SIGNAL_LENS_Z = 0.21;
+const LENS_RED = new THREE.Color(0xff3a26);
+const LENS_GREEN = new THREE.Color(0x2fd257);
+const LENS_RED_OFF = new THREE.Color(0x2a0f0b);
+const LENS_GREEN_OFF = new THREE.Color(0x0b1a0d);
+
 // One instanced quad per glow instead of one Sprite each (law 4): the vertex patch
 // offsets the corners in view space, so the quad faces the camera and keeps the
 // instance's depth exactly like the sprite it replaces. Per-lamp brightness rides on
@@ -107,6 +120,22 @@ function glowMaterial() {
   };
   mat.customProgramCacheKey = () => 'lamp-glow-billboard';
   return mat;
+}
+
+// A lens sits on the housing's front face, offset from the head's own pole in
+// the head's local frame: +x toward the road, +z at oncoming traffic.
+function setLens(mesh, dummy, idx, head, y) {
+  const c = Math.cos(head.yaw);
+  const s = Math.sin(head.yaw);
+  dummy.position.set(
+    head.x + SIGNAL_ARM * c + SIGNAL_LENS_Z * s,
+    y,
+    head.z - SIGNAL_ARM * s + SIGNAL_LENS_Z * c,
+  );
+  dummy.rotation.set(0, head.yaw, 0);
+  dummy.scale.set(1, 1, 1);
+  dummy.updateMatrix();
+  mesh.setMatrixAt(idx, dummy.matrix);
 }
 
 export function buildLamps(map = worldMap()) {
@@ -177,6 +206,40 @@ export function buildLamps(map = worldMap()) {
   if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
   group.add(poles, heads, cones, glows);
 
+  // The signal pool: one head per junction approach from the sim's placement,
+  // the housing facing the traffic that must stop for it.
+  const SIGNALS = signalHeads(map);
+  const sigParts = [
+    new THREE.CylinderGeometry(0.08, 0.11, SIGNAL_Y, 6),
+    new THREE.BoxGeometry(SIGNAL_ARM, 0.09, 0.09),
+    new THREE.BoxGeometry(0.4, 0.95, 0.28),
+  ];
+  sigParts[0].translate(0, SIGNAL_Y / 2, 0);
+  sigParts[1].translate(SIGNAL_ARM / 2, SIGNAL_Y, 0);
+  sigParts[2].translate(SIGNAL_ARM, SIGNAL_Y - 0.55, 0.06);
+  const sigGeo = mergeGeometries(sigParts);
+  const sigs = new THREE.InstancedMesh(sigGeo, new THREE.MeshStandardMaterial({
+    color: 0x14171d, roughness: 0.4, metalness: 0.7,
+  }), SIGNALS.length);
+  const lenses = new THREE.InstancedMesh(new THREE.CircleGeometry(0.12, 10), new THREE.MeshBasicMaterial({
+    color: 0xffffff, side: THREE.DoubleSide,
+  }), SIGNALS.length * 2);
+  SIGNALS.forEach((h, i) => {
+    dummy.position.set(h.x, 0, h.z);
+    dummy.rotation.set(0, h.yaw, 0);
+    dummy.scale.set(1, 1, 1);
+    dummy.updateMatrix();
+    sigs.setMatrixAt(i, dummy.matrix);
+    setLens(lenses, dummy, i * 2, h, SIGNAL_Y - 0.32);
+    setLens(lenses, dummy, i * 2 + 1, h, SIGNAL_Y - 0.78);
+    lenses.setColorAt(i * 2, LENS_RED_OFF);
+    lenses.setColorAt(i * 2 + 1, LENS_GREEN_OFF);
+  });
+  sigs.instanceMatrix.needsUpdate = true;
+  lenses.instanceMatrix.needsUpdate = true;
+  if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
+  group.add(sigs, lenses);
+
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const zoneLight = [1, 1];
   let nightF = 1;
@@ -206,9 +269,15 @@ export function buildLamps(map = worldMap()) {
       }
       glows.setColorAt(i, glowLevel.setScalar(b > 0.02 ? GLOW_OPACITY * nightF * b : 0));
     });
+    SIGNALS.forEach((h, i) => {
+      const green = signalGreen(h.axis, time);
+      lenses.setColorAt(i * 2, green ? LENS_RED_OFF : LENS_RED);
+      lenses.setColorAt(i * 2 + 1, green ? LENS_GREEN : LENS_GREEN_OFF);
+    });
     heads.instanceColor.needsUpdate = true;
     cones.instanceMatrix.needsUpdate = true;
     glows.instanceColor.needsUpdate = true;
+    if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
   }
 
   // Daylight: heads go dull, cones and glows fade with the night.
