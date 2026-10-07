@@ -518,7 +518,26 @@ async function judge(state, w) {
   return escalate(w, `failed its check ${w.tries} times`);
 }
 
+// A worker that asks a question waits on it, quiet but not stalled: nudging or
+// aborting it would throw the question away (M2.T11, 2026-10-07). Say it once and
+// leave it waiting until the director answers through /question/<id>/reply.
+async function question(w) {
+  const { url } = await client(w.dir);
+  const asks = await fetch(`${url}/question`).then((r) => r.json(), () => []);
+  const q = asks.find((a) => a.sessionID === w.session);
+  if (!q) {
+    delete w.asked;
+    return null;
+  }
+  if (w.asked === q.id) return null;
+  w.asked = q.id;
+  const opts = q.questions.map((x) => `${x.question} [${x.options.map((o) => o.label).join(' | ')}]`).join(' ');
+  return `${w.name}: ${w.task?.id ?? w.brief} NEEDS THE DIRECTOR (question ${q.id}): ${opts}`;
+}
+
 async function tend(state, w) {
+  const asked = await question(w).catch(() => null);
+  if (asked || w.asked) return asked;
   const i = await sessionInfo(w);
   const news = i.busy ? await supervise(w, i) : await judge(state, w);
   state.tasks[w.task.id].model = w.model;
