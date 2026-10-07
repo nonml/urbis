@@ -61,6 +61,25 @@ export function bindProbe(parts) {
     dark: () => [...parts.dark],
     cooldown: () => +hackCooldownLeft(street).toFixed(1),
     player: () => ({ x: +player.x.toFixed(2), y: +player.y.toFixed(2), z: +player.z.toFixed(2), mode: player.mode }),
+    // M2.F2b: the shipped person's world bounds and where it stands. `skinned`
+    // flips true once loadPersonAvatar has swapped the box figure for
+    // person.glb; min/max come from Box3.setFromObject on the posed skinned
+    // subtree, `player` is the drawn group, `onScreen` is the bound centre
+    // inside the camera's frustum (M2.F2's failure showed a body at the player
+    // nowhere in the frame, so the frame itself is part of the question).
+    avatarBox: () => {
+      const box = new THREE.Box3().setFromObject(parts.avatar.group, true);
+      const centre = box.getCenter(new THREE.Vector3()).project(parts.camera);
+      const round = (v) => +v.toFixed(3);
+      const at = parts.avatar.group.position;
+      return {
+        skinned: !!parts.avatar.skinned,
+        min: [round(box.min.x), round(box.min.y), round(box.min.z)],
+        max: [round(box.max.x), round(box.max.y), round(box.max.z)],
+        player: [round(at.x), round(at.y), round(at.z)],
+        onScreen: centre.z <= 1 && Math.abs(centre.x) <= 1 && Math.abs(centre.y) <= 1,
+      };
+    },
     car: () => ({ x: +heroCar.x.toFixed(2), y: +heroCar.y.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
     enter: () => parts.toggleVehicle(),
     profile: () => getProfile(),

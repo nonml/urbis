@@ -6,15 +6,17 @@
 // box in four, and the four had already drifted apart. Everything that needs to
 // know where the city is reads it from here.
 //
-// It also owns the heightfield — see "The ground gets a Y" at the foot of the
-// file. Anything that sits on the ground asks heightAt() instead of assuming 0.
-import { mulberry32 } from './rng.js';
+// It also builds its own district's terrain (sim/terrain.js) and re-exports
+// heightAt, so anything that sits on the ground asks here instead of assuming 0.
+import { createTerrain, roadFlatRects as flatRectsFor, ROAD_HALF_WIDTH } from './terrain.js';
 import { generateDistrict } from './citygen.js';
 import { worldSeed } from './seedstore.js';
 
-// Carriageway geometry. ROAD_HALF in render/block.js is the same 3.5; lanes sit
-// 2 m off the centre-line because that is where traffic has always been drawn.
-export const ROAD_HALF_WIDTH = 3.5;
+// Carriageway geometry: the half-width lives in terrain.js, which needs it for
+// the flat road footprints and cannot import this file (the one-way rule).
+// Lanes sit 2 m off the centre-line because that is where traffic has always
+// been drawn.
+export { ROAD_HALF_WIDTH } from './terrain.js';
 export const LANE_OFFSET = 2;
 
 // Every node is on a carriageway and heightAt() is exactly zero on every
@@ -182,130 +184,22 @@ export function laneCenterLine(edge, dir) {
 }
 
 // ---------------------------------------------------------------------------
-// The ground gets a Y.
+// The ground gets a Y in sim/terrain.js (M4.T2). This file builds one terrain
+// for its own district so every existing heightAt() call site keeps working;
+// the map's own terrain (sim/map.js) is the authority for new code.
 //
-// The field never goes below zero. Every base in this world sits at y <= 0
-// (buildings at 0, the ground plane at -0.08, the mountains at -4), so relief
-// that only rises can bury a base but never expose one, and the shipped skyline
-// cannot break. There was one dip once — a river channel, cut so the water
-// would be visible under an opaque ground plane — and it went with the river:
-// it put a 51-degree wall inside the drivable box with nothing to stop a car
-// falling in, and the deepest ground it made was under the water anyway.
-//
-// It lives here, in world.js, and not in a terrain.js that world.js re-exports,
-// which is the split anyone reading this will be tempted to make. It cannot be
-// made: the field derives its flat footprints from DISTRICTS, so terrain.js
-// would import world.js while world.js re-exported terrain.js, and whichever
-// module the bundler happened to evaluate first would decide whether DISTRICTS
-// was still in its temporal dead zone when these tables are built. A cycle that
-// works by luck is worse than a long file.
-//
-// A mover asking how high the ground is must not have to reach into the
-// renderer to find out (law 5), which is why it is on this side of the line.
-const TERRAIN_SEED = 70413;
-// Below SHOP_SILL (0.55 in block.js), so a swell never buries a shopfront.
-const VERGE_RISE = 0.45;
-const HILL_RISE = 3.0;
-// Metres of blend from a flat footprint's edge out to full relief. Short enough
-// for a 15 m park to read, long enough that the lip is a slope and not a step.
-const FLAT_BLEND = 11;
-// Beyond the built district the relief opens up over this distance.
-const WILD_BLEND = 70;
-
-// A carriageway stays dead flat across its own width plus the 3 m walkway
-// block.js lays beside it, plus a tenth of a metre, so the blend starts off the
-// paving and the street frame never tilts.
-const AVENUE_WALKWAY = 3;
-const FLAT_MARGIN = 0.1;
-const ROAD_FLAT_HALF = ROAD_HALF_WIDTH + AVENUE_WALKWAY + FLAT_MARGIN;
-
-// Footprints that stay dead flat. Every road in the graph makes its own — add an
-// avenue and the ground under it flattens without anyone editing a table.
-function roadFlatRects() {
-  const rects = [];
-  for (const d of DISTRICTS) {
-    for (const av of d.avenues) {
-      rects.push([av.x, (av.z0 + av.z1) / 2, ROAD_FLAT_HALF, (av.z1 - av.z0) / 2]);
-    }
-    for (const cr of d.crossings) {
-      rects.push([(cr.x0 + cr.x1) / 2, cr.z, (cr.x1 - cr.x0) / 2, ROAD_FLAT_HALF]);
-    }
-  }
-  return rects;
-}
-
-// The one flat footprint that is not a road: the promenade, a 22 x 9 m paved
-// deck block.js lays at (-17, -32). Nothing in the graph describes a deck, so
-// it stays data.
+// The hand map's flats are its own roads plus the one deck no road table
+// describes. The district here is fixed, so the rect builder takes no argument
+// — the shape tests/streetscape-wire.spec.js pins.
+const roadFlatRects = () => flatRectsFor(DOWNTOWN);
 const PROMENADE = [-17, -32, 11, 4.5];
 const FLAT_RECTS = [...roadFlatRects(), ...(generate ? [] : [PROMENADE])];
-
-// The built district as one rect (cx, cz, half-width, half-depth). Inside it the
-// relief is the verge swell only, so the 68 merged towers and the skyline ring
-// keep the flat ground they were authored against.
-const DISTRICT_RELIEF = [7, 2.5, 73, 117.5];
-
-// Two bands of randomly-oriented waves. The swell is short, so a 15 m verge
-// actually rolls instead of being handed one constant offset; the hills are
-// long, because a hill the size of a park is a mound. Every wavelength stays
-// above twice the 4 m sampling grid, so the mesh cannot alias one into facets.
-function seedWaves(rand, wavelengths) {
-  const waves = wavelengths.map((wavelength, i) => {
-    const angle = rand() * Math.PI * 2;
-    const k = (Math.PI * 2) / wavelength;
-    return {
-      kx: Math.cos(angle) * k, kz: Math.sin(angle) * k,
-      phase: rand() * Math.PI * 2, amp: 1 / (i + 1),
-    };
-  });
-  const total = waves.reduce((sum, w) => sum + w.amp, 0);
-  return waves.map((w) => ({ ...w, amp: w.amp / total }));
-}
-
-const TERRAIN_RAND = mulberry32(TERRAIN_SEED);
-const SWELL_WAVES = seedWaves(TERRAIN_RAND, [34, 19]);
-const HILL_WAVES = seedWaves(TERRAIN_RAND, [190, 88, 43]);
-
-function band01(waves, x, z) {
-  let n = 0;
-  for (const w of waves) n += w.amp * Math.sin(w.kx * x + w.kz * z + w.phase);
-  return 0.5 + 0.5 * n;
-}
-
-function smoothstep01(t) {
-  if (t <= 0) return 0;
-  if (t >= 1) return 1;
-  return t * t * (3 - 2 * t);
-}
-
-function rectDistance(x, z, cx, cz, hw, hd) {
-  const dx = Math.max(0, Math.abs(x - cx) - hw);
-  const dz = Math.max(0, Math.abs(z - cz) - hd);
-  return Math.hypot(dx, dz);
-}
-
-// 1 inside any of the rects, 0 once the blend has run out.
-function holdFlat(rects, blend, x, z) {
-  let held = 0;
-  for (const [cx, cz, hw, hd] of rects) {
-    held = Math.max(held, 1 - smoothstep01(rectDistance(x, z, cx, cz, hw, hd) / blend));
-    if (held >= 1) return 1;
-  }
-  return held;
-}
-
-function wildness(x, z) {
-  return smoothstep01(rectDistance(x, z, ...DISTRICT_RELIEF) / WILD_BLEND);
-}
-
-// Ground elevation in metres above the ground plane. Exactly zero on every road
-// and never negative anywhere.
-export function heightAt(x, z) {
-  const open = 1 - holdFlat(FLAT_RECTS, FLAT_BLEND, x, z);
-  const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
-  const hills = HILL_RISE * band01(HILL_WAVES, x, z) * wildness(x, z);
-  return open * (swell + hills);
-}
+const TERRAIN = createTerrain({
+  district: DOWNTOWN,
+  flatRects: FLAT_RECTS,
+});
+export const heightAt = TERRAIN.heightAt;
+export const buildable = TERRAIN.buildable;
 
 // Whole-way lookups, added when render/block.js, render/lamps.js and
 // sim/street.js migrated onto this file.

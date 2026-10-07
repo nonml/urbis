@@ -45,9 +45,21 @@ image-conditioned car run.
 
 ## Per-model cost (M2-0)
 
-M2.T3's car (`clean_car.py`) and M2.T4's person (`make_person.py`) append their
-minutes and peak memory here when they land; peak memory is `/usr/bin/time -l`'s
-maximum resident set size.
+Peak memory is `/usr/bin/time -l`'s maximum resident set size, measured on the
+operator's Mac (Apple M3, 16 GB, macOS 26.6.2), 2026-10-07.
+
+| Model | Script | Wall | Peak RSS | Output |
+|---|---|---|---|---|
+| Person | `make_person.py` (Blender 5.2.2 + MPFB 2.0.17) | 31.3 s | 278 MB | 398 KB GLB, 4,752 verts / 9,500 tris, 1.0 s `Walk` |
+
+The person is an MPFB body on its `cmu_mb` game rig. The walk is CMU mocap trial
+`08_01` (cgspeed MotionBuilder-friendly BVH), vendored at
+`tools/models/mocap/cmu-08_01-walk.bvh` — CMU's database is free for all uses.
+The script retargets one full gait cycle, grounds each frame, decimates under
+the 10,000-triangle budget and vertex-colours the body, then exports
+`public/assets/models/person.glb` (M2.F2). `PERSON_OUT=<path> python3
+tools/models/make_person.py` writes elsewhere; it stops and names the missing
+tool if Blender or MPFB is not installed.
 
 ## M2.E1 — trellis.cpp (GGML/Metal) evaluation
 

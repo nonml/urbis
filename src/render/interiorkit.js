@@ -300,17 +300,12 @@ export function part(geo, color, cell = CELL.plain, glow = null) {
 // Kit pieces. The rooms draw their furniture from these, not from raw boxes:
 // `cased` is the kit's square-section piece — counter carcasses, jambs,
 // beams, sills, crates — subdivided about every `step` metres so the baked
-// light pools on it, and `tag` names every part a builder pushed the way the
-// pool loader tags its meshes (models.js), so the sweep reads a model.
+// light pools on it.
 export function cased(w, h, depth, a, y, d, step = 0.5) {
   const seg = (v) => Math.max(1, Math.round(v / step));
   const g = new THREE.BoxGeometry(w, h, depth, seg(w), seg(h), seg(depth));
   g.translate(a, y, -d);
   return g;
-}
-
-export function tag(out, from, name) {
-  for (let i = from; i < out.length; i += 1) out[i].userData.model = name;
 }
 
 export function cylinder(rTop, rBottom, h, a, y, d, sides = 12) {
