@@ -147,8 +147,6 @@ export function buildGround(texLoader, maxAniso, map = worldMap()) {
       color: 0x2a2d33, roughness: 0.8, metalness: 0.3, vertexColors: true,
     })
   );
-  // Bollards, grates and utility boxes: curb clutter reads as a prop (M2-6).
-  clutterMesh.userData.model = 'curb-clutter';
   clutterMesh.castShadow = true;
   clutterMesh.receiveShadow = true;
   group.add(clutterMesh);
@@ -1049,8 +1047,6 @@ export function buildSkyline(texLoader, maxAniso, map = worldMap()) {
   });
   const footprints = RING.map(([x, z, w, , d], i) => ({ x, z, w, d, name: `RING[${i}]` }));
   const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
-  // The horizon ring is a building model for the VGA-084 sweep (M2-6).
-  mesh.userData.model = 'building-skyline-ring';
   mesh.frustumCulled = false;
   return { mesh, mat, footprints };
 }
