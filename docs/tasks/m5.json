@@ -62,16 +62,18 @@
     {
       "id": "M5.T3c",
       "lane": "build-ui",
-      "goal": "Finish the road drag. After M5.T3b (fd0cdbd), on main `tests/accept/m5-roads.spec.js` fails on seeds 7 and 22 with \"new lots on both sides (0 added)\", though the board ran it green in the lane. Its shots also show the new road laid over a black void: no tarmac and no ground, only lot outlines. The check now also picks the road's middle and a point 20 m off it, and both must hit something drawn. Make the new road draw as a road, make the land a player can build on draw as ground, and make the check pass on all five seeds on main.",
+      "goal": "Finish the road drag. After M5.T3b (fd0cdbd), on main `tests/accept/m5-roads.spec.js` fails on seeds 7 and 22 with \"new lots on both sides (0 added)\", though the board ran it green in the lane. Its shots also show the new road laid over a black void: no tarmac and no ground, only lot outlines. The check now also picks the road's middle and a point 20 m off it, and both must hit something drawn. Make the new road draw as a road, make the land a player can build on draw as ground, and make the check pass on all five seeds on main. M4.T6 (hills, d78a347) landed between the lane's run and main; check whether the new relief makes `buildable` refuse the new lots.",
       "files": [
         "src/sim/ops.js",
         "src/sim/map.js",
         "src/sim/cityview.js",
         "src/render/cityview.js",
-        "src/render/world.js",
         "src/render/roads.js",
-        "src/render/terrain.js",
-        "src/ui/cityview.js"
+        "src/ui/cityview.js",
+        "src/render/landscape.js",
+        "src/render/outskirts.js",
+        "src/sim/terrain.js",
+        "src/sim/layout.js"
       ],
       "needs": [
         "M5.T3b"
