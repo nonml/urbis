@@ -8,6 +8,7 @@ import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
 import { worldMap } from '../sim/patrol.js';
 import { loadPBRMaps, standardFromMaps } from './materials.js';
 import { buildInstancePools } from './buildings.js';
+import { refreshBuildGround } from './landscape.js';
 
 export const WALK_RISE = 0.24;
 const PLAZA_WALK_WIDTH = 2.4;  // narrower footways flanking the plaza's 104 m
@@ -43,21 +44,28 @@ function endTrim(way, node) {
 
 // A carriageway quad per edge, cut where a junction meets it, plus one square
 // per junction: the old full-span merges overlapped in every junction square,
-// edge-plus-junction tiles the same tarmac exactly once.
+// edge-plus-junction tiles the same tarmac exactly once. Every edge the graph
+// holds is drawn, whatever way laid it, so the road a player drags (M5.T3c)
+// appears the same frame its version change reaches the pools; a node with two
+// edges or more is a junction and trims them back, a dangling end keeps its
+// full half-width.
 function carriagewayPieces(map, nodes) {
-  const ways = new Map();
-  for (const w of [...map.district.avenues, ...map.district.crossings]) ways.set(w.id, w);
+  const degree = new Map();
+  for (const e of map.graph.edges) {
+    degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
+    degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
+  }
   const out = [];
   const junctionIds = new Set();
+  const trim = (id) => ((degree.get(id) ?? 0) > 1 ? ROAD_HALF : 0);
   for (const e of map.graph.edges) {
     const a = nodes.get(e.a);
     const b = nodes.get(e.b);
-    const way = ways.get(e.way);
-    if (!a || !b || !way) continue;
+    if (!a || !b) continue;
     const vertical = a.x === b.x;
     const raw = vertical ? b.z - a.z : b.x - a.x;
-    const t0 = endTrim(way, a);
-    const t1 = endTrim(way, b);
+    const t0 = trim(e.a);
+    const t1 = trim(e.b);
     if (t0 > 0) junctionIds.add(e.a);
     if (t1 > 0) junctionIds.add(e.b);
     const span = Math.abs(raw) - t0 - t1;
@@ -280,6 +288,7 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     kerbs.update(p.kerbs);
     markings.update(p.markings);
     manholes.update(p.manholes);
+    refreshBuildGround(next);
   };
   return {
     group,

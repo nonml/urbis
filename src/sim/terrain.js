@@ -44,6 +44,10 @@ const ROAD_FLAT_HALF = ROAD_HALF_WIDTH + AVENUE_WALKWAY + FLAT_MARGIN;
 // — 1 in 5. Past it a foundation wants the cut-and-fill this game does not
 // model, so placement refuses. M4.T5 is the first caller.
 export const MAX_BUILD_GRADIENT = 0.2;
+// A road grades its own corridor flat (graphFlatRects), so it may climb ground
+// a foundation may not. The relief's own worst slope is ~0.33 m/m (M4.T6's
+// hills), so a drag refuses only a cliff, not a hill (M5.T3c).
+export const MAX_ROAD_GRADIENT = 0.4;
 // The step central differences read the field over, the same scale render/
 // outskirts.js measures its normals over: 2 m is small enough that a 15 m verge
 // is a slope and not one number.
@@ -153,6 +157,52 @@ function holdFlat(rects, blend, x, z) {
   return held;
 }
 
+// A generated town's flat set is one rect per road edge and one per node, and
+// the ground mesh asks heightAt for every vertex. A 64 m bucket grid keeps a
+// lookup to the handful of rects that could reach it: FLAT_BLEND (11 m) is
+// well under the bucket, so the 3x3 neighbourhood around a point is exhaustive.
+const FLAT_CELL = 64;
+const FLAT_KEY = 0x8000; // shifts negative buckets into one integer key
+
+function flatBuckets(rects) {
+  const index = new Map();
+  for (const r of rects) {
+    const x0 = Math.floor((r[0] - r[2]) / FLAT_CELL);
+    const x1 = Math.floor((r[0] + r[2]) / FLAT_CELL);
+    const z0 = Math.floor((r[1] - r[3]) / FLAT_CELL);
+    const z1 = Math.floor((r[1] + r[3]) / FLAT_CELL);
+    for (let ix = x0; ix <= x1; ix++) {
+      for (let iz = z0; iz <= z1; iz++) {
+        const key = (ix + FLAT_KEY) * 0x10000 + (iz + FLAT_KEY);
+        const bucket = index.get(key);
+        if (bucket) bucket.push(r);
+        else index.set(key, [r]);
+      }
+    }
+  }
+  return index;
+}
+
+// holdFlat over a bucketed set. A small set keeps the plain scan: the world's
+// own hand terrain has a dozen rects and no lookup beats a dozen compares.
+function holdFlatIndexed(index, rects, blend, x, z) {
+  if (rects.length <= 16) return holdFlat(rects, blend, x, z);
+  const ix = Math.floor(x / FLAT_CELL);
+  const iz = Math.floor(z / FLAT_CELL);
+  let held = 0;
+  for (let dx = -1; dx <= 1; dx++) {
+    for (let dz = -1; dz <= 1; dz++) {
+      const bucket = index.get((ix + dx + FLAT_KEY) * 0x10000 + (iz + dz + FLAT_KEY));
+      if (!bucket) continue;
+      for (const r of bucket) {
+        held = Math.max(held, 1 - smoothstep01(rectDistance(x, z, r[0], r[1], r[2], r[3]) / blend));
+        if (held >= 1) return 1;
+      }
+    }
+  }
+  return held;
+}
+
 function wildness(x, z) {
   return smoothstep01(rectDistance(x, z, ...DISTRICT_RELIEF) / WILD_BLEND);
 }
@@ -191,14 +241,16 @@ export function createTerrain(map) {
     ?? (map.graph ? graphFlatRects(map.graph) : roadFlatRects(map.district));
   const pads = padRects(map);
   const water = map.water ?? [];
+  const flatIndex = flatBuckets(flats);
+  const padIndex = flatBuckets(pads);
 
   const heightAt = (x, z) => {
-    const open = 1 - holdFlat(flats, FLAT_BLEND, x, z);
+    const open = 1 - holdFlatIndexed(flatIndex, flats, FLAT_BLEND, x, z);
     // On the tarmac the answer is exactly zero, and a mover asks here often.
     if (open === 0) return 0;
     const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
     const hills = HILL_RISE * band01(HILL_WAVES, x, z);
-    const tuck = pads.length ? holdFlat(pads, FLAT_BLEND, x, z) : 0;
+    const tuck = pads.length ? holdFlatIndexed(padIndex, pads, FLAT_BLEND, x, z) : 0;
     return open * (swell + hills * wildness(x, z) * (1 - tuck));
   };
 

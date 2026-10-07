@@ -12,13 +12,21 @@ import { planLayout, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
 import { vistasOf } from '../sim/vistas.js';
 import { worldMap } from '../sim/patrol.js';
 
+// The ground of a map, live: the map's own terrain when it has one (a generated
+// map's, rebuilt from its graph after every road op), the load-time world's
+// otherwise. All the meshes here read the same one, so the ground a road is
+// laid on is the ground they follow (M5.T3c).
+export function terrainOf(map = worldMap()) {
+  return map.terrain?.heightAt ?? heightAt;
+}
+
 // Lift every vertex of an already-positioned geometry onto the field. A slab's
 // top and bottom move together, so its thickness and its vertical sides survive
 // and no face cracks open.
-export function displaceToTerrain(geo) {
+export function displaceToTerrain(geo, heightOf = terrainOf()) {
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
-    pos.setY(i, pos.getY(i) + heightAt(pos.getX(i), pos.getZ(i)));
+    pos.setY(i, pos.getY(i) + heightOf(pos.getX(i), pos.getZ(i)));
   }
   pos.needsUpdate = true;
   geo.computeVertexNormals();
@@ -98,6 +106,88 @@ function grassOf(map) {
   return grassFor(map.district, planLayout(map.district, map.seed, pinned), vistasOf(map));
 }
 
+// The ground a player can build on (M5.T3c): the map's own build box, drawn as
+// one mesh outside the fixed 700 m base plane (block.js). A generated town's
+// graph spans kilometres, so without this its outer roads and lots stand over
+// void. The frame keeps the base plane's own 4 m lattice so the two surfaces
+// meet exactly, and it is displaced by the live map terrain, which flattens
+// under every road and parcel pad — so tarmac and lots meet the ground.
+const BASE_PLANE_HALF = 350;  // block.js GROUND_EXTENT / 2 — keep in step
+const GROUND_STEP = 4;        // matches GROUND_CELL in block.js
+const GROUND_SINK = 0.08;     // the base plane's own drop (block.js)
+const GROUND_LATTICE = 2;     // the 700 m plane's vertices sit on 2 (mod 4)
+const GROUND_HEX = 0x14171c;  // the base plane's colour, so the two read as one
+
+// The nearest lattice line at or under `v`, and at or over it.
+const latticeLo = (v) => Math.floor((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
+const latticeHi = (v) => Math.ceil((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
+
+// The frame as up to four strips around the square the base plane covers.
+function frameRects(bounds) {
+  const x0 = latticeLo(bounds.minX), x1 = latticeHi(bounds.maxX);
+  const z0 = latticeLo(bounds.minZ), z1 = latticeHi(bounds.maxZ);
+  const hx0 = Math.max(x0, -BASE_PLANE_HALF), hx1 = Math.min(x1, BASE_PLANE_HALF);
+  const hz0 = Math.max(z0, -BASE_PLANE_HALF), hz1 = Math.min(z1, BASE_PLANE_HALF);
+  if (hx1 <= hx0 || hz1 <= hz0) return [[x0, x1, z0, z1]];
+  const rects = [];
+  if (z0 < hz0) rects.push([x0, x1, z0, hz0]);
+  if (z1 > hz1) rects.push([x0, x1, hz1, z1]);
+  if (x0 < hx0) rects.push([x0, hx0, hz0, hz1]);
+  if (x1 > hx1) rects.push([hx1, x1, hz0, hz1]);
+  return rects;
+}
+
+function buildGroundFrame(map) {
+  if (!map.bounds) return null;
+  const geos = frameRects(map.bounds).map(([x0, x1, z0, z1]) => {
+    const w = x1 - x0;
+    const d = z1 - z0;
+    const g = new THREE.PlaneGeometry(w, d, Math.round(w / GROUND_STEP), Math.round(d / GROUND_STEP));
+    g.rotateX(-Math.PI / 2);
+    g.translate((x0 + x1) / 2, 0, (z0 + z1) / 2);
+    return g;
+  });
+  const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos), terrainOf(map)),
+    new THREE.MeshStandardMaterial({ color: GROUND_HEX, roughness: 1, metalness: 0 }));
+  mesh.name = 'build ground';
+  mesh.position.y = -GROUND_SINK;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
+// The frame's vertex grid is fixed once its bounds are: a road op changes the
+// ground under it, not the grid. A refresh reads the terrain Ys again only when
+// the graph's counts changed, so zoning and bulldozing never re-displace it;
+// bounds that moved get the geometry rebuilt, because a drag may leave the box
+// the frame was first cut for.
+let groundRig = null;
+
+const sameBounds = (a, b) => a && b && a.minX === b.minX && a.maxX === b.maxX
+  && a.minZ === b.minZ && a.maxZ === b.maxZ;
+
+export function refreshBuildGround(map = worldMap()) {
+  if (!groundRig || groundRig.map !== map || !map.graph) return;
+  const nodes = map.graph.nodes.length;
+  const edges = map.graph.edges.length;
+  if (nodes === groundRig.nodes && edges === groundRig.edges && sameBounds(map.bounds, groundRig.bounds)) return;
+  if (!sameBounds(map.bounds, groundRig.bounds)) {
+    const next = buildGroundFrame(map);
+    if (!next) return;
+    groundRig.mesh.geometry.dispose();
+    groundRig.mesh.geometry = next.geometry;
+    groundRig.bounds = { ...map.bounds };
+  } else {
+    const pos = groundRig.mesh.geometry.attributes.position;
+    const heightOf = terrainOf(map);
+    for (let i = 0; i < pos.count; i++) pos.setY(i, heightOf(pos.getX(i), pos.getZ(i)));
+    pos.needsUpdate = true;
+    groundRig.mesh.geometry.computeVertexNormals();
+    groundRig.mesh.geometry.computeBoundingSphere();
+  }
+  groundRig.nodes = nodes;
+  groundRig.edges = edges;
+}
+
 export function buildGrassGround(map = worldMap()) {
   const grass = grassOf(map);
   const mat = new THREE.MeshStandardMaterial({ color: 0x1c3020, roughness: 1.0, envMapIntensity: 0.2 });
@@ -111,7 +201,15 @@ export function buildGrassGround(map = worldMap()) {
   for (const s of grass.slabs) slab(s.w, s.d, s.x, s.z);
   const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos)), mat);
   mesh.receiveShadow = true;
-  return mesh;
+  const frame = buildGroundFrame(map);
+  if (!frame) return mesh;
+  groundRig = {
+    mesh: frame, map, bounds: { ...map.bounds },
+    nodes: map.graph.nodes.length, edges: map.graph.edges.length,
+  };
+  const group = new THREE.Group();
+  group.add(mesh, frame);
+  return group;
 }
 
 function bladeTexture() {
