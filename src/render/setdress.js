@@ -6,6 +6,8 @@ import { getGlowTex } from './signs.js';
 import { mulberry32 } from '../sim/rng.js';
 import { zoneAt } from '../sim/street.js';
 import { loadPBRMaps, standardFromMaps, wetness } from './materials.js';
+import { loadModelPool } from './models.js';
+import { reportKit } from './lamps.js';
 import { PUDDLES, SHOPS, VENTS } from '../sim/dressing.js';
 
 // A signwriter's colours: a painted board and the letters on it. Lacquer red
@@ -102,6 +104,45 @@ function shopSignGeos(s, signGeos, brackets) {
   brackets.push(arm, stay, cap);
 }
 
+// Street kit (M2-5): benches and bus stops from the model pool, placed by
+// hand along the spawn's sidewalks with their long axis down the street. The
+// bins stay scene.js's load; the report below names the file so the M2-5
+// check reads the whole kit, not one file at a time.
+const BENCH_MODEL = 'assets/models/bench/bench.glb';
+const BUS_STOP_MODEL = 'assets/models/bus_stop/bus_stop.glb';
+// The bench backrest is at local +z: east sidewalk (road at -x) needs +z -> +x.
+// [x, z, yaw] — z spots clear of the lamp rhythm (sim/furniture.js) and bins.
+const BENCHES = [
+  [5.0, 16, Math.PI / 2], [5.0, -16, Math.PI / 2], [5.0, 33, Math.PI / 2],
+  [-5.0, 20, -Math.PI / 2], [-5.0, 0, -Math.PI / 2], [-5.0, -34, -Math.PI / 2],
+];
+// The shelter's back glass is at local -z: east sidewalk needs -z -> +x.
+const BUS_STOPS = [
+  [5.6, 21, -Math.PI / 2], [-5.6, -14, Math.PI / 2], [49.6, 4, -Math.PI / 2],
+];
+
+export function buildStreetKit() {
+  const group = new THREE.Group();
+  const dummy = new THREE.Object3D();
+  const place = (path, spots, label) => {
+    loadModelPool(path, spots.length).then((pool) => {
+      spots.forEach(([x, z, yaw]) => {
+        dummy.position.set(x, 0, z);
+        dummy.rotation.set(0, yaw, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        pool.set(pool.claim(), dummy.matrix);
+      });
+      group.add(pool.group);
+      reportKit({ [label]: spots.length, models: [path.split('/')[2]] });
+    }).catch(() => {});
+  };
+  place(BENCH_MODEL, BENCHES, 'benches');
+  place(BUS_STOP_MODEL, BUS_STOPS, 'shelters');
+  reportKit({ models: ['metal_trash_can'] });
+  return group;
+}
+
 export function buildShops(texLoader, maxAniso) {
   const group = new THREE.Group();
   const signTex = shopSignAtlas();
@@ -118,6 +159,7 @@ export function buildShops(texLoader, maxAniso) {
   const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
   const capMat = standardFromMaps(plate, { roughness: 0.62, metalness: 0.25, envMapIntensity: 0.9, color: 0x8b949f });
   group.add(new THREE.Mesh(mergeGeometries(brackets), capMat));
+  group.add(buildStreetKit());
   return { group, mats };
 }
 

@@ -205,7 +205,6 @@ function tagShape(geo, part) {
   return geo;
 }
 const foldShapes = (build) => mergeGeometries(CAR_SPECS.map((s, i) => tagShape(build(s), i)));
-const fleetBodyGeo = foldShapes(carBodyGeo);
 const fleetGlassGeo = foldShapes(carGlassGeo);
 const fleetTrimGeo = foldShapes(carTrimGeo);
 const fleetWheelGeo = foldShapes(carWheelGeo);
@@ -400,15 +399,17 @@ function loadFleetModels(rig) {
     const out = { paintGeos: [], trimGeos: [], wheelGeos: [] };
     gltf.scene.traverse((o) => { if (o.isMesh) heroSort(o, out); });
     if (!out.paintGeos.length || (!out.trimGeos.length && !out.wheelGeos.length)) return;
-    const paint = foldFleetVariants(out.paintGeos);
+    const base = mergeGeometries(out.paintGeos.map(fleetPart));
     const trim = out.trimGeos.length ? foldFleetVariants(out.trimGeos) : null;
     const wheels = out.wheelGeos.length ? foldFleetVariants(out.wheelGeos) : null;
-    if (!paint || !trim || !wheels) return;
-    for (const g of [paint, trim, wheels]) g.setAttribute('iShape', rig.iShape);
-    rig.bodies.geometry.dispose();
-    rig.bodies.geometry = paint;
-    rig.bodies.material = patchCarShape(out.paintMat, 'car-fleet-body');
-    rig.bodies.userData.model = FLEET_MODEL;
+    if (!base || !trim || !wheels) return;
+    for (const g of [trim, wheels]) g.setAttribute('iShape', rig.iShape);
+    rig.bodies.meshes.forEach((mesh, s) => {
+      mesh.geometry.dispose();
+      mesh.geometry = fleetVariant(base, FLEET_SHAPES[s].s);
+      mesh.material = out.paintMat;
+      mesh.userData.model = FLEET_MODEL;
+    });
     rig.trim.geometry.dispose();
     rig.trim.geometry = trim;
     rig.trim.material = patchCarShape(out.trimMat, 'car-fleet-trim');
@@ -459,6 +460,39 @@ function curbPose(car, out) {
   return out;
 }
 
+// Bodies draw per silhouette (M2-5): one InstancedMesh per fleet shape, so a
+// car submits its own ~6.5k triangles instead of the folded 32.5k all five
+// shapes cost. Five draws, and the fleet still stays inside M2-1's eleven-draw
+// guard. `slot[i]` maps a car index to its shape's instance slot.
+function shapePool(geos, material, slot) {
+  const group = new THREE.Group();
+  const meshes = geos.map((g, s) => {
+    const m = new THREE.InstancedMesh(g, material, slot.filter(([sh]) => sh === s).length);
+    m.name = 'fleet-car-body';
+    m.castShadow = true;
+    m.frustumCulled = false;
+    group.add(m);
+    return m;
+  });
+  return {
+    group,
+    meshes,
+    setColorAt(i, color) {
+      const [s, k] = slot[i];
+      meshes[s].setColorAt(k, color);
+      meshes[s].instanceColor.needsUpdate = true;
+    },
+    setMatrixAt(i, matrix) {
+      const [s, k] = slot[i];
+      meshes[s].setMatrixAt(k, matrix);
+    },
+    flush() {
+      for (const m of meshes) m.instanceMatrix.needsUpdate = true;
+    },
+    instanceMatrix: { needsUpdate: false },
+  };
+}
+
 export function buildTraffic(street) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
@@ -470,19 +504,19 @@ export function buildTraffic(street) {
   // slab with no colour left in them — the single worst object in the frame.
   // Metalness down, env down, roughness up a touch: the paint keeps its
   // colour, and there is still enough gloss for shop and street light to land on it.
-  const paintMat = patchCarShape(new THREE.MeshStandardMaterial({
+  const paintMat = new THREE.MeshStandardMaterial({
     roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
-  }), 'car-body');
-  const bodies = new THREE.InstancedMesh(fleetBodyGeo, paintMat, N);
-  bodies.name = 'fleet-car-body';
-  bodies.castShadow = true;
-  bodies.customDepthMaterial = patchCarShape(
-    new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), 'car-body-depth'
-  );
-  // One iShape array drives every folded mesh: a car's body, glass, trim and
+  });
+  const shapeCounts = FLEET_SHAPES.map(() => 0);
+  const slots = street.cars.map((c) => {
+    const s = c.shape ?? 0;
+    return [s, shapeCounts[s]++];
+  });
+  const bodies = shapePool(CAR_SPECS.map((spec) => carBodyGeo(spec)), paintMat, slots);
+  // One iShape array drives every folded mesh: a car's glass, trim and
   // wheels all read their silhouette from the same instance value.
   const iShape = new THREE.InstancedBufferAttribute(new Float32Array(N), 1);
-  for (const g of [fleetBodyGeo, fleetGlassGeo, fleetTrimGeo, fleetWheelGeo]) g.setAttribute('iShape', iShape);
+  for (const g of [fleetGlassGeo, fleetTrimGeo, fleetWheelGeo]) g.setAttribute('iShape', iShape);
   const wheels = new THREE.InstancedMesh(fleetWheelGeo, patchCarShape(wheelMaterial(), 'car-wheel'), N);
   wheels.name = 'fleet-wheels';
   const beams = new THREE.InstancedMesh(beamGeo, new THREE.MeshBasicMaterial({ color: 0xd8ecff }), N);
@@ -499,7 +533,7 @@ export function buildTraffic(street) {
   trim.name = 'fleet-trim';
   const poolMat = new THREE.MeshBasicMaterial({
     map: getThrowTex(), color: 0x7ba0c8, transparent: true, opacity: 0.34, side: THREE.DoubleSide,
-    blending: THREE.AdditiveBlending, depthWrite: false,
+    blending: THREE.AdditiveBlending, depthWrite: false, forceSinglePass: true,
   });
   const pools = new THREE.InstancedMesh(poolGeo, poolMat, N + POOL_EXTRA);
   pools.name = 'fleet-pools';
@@ -518,16 +552,15 @@ export function buildTraffic(street) {
     bodies.setColorAt(i, new THREE.Color(c.paint));
     iShape.setX(i, c.shape ?? 0);
   });
-  bodies.instanceColor.needsUpdate = true;
   iShape.needsUpdate = true;
-  group.add(bodies, wheels, beams, tails, glass, trim, pools);
+  group.add(bodies.group, wheels, beams, tails, glass, trim, pools);
   const rig = {
     bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, iShape,
     model: FLEET_MODEL, modelReady: false, credited: false,
     // One blended pose per car, reused every frame (M0-9).
     poses: street.cars.map(() => ({})),
     inspect() {
-      const fleet = [rig.bodies, rig.trim, rig.wheels].filter((m) => m?.isMesh);
+      const fleet = [...rig.bodies.meshes, rig.trim, rig.wheels].filter((m) => m?.isMesh);
       return {
         model: rig.model, credits: rig.credited, ready: rig.modelReady,
         files: FLEET_SHAPES.length,
@@ -582,6 +615,7 @@ export function updateTraffic(rig, street, camera = null) {
     glows.setMatrixAt(i, dummy.matrix);
   });
   bodies.instanceMatrix.needsUpdate = true;
+  if (bodies.flush) bodies.flush();
   wheels.instanceMatrix.needsUpdate = true;
   beams.instanceMatrix.needsUpdate = true;
   tails.instanceMatrix.needsUpdate = true;

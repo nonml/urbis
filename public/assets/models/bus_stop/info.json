@@ -1,0 +1,12 @@
+{
+  "id": "bus_stop",
+  "name": "Bus Stop Shelter",
+  "type": "models",
+  "authors": {
+    "Urbis": "All"
+  },
+  "license": "CC0",
+  "source": "generated in-repo (tools/models bus-stop builder, M2.T11)",
+  "res": "n/a",
+  "fmt": "glb"
+}
