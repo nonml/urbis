@@ -1,0 +1,43 @@
+{
+  "milestone": "M2 rework: the director's audit of 2026-10-07 found Muse Spark's M2 work labelled hand-built boxes as models and shipped no person",
+  "tasks": [
+    {
+      "id": "M2.F1",
+      "lane": "honest",
+      "goal": "Honest model tags. Remove every `userData.model` tag in src/render that is not set from a .glb path, so the VGA-084 sweep lists every hand-built box, cylinder, cone and quad again",
+      "files": ["src/render/"],
+      "test": "tests/accept/m2-honest-tags.test.js",
+      "commit": "M2.F1 (M2-6): model tags only on model files",
+      "notes": "Size S. Commit 5edace1 (M2.T15) and M2.T10/T12/T13 tagged procedural meshes as models ('player-avatar' on the player's boxes, 'tree-trunk', 'building-*', 'street-lamp', the interiorkit asModel helper, and more) so the sweep passed without replacing anything. Delete those tag lines and the comments that justify them; delete interiorkit.js's asModel tagging. Do NOT change any geometry, material or draw. Keep tags whose value is a .glb path (FLEET_MODEL, HERO_MODEL, POLICE_MODEL, WALKERS_GLB, PERSON_MODEL) and models.js. Do not edit the test. Draws must not change."
+    },
+    {
+      "id": "M2.F3",
+      "lane": "police",
+      "goal": "Smooth cruisers. The pipeline cruiser pool that M2.T7 added must draw every cruiser between its last two sim steps every frame, as the old kit did (M0-9)",
+      "files": ["src/render/police.js", "src/render/policekit.js"],
+      "test": "tests/accept/m0-smooth.spec.js",
+      "needs": ["M2.F1"],
+      "commit": "M2.F3 (M0-9): cruisers drawn between sim steps",
+      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' — the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test."
+    },
+    {
+      "id": "M2.F2",
+      "lane": "people",
+      "goal": "Ship the person. Run tools/models/make_person.py so public/assets/models/person.glb is committed: an MPFB body, rigged, with a CMU walk clip; the player in the game is that person, not the boxes",
+      "files": ["tools/models/", "public/assets/models/", "public/assets/CREDITS.md", "docs/shots/"],
+      "test": "tests/accept/m2-person-ships.test.js",
+      "commit": "M2.F2 (M2-0, M2-2): person.glb ships",
+      "notes": "Size M, slow: a Blender bake. M2.T4 only made person.glb in a temp dir inside its test, so the game never had it and still shows the box figure; its evidence shot docs/shots/m2-0-person.png shows no person at all. Export to public/assets/models/person.glb (under 1.5 MB, under 15k triangles), add a CREDITS.md line naming person.glb (MPFB output CC0, CMU mocap). Then retake docs/shots/m2-0-person.png with scripts/shot.mjs from the play camera: the person must fill the lower middle of the frame, standing on the pavement, feet on the ground. If MPFB or Blender is missing, stop and say exactly what is missing. Do not edit the test."
+    },
+    {
+      "id": "M2.F4",
+      "lane": "car",
+      "goal": "A real car. Replace car.glb (trellis 'showcase racer': red shards on a flat grey plane) with a believable modern four-door saloon made directly as a Blender script, as docs/ROADMAP.md M2 allows when a generated model comes out wrong",
+      "files": ["tools/models/", "public/assets/models/car/", "public/assets/CREDITS.md", "docs/shots/"],
+      "test": "tests/accept/m2-car-body.test.js",
+      "needs": ["M2.F2"],
+      "commit": "M2.F4 (M2-1): the saloon",
+      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall — bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test."
+    }
+  ]
+}

@@ -42,7 +42,7 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
 // CREW_TIERS overrides the ladder, e.g. an A/B of a challenger above the incumbent.
 const TIERS = (process.env.CREW_TIERS
-  ?? 'opencode-go/muse-spark-1.3-contributor,opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
+  ?? 'opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
 // Muse Spark's thinking levels top out at xhigh.
 const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
