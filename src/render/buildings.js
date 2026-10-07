@@ -12,6 +12,7 @@
 // (materials.js) reads the instance matrix columns, so a unit shell tiles the
 // same FACADE_TILE window grid the merged towers baked in.
 import * as THREE from 'three';
+import { loadModelPool } from './models.js';
 
 const SHELL_SLACK = 64; // headroom for a re-planned frontage (M3.T20)
 const NO_ID = -1; // the hand preset's buildings are not map parcels
@@ -236,5 +237,55 @@ export function buildBuildingKit(materials, buildings, districtId = null) {
   return {
     group, pools: { frame, shop, plant }, slots, update,
     draws: () => frame.draws() + shop.draws() + plant.draws(),
+  };
+}
+
+// The six service buildings (M5.T10), one pool per kind through the M2 pool
+// loader (models.js): each model's meshes are merged by material, so one
+// placed kind costs its material count in draws however many stand — and a
+// kind with nothing placed costs zero. `front +Z` is the model's own facing;
+// `yaw` turns it, so the sim (M5.T11) faces a service at its avenue. Slots are
+// reclaimed and rewritten whole on every `place`, because a service is placed
+// or bulldozed one at a time and the list is short.
+const UP = new THREE.Vector3(0, 1, 0);
+export const SERVICE_KINDS = ['substation', 'police', 'fire', 'clinic', 'school', 'park'];
+export const SERVICE_CAPACITY = 8;
+export const SERVICE_MODEL = (kind) => `assets/models/service_${kind}/service_${kind}.glb`;
+
+// `services` is [{ kind, x, z, yaw? }]. A slot past capacity is dropped, like
+// a buildInstancePools slot: the pools never grow after load.
+export async function loadServicePools() {
+  const group = new THREE.Group();
+  const pools = new Map();
+  for (const kind of SERVICE_KINDS) {
+    const pool = await loadModelPool(SERVICE_MODEL(kind), SERVICE_CAPACITY);
+    pools.set(kind, pool);
+    group.add(pool.group);
+  }
+  const placed = new Map();
+  const at = new THREE.Vector3(), turn = new THREE.Quaternion(), one = new THREE.Vector3(1, 1, 1);
+  const matrix = new THREE.Matrix4();
+  function place(services = []) {
+    for (const [kind, ids] of placed) {
+      for (const i of ids) pools.get(kind).free(i);
+    }
+    placed.clear();
+    for (const s of services) {
+      const pool = pools.get(s.kind);
+      if (!pool) continue;
+      const i = pool.claim();
+      if (i < 0) continue;
+      at.set(s.x, s.y ?? 0, s.z);
+      turn.setFromAxisAngle(UP, s.yaw ?? 0);
+      pool.set(i, matrix.compose(at, turn, one));
+      if (!placed.has(s.kind)) placed.set(s.kind, []);
+      placed.get(s.kind).push(i);
+    }
+  }
+  return {
+    group, pools, place,
+    // One draw per material an occupied pool actually draws.
+    draws: () => [...pools.values()].reduce(
+      (n, p) => n + p.meshes.filter((m) => m.count > 0).length, 0),
   };
 }

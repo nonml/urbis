@@ -1,0 +1,1 @@
+{"id": "service_substation", "name": "Substation", "type": "models", "license": "generated", "fmt": "glb", "tris": 1044, "size_m": {"w": 10.4, "h": 5.49, "d": 11.14}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M5.T10, M2 pipeline Blender stage; palette + glass materials"}

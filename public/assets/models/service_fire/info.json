@@ -1,0 +1,1 @@
+{"id": "service_fire", "name": "Fire station", "type": "models", "license": "generated", "fmt": "glb", "tris": 600, "size_m": {"w": 11.46, "h": 10.7, "d": 10.9}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M5.T10, M2 pipeline Blender stage; palette + glass materials"}
