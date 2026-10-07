@@ -3,7 +3,9 @@
 // pool, and a barricade, a stinger and the helicopter sharing one instanced
 // mesh. The cruiser keeps the model's own paint and trim materials, so it
 // cannot ride the kit's single vertex-coloured material; its pool costs one
-// draw per material however many cruisers deploy (law 4).
+// draw per material however many cruisers deploy (law 4). The pool's paint
+// mesh is `kit.mesh`, the mesh each cruiser's drawn pose is recorded on
+// (M0-9); the folding barricade, stinger and helicopter mesh is `kit.props`.
 //
 // The kit holds three different things in one mesh the other way round: the
 // geometry holds all three, each vertex knows which one it belongs to
@@ -171,12 +173,15 @@ function buildCruiserPool() {
     const trim = mergeGeometries([...out.trimGeos, ...cruiserBars()].map(modelClean));
     const livery = mergeGeometries(cruiserPanels().map(modelClean));
     if (!paint || !trim || !livery) return;
+    pool.paint.geometry.dispose();
     pool.paint.geometry = paint;
     pool.paint.material = out.paintMat;
     for (let i = 0; i < MAX_CRUISERS; i++) pool.paint.setColorAt(i, LIVERY_TINT);
     pool.paint.instanceColor.needsUpdate = true;
+    pool.trim.geometry.dispose();
     pool.trim.geometry = trim;
     pool.trim.material = out.trimMat;
+    pool.livery.geometry.dispose();
     pool.livery.geometry = livery;
     pool.livery.material = new THREE.MeshStandardMaterial({
       color: LIVERY_WHITE, roughness: 0.35, metalness: 0.1,
