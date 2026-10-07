@@ -17,6 +17,7 @@ import {
 } from './map.js';
 import { waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
+import { createTerrain } from './terrain.js';
 
 // A placed building is sized from its footprint with the rule the city rolls
 // for a lot (zoning.js makeParcel): three storeys at the least, slender enough
@@ -403,10 +404,15 @@ function roadEdit(map, box, change) {
   const buildingsBefore = map.buildings ? map.buildings.slice() : null;
   const driveBefore = map.bounds && map.district ? { ...map.district.drive } : null;
   const boundsBefore = map.bounds ? { ...map.bounds } : null;
+  const terrainBefore = map.terrain ?? null;
   change();
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const kept = replanFrontage(map, box, byId);
   const touched = reconcileFrontage(map, box, byId, kept);
+  // The road grades its own corridor and its new lots' pads (M5.T3c): the
+  // terrain is derived from the graph and the parcels, so a new road that
+  // leaves the old flats gets ground of its own instead of standing over hills.
+  if (terrainBefore && map.graph) map.terrain = createTerrain(map);
   // A road op settles the drivable box on the graph it leaves (M5.T3b): the car
   // is clamped to the exact box of the roads, so a road that leaves the old box
   // hands the car its whole length, and the city view pans the build margin.
@@ -443,6 +449,7 @@ function roadEdit(map, box, change) {
     }
     if (driveBefore) Object.assign(map.district.drive, driveBefore);
     if (boundsBefore) Object.assign(map.bounds, boundsBefore);
+    if (terrainBefore) map.terrain = terrainBefore;
     map.version = version;
     markDirty(map, box);
   };
