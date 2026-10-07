@@ -128,6 +128,7 @@ export function bulldoze(map, ref) {
     if (q.stage === STAGE.EMPTY) {
       q.kind = 'lot';
       q.use = q.zoned;
+      delete q.type;
     }
   });
 }
@@ -149,6 +150,84 @@ export function place(map, kind, ref) {
     q.zoned = q.use;
     q.painted = false;
   });
+}
+
+// ---------------------------------------------------------------------------
+// Services (M5.T11). A service is a finished building the player places on an
+// empty lot: the parcel becomes kind 'service' with a `type`, and the city view
+// gets a tool for each. Every service reaches only the parcels inside its
+// catchment (`radius`, metres between centres) and only `capacity` of them, so
+// a second service in the same catchment adds capacity, never a second boost
+// (M5-5, serviceReach below). The numbers are provisional, written down in
+// docs/CITYVIEW.md; M5.T21 shades a catchment by how full it is. `use` is the
+// architecture the renderer draws the building with (a clinic reads as a shop,
+// a substation as a works yard) and `height` the storeys it stands, so a park
+// is not a tower. `serves` names what a capacity counts, for that doc.
+export const SERVICES = {
+  substation: { name: 'substation', use: 'ind', height: 8, cost: 600, radius: 200, capacity: 2, serves: 'grids' },
+  police: { name: 'police station', use: 'com', height: 12, cost: 900, radius: 100, capacity: 4, serves: 'cells' },
+  fire: { name: 'fire station', use: 'ind', height: 10, cost: 800, radius: 300, capacity: 3, serves: 'trucks' },
+  clinic: { name: 'clinic', use: 'com', height: 10, cost: 700, radius: 120, capacity: 6, serves: 'patients' },
+  school: { name: 'school', use: 'com', height: 12, cost: 1000, radius: 150, capacity: 8, serves: 'pupils' },
+  park: { name: 'park', use: 'com', height: 4, cost: 300, radius: 100, capacity: 8, serves: 'visitors' },
+};
+
+export const SERVICE_TYPES = Object.keys(SERVICES);
+
+// Place a `type` service on an empty lot: kind 'service', the type's own use
+// and low height, finished at HIGH, keeping its id and land. Only an empty lot
+// takes one — a standing building is bulldozed first. An edit like any other,
+// so the undo restores the lot exactly.
+export function placeService(map, ref, type) {
+  const def = SERVICES[type];
+  const p = parcelOf(map, ref);
+  if (!p || !def || p.kind !== 'lot' || p.stage !== STAGE.EMPTY) return NOOP;
+  return edit(map, p, (q) => {
+    q.kind = 'service';
+    q.type = type;
+    q.stage = STAGE.HIGH;
+    q.progress = 0;
+    q.building = false;
+    q.painted = false;
+    q.use = def.use;
+    q.zoned = def.use;
+    q.heights = STAGES.map(() => def.height);
+  });
+}
+
+// The standing services of `type` among `parcels`.
+export function servicesOf(parcels, type) {
+  return (parcels ?? []).filter((p) => p.kind === 'service' && p.type === type);
+}
+
+// Is a parcel's centre inside a service's catchment?
+export function inCatchment(service, p) {
+  const def = SERVICES[service.type];
+  return Boolean(def)
+    && (p.x - service.x) ** 2 + (p.z - service.z) ** 2 <= def.radius * def.radius;
+}
+
+// Which parcels a type's services reach (M5.T11). Each service takes the
+// nearest unserved parcel inside its catchment until its capacity is full; a
+// parcel reached once is never reached again, so a second service adds capacity
+// where the first is full instead of a second helping. Returns Map<parcel,
+// service>; services are not each other's customers.
+export function serviceReach(parcels, type) {
+  const def = SERVICES[type];
+  const reach = new Map();
+  if (!def) return reach;
+  const customers = (parcels ?? []).filter((p) => p.kind !== 'service');
+  const r2 = def.radius * def.radius;
+  for (const service of servicesOf(parcels, type)) {
+    const near = customers
+      .filter((p) => !reach.has(p))
+      .map((p) => ({ p, d2: (p.x - service.x) ** 2 + (p.z - service.z) ** 2 }))
+      .filter((q) => q.d2 <= r2)
+      .sort((a, b) => a.d2 - b.d2)
+      .slice(0, def.capacity);
+    for (const { p } of near) reach.set(p, service);
+  }
+  return reach;
 }
 
 // ---------------------------------------------------------------------------

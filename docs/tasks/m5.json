@@ -206,7 +206,8 @@
       "lane": "build-ui",
       "goal": "New land grows. `m5-newland.spec.js`: a lot on a new road zoned R shows its first floor within 60 game seconds; a capped lot stops at LOW",
       "files": [
-        "tests/accept/m5-newland.spec.js"
+        "tests/accept/m5-newland.spec.js",
+        "src/sim/ops.js"
       ],
       "needs": [
         "M5.T4",
@@ -263,6 +264,20 @@
       ],
       "commit": "M5.T11 (M5-5): services as parcels",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T11b",
+      "lane": "build-sim",
+      "goal": "Service numbers, written and sane. M5.T11 (babefd4) put each service's radius and capacity in src/sim/ops.js but not in docs/CITYVIEW.md as the task asked, and the capacities count parcels: a police station serves 4 buildings, a clinic 6, a school 8, while a 100-150 m catchment holds 20-40 buildings, so most of a neighbourhood gets nothing from the one service a player built for it. Count each service's catchment on all five seeds (buildings within its radius when placed on a central empty lot), set every capacity so one service covers about 80% of a typical catchment, and write a table in docs/CITYVIEW.md: service, radius, capacity, what it serves, the median catchment count it was set from.",
+      "files": [
+        "src/sim/ops.js",
+        "docs/CITYVIEW.md"
+      ],
+      "needs": [
+        "M5.T11"
+      ],
+      "commit": "M5.T11b (M5-5): service reach and capacity, written and sane",
+      "notes": "Size S. Print the catchment counts you measured in the commit message. Commit as you go."
     },
     {
       "id": "M5.T12",
