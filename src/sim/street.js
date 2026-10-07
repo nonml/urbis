@@ -16,6 +16,10 @@ import { createWalkers, tick as tickWalkers } from './walkers.js';
 // Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is called
 // here so every walker and car carries the pose the last step started from.
 import { snap } from '../game/loop.js';
+// The substations the player placed are service parcels on the map (M5.T11):
+// a district with two of them comes back from a blackout in half the dark time
+// (M5.T12), so a hack reads them here.
+import { servicesOf } from './ops.js';
 
 export const NPC_COUNT = 72;
 export const CAR_COUNT = 16;
@@ -38,6 +42,14 @@ export const BLACKOUT_SECS = 8;
 export const COLLAPSE_SECS = 0.9;
 export const RESTORE_SECS = 0.7;
 export const ZONE_COOLDOWN_SECS = 3;
+// The world a street lives in, keyed weakly: the map's parcels carry the
+// player's services, and the map is not sim state to save or hash. createStreet
+// registers it; save.js rebuilds through createStreet, so a load registers too.
+const WORLDS = new WeakMap();
+// A district served by two substations comes back in half the dark time
+// (M5-5, M5.T12).
+const SUBSTATION_PAIR = 2;
+const STATION_SCALE = 0.5;
 
 const COAT_COLORS = [0x1c2733, 0x33231c, 0x1c3327, 0x2b1c33, 0x3d2f16, 0x101418, 0x5c1f2e, 0x1f4d5c, 0x2e3d4d, 0x4d3a2e, 0x7a2a3a, 0x2a6a7a];
 export const SKIN_TONES = [0x9a7b62, 0x7a5a44, 0x5a4030, 0xc4a080, 0x8a6248];
@@ -127,7 +139,7 @@ export function createStreet(seed, map = worldMap()) {
       shape: (k * 3) % SHAPE_COUNT,
     });
   });
-  return {
+  const state = {
     time: 0,
     npcs,
     cars,
@@ -141,6 +153,8 @@ export function createStreet(seed, map = worldMap()) {
     hurryUntil: 0,
     lastHack: null,
   };
+  WORLDS.set(state, map);
+  return state;
 }
 
 // The halves zoneAt drew. Deprecated: areas (districtAt) replaced it, but the
@@ -191,13 +205,22 @@ export function isDark(state, zone) {
   return state.time < state.zones[zone].darkUntil;
 }
 
+// Does the district stand on a pair of the player's substations?
+function substationPair(state, zone) {
+  return servicesOf(WORLDS.get(state)?.parcels, 'substation')
+    .filter((p) => p.powerZone === zone).length >= SUBSTATION_PAIR;
+}
+
 // The hack: kill a lamp zone. Each zone recharges on its own clock, so chaining
 // two zones inside one 8s window is possible — by car, not on foot.
 // Returns affected lamp count (0 = that zone recharging).
 export function hackBlackout(state, zone) {
   if (state.time < state.zones[zone].coolUntil) return 0;
-  state.zones[zone].collapseUntil = state.time + COLLAPSE_SECS;
-  state.zones[zone].darkUntil = state.time + COLLAPSE_SECS + BLACKOUT_SECS;
+  // Two substations in the district (M5-5) run the whole blackout at double
+  // recovery: collapse and dark both scale, so it comes back in half the time.
+  const scale = substationPair(state, zone) ? STATION_SCALE : 1;
+  state.zones[zone].collapseUntil = state.time + COLLAPSE_SECS * scale;
+  state.zones[zone].darkUntil = state.time + (COLLAPSE_SECS + BLACKOUT_SECS) * scale;
   state.zones[zone].coolUntil = state.time + COLLAPSE_SECS + BLACKOUT_SECS + ZONE_COOLDOWN_SECS;
   state.zones[zone].restoreUntil = 0;
   state.hurryUntil = state.time + BLACKOUT_SECS + 5;
