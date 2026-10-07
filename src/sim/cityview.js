@@ -13,7 +13,7 @@ import { STAGE, builtHeight, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt } from './map.js';
 import { addRoad, bulldoze, removeRoad } from './ops.js';
-import { MAX_BUILD_GRADIENT } from './terrain.js';
+import { MAX_ROAD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
 // Seconds for the whole rise, and for the whole descent.
@@ -356,7 +356,8 @@ function roadBand(from, to, axis) {
 
 const overlaps = (b, x0, x1, z0, z1) => b.minX < x1 && b.maxX > x0 && b.minZ < z1 && b.maxZ > z0;
 
-// Is the ground under the drag steeper than the ground places buildings by?
+// Is the ground under the drag steeper than a road may climb? A road grades its
+// own corridor, so it takes the hills M4.T6 laid down; only a cliff refuses.
 function roadTooSteep(map, from, to) {
   const heightAt = map.terrain?.heightAt;
   if (!heightAt) return false;
@@ -366,7 +367,7 @@ function roadTooSteep(map, from, to) {
   for (let i = 1; i <= steps; i++) {
     const t = i / steps;
     const h = heightAt(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t);
-    if (Math.abs(h - prev) > MAX_BUILD_GRADIENT * (len / steps)) return true;
+    if (Math.abs(h - prev) > MAX_ROAD_GRADIENT * (len / steps)) return true;
     prev = h;
   }
   return false;

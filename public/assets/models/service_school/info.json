@@ -1,1 +1,1 @@
-{"id": "service_school", "name": "School", "type": "models", "license": "generated", "fmt": "glb", "tris": 760, "size_m": {"w": 12.03, "h": 7.75, "d": 10.4}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M5.T10, M2 pipeline Blender stage; palette + glass materials"}
+{"id": "service_school", "name": "School", "type": "models", "license": "generated", "fmt": "glb", "tris": 530, "size_m": {"w": 12.03, "h": 7.75, "d": 10.4}, "origin": "base centre, Y-up, front +Z", "source": "tools/models/make_services.py"}
