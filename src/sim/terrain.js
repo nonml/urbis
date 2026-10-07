@@ -27,12 +27,22 @@ export const ROAD_HALF_WIDTH = 3.5;
 const TERRAIN_SEED = 70413;
 // Below SHOP_SILL (0.55 in block.js), so a swell never buries a shopfront.
 const VERGE_RISE = 0.45;
-const HILL_RISE = 3.0;
-// Metres of blend from a flat footprint's edge out to full relief. Short enough
-// for a 15 m park to read, long enough that the lip is a slope and not a step.
-const FLAT_BLEND = 11;
-// Beyond the built district the relief opens up over this distance.
-const WILD_BLEND = 70;
+// Tall enough that the ground off the roads reaches 8 m+ within 150 m of the
+// centre on every seed (M4.T6b): 12 m of hill plus the swell, minus the road
+// and pad blends, peaks near 10 m. The gradient it costs is bounded by the
+// longer FLAT_BLEND below, so the hill banks instead of walling (M4-3).
+const HILL_RISE = 12;
+// Metres of blend from a flat footprint's edge out to full relief. At 46 m the
+// steepest bank a 12 m hill makes is 12 * 1.5 / 46 = 0.39 m/m, and where the
+// wild ramp and the hill's own slope stack on it the sum stays under the
+// 0.6 m per 2 m sample M4-3 caps; a bank this long reads as a verge, not a
+// kerb. The park-scale swell stays short inside it.
+const FLAT_BLEND = 46;
+// Beyond the built district the relief opens up over this distance. The
+// district's own edge is the datum: every seed's district ends at z = +/-100
+// and the M4-3 sweep reaches z = +/-150, so a 50 m ramp is at full relief by
+// the reach edge — the field's own peaks, no wall (M4.T6b).
+const WILD_BLEND = 50;
 
 // A carriageway stays dead flat across its own width plus the 3 m walkway
 // block.js lays beside it, plus a tenth of a metre, so the blend starts off the
@@ -95,18 +105,41 @@ function padRects(map) {
   return (map.parcels ?? []).map((p) => [p.x, p.z, p.w / 2, p.d / 2]);
 }
 
-// The hand-authored district as one rect (cx, cz, half-width, half-depth).
-// Inside it the relief is the verge swell only, so the merged towers and the
-// skyline ring keep the flat ground they were authored against and the road
-// tool finds gentle land (M5-1). Past it the hills run across the town, held
-// off the tarmac by every road and off every base by its parcel's own pad
-// (M4.T6).
-const DISTRICT_RELIEF = [7, 2.5, 73, 117.5];
+// The shelf the hills crest off: the district's own road spans. Derived, so a
+// new seed's district carries its hills in its own place instead of under a
+// rect tuned to the hand map. No margin: the WILD_BLEND ramp starts at this
+// edge, so a district ending at the usual z = +/-100 is at full relief on the
+// M4-3 sample at +/-150. Parcels past the roads are still pad-flat, so lots
+// keep their ground.
+function reliefRect(district) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const av of district.avenues) {
+    minX = Math.min(minX, av.x);
+    maxX = Math.max(maxX, av.x);
+    minZ = Math.min(minZ, av.z0);
+    maxZ = Math.max(maxZ, av.z1);
+  }
+  for (const cr of district.crossings) {
+    minX = Math.min(minX, cr.x0);
+    maxX = Math.max(maxX, cr.x1);
+    minZ = Math.min(minZ, cr.z);
+    maxZ = Math.max(maxZ, cr.z);
+  }
+  return [
+    (minX + maxX) / 2, (minZ + maxZ) / 2,
+    (maxX - minX) / 2, (maxZ - minZ) / 2,
+  ];
+}
 
 // Two bands of randomly-oriented waves. The swell is short, so a 15 m verge
 // actually rolls instead of being handed one constant offset; the hills are
-// long, because a hill the size of a park is a mound. Every wavelength stays
-// above twice the 4 m sampling grid, so the mesh cannot alias one into facets.
+// long, because a hill the size of a park is a mound and a long wave spends
+// its amplitude on height rather than on the slope budget. Every wavelength
+// stays above twice the 4 m sampling grid, so the mesh cannot alias one into
+// facets.
 function seedWaves(rand, wavelengths) {
   const waves = wavelengths.map((wavelength, i) => {
     const angle = rand() * Math.PI * 2;
@@ -124,7 +157,10 @@ function seedWaves(rand, wavelengths) {
 // own. The order of the two calls is part of the field.
 const TERRAIN_RAND = mulberry32(TERRAIN_SEED);
 const SWELL_WAVES = seedWaves(TERRAIN_RAND, [34, 19]);
-const HILL_WAVES = seedWaves(TERRAIN_RAND, [190, 88, 43]);
+// 300 m and 150 m: the same 2:1 weighting as the swell, stretched so a 12 m
+// hill's own slope (12 * 0.5 * (2/3 * 2pi/300 + 1/3 * 2pi/150) = 0.17 m/m)
+// leaves the M4-3 bank budget to the road and pad blends.
+const HILL_WAVES = seedWaves(TERRAIN_RAND, [300, 150]);
 
 function band01(waves, x, z) {
   let n = 0;
@@ -154,8 +190,8 @@ function holdFlat(rects, blend, x, z) {
   return held;
 }
 
-function wildness(x, z) {
-  return smoothstep01(rectDistance(x, z, ...DISTRICT_RELIEF) / WILD_BLEND);
+function wildness(relief, x, z) {
+  return smoothstep01(rectDistance(x, z, ...relief) / WILD_BLEND);
 }
 
 // A footprint is refused near water when its box comes within the building
@@ -194,6 +230,7 @@ export function createTerrain(map) {
     ?? (map.graph ? graphFlatRects(map.graph) : roadFlatRects(map.district));
   const pads = padRects(map);
   const water = map.water ?? [];
+  const relief = reliefRect(map.district);
 
   const heightAt = (x, z) => {
     const open = 1 - holdFlat(flats, FLAT_BLEND, x, z);
@@ -202,7 +239,7 @@ export function createTerrain(map) {
     const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
     const hills = HILL_RISE * band01(HILL_WAVES, x, z);
     const tuck = pads.length ? holdFlat(pads, FLAT_BLEND, x, z) : 0;
-    return open * (swell + hills * wildness(x, z) * (1 - tuck));
+    return open * (swell + hills * wildness(relief, x, z) * (1 - tuck));
   };
 
   // What a w x d footprint centred on (x, z) would stand on: `water` when any
