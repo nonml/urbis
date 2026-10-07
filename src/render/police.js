@@ -70,7 +70,7 @@ function activeStrips(r) {
 export function buildPolice(scene) {
   const group = new THREE.Group();
   const kit = buildKit();
-  kit.mesh.name = 'police-kit';
+  kit.props.name = 'police-kit';
   const lights = new THREE.InstancedMesh(
     new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: 0xffffff }), MAX_LIGHTS
   );
@@ -85,7 +85,7 @@ export function buildPolice(scene) {
   const wash = new THREE.PointLight(0xff2a1c, 0, 32, 2);
   wash.position.set(0, -50, 0);
   const heli = buildHeli();
-  group.add(kit.mesh, kit.cruisers.group, lights, wash, heli.group);
+  group.add(kit.props, kit.cruisers.group, lights, wash, heli.group);
   scene.add(group);
   return {
     group, kit, lights, wash, heli,
@@ -232,10 +232,10 @@ export function updatePolice(rig, wanted, ctx) {
     body: (x, y, z, yaw) => placeKit(rig.kit, KIT.HELI, x, y, z, yaw),
   });
   endKit(rig.kit, ctx.night < SHADOWLESS_NIGHT);
-  // three caches an InstancedMesh's raycast sphere on the first ray. The kit
-  // starts empty, so a probe that asked before any cruiser was placed would
-  // keep missing these instances; keep the sphere on the placed ones.
-  if (rig.kit.n > 0) rig.kit.mesh.computeBoundingSphere();
+  // three caches an InstancedMesh's raycast sphere on the first ray. The props
+  // start empty, so a probe that asked before any was placed would keep
+  // missing these instances; keep the sphere on the placed ones.
+  if (rig.kit.n > 0) rig.kit.props.computeBoundingSphere();
   rig.lights.count = rig.lightN;
   rig.lights.visible = rig.lightN > 0;
   rig.lights.instanceMatrix.needsUpdate = true;

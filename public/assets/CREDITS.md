@@ -18,7 +18,8 @@ were copied (no preview renders). Each folder keeps its upstream `info.json`.
 - Poly Haven Yellow Brick — CC0 — https://polyhaven.com/a/yellow_brick — tower facade (VGA-084.2a)
 - Poly Haven Sandstone Blocks 08 — CC0 — https://polyhaven.com/a/sandstone_blocks_08 — tower facade (VGA-084.2a)
 - Poly Haven Street Lamp 01 / fire hydrant / metal trash can (GLTF, CC0, Josh Dean + authors in per-folder info.json) — vendored under models/, unwired: GLB→instanced pipeline lands in its own slice
-- `models/car/car.glb` — generated: trellis.cpp (MIT) from its showcase AI racer reference (no trademark), cleaned by `tools/models/clean_car.py` (6,806 tris, 4.41 × 1.82 m, wheels as separate nodes) — hero/traffic car body (M2.T3)
+- `models/car/car.glb` — generated: a modern four-door saloon built in Blender by `tools/models/make_saloon.py` (CC0) — 2,534 tris, 4.60 × 1.93 × 1.45 m, bonnet/glass cabin/boot, wheels as separate Wheel_FL/FR/RL/RR nodes — hero/traffic car body (M2.F4)
+- `models/person.glb` — generated: MPFB (MakeHuman Community, CC0 output) body with its `cmu_mb` game rig, walk retargeted from CMU mocap trial 08_01 (cgspeed MotionBuilder-friendly BVH conversion; CMU's database is free for all uses) by `tools/models/make_person.py` — 9,500 tris, one 1.0 s `Walk` cycle — the player (M2.F2)
 
 Technique mined alongside (from their `AssetLoader.js` + buildings materials):
 albedo/emissive maps in sRGB, data maps (normal/rough/metal) linear, RepeatWrapping,
