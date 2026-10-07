@@ -2,6 +2,11 @@
 // model pool per zone, plus the light shaft and glare that make a lit street.
 // Zones (z<0 / z>=0) can go dark for the blackout hack — one material set per
 // zone, so a zone's lanterns and their light die together.
+//
+// A road the player lays replans the map's furniture (M5.T4b), and rebuild()
+// re-seats every pool from the new plan: the lamps, cones, glows and signals of
+// a street laid after the world was born are drawn like the ones it was born
+// with. One mesh per material at any count, never a mesh per lamp (law 4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
@@ -103,6 +108,11 @@ const LENS_GREEN = new THREE.Color(0x2fd257);
 const LENS_RED_OFF = new THREE.Color(0x2a0f0b);
 const LENS_GREEN_OFF = new THREE.Color(0x0b1a0d);
 
+// Headroom in every pooled InstancedMesh, so the handful of lamps a drag adds
+// are seated in the pool the frame already has; a plan that outgrows its pool
+// asks for a wider one, still one mesh per material at any count (law 4).
+const POOL_SLACK = 64;
+
 // One instanced quad per glow instead of one Sprite each (law 4): the vertex patch
 // offsets the corners in view space, so the quad faces the camera and keeps the
 // instance's depth exactly like the sprite it replaces. Per-lamp brightness rides on
@@ -158,39 +168,13 @@ export function reportKit(fields) {
 }
 
 export function buildLamps(map = worldMap()) {
-  // On a generated world the plan places the lamps; the hand preset keeps its table.
-  const LAMPS = (map.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(map.district);
   const group = new THREE.Group();
-  const poolsByZone = [[], []];
   const dummy = new THREE.Object3D();
-
-  // The lantern: street_lamp_01 through the pool loader (M2.T2), one pool per
-  // power zone, so a blackout takes one side of the street dark and leaves the
-  // other lit (VGA-010). Each pool's meshes carry userData.model for M2-6.
-  const lanternMats = [[], []];
-  let pending = 0;
-  for (const zone of [0, 1]) {
-    const mine = LAMPS.filter((l) => l.zone === zone);
-    pending += 1;
-    loadModelPool(LAMP_MODEL, mine.length).then((pool) => {
-      mine.forEach((l) => {
-        dummy.position.set(l.x, 0, l.z);
-        dummy.rotation.set(0, l.rotY, 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        pool.set(pool.claim(), dummy.matrix);
-      });
-      for (const mesh of pool.meshes) {
-        if (/glass|bulb/i.test(mesh.material.name ?? '')) lanternMats[zone].push(mesh.material);
-      }
-      group.add(pool.group);
-      pending -= 1;
-      if (pending === 0) reportKit({ lamps: LAMPS.length, models: ['street_lamp_01'] });
-    }).catch(() => { pending -= 1; });
-  }
+  const glowLevel = new THREE.Color();
 
   // Shafts fade head-to-ground via a gradient alphaMap: light falloff, not a
-  // solid pyramid. Same instanced mesh, +1 draw (VGA-082 partial).
+  // solid pyramid. Same instanced mesh, +1 draw (VGA-082 partial). Static across
+  // rebuilds, so a road op never re-makes a canvas or a buffer.
   const shaftTex = (() => {
     const c = document.createElement('canvas');
     c.width = 4;
@@ -210,31 +194,8 @@ export function buildLamps(map = worldMap()) {
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
     forceSinglePass: true,     // both faces of the shaft add light, in either order: see glowMaterial
   });
-  const cones = new THREE.InstancedMesh(coneGeo, coneMat, LAMPS.length);
+  const glowGeo = new THREE.PlaneGeometry(GLOW_SIZE, GLOW_SIZE);
   const glowMat = glowMaterial();
-  const glows = new THREE.InstancedMesh(new THREE.PlaneGeometry(GLOW_SIZE, GLOW_SIZE), glowMat, LAMPS.length);
-  const glowLevel = new THREE.Color();
-
-  LAMPS.forEach((l, i) => {
-    dummy.position.set(l.x, LANTERN_Y, l.z);
-    dummy.rotation.set(0, 0, 0);
-    dummy.scale.set(1, 1, 1);
-    dummy.updateMatrix();
-    glows.setMatrixAt(i, dummy.matrix);
-    glows.setColorAt(i, glowLevel.setScalar(GLOW_OPACITY));
-    dummy.position.set(l.x, LANTERN_Y / 2, l.z);
-    dummy.updateMatrix();
-    cones.setMatrixAt(i, dummy.matrix);
-
-    poolsByZone[l.zone].push({ x: l.x, z: l.z, size: 11, color: '#b97c3a' });
-  });
-  cones.instanceMatrix.needsUpdate = true;
-  glows.instanceMatrix.needsUpdate = true;
-  group.add(cones, glows);
-
-  // The signal pool: one head per junction approach from the sim's placement,
-  // the housing facing the traffic that must stop for it.
-  const SIGNALS = signalHeads(map);
   const sigParts = [
     new THREE.CylinderGeometry(0.08, 0.11, SIGNAL_Y, 6),
     new THREE.BoxGeometry(SIGNAL_ARM, 0.09, 0.09),
@@ -244,41 +205,198 @@ export function buildLamps(map = worldMap()) {
   sigParts[1].translate(SIGNAL_ARM / 2, SIGNAL_Y, 0);
   sigParts[2].translate(SIGNAL_ARM, SIGNAL_Y - 0.55, 0.06);
   const sigGeo = mergeGeometries(sigParts);
-  const sigs = new THREE.InstancedMesh(sigGeo, new THREE.MeshStandardMaterial({
-    color: 0x14171d, roughness: 0.4, metalness: 0.7,
-  }), SIGNALS.length);
-  const lenses = new THREE.InstancedMesh(new THREE.CircleGeometry(0.12, 10), new THREE.MeshBasicMaterial({
-    color: 0xffffff, side: THREE.DoubleSide,
-  }), SIGNALS.length * 2);
-  SIGNALS.forEach((h, i) => {
-    dummy.position.set(h.x, 0, h.z);
-    dummy.rotation.set(0, h.yaw, 0);
-    dummy.scale.set(1, 1, 1);
-    dummy.updateMatrix();
-    sigs.setMatrixAt(i, dummy.matrix);
-    setLens(lenses, dummy, i * 2, h, SIGNAL_Y - 0.32);
-    setLens(lenses, dummy, i * 2 + 1, h, SIGNAL_Y - 0.78);
-    lenses.setColorAt(i * 2, LENS_RED_OFF);
-    lenses.setColorAt(i * 2 + 1, LENS_GREEN_OFF);
-  });
-  sigs.instanceMatrix.needsUpdate = true;
-  lenses.instanceMatrix.needsUpdate = true;
-  if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
-  group.add(sigs, lenses);
+  const sigMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.4, metalness: 0.7 });
+  const lensGeo = new THREE.CircleGeometry(0.12, 10);
+  const lensMat = new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide });
 
-  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
+  // What is drawn from the current plan. The plan, the heads and the light
+  // pools are mutated in place on rebuild, so every handle scene.js took at
+  // boot (fadedDraws' cones, the pools, the fireHack spark heads) stays live.
+  const rig = {
+    lamps: [],
+    heads: [],
+    poolsByZone: [[], []],
+    lanternMats: [[], []],
+    cones: null,
+    glows: null,
+    signals: [],
+    sigs: null,
+    lenses: null,
+  };
   const zoneLight = [1, 1];
   let nightF = 1;
+  const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const m4 = new THREE.Matrix4();
   const q0 = new THREE.Quaternion();
   const v3 = new THREE.Vector3();
   const s3 = new THREE.Vector3();
+
+  // The lantern model pools, one per power zone, with their headroom: the slot
+  // list is every slot currently seated, so a rebuild gives them back and seats
+  // the new plan. Only a plan wider than the pool loads a wider model.
+  const poolRig = [
+    { pool: null, slots: [], group: null },
+    { pool: null, slots: [], group: null },
+  ];
+  let poolBusy = 0;
+  let poolAgain = false;
+
+  function needPerZone() {
+    const need = [0, 0];
+    for (const l of rig.lamps) need[l.zone] += 1;
+    return need;
+  }
+
+  function placeLanterns() {
+    for (const zone of [0, 1]) {
+      const st = poolRig[zone];
+      if (!st.pool) continue;
+      for (const i of st.slots) st.pool.free(i);
+      st.slots.length = 0;
+      rig.lanternMats[zone] = [];
+      for (const l of rig.lamps) {
+        if (l.zone !== zone) continue;
+        const i = st.pool.claim();
+        if (i < 0) break;         // a wider pool is already on its way
+        dummy.position.set(l.x, 0, l.z);
+        dummy.rotation.set(0, l.rotY, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        st.pool.set(i, dummy.matrix);
+        st.slots.push(i);
+      }
+      for (const mesh of st.pool.meshes) {
+        if (/glass|bulb/i.test(mesh.material.name ?? '')) rig.lanternMats[zone].push(mesh.material);
+      }
+    }
+  }
+
+  function growLanterns() {
+    const need = needPerZone();
+    const wants = [0, 1].filter((z) => !poolRig[z].pool || poolRig[z].pool.capacity < need[z]);
+    if (wants.length === 0) {
+      placeLanterns();
+      return;
+    }
+    poolBusy += 1;
+    Promise.all(wants.map((z) => loadModelPool(LAMP_MODEL, need[z] + POOL_SLACK)
+      .then((pool) => {
+        const st = poolRig[z];
+        if (st.group) {
+          group.remove(st.group);
+          for (const m of st.group.children) {
+            m.geometry.dispose();
+            m.material.dispose();
+            m.dispose();
+          }
+        }
+        st.pool = pool;
+        st.slots = [];
+        st.group = pool.group;
+        group.add(pool.group);
+      }))).catch(() => {}).finally(() => {
+      poolBusy -= 1;
+      if (poolBusy > 0) return;
+      if (poolAgain) { poolAgain = false; growLanterns(); return; }
+      placeLanterns();
+      reportKit({ lamps: rig.lamps.length, models: ['street_lamp_01'] });
+    });
+  }
+
+  function syncLanterns() {
+    if (poolBusy > 0) { poolAgain = true; return; }
+    const need = needPerZone();
+    if ([0, 1].every((z) => poolRig[z].pool && poolRig[z].pool.capacity >= need[z])) {
+      placeLanterns();
+      return;
+    }
+    growLanterns();
+  }
+
+  function buildCones() {
+    const n = rig.lamps.length;
+    if (!rig.cones || rig.cones.instanceMatrix.count < n) {
+      const capacity = Math.max(n, 1) + POOL_SLACK;
+      if (rig.cones) { group.remove(rig.cones, rig.glows); rig.cones.dispose(); rig.glows.dispose(); }
+      rig.cones = new THREE.InstancedMesh(coneGeo, coneMat, capacity);
+      rig.glows = new THREE.InstancedMesh(glowGeo, glowMat, capacity);
+      group.add(rig.cones, rig.glows);
+    }
+    const { cones, glows } = rig;
+    cones.count = n;
+    glows.count = n;
+    rig.lamps.forEach((l, i) => {
+      dummy.position.set(l.x, LANTERN_Y, l.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      glows.setMatrixAt(i, dummy.matrix);
+      glows.setColorAt(i, glowLevel.setScalar(GLOW_OPACITY));
+      dummy.position.set(l.x, LANTERN_Y / 2, l.z);
+      dummy.updateMatrix();
+      cones.setMatrixAt(i, dummy.matrix);
+    });
+    cones.instanceMatrix.needsUpdate = true;
+    glows.instanceMatrix.needsUpdate = true;
+    if (glows.instanceColor) glows.instanceColor.needsUpdate = true;
+  }
+
+  // The signal pool: one head per junction approach from the sim's placement,
+  // the housing facing the traffic that must stop for it. A road op that makes
+  // a junction adds them; the pool grows to hold what the new graph asks.
+  function buildSignals(nextMap) {
+    rig.signals = signalHeads(nextMap);
+    const n = rig.signals.length;
+    if (!rig.sigs || rig.sigs.instanceMatrix.count < n || rig.lenses.instanceMatrix.count < n * 2) {
+      const capacity = Math.max(n, 1) + POOL_SLACK;
+      if (rig.sigs) { group.remove(rig.sigs, rig.lenses); rig.sigs.dispose(); rig.lenses.dispose(); }
+      rig.sigs = new THREE.InstancedMesh(sigGeo, sigMat, capacity);
+      rig.lenses = new THREE.InstancedMesh(lensGeo, lensMat, capacity * 2);
+      group.add(rig.sigs, rig.lenses);
+    }
+    const { sigs, lenses } = rig;
+    sigs.count = n;
+    lenses.count = n * 2;
+    rig.signals.forEach((h, i) => {
+      dummy.position.set(h.x, 0, h.z);
+      dummy.rotation.set(0, h.yaw, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      sigs.setMatrixAt(i, dummy.matrix);
+      setLens(lenses, dummy, i * 2, h, SIGNAL_Y - 0.32);
+      setLens(lenses, dummy, i * 2 + 1, h, SIGNAL_Y - 0.78);
+      lenses.setColorAt(i * 2, LENS_RED_OFF);
+      lenses.setColorAt(i * 2 + 1, LENS_GREEN_OFF);
+    });
+    sigs.instanceMatrix.needsUpdate = true;
+    lenses.instanceMatrix.needsUpdate = true;
+    if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
+  }
+
+  // Redraw every pool from the plan a road op just wrote (M5.T4b): the district
+  // plan plus the lamps, boxes and junctions of every edge the player laid
+  // (sim/furniture.js). Boot calls it once; main calls it whenever the map's
+  // furniture is replanned.
+  function rebuild(nextMap = worldMap()) {
+    rig.lamps = (nextMap.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(nextMap.district);
+    rig.heads.length = 0;
+    for (const zone of [0, 1]) rig.poolsByZone[zone].length = 0;
+    for (const l of rig.lamps) {
+      rig.heads.push(new THREE.Vector3(l.x, LANTERN_Y, l.z));
+      rig.poolsByZone[l.zone].push({ x: l.x, z: l.z, size: 11, color: '#b97c3a' });
+    }
+    buildCones();
+    buildSignals(nextMap);
+    syncLanterns();
+  }
+
   // Per-fixture brightness: mid-phase zones sputter per lamp (seeded blink).
   function setZoneLight(zone, v) {
     zoneLight[zone] = v;
   }
   function tick(time) {
-    LAMPS.forEach((l, i) => {
+    const { lamps, cones, glows, signals, lenses, lanternMats } = rig;
+    lamps.forEach((l, i) => {
       const v = zoneLight[l.zone];
       const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(time, i * 1.7 + l.zone);
       if (b <= 0.02) {
@@ -299,13 +417,13 @@ export function buildLamps(map = worldMap()) {
       const lit = (0.15 + 0.85 * nightF) * b;
       for (const mat of lanternMats[zone]) mat.emissiveIntensity = 1.5 * lit;
     }
-    SIGNALS.forEach((h, i) => {
+    signals.forEach((h, i) => {
       const green = signalGreen(h.axis, time);
       lenses.setColorAt(i * 2, green ? LENS_RED_OFF : LENS_RED);
       lenses.setColorAt(i * 2 + 1, green ? LENS_GREEN : LENS_GREEN_OFF);
     });
     cones.instanceMatrix.needsUpdate = true;
-    glows.instanceColor.needsUpdate = true;
+    if (glows.instanceColor) glows.instanceColor.needsUpdate = true;
     if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
   }
 
@@ -315,6 +433,22 @@ export function buildLamps(map = worldMap()) {
     coneMat.opacity = 0.03 * n;
   }
 
-  const headPositions = LAMPS.map((l) => new THREE.Vector3(l.x, LANTERN_Y, l.z));
-  return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions, cones };
+  // The number of lamp instances the current plan draws: the M5.T4b check reads
+  // it before and after a drag, so "the street is lit" is a measured number.
+  function drawn() {
+    return rig.lamps.length;
+  }
+
+  rebuild(map);
+  return {
+    group,
+    heads: rig.heads,
+    poolsByZone: rig.poolsByZone,
+    get cones() { return rig.cones; },
+    setZoneLight,
+    setDaylight,
+    tick,
+    rebuild,
+    drawn,
+  };
 }

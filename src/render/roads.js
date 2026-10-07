@@ -9,6 +9,7 @@ import { worldMap } from '../sim/patrol.js';
 import { loadPBRMaps, standardFromMaps } from './materials.js';
 import { buildInstancePools } from './buildings.js';
 import { refreshBuildGround } from './landscape.js';
+import { buildRiver, bridgeHalf } from './river.js';
 
 export const WALK_RISE = 0.24;
 const PLAZA_WALK_WIDTH = 2.4;  // narrower footways flanking the plaza's 104 m
@@ -18,6 +19,7 @@ const EDGE_LINE_OUT = ROAD_HALF + 0.2;  // the painted edge line, as shipped
 const MARK_Y = 0.02;
 const MANHOLE_R = 0.55;
 const ROAD_SLACK = 96;  // headroom for a road op that adds a stretch (M3.T27)
+const BRIDGE_SLACK = 96;  // the same headroom for a bridge a road op brings
 
 // One flat quad as a slot: the pool's unit plane turned to the ground, `across`
 // its x span and `along` its z span. One centred box: `y` is the slot's centre.
@@ -267,6 +269,7 @@ export function roadPieces(map = worldMap(), extras = {}) {
     kerbs: [...paving.kerbs, ...op.kerbs, ...(extras.kerbs ?? [])],
     markings: [...markings, ...op.markings, ...(extras.markings ?? [])],
     manholes,
+    bridges: bridgePieces(map),
   };
 }
 
@@ -292,6 +295,74 @@ function buildCirclePool(material, slots, slack) {
   };
   update();
   return { mesh, update, draws: () => (mesh.count > 0 ? 1 : 0) };
+}
+
+// The deck and railing of every bridge edge (M4.T8). The deck is a slab under
+// the carriageway whose top stays 1 cm under the tarmac, so the road plane and
+// its paint are never covered; the railings run post-and-rail along both edges
+// for the whole span, which is the part of a flat city's bridge a player
+// actually reads. Slots, so a road op that adds or removes a crossing rewrites
+// them with the rest of the road (M3.T27).
+const DECK_TOP = -0.01;
+const DECK_BOTTOM = -0.75;
+const RAIL_INSET = 0.2; // the railing stands this far inside the deck edge
+const RAIL_STEP = 2;
+const POST_W = 0.09;
+const POST_H = 1.0;
+const TOP_RAIL_Y = 0.95;
+const MID_RAIL_Y = 0.55;
+const RAIL_T = 0.07;
+const END_OVER = 0.4; // tucked under the road at each end of the edge
+
+// One side's worth of railing along `len` centred on `at`: posts on a fixed
+// step with one at each end, two rails spanning it. A rail is a long thin box,
+// so a post and a rail are the same pool.
+function railSlots(at, len, vertical) {
+  const out = [];
+  const count = Math.max(2, Math.ceil(len / RAIL_STEP) + 1);
+  const step = len / (count - 1);
+  for (let i = 0; i < count; i++) {
+    const t = -len / 2 + i * step;
+    out.push(vertical
+      ? { kind: 0, x: at.x, y: POST_H / 2, z: at.z + t, w: POST_W, h: POST_H, d: POST_W }
+      : { kind: 0, x: at.x + t, y: POST_H / 2, z: at.z, w: POST_W, h: POST_H, d: POST_W });
+  }
+  for (const y of [TOP_RAIL_Y, MID_RAIL_Y]) {
+    out.push(vertical
+      ? { kind: 0, x: at.x, y, z: at.z, w: RAIL_T, h: RAIL_T, d: len }
+      : { kind: 0, x: at.x, y, z: at.z, w: len, h: RAIL_T, d: RAIL_T });
+  }
+  return out;
+}
+
+// Every bridge edge's deck and railings. The bank runs in render/river.js share
+// `bridgeHalf`, so the deck's edge and the gap cut for it cannot drift apart.
+export function bridgePieces(map) {
+  const nodes = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const decks = [];
+  const rails = [];
+  for (const e of map.graph.edges) {
+    if (e.kind !== 'bridge') continue;
+    const a = nodes.get(e.a);
+    const b = nodes.get(e.b);
+    if (!a || !b) continue;
+    const vertical = a.x === b.x;
+    const lo = (vertical ? Math.min(a.z, b.z) : Math.min(a.x, b.x)) - END_OVER;
+    const hi = (vertical ? Math.max(a.z, b.z) : Math.max(a.x, b.x)) + END_OVER;
+    const mid = (lo + hi) / 2;
+    const len = hi - lo;
+    const line = vertical ? a.x : a.z;
+    const width = bridgeHalf(map, e) * 2;
+    const deck = { kind: 0, y: (DECK_TOP + DECK_BOTTOM) / 2, h: DECK_TOP - DECK_BOTTOM };
+    decks.push(vertical
+      ? { ...deck, x: line, z: mid, w: width, d: len }
+      : { ...deck, x: mid, z: line, w: len, d: width });
+    for (const side of [-1, 1]) {
+      const off = line + side * (width / 2 - RAIL_INSET);
+      rails.push(...railSlots(vertical ? { x: off, z: mid } : { x: mid, z: off }, len, vertical));
+    }
+  }
+  return { decks, rails };
 }
 
 // One fixed InstancedMesh per material whatever the map does; `update(map)`
@@ -334,6 +405,22 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
   }
   manholes.mesh.name = 'road';
   group.add(manholes.mesh);
+  // Bridge decks and railings ride their own pools (M4.T8): one draw each
+  // whatever the map does, rewritten by the same update a road op triggers.
+  const deck = buildInstancePools(
+    [new THREE.MeshStandardMaterial({ color: 0x4b5158, roughness: 0.85, metalness: 0.05 })],
+    pieces.bridges.decks, { shape: 'box', castShadow: false, receiveShadow: true, slack: BRIDGE_SLACK },
+  );
+  const rails = buildInstancePools(
+    [new THREE.MeshStandardMaterial({ color: 0x2f343a, roughness: 0.5, metalness: 0.6 })],
+    pieces.bridges.rails, { shape: 'box', castShadow: true, receiveShadow: false, slack: BRIDGE_SLACK },
+  );
+  // The river the graph crosses (M4.T8): water and its banks; the decks and
+  // railings above are road furniture and ride the road pools.
+  const river = buildRiver(texLoader, maxAniso, map);
+  group.add(deck.group);
+  group.add(rails.group);
+  group.add(river.group);
 
   const update = (next = worldMap()) => {
     const p = roadPieces(next, extrasOf(next));
@@ -342,13 +429,17 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     kerbs.update(p.kerbs);
     markings.update(p.markings);
     manholes.update(p.manholes);
+    deck.update(p.bridges.decks);
+    rails.update(p.bridges.rails);
+    river.update(next);
     refreshBuildGround(next);
   };
   return {
     group,
     mats: { road: roadMat, walk: walkMat, curb: curbMat },
     markings: markingMats,
-    pools: { road, walks, kerbs, markings, manholes },
+    pools: { road, walks, kerbs, markings, manholes, deck, rails },
+    river,
     update,
   };
 }

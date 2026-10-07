@@ -8,7 +8,12 @@
 // whose way to the door is shortest. Pure sim (law 5).
 import { mulberry32 } from './rng.js';
 import { frontageRoad, projectOnSegment } from './map.js';
-import { ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
+import { ROAD_HALF_WIDTH, WALKWAY_WIDTH, heightAt } from './world.js';
+
+// The ground under a walker (M4.T10): the map's own field when it has one
+// (M4.T2, the field the render draws); the load-time world field is the hand
+// preset's fallback.
+const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
 
 // Mid-pavement: kerb face to building line.
 export const WALK_OFF = ROAD_HALF_WIDTH + WALKWAY_WIDTH / 2;
@@ -120,10 +125,13 @@ export function createWalkers(map, seed, bodies = []) {
 // Boot walkers start spread along their first edge.
 function makeWalker(state, body) {
   const w = { ...body, route: [], leg: 0, tdir: 1, orient: 1, s: 0, side: 1, turn: null,
-    axis: 'z', dir: 1, v: 0, x: 0, z: 0, yaw: 0, commute: null, dest: null,
+    axis: 'z', dir: 1, v: 0, x: 0, y: 0, z: 0, yaw: 0, commute: null, dest: null,
     hold: null, freeAfter: 0, roamUntil: 0 };
-  if (assignTrip(state, w, null)) return w;
-  const n0 = state.map.graph.nodes[0]; if (n0) { w.x = n0.x + WALK_OFF; w.z = n0.z; }
+  if (!assignTrip(state, w, null)) {
+    const n0 = state.map.graph.nodes[0];
+    if (n0) { w.x = n0.x + WALK_OFF; w.z = n0.z; }
+  }
+  w.y = groundAt(state.map, w.x, w.z);
   return w;
 }
 
@@ -311,6 +319,9 @@ export function tick(state, dt) {
     w.phase += Math.hypot(p.x - w.x, p.z - w.z) * 4;
     w.x = p.x; w.z = p.z; w.yaw = p.yaw; w.axis = edge.axis; w.dir = w.tdir * w.orient;
   }
+  // One pass after the step puts every walker on the ground, whichever branch
+  // moved it — a leg, a junction turn or a held door (M4.T10).
+  for (const w of state.walkers) w.y = groundAt(state.map, w.x, w.z);
 }
 
 // Off one end: the route carries on through this node whichever way the path

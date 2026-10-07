@@ -9,10 +9,15 @@ const ACCEL = 9;
 const BRAKE = 17;
 const TURN = 1.9;
 
+// The ground under a mover (M4.T10): the map's own field when it has one
+// (M4.T2, the field the render draws); the load-time world field is the hand
+// preset's fallback.
+const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
+
 export function createPlayerCar(map = worldMap()) {
   // Curb-parked beside the player's spawn — the F prompt greets you.
   const { x, z, yaw } = map.spawn.car;
-  return { x, y: heightAt(x, z), z, yaw, speed: 0 };
+  return { x, y: groundAt(map, x, z), z, yaw, speed: 0 };
 }
 
 // input: {throttle -1..1, steer -1..1}. Returns {braking} for taillights.
@@ -40,10 +45,9 @@ export function tickPlayerCar(car, input, dt, map = worldMap()) {
     car.z = inside.z;
     car.speed = 0;
   }
-  // The wheels are on the ground, always. No slope limit, because there is
-  // nothing to limit: with the river channel gone the steepest gradient inside
-  // the drive box is 4 degrees, measured over the whole box at 0.25 m. A car
-  // cannot reach anything it could not drive up.
-  car.y = heightAt(car.x, car.z);
+  // The wheels are on the ground, always — the map's own field, the same one
+  // the render draws. No slope limit: the car follows whatever surface it is
+  // on, on the graded roads at 0 and on the relief off them alike.
+  car.y = groundAt(map, car.x, car.z);
   return { braking };
 }
