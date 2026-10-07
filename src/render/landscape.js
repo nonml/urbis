@@ -314,9 +314,6 @@ export function buildMountains(district) {
     geo,
     new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
   );
-  // A model tag like the pool loader sets, so the VGA-084 sweep reads this
-  // smooth terrain as a model rather than a raw primitive.
-  mesh.userData.model = 'mountain-range';
   const g = new THREE.Group();
   g.add(mesh);
   return g;

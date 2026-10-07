@@ -2,7 +2,7 @@
 // stair door. Each builder returns parts in its space's frame (interiorkit.js);
 // render/interior.js merges, lights and places them. Footprints come from the
 // sim's SPACES items, so what a player bumps into is what they see.
-import { CELL, ball, cased, cylinder, panel, part, tag, tiled } from './interiorkit.js';
+import { CELL, ball, cased, cylinder, panel, part, tiled } from './interiorkit.js';
 
 // A floor surface sits this far above its datum, the way the pavement slab's
 // top sits above heightAt() (block.js WALK_RISE / 2): the hero and its contact
@@ -319,32 +319,19 @@ function emergencyLamp(out) {
   }
 }
 
-// Every part leaves tagged with its model, the way the pool loader tags its
-// meshes (models.js): what stands in a room is furniture models, and the
-// sweep can tell them apart (M2-5).
-function asModel(out, name, build) {
-  const from = out.length;
-  build();
-  tag(out, from, name);
-}
-
 export function ramenRoom(place) {
   const out = [];
-  asModel(out, 'ramen-shell', () => {
-    shellFloorAndCeiling(place, out);
-    shellWalls(place, out);
-    shellFront(place, out);
-    rightWallDressing(place, out);
-  });
-  asModel(out, 'ramen-emergency', () => emergencyLamp(out));
+  shellFloorAndCeiling(place, out);
+  shellWalls(place, out);
+  shellFront(place, out);
+  rightWallDressing(place, out);
+  emergencyLamp(out);
   for (const [a, d] of CEILING_LAMPS) {
-    asModel(out, 'ramen-lamp', () => {
-      out.push(part(cylinder(0.24, 0.24, 0.05, a, place.height - 0.03, d, 20), 0xfff4e0, CELL.plain, PANEL_LAMP));
-    });
+    out.push(part(cylinder(0.24, 0.24, 0.05, a, place.height - 0.03, d, 20), 0xfff4e0, CELL.plain, PANEL_LAMP));
   }
   for (const it of place.items) {
     const build = ROOM_BUILDERS[it.kind];
-    if (build) asModel(out, `ramen-${it.kind}`, () => build(it, out));
+    if (build) build(it, out);
   }
   return out;
 }
@@ -638,18 +625,16 @@ function parcelShell(place, out) {
 
 export function parcelRoom(place) {
   const out = [];
-  asModel(out, 'parcel-shell', () => parcelShell(place, out));
+  parcelShell(place, out);
   const A = place.room.a[1];
   const dm = mid(place.room.d);
   // Ceiling lamps, directly above the baked sources in sim/interior.js.
   for (const a of [-A * 0.55, A * 0.55]) {
-    asModel(out, 'parcel-lamp', () => {
-      out.push(part(cylinder(0.22, 0.22, 0.05, a, place.height - 0.03, dm, 20), 0xfff4e0, CELL.plain, PANEL_LAMP));
-    });
+    out.push(part(cylinder(0.22, 0.22, 0.05, a, place.height - 0.03, dm, 20), 0xfff4e0, CELL.plain, PANEL_LAMP));
   }
   for (const it of place.items) {
     const build = PARCEL_BUILDERS[it.kind];
-    if (build) asModel(out, `parcel-${it.kind}`, () => build(it, out));
+    if (build) build(it, out);
   }
   return out;
 }

@@ -5,6 +5,8 @@
 // Pure sim (law 5): no three.js, no DOM. A map is built in a process booted on
 // its seed: planLayout still reads its own load-time towers (M3.T14 removes it).
 import { generateDistrict } from './citygen.js';
+import { createTerrain } from './terrain.js';
+import { planTown } from './townplan.js';
 import { BUILD_LINE, buildingsOf, planLayout } from './layout.js';
 import { HAND_PINNED, placePinned } from './landmarks.js';
 import { planFurniture } from './furniture.js';
@@ -150,12 +152,16 @@ function splitDistricts(district) {
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
   const district = generateDistrict(seed);
+  // The coarse town (M4.T3): cells, kinds, arterials and the river. Today the
+  // generated district still fills the map; M4.T4 makes one district per cell
+  // and joins their roads through town.arterials.
+  const town = planTown(seed);
   const plan = planLayout(district, seed);
   plan.pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings);
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
   const buildings = buildingsOf(plan);
-  return {
+  const map = {
     seed,
     version: 0,
     // Tiles an edit has touched since the renderer last drained them (M3.T27).
@@ -164,6 +170,10 @@ export function createMap(seed) {
     district,
     districts: splitDistricts(district),
     graph: buildGraph(district),
+    town,
+    // The town's water (M4.T3): terrain.buildable refuses a footprint in it
+    // (M4.T5), and M4.T8 draws it. Rects are terrain's [cx, cz, hw, hd].
+    water: town.river.rects,
     buildings,
     // Every building the renderer draws, and every lot, is one parcel with an
     // id: nothing the city shows a footprint for is anonymous (M3-3).
@@ -185,6 +195,10 @@ export function createMap(seed) {
     },
     spawn: spawnFor(district),
   };
+  // The map's own ground (M4.T2): built last, from the map itself, so the flats
+  // and, from M4.T3, the water are the map's data and not a copy of it.
+  map.terrain = createTerrain(map);
+  return map;
 }
 
 // The graph node nearest a point, as { node, dist }.

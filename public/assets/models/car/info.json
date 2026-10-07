@@ -1,1 +1,1 @@
-{"id": "car", "name": "Concept saloon", "type": "models", "license": "generated", "fmt": "glb", "source": "trellis.cpp showcase racer via tools/models/clean_car.py"}
+{"id": "car", "name": "Modern saloon", "type": "models", "license": "CC0", "fmt": "glb", "source": "tools/models/make_saloon.py"}

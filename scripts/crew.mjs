@@ -50,6 +50,10 @@ const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
 // Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
 const STALL_MIN = Number(process.env.CREW_STALL_MIN ?? 10);
 const POLL_MS = 30_000;
+// Lanes live at once; CREW_MAX_LIVE overrides.
+const MAX_LIVE = Number(process.env.CREW_MAX_LIVE ?? 3);
+// Browsers per check: each is ~0.5 GB, and four lanes of four filled the 16 GB.
+const GATE_WORKERS = Number(process.env.CREW_GATE_WORKERS ?? 2);
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
 // One block per live worker, gate block*100+73, shot +91, score +95. Clear of
 // 4100-4499, where the OpenCode plugin derives each worktree's server port
@@ -349,6 +353,10 @@ async function assign(state, lane, task) {
   // Every block taken: wait for a lane to finish rather than share a port, which
   // makes a gate adopt another worktree's server or fail on a busy port.
   if (ports(state, lane).block === undefined) return null;
+  // The models run in the cloud, but every gate, build and bake runs on this Mac
+  // (8 cores, 16 GB): nine lanes at once drove the load average past 400, and four
+  // still left 645 MB free.
+  if (Object.values(state.workers).filter((x) => x.live).length >= MAX_LIVE) return null;
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
@@ -416,7 +424,7 @@ async function gateFault(w) {
     if (w.task.brief) out = await shAsync('npm', ['run', 'gate'], w.dir, env);
     else {
       for (const check of STATIC_CHECKS) await shAsync('npm', ['run', check], w.dir, env);
-      out = await shAsync('npx', ['playwright', 'test', '--workers', '4', ...specsFor(w)], w.dir, env);
+      out = await shAsync('npx', ['playwright', 'test', '--workers', String(GATE_WORKERS), ...specsFor(w)], w.dir, env);
     }
     w.draws = out.match(/draws: (\d+)/)?.[1] ?? null;
     return null;
