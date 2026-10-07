@@ -9,10 +9,10 @@
 // and pure maths (law 5). The camera and the lot outlines are
 // render/cityview.js; the pointer, the palette and the readout are
 // ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
-import { STAGE, zoneParcel } from './zoning.js';
+import { STAGE, builtHeight, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
-import { nodeAt } from './map.js';
-import { addRoad } from './ops.js';
+import { frontageRoad, nodeAt } from './map.js';
+import { addRoad, bulldoze, removeRoad } from './ops.js';
 import { MAX_BUILD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
@@ -80,8 +80,32 @@ export const ROAD_TOOL = {
   cost: () => ROAD_PRICE,
 };
 
+// The bulldoze tool (M5.T5) is not a lot brush: its cursor holds a whole
+// parcel or a road edge, and a click runs one stage of `bulldoze` or takes the
+// edge out. Costs are provisional like the zone prices (M5.T17 meters them).
+const BULLDOZE_PRICE = { call: 25, height: 2, road: 6 };
+
+export const BULLDOZE_TOOL = {
+  id: 'bulldoze',
+  use: 'bulldoze',
+  name: 'bulldoze',
+  blurb: 'tears down the building or road under the cursor',
+  cost: (map, at) => {
+    if (!at) return BULLDOZE_PRICE.call;
+    if (at.kind === 'road') return Math.round((at.length ?? 0) * BULLDOZE_PRICE.road);
+    return Math.round(BULLDOZE_PRICE.call + builtHeight(at.parcel ?? at) * BULLDOZE_PRICE.height);
+  },
+  refuse: (map, at) => {
+    if (!at) return 'nothing under the cursor';
+    if (at.kind === 'road') return null;
+    const p = at.parcel ?? at;
+    return p.kind === 'lot' && p.stage === STAGE.EMPTY ? 'already open land' : null;
+  },
+};
+
 export const TOOLS = {
   road: ROAD_TOOL,
+  bulldoze: BULLDOZE_TOOL,
   res: zoneTool('res', 'r', 'res', 'residential', 'zones a lot for homes'),
   com: zoneTool('com', 'c', 'com', 'commercial', 'zones a lot for shops'),
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
@@ -106,6 +130,8 @@ export function toolOf(view) {
 export function layDownTool(view) {
   view.active = false;
   view.drag = null;
+  view.pick = null;
+  view.confirm = null;
 }
 
 // The rise frames the lots, whichever corner of the district it starts from.
@@ -137,6 +163,8 @@ export function createCityView(city, map = worldMap()) {
     active: true,          // false once the player lays the tool down
     hover: -1,
     drag: null,            // the road drag's snapped ends, while one is held
+    pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
+    confirm: null,         // a road removal waiting on the page's ask (M5.T5)
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
   };
@@ -154,6 +182,8 @@ export function toggleCityView(view, streetYaw) {
     view.mode = 'street';
     view.hover = -1;
     view.drag = null;
+    view.pick = null;
+    view.confirm = null;
     return;
   }
   view.mode = 'city';
@@ -182,6 +212,8 @@ export function cityKey(view, key, streetYaw) {
 export function chooseTool(view, tool) {
   view.brush = tool.use;
   view.active = true;
+  view.pick = null;
+  view.confirm = null;
 }
 
 export function chooseBrush(view, use) {
@@ -203,13 +235,27 @@ export function hoverLot(view, index) {
   view.hover = view.mode === 'city' ? index : -1;
 }
 
-// A click: the tool goes on the lot under the cursor. Returns whether the
-// lot's zoning changed. A tool the player put down paints nothing.
+// The bulldoze cursor (M5.T5): the parcel or road edge the renderer's picker
+// found. A lot among them keeps the old hover too, so its kerbs light and the
+// readout reads it; a building or a road has no lot index.
+export function hoverPick(view, city, target) {
+  view.pick = view.mode === 'city' ? target ?? null : null;
+  if (view.mode === 'city') {
+    view.hover = target?.kind === 'parcel' ? city.parcels.indexOf(target.parcel) : -1;
+  }
+}
+
+// A click: the tool goes on the lot under the cursor, or — with the bulldozer —
+// on the whole parcel or road the cursor holds. Returns whether the world
+// changed. A tool the player put down acts nowhere.
 export function paintLot(view, city) {
-  if (view.mode !== 'city' || view.lift < 1 || view.hover < 0) return false;
+  if (view.mode !== 'city' || view.lift < 1) return false;
   const tool = toolOf(view);
+  if (!tool || tool.drag) return false;
+  if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
+  if (view.hover < 0) return false;
   const at = city.parcels[view.hover];
-  if (!tool || tool.drag || tool.refuse(city, at)) return false;
+  if (tool.refuse(city, at)) return false;
   return tool.op(city, at);
 }
 
@@ -235,6 +281,67 @@ function adoptLots(view, city, map) {
   view.level = lots.map(levelOf);
   view.trend = lots.map(() => 0);
   view.hover = -1;
+  view.pick = null;
+}
+
+// The map a view edits (M5.T5): the op runs on it, the picker reads its parcels.
+export function mapOf(view) {
+  return WORLDS.get(view)?.map ?? null;
+}
+
+// Every standing building left without a road if `edge` went (M5.T5): the same
+// frontage test removeRoad reconciles with, run with the edge out and put back.
+export function roadCutsOff(map, edge) {
+  const at = map.graph.edges.indexOf(edge);
+  if (at < 0) return [];
+  map.graph.edges.splice(at, 1);
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const cut = (map.parcels ?? []).filter((p) => (p.kind !== 'lot' || p.stage > STAGE.EMPTY)
+    && frontageRoad(map, p, byId) === null);
+  map.graph.edges.splice(at, 0, edge);
+  return cut;
+}
+
+// Taking an edge out: the page is asked first when buildings would be stranded.
+function takeRoad(view, city, map, edge, confirmed) {
+  if (!confirmed) {
+    const cuts = roadCutsOff(map, edge);
+    if (cuts.length > 0) {
+      view.confirm = { edge, cuts: cuts.length };
+      return false;
+    }
+  }
+  const version = map.version;
+  removeRoad(map, edge);
+  if (map.version === version) return false;
+  adoptLots(view, city, map);
+  return true;
+}
+
+// One bulldoze click (M5.T5): the building comes down a stage, or the road
+// goes. A parcel fully down keeps its id and stays live as an empty lot.
+function demolish(view, city, map) {
+  const target = view.pick;
+  if (!target) return false;
+  if (target.kind === 'road') return takeRoad(view, city, map, target.edge, false);
+  const version = map.version;
+  bulldoze(map, target.parcel);
+  if (map.version === version) return false;
+  adoptLots(view, city, map);
+  return true;
+}
+
+// The page's yes on the road ask (M5.T5): now take it out.
+export function confirmRoad(view, city) {
+  const { map } = WORLDS.get(view);
+  const ask = view.confirm;
+  view.confirm = null;
+  return ask ? takeRoad(view, city, map, ask.edge, true) : false;
+}
+
+// The page's no: the road stays where it is.
+export function dismissRoad(view) {
+  view.confirm = null;
 }
 
 // The carriageway's footprint: the drag line swept half a road to each side.

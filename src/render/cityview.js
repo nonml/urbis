@@ -11,13 +11,15 @@
 // what the lot is zoned for: one draw, and only while the camera is up.
 import * as THREE from 'three';
 import { builtHeight } from '../sim/zoning.js';
-import { roadPreview } from '../sim/cityview.js';
+import { edgesNear } from '../sim/map.js';
+import { mapOf, roadPreview } from '../sim/cityview.js';
 
 // Grounded paint, the colours a planning map would use: leaf green for homes,
-// slate blue for shops and offices, ochre for works, grey for open land and the
-// road tool's own mark.
+// slate blue for shops and offices, ochre for works, grey for open land, the
+// road tool's own mark, and a rust red for the bulldozer's cursor.
 export const ZONE_PAINT = { res: '#6b9651', com: '#4d7aa6', ind: '#c19436', none: '#8e8b84',
-  road: '#cfc9bc' };export const paintOf = (use) => ZONE_PAINT[use ?? 'none'];
+  road: '#cfc9bc', bulldoze: '#b0553b' };
+export const paintOf = (use) => ZONE_PAINT[use ?? 'none'];
 
 // A kerb just outside the hoarding line and a little taller than it, so from
 // any side of an oblique view the fence never hides the far edge and the kerb
@@ -47,6 +49,12 @@ const OVERVIEW_NEAR = 4;
 const PREVIEW_RISE = 0.6;
 const PREVIEW_WIDTH = 7;
 const PREVIEW_REFUSE = 0xd0563f;
+// The bulldoze cursor (M5.T5): a translucent shell over the whole building or a
+// low band over the road under the pointer, so the thing about to go reads at
+// once; one more draw, and only while the bulldozer is up. A cursor holds a
+// road when its ground point is this near a centre-line.
+const MARK_OPACITY = 0.34;
+const ROAD_PICK_W = 6;
 // How far a ground ray may travel: the camera's 400 m reach plus its distance.
 const GROUND_REACH = 2000;
 
@@ -134,15 +142,43 @@ function drawPreview(rig, show) {
   bar.visible = true;
 }
 
+// The bulldoze cursor's mark (M5.T5): a translucent shell over the whole
+// building, so it reads over the roof from an oblique view, or a low band over
+// the road. One draw, and only while there is a pick to show.
+function drawMark(rig, show) {
+  const { view, mark } = rig;
+  const pick = view.pick;
+  if (!show || !pick || view.drag) {
+    mark.visible = false;
+    return;
+  }
+  mark.material.color.set(paintOf('bulldoze'));
+  if (pick.kind === 'road') {
+    const map = mapOf(view);
+    const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+    const a = byId.get(pick.edge.a);
+    const b = byId.get(pick.edge.b);
+    mark.position.set((a.x + b.x) / 2, 0, (a.z + b.z) / 2);
+    mark.scale.set(Math.abs(b.x - a.x) || PREVIEW_WIDTH, PREVIEW_RISE,
+      Math.abs(b.z - a.z) || PREVIEW_WIDTH);
+  } else {
+    const p = pick.parcel;
+    mark.position.set(p.x, 0, p.z);
+    mark.scale.set(p.w + KERB_OUT * 2, Math.max(builtHeight(p), PICK_FLOOR), p.d + KERB_OUT * 2);
+  }
+  mark.visible = true;
+}
+
 // The ground point (y = 0) under an NDC screen point: every road node stands
-// at zero (ops.js), so that is the plane the road drag snaps on.
+// at zero (ops.js), so that is the plane the road drag snaps on. `t` is how far
+// down the ray it lies, so a parcel hit can be compared against it.
 function ground(camera, x, y) {
   raycaster.setFromCamera(ndc.set(x, y), camera);
   const { origin, direction } = raycaster.ray;
   if (Math.abs(direction.y) < 1e-6) return null;
   const t = -origin.y / direction.y;
   if (!(t > 0 && t < GROUND_REACH)) return null;
-  return { x: origin.x + direction.x * t, z: origin.z + direction.z * t };
+  return { x: origin.x + direction.x * t, z: origin.z + direction.z * t, t };
 }
 
 function backOff(rig, camera, e) {
@@ -160,6 +196,7 @@ function frame(rig, camera, streetAim, scene) {
   const e = ease(view.lift);
   kerbs.visible = e > 0;
   drawPreview(rig, e > 0);
+  drawMark(rig, e > 0);
   backOff(rig, camera, e);
   if (e === 0) return;
   off.subVectors(camera.position, streetAim);
@@ -180,10 +217,13 @@ function frame(rig, camera, streetAim, scene) {
   outline(rig, e, dist);
 }
 
-// A lot's whole standing volume, so pointing at a tower's roof picks its lot.
-function lotBox(p) {
+// A parcel's whole standing volume, so pointing at a tower's roof picks it; the
+// renderer's crown and roof plant stand above the parcel's own height.
+const PICK_CROWN = 1.35;
+function parcelBox(p) {
   box.min.set(p.x - p.w / 2 - KERB_OUT, 0, p.z - p.d / 2 - KERB_OUT);
-  box.max.set(p.x + p.w / 2 + KERB_OUT, Math.max(builtHeight(p), PICK_FLOOR), p.z + p.d / 2 + KERB_OUT);
+  box.max.set(p.x + p.w / 2 + KERB_OUT, Math.max(builtHeight(p) * PICK_CROWN, PICK_FLOOR),
+    p.z + p.d / 2 + KERB_OUT);
   return box;
 }
 
@@ -193,7 +233,7 @@ function pick({ city }, camera, x, y) {
   let best = -1;
   let bestDist = Infinity;
   city.parcels.forEach((p, i) => {
-    if (!raycaster.ray.intersectBox(lotBox(p), hit)) return;
+    if (!raycaster.ray.intersectBox(parcelBox(p), hit)) return;
     const d = hit.distanceTo(raycaster.ray.origin);
     if (d < bestDist) {
       bestDist = d;
@@ -201,6 +241,34 @@ function pick({ city }, camera, x, y) {
     }
   });
   return best;
+}
+
+// The road edge under a screen point: the ground point the ray meets and the
+// nearest centre-line to it; its length is what the cost is metered on.
+function roadPick(map, camera, x, y) {
+  const at = ground(camera, x, y);
+  if (!at) return null;
+  const near = edgesNear(map, at.x, at.z, ROAD_PICK_W)[0];
+  if (!near) return null;
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const a = byId.get(near.edge.a);
+  const b = byId.get(near.edge.b);
+  return { kind: 'road', edge: near.edge, length: Math.hypot(b.x - a.x, b.z - a.z), dist: at.t };
+}
+
+// What the bulldoze cursor holds (M5.T5): the nearest whole parcel along the
+// ray, or the road when the ray meets it first. The pick is the map's parcel.
+function pickTarget({ city, view }, camera, x, y) {
+  raycaster.setFromCamera(ndc.set(x, y), camera);
+  const map = mapOf(view);
+  let best = null;
+  for (const p of map?.parcels ?? city.parcels) {
+    if (!raycaster.ray.intersectBox(parcelBox(p), hit)) continue;
+    const d = hit.distanceTo(raycaster.ray.origin);
+    if (!best || d < best.dist) best = { kind: 'parcel', parcel: p, dist: d };
+  }
+  const road = map ? roadPick(map, camera, x, y) : null;
+  return road && (!best || road.dist < best.dist) ? road : best;
 }
 
 // Where lot `index` sits on screen, in normalised device coordinates.
@@ -227,11 +295,20 @@ export function buildCityView(city, view) {
   bar.frustumCulled = false;
   bar.visible = false;
   group.add(bar);
-  const rig = { city, view, kerbs, bar, group, streetNear: null };
+  // The bulldoze cursor: see-through and depth-write off, so the building it
+  // shells stays readable; hidden until the cursor holds something.
+  const mark = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({
+    color: paintOf('bulldoze'), fog: false, transparent: true, opacity: MARK_OPACITY, depthWrite: false,
+  }));
+  mark.frustumCulled = false;
+  mark.visible = false;
+  group.add(mark);
+  const rig = { city, view, kerbs, bar, mark, group, streetNear: null };
   return {
     mesh: group,
     frame: (camera, streetAim, scene) => frame(rig, camera, streetAim, scene),
     pick: (camera, x, y) => pick(rig, camera, x, y),
+    pickTarget: (camera, x, y) => pickTarget(rig, camera, x, y),
     screenOf: (camera, index) => screenOf(rig, camera, index),
     ground: (camera, x, y) => ground(camera, x, y),
   };
