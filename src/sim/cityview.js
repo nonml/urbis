@@ -154,8 +154,10 @@ export function createCityView(city, map = worldMap()) {
     home,
     x: home.x,             // the overview's pivot on the ground
     z: home.z,
-    // The map's own district floor: the pan stays over it, whatever the seed.
-    bounds: map.district.walk,
+    // The map's own buildable box: the generated town's graph box plus its
+    // build margin (map.js M5.T3b), so the pan reaches the land a road drag can
+    // use; the hand preset keeps its district floor.
+    bounds: map.bounds ?? map.district.walk,
     yaw: 0,
     tilt: TILT.start,
     reach: REACH.start,

@@ -12,8 +12,8 @@
 // An op is pure logic on the map (law 5) and deterministic given its state, so
 // the save's op log (M3.T38) replays.
 import {
-  STAGE, STAGES, USES, USE_BY_KIND, buildingParcel, frontageRoad, markBridges, markDirty,
-  projectOnSegment,
+  STAGE, STAGES, USES, USE_BY_KIND, BUILD_MARGIN, buildingParcel, frontageRoad, graphBounds,
+  markBridges, markDirty, projectOnSegment,
 } from './map.js';
 import { waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
@@ -401,10 +401,23 @@ function roadEdit(map, box, change) {
   const parcelsBefore = map.parcels ? map.parcels.slice() : null;
   const lotsBefore = map.lots ? map.lots.slice() : null;
   const buildingsBefore = map.buildings ? map.buildings.slice() : null;
+  const driveBefore = map.bounds && map.district ? { ...map.district.drive } : null;
+  const boundsBefore = map.bounds ? { ...map.bounds } : null;
   change();
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const kept = replanFrontage(map, box, byId);
   const touched = reconcileFrontage(map, box, byId, kept);
+  // A road op settles the drivable box on the graph it leaves (M5.T3b): the car
+  // is clamped to the exact box of the roads, so a road that leaves the old box
+  // hands the car its whole length, and the city view pans the build margin.
+  if (driveBefore) {
+    const land = graphBounds(map.graph);
+    Object.assign(map.district.drive, land);
+    Object.assign(map.bounds, {
+      minX: land.minX - BUILD_MARGIN, maxX: land.maxX + BUILD_MARGIN,
+      minZ: land.minZ - BUILD_MARGIN, maxZ: land.maxZ + BUILD_MARGIN,
+    });
+  }
   map.version = version + 1;
   markDirty(map, box);
   const reverse = () => {
@@ -428,6 +441,8 @@ function roadEdit(map, box, change) {
       if (t.had) t.p.noRoad = t.value;
       else delete t.p.noRoad;
     }
+    if (driveBefore) Object.assign(map.district.drive, driveBefore);
+    if (boundsBefore) Object.assign(map.bounds, boundsBefore);
     map.version = version;
     markDirty(map, box);
   };

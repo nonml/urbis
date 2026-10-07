@@ -200,6 +200,27 @@ function splitDistricts(district) {
   ];
 }
 
+// The box a road graph spans (M5.T3b): the map's own buildable land grows from
+// this, so a new game's whole town fits however the seed lays it out.
+export function graphBounds(graph) {
+  let minX = Infinity;
+  let maxX = -Infinity;
+  let minZ = Infinity;
+  let maxZ = -Infinity;
+  for (const node of graph.nodes) {
+    if (node.x < minX) minX = node.x;
+    if (node.x > maxX) maxX = node.x;
+    if (node.z < minZ) minZ = node.z;
+    if (node.z > maxZ) maxZ = node.z;
+  }
+  return { minX, maxX, minZ, maxZ };
+}
+
+// Open land a road drag may still reach past the outermost road (M5.T3b): the
+// build box is the graph's own box grown by this much, so a player can leave
+// the town's edge instead of being fenced onto its last street.
+export const BUILD_MARGIN = 100;
+
 // A seed's whole map. `version` is the edit revision; ops (M3.T18) bump it, so
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
@@ -267,6 +288,22 @@ export function createMap(seed) {
   // The map's own ground (M4.T2): built last, from the map itself, so the flats
   // and, from M4.T3, the water are the map's data and not a copy of it.
   map.terrain = createTerrain(map);
+  // The land a player can build on is the whole generated town (M5.T3b), not
+  // the legacy district's own little road box: the graph now spans every cell
+  // and arterial. The drive box grows to the graph plus BUILD_MARGIN, so a drag
+  // can leave the outermost road. Its east edge stays the legacy district's own
+  // until the first road op settles the box (ops.js roadEdit), because
+  // render/outskirts.js picks its lane's crossing by `x1 === drive.maxX`.
+  // `map.bounds` is the same box the city view pans over, and a road op keeps
+  // it in step.
+  const land = graphBounds(map.graph);
+  map.bounds = {
+    minX: land.minX - BUILD_MARGIN, maxX: land.maxX + BUILD_MARGIN,
+    minZ: land.minZ - BUILD_MARGIN, maxZ: land.maxZ + BUILD_MARGIN,
+  };
+  district.drive.minX = map.bounds.minX;
+  district.drive.minZ = map.bounds.minZ;
+  district.drive.maxZ = map.bounds.maxZ;
   return map;
 }
 

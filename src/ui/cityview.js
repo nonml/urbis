@@ -60,6 +60,65 @@ function swatch(use) {
     + `background:${paintOf(use)};border-radius:2px"></span>`;
 }
 
+// Demand bars (M5.T27): three rows — res, com, ind — for the district under the
+// cursor, straight off the economy's own demand (sim/economy.js). With no
+// district under it the strip reads the city's mean, named CITY. Each row keeps
+// the raw value on `data-demand` so the acceptance check can compare it with
+// window.__game.economy() instead of reading a rounded bar.
+const DEMAND_USES = ['res', 'com', 'ind'];
+const DEMAND_WIDTH = 64;
+const DEMAND_CITY = 'DEMAND · CITY';
+
+function demandRow(use) {
+  const row = document.createElement('div');
+  row.id = `demand-${use}`;
+  row.dataset.use = use;
+  row.style.cssText = 'display:flex;align-items:center;gap:6px';
+  const label = document.createElement('span');
+  label.textContent = use;
+  label.style.cssText = 'width:2.4em;opacity:0.75';
+  const track = document.createElement('span');
+  track.style.cssText = `position:relative;display:inline-block;width:${DEMAND_WIDTH}px;height:6px;`
+    + 'background:rgba(255,255,255,0.12);border-radius:2px;overflow:hidden';
+  const fill = document.createElement('span');
+  fill.style.cssText = `display:block;height:100%;width:0;background:${paintOf(use)}`;
+  track.appendChild(fill);
+  const value = document.createElement('span');
+  value.style.cssText = 'min-width:3.2em;text-align:right;opacity:0.9';
+  row.append(label, track, value);
+  return { row, fill, value };
+}
+
+function buildDemand() {
+  const el = document.createElement('div');
+  el.id = 'demand-bars';
+  el.style.cssText = 'margin-top:4px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.14)';
+  const head = document.createElement('div');
+  head.id = 'demand-zone';
+  head.style.cssText = 'opacity:0.7;letter-spacing:0.06em';
+  head.textContent = DEMAND_CITY;
+  const bars = Object.fromEntries(DEMAND_USES.map((use) => [use, demandRow(use)]));
+  el.append(head, ...DEMAND_USES.map((use) => bars[use].row));
+  return { el, head, bars };
+}
+
+function showDemand({ view, city, demand }) {
+  if (view.mode !== 'city' || view.lift <= 0) return;
+  const parcel = view.hover >= 0 ? city.parcels[view.hover] : view.pick?.parcel;
+  const district = parcel ? city.economy?.districts?.[parcel.powerZone] : null;
+  const values = district ? district.demand : city.demand;
+  if (!values) return;
+  demand.el.dataset.zone = district ? `${district.id}` : '';
+  demand.head.textContent = district ? `DEMAND · ${district.name.toUpperCase()}` : DEMAND_CITY;
+  for (const use of DEMAND_USES) {
+    const { row, fill, value } = demand.bars[use];
+    const v = Math.max(0, Math.min(1, values[use] ?? 0));
+    row.dataset.demand = `${v}`;
+    fill.style.width = `${Math.round(v * DEMAND_WIDTH)}px`;
+    value.textContent = `${Math.round(v * 100)}%`;
+  }
+}
+
 // A tool row names what the tool does and what it costs before it is used;
 // hovering one says the same in the help line (M5-7's half that lives here).
 const PUT_DOWN = 'right click or Esc puts the tool down';
@@ -75,6 +134,8 @@ function buildPalette(view, city) {
   const title = document.createElement('div');
   title.innerHTML = '<b style="color:#fff">CITY VIEW</b> <span style="opacity:0.6">· z · street</span>';
   panel.appendChild(title);
+  const demand = buildDemand();
+  panel.appendChild(demand.el);
   const rows = Object.values(TOOLS).map((tool) => {
     const row = document.createElement('div');
     row.id = `tool-${tool.id}`;
@@ -101,7 +162,7 @@ function buildPalette(view, city) {
   help.textContent = PUT_DOWN;
   panel.appendChild(help);
   document.body.appendChild(panel);
-  return { panel, rows, help };
+  return { panel, rows, help, demand };
 }
 
 // What the held tool will do to the lot under the cursor (M5-7). A drag tool
@@ -320,6 +381,7 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
     holdStreetRig(ui);
     hover(ui);
     showPalette(ui);
+    showDemand(ui);
     showCard(ui);
     showAsk(ui);
   }
