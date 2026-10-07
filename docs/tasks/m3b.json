@@ -262,6 +262,8 @@
       "lane": "traffic",
       "goal": "A new road carries traffic within 60 game seconds: when addRoad adds edges, cars near them take trips over them, and the addRoad check's marker is dropped",
       "files": [
+        "src/sim/map.js",
+        "src/sim/ops.js",
         "src/sim/traffic.js"
       ],
       "needs": [
@@ -270,7 +272,56 @@
       ],
       "test": "tests/accept/m3-traffic.test.js",
       "commit": "M3.T40 (M3-6): a new road carries traffic",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing. Re-queued 2026-10-07: the removeRoad test in the same file (passed at M3.T28) also fails now on seeds 7, 33, 73 (cars still on the removed road 10 s later). Make both tests in m3-traffic.test.js pass."
+    },
+    {
+      "id": "M3.R1",
+      "lane": "build-sim",
+      "goal": "Saves are exact again. tests/accept/m3-save.spec.js passed when M3.T38 landed and now fails: on seed 33 a game after 200 ops loads to a different map, and on seed 7 the save no longer folds a run of zone flips to its net effect (0 folded, 56+ expected). Later ops (M5 services, new land, roads, bulldoze) must save, load and compact like every other op. Find the commit that broke it (git bisect between the task's landing and main). If a later milestone's criterion changed what the check assumes, ask the director with the evidence; never edit the check to pass.",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/save.js",
+        "src/sim/map.js",
+        "src/sim/zoning.js"
+      ],
+      "needs": [],
+      "test": "tests/accept/m3-save.spec.js",
+      "commit": "M3.R1 (M3-8): saves are exact again",
+      "notes": "Size S. Regression found by the director's full accept run on 2026-10-07."
+    },
+    {
+      "id": "M3.R2",
+      "lane": "build-sim",
+      "goal": "Ops are fast again. tests/accept/m3-ops.test.js passed when M3.T21 landed and now fails on its own, with the Mac idle: on seed 22 the slowest of 200 ops takes 2.17 ms, over the 2 ms bar. Find the op that got slow and make it fast without loosening the bar. Find the commit that broke it (git bisect between the task's landing and main). If a later milestone's criterion changed what the check assumes, ask the director with the evidence; never edit the check to pass.",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/map.js",
+        "src/sim/zoning.js",
+        "src/sim/terrain.js"
+      ],
+      "needs": [
+        "M3.R1"
+      ],
+      "test": "tests/accept/m3-ops.test.js",
+      "commit": "M3.R2 (M3-4): ops are fast again",
+      "notes": "Size S. Regression found 2026-10-07."
+    },
+    {
+      "id": "M3.R3",
+      "lane": "city",
+      "goal": "Districts and the street wall again. Two checks that passed when they landed now fail: tests/accept/m3-districts.test.js (a test map of 6 districts runs 6 power zones and 6 economy districts: one district is empty, size 0) and tests/accept/m3-parcels.spec.js ('the street wall comes from the world seed': on seed 7 the wall no longer equals planBuildings(district, seed)). Both must pass. Find the commit that broke it (git bisect between the task's landing and main). If a later milestone's criterion changed what the check assumes, ask the director with the evidence; never edit the check to pass.",
+      "files": [
+        "src/sim/layout.js",
+        "src/sim/map.js",
+        "src/sim/economy.js",
+        "src/sim/zoning.js",
+        "src/sim/townplan.js",
+        "src/sim/citygen.js"
+      ],
+      "needs": [],
+      "test": "tests/accept/m3-parcels.spec.js",
+      "commit": "M3.R3 (M3-3, M3-5): districts and the street wall again",
+      "notes": "Size S. The task's test is m3-parcels; m3-districts.test.js must pass too (run both). Regression found 2026-10-07."
     }
   ]
 }
