@@ -142,6 +142,23 @@
       "test": "tests/accept/m2-people.spec.js",
       "commit": "M2.F2f (M2-2): the dressed person in budget",
       "notes": "Size S. Rebake takes about 7 s. Compare the play shot before and after: same clothes, same pose."
+    },
+    {
+      "id": "M2.F5",
+      "lane": "assets",
+      "goal": "Real trees and mountains. M2.F1 removed the model tags Muse put on hand-built boxes, so tests/accept/m2-landscape.spec.js now fails honestly: the mountains and trees are not models. Build them in a tools/models/ script (like make_person.py), ship the GLBs in public/assets/models/, and load them through the model pool so the mountains are one smooth model mesh and the trees draw from 3 tree models, each tagged by the loader. Grounded and natural: no lollipop trees, no stepped boxes.",
+      "files": [
+        "tools/models/",
+        "public/assets/models/",
+        "src/render/landscape.js",
+        "src/render/trees.js",
+        "src/render/models.js",
+        "docs/shots/"
+      ],
+      "needs": [],
+      "test": "tests/accept/m2-landscape.spec.js",
+      "commit": "M2.F5 (M2-4): real trees and mountains",
+      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing."
     }
   ]
 }
