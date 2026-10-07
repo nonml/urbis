@@ -38,9 +38,15 @@ for (const seed of SEEDS) {
     await page.waitForTimeout(1500);
     const pickAt = async (p) => {
       const s = await page.evaluate((q) => window.__game.screenOf(q.x, 0, q.z), p);
-      return page.evaluate(([x, y]) => window.__game.pick(x, y, window.innerWidth, window.innerHeight), [s.x, s.y]);
+      // See-through quads (glow, rain) are not what the eye lands on.
+      return (await page.evaluate(([x, y]) => window.__game.pick(x, y, window.innerWidth, window.innerHeight), [s.x, s.y]))
+        .filter((h) => !h.see);
     };
-    const water = (await pickAt({ x: near.x + 15, z: river.z }))[0];
+    // Water away from every deck: bridges can stand under 20 m apart.
+    const clear = [15, -15, 30, -30, 8, -8].map((k) => ({ x: near.x + k, z: river.z }))
+      .map((p) => ({ p, gap: Math.min(...river.decks.map((d) => Math.hypot(d.x - p.x, d.z - p.z))) }))
+      .reduce((a, b) => (b.gap > a.gap ? b : a)).p;
+    const water = (await pickAt(clear))[0];
     expect(water?.path ?? 'nothing', `seed ${seed}: the river's centre is drawn as river`).toMatch(/river|water/i);
     const [r, g, b] = (water.color ?? '000000').match(/../g).map((h) => parseInt(h, 16));
     expect(b + g, `seed ${seed}: the water is blue-green (#${water.color})`).toBeGreaterThan(2 * r);

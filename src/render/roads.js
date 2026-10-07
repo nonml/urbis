@@ -50,7 +50,10 @@ function endTrim(way, node) {
 // holds is drawn, whatever way laid it, so the road a player drags (M5.T3c)
 // appears the same frame its version change reaches the pools; a node with two
 // edges or more is a junction and trims them back, a dangling end keeps its
-// full half-width.
+// full half-width. A bridge edge is the one exception (M4.T8b): its deck is the
+// carriageway (bridgePieces), so no tarmac quad is laid over the deck and a
+// pick at the deck's middle names the bridge, not the road. The junction
+// squares still close the street at each end of the span.
 function carriagewayPieces(map, nodes) {
   const degree = new Map();
   for (const e of map.graph.edges) {
@@ -70,6 +73,7 @@ function carriagewayPieces(map, nodes) {
     const t1 = trim(e.b);
     if (t0 > 0) junctionIds.add(e.a);
     if (t1 > 0) junctionIds.add(e.b);
+    if (e.kind === 'bridge') continue;
     const span = Math.abs(raw) - t0 - t1;
     if (span <= 0) continue;
     const mid = (vertical ? a.z + b.z : a.x + b.x) / 2 + (Math.sign(raw) * (t0 - t1)) / 2;
@@ -297,12 +301,13 @@ function buildCirclePool(material, slots, slack) {
   return { mesh, update, draws: () => (mesh.count > 0 ? 1 : 0) };
 }
 
-// The deck and railing of every bridge edge (M4.T8). The deck is a slab under
-// the carriageway whose top stays 1 cm under the tarmac, so the road plane and
-// its paint are never covered; the railings run post-and-rail along both edges
-// for the whole span, which is the part of a flat city's bridge a player
-// actually reads. Slots, so a road op that adds or removes a crossing rewrites
-// them with the rest of the road (M3.T27).
+// The deck and railing of every bridge edge (M4.T8). Since M4.T8b the deck's
+// top is the bridge's carriageway — carriagewayPieces leaves bridge edges out —
+// so the dark asphalt stops at each bank and the concrete deck spans the water
+// 1 cm under street level, the paint still drawn above it. The railings run
+// post-and-rail along both edges for the whole span, which is the part of a
+// flat city's bridge a player actually reads. Slots, so a road op that adds or
+// removes a crossing rewrites them with the rest of the road (M3.T27).
 const DECK_TOP = -0.01;
 const DECK_BOTTOM = -0.75;
 const RAIL_INSET = 0.2; // the railing stands this far inside the deck edge
@@ -407,14 +412,18 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
   group.add(manholes.mesh);
   // Bridge decks and railings ride their own pools (M4.T8): one draw each
   // whatever the map does, rewritten by the same update a road op triggers.
+  // Both answer to the name 'bridge' (M4.T8b), so a pick on the deck — the
+  // bridge's carriageway — or its railing names the crossing. The concrete and
+  // steel are light enough to read against the blue-green water from above.
   const deck = buildInstancePools(
-    [new THREE.MeshStandardMaterial({ color: 0x4b5158, roughness: 0.85, metalness: 0.05 })],
+    [new THREE.MeshStandardMaterial({ color: 0x6d737c, roughness: 0.85, metalness: 0.05 })],
     pieces.bridges.decks, { shape: 'box', castShadow: false, receiveShadow: true, slack: BRIDGE_SLACK },
   );
   const rails = buildInstancePools(
-    [new THREE.MeshStandardMaterial({ color: 0x2f343a, roughness: 0.5, metalness: 0.6 })],
+    [new THREE.MeshStandardMaterial({ color: 0x8a919a, roughness: 0.42, metalness: 0.55 })],
     pieces.bridges.rails, { shape: 'box', castShadow: true, receiveShadow: false, slack: BRIDGE_SLACK },
   );
+  for (const mesh of [...deck.meshes, ...rails.meshes]) mesh.name = 'bridge';
   // The river the graph crosses (M4.T8): water and its banks; the decks and
   // railings above are road furniture and ride the road pools.
   const river = buildRiver(texLoader, maxAniso, map);

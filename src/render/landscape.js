@@ -11,6 +11,7 @@ import { heightAt } from '../sim/world.js';
 import { planLayout, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
 import { vistasOf } from '../sim/vistas.js';
 import { worldMap } from '../sim/patrol.js';
+import { WATER_BED } from './river.js';
 
 // The ground of a map, live: the map's own terrain when it has one (a generated
 // map's, rebuilt from its graph after every road op), the load-time world's
@@ -20,13 +21,27 @@ export function terrainOf(map = worldMap()) {
   return map.terrain?.heightAt ?? heightAt;
 }
 
+// Inside a map water rect (M4.T8b). The rects are sim/map.js's [cx, cz, hw, hd];
+// the sink is below the sheet at -WATER_DROP and the bank foot, so the water is
+// the surface a camera and a pick see.
+function inWater(x, z, water) {
+  return water.some(([cx, cz, hw, hd]) => Math.abs(x - cx) <= hw && Math.abs(z - cz) <= hd);
+}
+
 // Lift every vertex of an already-positioned geometry onto the field. A slab's
 // top and bottom move together, so its thickness and its vertical sides survive
-// and no face cracks open.
+// and no face cracks open. A vertex inside a water rect drops to WATER_BED
+// instead of riding the relief: every displaced ground reads this — the base
+// plane and the build frame (block.js, landscape.js) and the outskirts ground —
+// because the river is the world's, not one builder's, and the field still
+// carries relief over the corridor.
 export function displaceToTerrain(geo, heightOf = terrainOf()) {
+  const water = worldMap().water ?? [];
   const pos = geo.attributes.position;
   for (let i = 0; i < pos.count; i++) {
-    pos.setY(i, pos.getY(i) + heightOf(pos.getX(i), pos.getZ(i)));
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    pos.setY(i, water.length && inWater(x, z, water) ? WATER_BED : pos.getY(i) + heightOf(x, z));
   }
   pos.needsUpdate = true;
   geo.computeVertexNormals();
@@ -66,15 +81,18 @@ const rectAt = (x, z, w, d) => ({ x0: x - w / 2, x1: x + w / 2, z0: z - d / 2, z
 const touches = (a, b) => Math.min(a.x1, b.x1) > Math.max(a.x0, b.x0) && Math.min(a.z1, b.z1) > Math.max(a.z0, b.z0);
 
 // Lays verges on the 4 m grass grid over the walk box grown by VERGE_REACH_X
-// and VERGE_REACH_Z, on every cell no street, building row, lot or skyline tower
-// touches, one slab per clear run along z, and tufts inset on every slab.
-export function grassFor(district, plan, vistas) {
+// and VERGE_REACH_Z, on every cell no street, building row, lot, skyline tower
+// or water rect touches, one slab per clear run along z, and tufts inset on
+// every slab. `water` keeps a generated city's grass off the river (M4.T8b);
+// the hand map has no map.water and keeps its own table.
+export function grassFor(district, plan, vistas, water = []) {
   const keepOff = [
     ...district.avenues.map((a) => rectAt(a.x, (a.z0 + a.z1) / 2, BUILD_LINE * 2, a.z1 - a.z0)),
     ...district.crossings.map((c) => rectAt((c.x0 + c.x1) / 2, c.z, c.x1 - c.x0, CROSSING_BAND * 2)),
     ...plan.rows.flatMap((r) => r.runs.map(([z0, z1]) => rectAt(r.ax + r.side * (BUILD_LINE + r.depth / 2), (z0 + z1) / 2, r.depth, z1 - z0))),
     ...plan.lots.map(([x, z, w, d]) => rectAt(x, z, w, d)),
     ...[...vistas.caps, ...vistas.ring].map((t) => rectAt(t.x, t.z, t.w, t.d)),
+    ...water.map(([cx, cz, hw, hd]) => rectAt(cx, cz, hw * 2, hd * 2)),
   ];
   const { walk } = district;
   const zFrom = walk.minZ - VERGE_REACH_Z;
@@ -103,7 +121,7 @@ function grassOf(map) {
   if (!map.buildings) return HAND_GRASS;
   const pinned = map.buildings.filter((b) => b.kind === 'tower')
     .map((b) => ({ side: -b.face[0], z: b.z, d: b.d }));
-  return grassFor(map.district, planLayout(map.district, map.seed, pinned), vistasOf(map));
+  return grassFor(map.district, planLayout(map.district, map.seed, pinned), vistasOf(map), map.water ?? []);
 }
 
 // The ground a player can build on (M5.T3c): the map's own build box, drawn as
@@ -121,6 +139,22 @@ const GROUND_HEX = 0x14171c;  // the base plane's colour, so the two read as one
 // The nearest lattice line at or under `v`, and at or over it.
 const latticeLo = (v) => Math.floor((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
 const latticeHi = (v) => Math.ceil((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
+
+// The frame a road op re-displaces keeps the river bed: the same drop
+// displaceToTerrain applies at boot, run over the Ys refreshBuildGround just
+// wrote (M4.T8b).
+function sinkWater(geo, map) {
+  const water = map.water ?? [];
+  const pos = geo.attributes.position;
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i);
+    const z = pos.getZ(i);
+    if (inWater(x, z, water)) pos.setY(i, WATER_BED);
+  }
+  pos.needsUpdate = true;
+  geo.computeVertexNormals();
+  return geo;
+}
 
 // The frame as up to four strips around the square the base plane covers.
 function frameRects(bounds) {
@@ -181,7 +215,7 @@ export function refreshBuildGround(map = worldMap()) {
     const heightOf = terrainOf(map);
     for (let i = 0; i < pos.count; i++) pos.setY(i, heightOf(pos.getX(i), pos.getZ(i)));
     pos.needsUpdate = true;
-    groundRig.mesh.geometry.computeVertexNormals();
+    sinkWater(groundRig.mesh.geometry, map);
     groundRig.mesh.geometry.computeBoundingSphere();
   }
   groundRig.nodes = nodes;
