@@ -6,20 +6,29 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mulberry32 } from '../sim/rng.js';
 
 // M2.T4: the MPFB/CMU person (tools/models/make_person.py) as one SkinnedMesh
-// with its walk clip on an animation mixer.
+// with its walk and idle clips on an animation mixer.
 export const PERSON_MODEL = 'assets/models/person.glb';
+
+// How fast the walk fades in and out around the Idle pose, in seconds.
+const BLEND_TIME = 0.08;
+// Below this the avatar is standing, not walking.
+const IDLE_SPEED = 0.05;
 
 export function loadPersonAvatar(avatar) {
   new GLTFLoader().loadAsync(PERSON_MODEL).then((gltf) => {
     const skinned = gltf.scene.getObjectByProperty('isSkinnedMesh', true);
-    const clip = (gltf.animations ?? []).find((c) => /walk/i.test(c.name));
-    if (!skinned || !clip) return;
+    const walk = (gltf.animations ?? []).find((c) => /walk/i.test(c.name));
+    const idle = (gltf.animations ?? []).find((c) => /idle/i.test(c.name));
+    if (!skinned || !walk) return;
     // The armature, not the bare mesh: the clip's tracks bind bones by name and
     // a bone outside the drawn tree never gets its world matrix updated, so the
     // skin collapsed at the group origin. gltf.scene carries both the bones and
     // the skinned mesh as one subtree, grounded at feet y=0.
     avatar.mixer = new THREE.AnimationMixer(gltf.scene);
-    avatar.mixer.clipAction(clip).play();
+    avatar.walk = avatar.mixer.clipAction(walk);
+    avatar.idle = idle && avatar.mixer.clipAction(idle);
+    avatar.idle?.play();
+    avatar.walkWeight = 0;
     for (const m of [...avatar.group.children]) avatar.group.remove(m);
     skinned.castShadow = true;
     skinned.userData.model = PERSON_MODEL;
@@ -253,7 +262,7 @@ export function buildPlayer() {
   return avatar;
 }
 
-export function updatePlayer(avatar, player) {
+export function updatePlayer(avatar, player, dt) {
   avatar.group.position.set(player.x, player.y, player.z);
   avatar.group.rotation.y = player.yaw;
   const swing = Math.sin(player.walkPhase) * Math.min(1, player.speed / 3) * 0.55;
@@ -263,9 +272,19 @@ export function updatePlayer(avatar, player) {
   avatar.armR.rotation.x = swing * 0.7;
   avatar.group.position.y = player.y + Math.abs(Math.sin(player.walkPhase)) * 0.03 * Math.min(1, player.speed / 3);
   // The clip loops one gait cycle a second; the phase delta drives it, so the
-  // rig's limbs track the sim with no clock of their own.
+  // rig's limbs track the sim with no clock of their own. M2.F2c: fading to
+  // the Idle clip when the player stands, so the mid-stride pose stops
+  // leaking into a still frame — the walk only plays while walking.
   if (avatar.mixer) {
-    avatar.mixer.update((player.walkPhase - (avatar.lastPhase ?? 0)) / (Math.PI * 2));
+    const moving = player.speed > IDLE_SPEED;
+    const fade = Math.min(1, dt / BLEND_TIME);
+    const target = moving ? 1 : 0;
+    if (avatar.walkWeight === undefined) avatar.walkWeight = target;
+    avatar.walkWeight += (target - avatar.walkWeight) * fade;
+    avatar.walk.setEffectiveWeight(avatar.walkWeight);
+    if (avatar.idle) avatar.idle.setEffectiveWeight(1 - avatar.walkWeight);
+    const delta = moving ? (player.walkPhase - (avatar.lastPhase ?? player.walkPhase)) / (Math.PI * 2) : 0;
+    avatar.mixer.update(delta);
     avatar.lastPhase = player.walkPhase;
   }
 }
