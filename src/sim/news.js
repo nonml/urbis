@@ -6,7 +6,7 @@
 // Pure (law 5): main ticks it after the city and the people, render reads
 // liveNews. It only compares snapshots; it never decides anything.
 import { address } from './decline.js';
-import { STAGE } from './zoning.js';
+import { NO_ROAD, STAGE } from './zoning.js';
 import { isDark } from './street.js';
 
 // Lines kept, oldest first.
@@ -31,14 +31,24 @@ export function createNews() {
   return { items: [], last: null, residents: null };
 }
 
-// What the news compares, one frame's worth: each lot's stage, each district's
-// last firm move (economy.js replaces d.last with a new object on every move, so
-// a move is a change of identity), whether each district is dark, the demand
-// change a rezone was credited with (economy.js d.credit, a new object when it
-// lands), and how many people live on the lots.
+// The parcels the news watches: the city's own lots, then the standing buildings
+// a road op can cut off (zoning.js createCity). Snapshot and diff index with the
+// same list, so one frame's arrays line up.
+function watched(city) {
+  return city.standing ? [...city.parcels, ...city.standing] : city.parcels;
+}
+
+// What the news compares, one frame's worth: each lot's stage and each parcel's
+// decline cause (p.why; zoning.js sets 'no-road' on one the roads cut off), each
+// district's last firm move (economy.js replaces d.last with a new object on
+// every move, so a move is a change of identity), whether each district is dark,
+// the demand change a rezone was credited with (economy.js d.credit, a new
+// object when it lands), and how many people live on the lots.
 export function snapshot(city, people, street) {
+  const all = watched(city);
   return {
-    stages: city.parcels.map((p) => p.stage),
+    stages: all.map((p) => p.stage),
+    whys: all.map((p) => p.why),
     moves: city.economy.districts.map((d) => d.last),
     credits: city.economy.districts.map((d) => d.credit),
     dark: city.economy.districts.map((d) => isDark(street, d.id)),
@@ -51,29 +61,32 @@ export function snapshot(city, people, street) {
 // 1. Each district i, in order: lit before and dark after gives `Power cut in the
 //    ${name} district`; dark before and lit after gives `Power back in the ${name}
 //    district`.
-// 2. Each lot i, in order, whose stage changed, with p = city.parcels[i], noun =
-//    NOUN[p.use] and at = address(p.x, p.z): EMPTY before and SITE after gives
-//    `${noun} breaking ground at ${at}`; HIGH after gives `${noun} topped out at
-//    ${at}`; EMPTY after gives `${noun} at ${at} came down`. Any other change says
-//    nothing.
-// 3. Each district i, in order, whose move after is not null and is not the same
+// 2. Each watched parcel i, in order, whose stage changed, with p = watched[i],
+//    noun = NOUN[p.use] and at = address(p.x, p.z): EMPTY before and SITE after
+//    gives `${noun} breaking ground at ${at}`; HIGH after gives `${noun} topped
+//    out at ${at}`; EMPTY after gives `${noun} at ${at} came down`. Any other
+//    change says nothing.
+// 3. Each watched parcel i, in order, whose cause changed to the no-road cut
+//    (NO_ROAD, zoning.js): `${NOUN[p.use]} at ${at} declining — no road`.
+// 4. Each district i, in order, whose move after is not null and is not the same
 //    object as its move before, with m = that move and n =
 //    Math.round(Math.abs(m.jobs)), when n > 0: m.jobs > 0 gives `${n} ${JOBS[m.use]}
 //    jobs moved into the ${name} district`, else `${n} ${JOBS[m.use]} jobs left the
 //    ${name} district`, and when m.cause is set (economy.js flee: the firm a
 //    power cut or a chase drove out) that line ends WHY[m.cause].
-// 4. Each district i, in order, whose credit after is set and is not the same
+// 5. Each district i, in order, whose credit after is set and is not the same
 //    object as its credit before, with c = that credit (economy.js creditRezone:
 //    a rezone that moved the district over the build bar): `More ${NOUN[c.use],
 //    lower case} wanted in the ${name} district for the new ${CREDIT_NOUN[c.source]}`.
 export function newsBetween(before, after, city) {
   const lines = [];
   const { districts } = city.economy;
+  const all = watched(city);
   districts.forEach((d, i) => {
     if (!before.dark[i] && after.dark[i]) lines.push(`Power cut in the ${d.name} district`);
     if (before.dark[i] && !after.dark[i]) lines.push(`Power back in the ${d.name} district`);
   });
-  city.parcels.forEach((p, i) => {
+  all.forEach((p, i) => {
     const was = before.stages[i];
     const now = after.stages[i];
     if (was === now) return;
@@ -82,6 +95,10 @@ export function newsBetween(before, after, city) {
     if (was === STAGE.EMPTY && now === STAGE.SITE) lines.push(`${noun} breaking ground at ${at}`);
     else if (now === STAGE.HIGH) lines.push(`${noun} topped out at ${at}`);
     else if (now === STAGE.EMPTY) lines.push(`${noun} at ${at} came down`);
+  });
+  all.forEach((p, i) => {
+    if (after.whys[i] !== NO_ROAD || before.whys[i] === NO_ROAD || !(p.use in NOUN)) return;
+    lines.push(`${NOUN[p.use]} at ${address(p.x, p.z)} declining — no road`);
   });
   districts.forEach((d, i) => {
     const m = after.moves[i];
