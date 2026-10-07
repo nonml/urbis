@@ -173,7 +173,8 @@
         "M4.T5"
       ],
       "commit": "M4.T12 (M4-1): story places across the town",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-districts.test.js"
     },
     {
       "id": "M4.T13",
