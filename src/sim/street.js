@@ -209,23 +209,6 @@ export function hackCooldownLeft(state, zone) {
   return Math.max(0, state.zones[zone].coolUntil - state.time);
 }
 
-// Nearest NPC inside a ~30° facing cone within 12m. Null when nobody qualifies.
-export function profilerTarget(street, px, pz, fx, fz) {
-  let best = null;
-  let bestD = 12;
-  for (const n of street.npcs) {
-    if (n.out === false) continue;
-    const dx = n.x - px;
-    const dz = n.z - pz;
-    const d = Math.hypot(dx, dz);
-    if (d > bestD || d < 0.5) continue;
-    if ((dx * fx + dz * fz) / (d || 1) < 0.86) continue;
-    best = n;
-    bestD = d;
-  }
-  return best ? { npc: best, dist: bestD } : null;
-}
-
 export function tickStreet(state, dt) {
   state.time += dt;
   for (const z of state.zones) {

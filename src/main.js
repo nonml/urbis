@@ -5,7 +5,7 @@ import { createRecorder, bindRecorder, loadReplay, createReplay } from './game/r
 import { bindProbe } from './game/probe.js';
 import { bindInput } from './game/input.js';
 import { createFollowRig, CAM_PIVOT } from './game/camera.js';
-import { buildHud, updateHud, tickHud, acquire, clearTarget, applySpawn } from './game/hud.js';
+import { buildHud, updateHud, tickHud, applySpawn } from './game/hud.js';
 import * as THREE from 'three';
 import { createClock, tickClock } from './sim/clock.js';
 import { createStreet, tickStreet, hackBlackout, isDark, zoneAt } from './sim/street.js';
@@ -17,6 +17,7 @@ import { createMission, missionOnBlackout, missionOnEnterCar, missionOnHeatZero,
 import { createWanted, wantedOnBlackout, tickWanted, drainEvents } from './sim/wanted.js';
 import { createDispatch, tickDispatch } from './sim/dispatch.js';
 import { createCity, tickZoning } from './sim/zoning.js';
+import { createHackables, syncHackables, aimTarget } from './sim/hackables.js';
 import { createPeople, tickPeople } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
@@ -66,6 +67,9 @@ const clock = restored?.clock ?? createClock();
 const interior = restored?.interior ?? createInterior(city);
 interior.city = city;
 const cityView = createCityView(city);
+// Every hackable thing on this map (M6.T1), synced each sim step; the frame's
+// aim pick comes from it, and the HUD highlights that pick.
+const hackables = createHackables({ map, city, street });
 
 // Scene assembly (M3.T4a) lives in game/scene.js, returning every handle.
 const renderParts = buildScene({ scene, renderer, texLoader, maxAniso, city, street, heroCar, cityView });
@@ -137,7 +141,7 @@ function nearHero() {
 function enterDoor() {
   if (player.mode !== 'foot' || !useDoor(interior, player)) return;
   snap(player); camRig.enterSpace(player);
-  clearTarget(); hud.fadeDoor();
+  hud.fadeDoor();
 }
 
 function toggleVehicle() {
@@ -215,6 +219,7 @@ function tickSim() {
   tickCommute(street, people, city, clock.hour, player.x, player.z);
   tickNews(news, city, people, street);
   tickCityView(cityView, city, STEP, input.keys);
+  syncHackables(hackables, { map, street, city });
   if (driving) {
     braking = tickPlayerCar(heroCar, input.driveInput(), STEP, map).braking;
     camRig.easeDrive(heroCar.yaw, clock.elapsed, input, STEP);
@@ -279,16 +284,20 @@ function render() {
   HERO_BOX.z = carDraw.z;
   const lookAt = camRig.placeFollowCamera(
     driving ? carDraw : playerDraw, driving, dt, driving ? CAM_BLOCKERS : WALK_BLOCKERS);
-  const target = driving || interior.space !== STREET ? null : acquire(street, player.x, player.z, player.yaw);
-  const targetPerson = target && people.list.length > 0
-    ? people.list[street.npcs.indexOf(target.npc) % people.list.length]
+  // The registry aim (M6.T2): on the street the nearest registered thing in
+  // the view cone and in sight is the pick the HUD highlights.
+  const target = driving || interior.space !== STREET ? null
+    : aimTarget(hackables, player.x, player.z, Math.sin(player.yaw), Math.cos(player.yaw));
+  const person = target?.entry.kind === 'person' ? target.entry.ref : null;
+  const targetPerson = person && people.list.length > 0
+    ? people.list[street.npcs.indexOf(person) % people.list.length]
     : null;
   const doing = targetPerson ? commuteLabel(targetPerson, clock.hour) : null;
   // HUD (M3.T5): every panel writes here; the profile it returns feeds the mission.
   lastProfile = updateHud(hud, hudCtx, {
     driving, hx, hz, target, targetPerson, doing, nearHero: !driving && nearHero(),
   });
-  if (driving) clearTarget(); showNews(newsLine, liveNews(news, street.time));
+  showNews(newsLine, liveNews(news, street.time));
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   cityRig.frame(camera, lookAt, scene);
   input.cityUi.update();
