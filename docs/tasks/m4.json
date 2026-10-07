@@ -84,6 +84,20 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-3: **Hills:** the ground off the roads has relief, and the player, cars and people stand on it, never sunk into it or floating (checked by `tests/accept/m4-terrain.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M4.T6b",
+      "lane": "city",
+      "goal": "Hills you can see. M4.T6 gives at most 3.4 m of relief over the whole map, which looks flat. Raise it so that on every seed the ground off the roads rises at least 8 m within 150 m of the centre, the roads and junctions stay at 0, and the ground banks up from the road edge (no step steeper than 0.6 between samples 2 m apart). Lots still need ground they can build on (`buildable`), so put the big rises away from the lots or keep pads flat under them.",
+      "files": [
+        "src/sim/terrain.js"
+      ],
+      "needs": [
+        "M4.T6"
+      ],
+      "test": "tests/accept/m4-hills.test.js",
+      "commit": "M4.T6b (M4-3): hills you can see",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. M4-1 still needs 400+ buildings and 40+ free lots on every seed, so do not make the land unbuildable. Every new game generates the whole city from its seed: derive, never hard-code positions."
+    },
+    {
       "id": "M4.T7",
       "lane": "city",
       "goal": "Bridges. Where a road crosses the river corridor, its edge becomes kind `bridge`, its deck level with the road; nothing else may cross water; its check first",
@@ -141,7 +155,8 @@
         "tests/accept/m4-terrain.spec.js"
       ],
       "needs": [
-        "M4.T6"
+        "M4.T6",
+        "M4.T6b"
       ],
       "commit": "M4.T10 (M4-3): movers on hills",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-3: **Hills:** the ground off the roads has relief, and the player, cars and people stand on it, never sunk into it or floating (checked by `tests/accept/m4-terrain.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",

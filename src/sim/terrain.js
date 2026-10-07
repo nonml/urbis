@@ -49,10 +49,9 @@ export const MAX_BUILD_GRADIENT = 0.2;
 // is a slope and not one number.
 const GRADIENT_STEP = 2;
 
-// Footprints that stay dead flat. Every road in the district makes its own — add
-// an avenue and the ground under it flattens without anyone editing a table.
-// A caller that owns a whole flat table (the hand map, with its promenade) can
-// hand one in as `map.flatRects` instead.
+// Flat footprints from a road table's own spans: the fallback for a caller with
+// no graph (world.js's own district). Every road makes its own, so a new avenue
+// flattens the ground under it without anyone editing this file.
 export function roadFlatRects(district) {
   const rects = [];
   for (const av of district.avenues) {
@@ -64,9 +63,43 @@ export function roadFlatRects(district) {
   return rects;
 }
 
-// The built district as one rect (cx, cz, half-width, half-depth). Inside it the
-// relief is the verge swell only, so the merged towers and the skyline ring keep
-// the flat ground they were authored against. M4.T6 makes this follow the town.
+// One flat rect per road edge and one per junction, read from the graph the sim
+// actually drives (M4.T6). Edges are cut at every junction (M3.T8) and each runs
+// along one axis (D2), so an edge rect is exactly its tarmac plus walks; the
+// junction square covers the four corner quadrants no edge reaches, so the
+// ground through a junction is as level as the tarmac through it. Deriving from
+// the graph means a road op (M5.T3) grades its own road without touching this
+// file.
+function graphFlatRects(graph) {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const rects = [];
+  for (const e of graph.edges) {
+    const a = byId.get(e.a);
+    const b = byId.get(e.b);
+    if (!a || !b) continue;
+    rects.push(a.x === b.x
+      ? [a.x, (a.z + b.z) / 2, ROAD_FLAT_HALF, Math.abs(b.z - a.z) / 2]
+      : [(a.x + b.x) / 2, a.z, Math.abs(b.x - a.x) / 2, ROAD_FLAT_HALF]);
+  }
+  for (const n of graph.nodes) rects.push([n.x, n.z, ROAD_FLAT_HALF, ROAD_FLAT_HALF]);
+  return rects;
+}
+
+// Every parcel's footprint, as the pad the hills stay out from under. Hills
+// ramp off these over FLAT_BLEND, so the ground between them rolls across the
+// town while no base is ever buried by more than VERGE_RISE — which SHOP_SILL
+// already clears. The map's record of what stands there (buildings, lots, later
+// services) is the only list needed.
+function padRects(map) {
+  return (map.parcels ?? []).map((p) => [p.x, p.z, p.w / 2, p.d / 2]);
+}
+
+// The hand-authored district as one rect (cx, cz, half-width, half-depth).
+// Inside it the relief is the verge swell only, so the merged towers and the
+// skyline ring keep the flat ground they were authored against and the road
+// tool finds gentle land (M5-1). Past it the hills run across the town, held
+// off the tarmac by every road and off every base by its parcel's own pad
+// (M4.T6).
 const DISTRICT_RELIEF = [7, 2.5, 73, 117.5];
 
 // Two bands of randomly-oriented waves. The swell is short, so a 15 m verge
@@ -149,18 +182,24 @@ function footprintGradient(heightAt, x, z, w, d) {
 }
 
 // The ground a map stands on. `map.flatRects` is the whole flat table when a
-// caller owns one, otherwise the district's roads make it; `map.water` is the
-// water a footprint may never touch. Exactly zero on every road and never
-// negative anywhere.
+// caller owns one, otherwise the roads make it — from the map's graph when it
+// has one, from its district's spans when it does not; `map.water` is the water
+// a footprint may never touch. Exactly zero on every road and never negative
+// anywhere.
 export function createTerrain(map) {
-  const flats = map.flatRects ?? roadFlatRects(map.district);
+  const flats = map.flatRects
+    ?? (map.graph ? graphFlatRects(map.graph) : roadFlatRects(map.district));
+  const pads = padRects(map);
   const water = map.water ?? [];
 
   const heightAt = (x, z) => {
     const open = 1 - holdFlat(flats, FLAT_BLEND, x, z);
+    // On the tarmac the answer is exactly zero, and a mover asks here often.
+    if (open === 0) return 0;
     const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
-    const hills = HILL_RISE * band01(HILL_WAVES, x, z) * wildness(x, z);
-    return open * (swell + hills);
+    const hills = HILL_RISE * band01(HILL_WAVES, x, z);
+    const tuck = pads.length ? holdFlat(pads, FLAT_BLEND, x, z) : 0;
+    return open * (swell + hills * wildness(x, z) * (1 - tuck));
   };
 
   // What a w x d footprint centred on (x, z) would stand on: `water` when any
