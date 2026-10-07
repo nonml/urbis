@@ -206,7 +206,8 @@
       "lane": "build-ui",
       "goal": "New land grows. `m5-newland.spec.js`: a lot on a new road zoned R shows its first floor within 60 game seconds; a capped lot stops at LOW",
       "files": [
-        "tests/accept/m5-newland.spec.js"
+        "tests/accept/m5-newland.spec.js",
+        "src/sim/ops.js"
       ],
       "needs": [
         "M5.T4",
