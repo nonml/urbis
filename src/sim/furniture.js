@@ -160,12 +160,144 @@ export function junctionsOf(district) {
     .map((a) => ({ x: a.x, z: c.z })));
 }
 
-export function planFurniture(district, seed) {
+// ---------------------------------------------------------------------------
+// The roads the player lays (M5.T4). Every edge an op adds is `way: 'op'`; a
+// new road is a street, so the same rhythm runs along it and the same kerbside
+// fittings stand on it. Only those edges are read here, so the district's own
+// plan above never moves, and a road taken out takes its fittings with it.
+const ROAD_WAY = 'op';
+const SAME = 1e-6;
+
+// Every edge a player laid, as { axis, at, from, to, ends }: `at` is the fixed
+// centre-line coordinate, `from..to` the span along the varying axis, ascending.
+function opPieces(graph) {
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  const pieces = [];
+  for (const e of graph.edges) {
+    if (e.way !== ROAD_WAY) continue;
+    const a = byId.get(e.a);
+    const b = byId.get(e.b);
+    if (!a || !b) continue;
+    if (Math.abs(a.x - b.x) < SAME && Math.abs(a.z - b.z) < SAME) continue;
+    const axis = e.axis === 'x' ? 'x' : 'z';
+    pieces.push(axis === 'x'
+      ? { axis, at: a.z, from: Math.min(a.x, b.x), to: Math.max(a.x, b.x), ends: [a, b] }
+      : { axis, at: a.x, from: Math.min(a.z, b.z), to: Math.max(a.z, b.z), ends: [a, b] });
+  }
+  return pieces;
+}
+
+// The graph's junctions: nodes where roads of both axes meet. The generated
+// plan names its own as crossing x avenue (junctionsOf); this is the graph's
+// answer, and the one a player's road is judged by.
+function junctionNodes(graph) {
+  const axes = new Map();
+  for (const e of graph.edges) {
+    for (const id of [e.a, e.b]) {
+      let set = axes.get(id);
+      if (!set) axes.set(id, (set = new Set()));
+      set.add(e.axis);
+    }
+  }
+  return graph.nodes.filter((n) => (axes.get(n.id)?.size ?? 0) >= 2);
+}
+
+// The along-coordinates of the junctions a piece meets: its own ends, since
+// ops.js cuts every road it crosses at the junction, so a piece never carries
+// a junction inside it.
+function pieceBlocks(piece, junctionIds) {
+  return piece.ends.filter((end) => junctionIds.has(end.id))
+    .map((end) => (piece.axis === 'x' ? end.x : end.z));
+}
+
+// The spots a piece carries on `phase + k * step`, END_CLEAR off its own ends
+// and BAND clear of every junction it meets: the rhythm avenueSpots walks.
+function pieceSpots(piece, phase, step, blocks) {
+  const out = [];
+  for (let k = Math.ceil((piece.from + END_CLEAR - phase) / step);
+    phase + k * step <= piece.to - END_CLEAR; k++) {
+    const v = phase + k * step;
+    if (blocks.every((b) => Math.abs(v - b) >= BAND)) out.push(v);
+  }
+  return out;
+}
+
+// Street lamps along the roads the player laid, the shape lampsFor names: the
+// avenue rhythm (POLE_X, ARM, LAMP_PHASE/STEP), alternating sides from the
+// west/south, zone is the pole's own z (the blackout's two halves).
+function roadLamps(graph) {
+  const junctionIds = new Set(junctionNodes(graph).map((n) => n.id));
+  const lamps = [];
+  const add = (piece, v, side) => {
+    if (piece.axis === 'x') {
+      const z = piece.at + side * POLE_X;
+      lamps.push({
+        x: v, z, hx: v, hz: piece.at + side * (POLE_X - ARM),
+        rotY: side > 0 ? -Math.PI / 2 : Math.PI / 2, zone: z < 0 ? 0 : 1,
+      });
+      return;
+    }
+    lamps.push({
+      x: piece.at + side * POLE_X, z: v,
+      hx: piece.at + side * (POLE_X - ARM), hz: v,
+      rotY: side > 0 ? 0 : Math.PI, zone: v < 0 ? 0 : 1,
+    });
+  };
+  for (const piece of opPieces(graph)) {
+    pieceSpots(piece, LAMP_PHASE, LAMP_STEP, pieceBlocks(piece, junctionIds))
+      .forEach((v, i) => add(piece, v, i % 2 === 0 ? -1 : 1));
+  }
+  return lamps;
+}
+
+// Utility boxes along a player's road, the shape boxesFor names: every
+// BOX_STEP on alternate sides, out against the building line.
+function roadBoxes(graph) {
+  const junctionIds = new Set(junctionNodes(graph).map((n) => n.id));
+  const boxes = [];
+  for (const piece of opPieces(graph)) {
+    pieceSpots(piece, BOX_PHASE, BOX_STEP, pieceBlocks(piece, junctionIds))
+      .forEach((v, i) => {
+        const side = i % 2 === 0 ? -1 : 1;
+        boxes.push(piece.axis === 'x'
+          ? [v, piece.at + side * BOX_OUT]
+          : [piece.at + side * BOX_OUT, v]);
+      });
+  }
+  return boxes;
+}
+
+// A junction is a zebra: every node a player's road touches and joins a road
+// of the other axis, which is every crossing of the drag and every street it
+// lands on. A coordinate the district's own plan already names is kept once.
+function roadJunctions(graph, district) {
+  const touched = new Set();
+  for (const e of graph.edges) {
+    if (e.way !== ROAD_WAY) continue;
+    touched.add(e.a);
+    touched.add(e.b);
+  }
+  const seen = new Set(junctionsOf(district).map((j) => `${j.x},${j.z}`));
+  const out = [];
+  for (const n of junctionNodes(graph)) {
+    if (!touched.has(n.id)) continue;
+    const key = `${n.x},${n.z}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ x: n.x, z: n.z });
+  }
+  return out;
+}
+
+// The furniture plan of a map. A road op passes the graph it leaves (M5.T4),
+// so the player's streets carry the district's own rhythms; the load-time map
+// passes none and gets the district plan alone.
+export function planFurniture(district, seed, graph = null) {
   return {
-    lamps: lampsFor(district),
+    lamps: graph ? [...lampsFor(district), ...roadLamps(graph)] : lampsFor(district),
     parked: parkedFor(district, seed),
-    boxes: boxesFor(district),
-    junctions: junctionsOf(district),
+    boxes: graph ? [...boxesFor(district), ...roadBoxes(graph)] : boxesFor(district),
+    junctions: graph ? [...junctionsOf(district), ...roadJunctions(graph, district)] : junctionsOf(district),
   };
 }
 

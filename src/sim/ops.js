@@ -18,6 +18,7 @@ import {
 import { waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
 import { createTerrain } from './terrain.js';
+import { planFurniture } from './furniture.js';
 
 // A placed building is sized from its footprint with the rule the city rolls
 // for a lot (zoning.js makeParcel): three storeys at the least, slender enough
@@ -433,6 +434,7 @@ function roadEdit(map, box, change) {
   const driveBefore = map.bounds && map.district ? { ...map.district.drive } : null;
   const boundsBefore = map.bounds ? { ...map.bounds } : null;
   const terrainBefore = map.terrain ?? null;
+  const furnitureBefore = map.furniture ?? null;
   change();
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const kept = replanFrontage(map, box, byId);
@@ -441,6 +443,10 @@ function roadEdit(map, box, change) {
   // terrain is derived from the graph and the parcels, so a new road that
   // leaves the old flats gets ground of its own instead of standing over hills.
   if (terrainBefore && map.graph) map.terrain = createTerrain(map);
+  // The streets a road op leaves carry their own furniture (M5.T4): the lamps,
+  // boxes and junctions of every `way: 'op'` edge, planned with the district's
+  // own. A generated map has a plan; the hand preset keeps none.
+  if (furnitureBefore) map.furniture = planFurniture(map.district, map.seed, map.graph);
   // A road op settles the drivable box on the graph it leaves (M5.T3b): the car
   // is clamped to the exact box of the roads, so a road that leaves the old box
   // hands the car its whole length, and the city view pans the build margin.
@@ -478,6 +484,7 @@ function roadEdit(map, box, change) {
     if (driveBefore) Object.assign(map.district.drive, driveBefore);
     if (boundsBefore) Object.assign(map.bounds, boundsBefore);
     if (terrainBefore) map.terrain = terrainBefore;
+    if (furnitureBefore) map.furniture = furnitureBefore;
     map.version = version;
     markDirty(map, box);
   };
