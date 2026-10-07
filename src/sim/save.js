@@ -81,9 +81,12 @@ export function opsOf(map) {
 
 // Replay a saved log on the map it was written against. Every stored op was
 // effective when it was made, so one that does not move the version means the
-// log and the map have drifted: reject the save.
-function replay(map, ops) {
-  for (const op of ops) {
+// log and the map have drifted: reject the save. `onOp(op, i, map)` runs
+// before the op, so the compactor can read the parcel state the op found.
+function replay(map, ops, onOp) {
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
+    if (onOp) onOp(op, i, map);
     const version = map.version;
     APPLIERS[op.op](map, op);
     if (map.version === version) throw new Error('save: op did not apply');
@@ -96,20 +99,39 @@ function replay(map, ops) {
 // op on that parcel closes its run; a road op closes every run, because
 // replanning can take a parcel away. The shorter log is only trusted when a
 // replay on the seed proves it rebuilds the same map (mapHash).
-function collapseZones(ops) {
+//
+// A run can land on the use it found — repainted away and back. A lone op for
+// that would change nothing (`zone` refuses a parcel already zoned so) and the
+// proof, which replays every stored op, would reject the fold. `starts` is
+// what each zone op found, recorded by the full replay, so the fold knows when
+// to step through another use first and keep the run's `painted` mark.
+const otherUse = (use) => USES.find((u) => u !== use);
+
+function collapseZones(ops, starts = []) {
   const out = [];
   const open = new Map();
   const close = (id) => {
     const run = open.get(id);
     if (!run) return;
     open.delete(id);
-    if (run.last !== null) out.push({ op: 'zone', id, use: run.last });
-    else if (run.mark !== null) out.push({ op: 'zone', id, use: run.mark }, { op: 'zone', id, use: null });
-    else out.push({ op: 'zone', id, use: null });
+    if (run.mark === null) out.push({ op: 'zone', id, use: null });
+    else if (run.last !== null) {
+      if (run.start !== run.last) out.push({ op: 'zone', id, use: run.last });
+      else out.push({ op: 'zone', id, use: otherUse(run.last) }, { op: 'zone', id, use: run.last });
+    } else if (run.start !== run.mark) {
+      out.push({ op: 'zone', id, use: run.mark }, { op: 'zone', id, use: null });
+    } else {
+      out.push(
+        { op: 'zone', id, use: otherUse(run.mark) },
+        { op: 'zone', id, use: run.mark },
+        { op: 'zone', id, use: null },
+      );
+    }
   };
-  for (const op of ops) {
+  for (let i = 0; i < ops.length; i++) {
+    const op = ops[i];
     if (op.op === 'zone') {
-      const run = open.get(op.id) ?? { last: op.use, mark: op.use };
+      const run = open.get(op.id) ?? { last: op.use, mark: op.use, start: starts[i] ?? null };
       run.last = op.use;
       if (op.use !== null) run.mark = op.use;
       open.set(op.id, run);
@@ -125,15 +147,23 @@ function collapseZones(ops) {
 
 function compactOps(map, ops) {
   if (ops.length < 2) return ops;
-  const kept = collapseZones(ops);
-  if (kept.length === ops.length) return ops;
   // Prove it: the full log and the shorter one, replayed on the seed's own
   // map, must land on the same map. The live map cannot be the reference here
   // — ticks have moved its parcels since the last op — so the full replay is.
+  // That replay also records what each zone op found, so the fold knows when a
+  // run lands back on the use it started from.
   try {
     const full = createMap(map.seed);
     createCity(map.seed, full);
-    replay(full, ops);
+    const starts = [];
+    replay(full, ops, (op, i, m) => {
+      if (op.op === 'zone') {
+        const p = m.parcels.find((q) => q.id === op.id);
+        starts[i] = p ? p.zoned : null;
+      }
+    });
+    const kept = collapseZones(ops, starts);
+    if (kept.length === ops.length) return ops;
     const proof = createMap(map.seed);
     createCity(map.seed, proof);
     replay(proof, kept);
@@ -198,10 +228,15 @@ function snapshotStreet(street) {
 }
 
 function snapshotParcel(p) {
-  return {
+  const s = {
     use: p.use, zoned: p.zoned, painted: p.painted, stage: p.stage, progress: p.progress,
-    building: p.building, trend: p.trend, why: p.why, vacancy: p.vacancy,
+    building: p.building, why: p.why, vacancy: p.vacancy,
   };
+  // A standing building no tick has judged carries `trend: 0`, not a word
+  // (map.js buildingParcel). Only a trend the sim set travels; a parcel that
+  // has none keeps the replay's own, so the loaded map stays exact.
+  if (typeof p.trend === 'string') s.trend = p.trend;
+  return s;
 }
 
 function snapshotDistrict(d) {
@@ -215,6 +250,10 @@ function snapshotCity(city) {
   return {
     time: city.time,
     parcels: city.parcels.map(snapshotParcel),
+    // The standing buildings are the map's parcels and the city ticks them
+    // (zoning.js noRoad): their trend and why move without an op, so a save
+    // that dropped them would load to a map that differs from the one it left.
+    standing: (city.standing ?? []).map(snapshotParcel),
     economy: {
       time: city.economy.time,
       // The stream's whole state: without it a firm move after the load draws
@@ -373,7 +412,7 @@ function applyParcel(p, s) {
   if (!Number.isInteger(p.stage) || p.stage < 0 || p.stage > STAGE.HIGH) throw new Error('save: bad stage');
   p.progress = num(s.progress);
   p.building = bool(s.building);
-  p.trend = str(s.trend);
+  if (s.trend !== undefined) p.trend = str(s.trend);
   p.why = s.why === null ? null : str(s.why);
   p.vacancy = num(s.vacancy);
 }
@@ -394,6 +433,10 @@ function applyCity(city, s) {
   if (s.economy.districts.length !== city.economy.districts.length) throw new Error('save: district count');
   city.time = num(s.time);
   city.parcels.forEach((p, i) => applyParcel(p, s.parcels[i]));
+  if (Array.isArray(s.standing) && city.standing) {
+    if (s.standing.length !== city.standing.length) throw new Error('save: standing count');
+    city.standing.forEach((p, i) => applyParcel(p, s.standing[i]));
+  }
   city.economy.time = num(s.economy.time);
   city.economy.rand.load(num(s.economy.rand));
   city.economy.districts.forEach((d, i) => applyDistrict(d, s.economy.districts[i]));
