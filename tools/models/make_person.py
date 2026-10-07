@@ -7,10 +7,17 @@
 # onto the rig for one full gait cycle, grounded every frame; M2.F2d: a second
 # `Idle` clip is the mean of that cycle — arms hanging where the swing centres
 # them, the walk's own slight elbow bend, both legs under the hips — keyed twice
-# so a still frame is a relaxed stand and not a cadence frozen mid-step. All
-# parts are merged, decimated under the tri budget, vertex-coloured and
-# exported to PERSON_OUT (default public/assets/models/person.glb): one skinned
-# mesh, one material, `Walk` + `Idle`.
+# so a still frame is a relaxed stand and not a cadence frozen mid-step. M2.F2e:
+# that mean is only a stand from the waist up. A knee only flexes, so the
+# cycle's mean is a permanent crouch, its mean ankle is plantarflexed (heels
+# up), and the CMU finger joints fan the hand open. The Idle's hips, legs,
+# feet and fingers are the rig's own rest stance instead — straight knees,
+# level pelvis, ankles a stance apart, soles flat, fingers together — with the
+# walk's hanging arms kept from M2.F2d. All parts are merged, decimated under
+# the tri budget, vertex-coloured and exported to PERSON_OUT (default
+# public/assets/models/person.glb): one skinned mesh, one material, `Walk` +
+# `Idle`.
+import math
 import os
 import shutil
 import subprocess
@@ -35,6 +42,28 @@ SHOES = (0.012, 0.012, 0.014)
 HAIR = (0.052, 0.030, 0.016)
 # Below this height the suit reads as trousers; above it, jacket.
 HIP_Y = 0.95
+# M2.F2e: the walk's swing averages to a stand only from the shoulders down.
+# These bones take the rig's rest stance in Idle instead of the walk mean:
+# pelvis level, torso upright, knees straight, feet flat, fingers together.
+# The hips go back to rest too — the mean pelvis leans, and the mean spine
+# only cancelled that lean; reset both and the body stands straight.
+STAND_REST = ('Hips', 'LowerBack', 'Spine', 'Spine1', 'Neck', 'Neck1', 'Head',
+              'LHipJoint', 'LeftUpLeg', 'LeftLeg', 'LeftFoot', 'LeftToeBase',
+              'RHipJoint', 'RightUpLeg', 'RightLeg', 'RightFoot', 'RightToeBase',
+              'LeftFingerBase', 'LeftHandFinger1', 'LThumb',
+              'RightFingerBase', 'RightHandFinger1', 'RThumb')
+# M2.F2d's hanging arms are a world pose, not a local one: under the rest
+# torso the mean locals would swing them back with the chest. These keep the
+# world orientation the mean gave them.
+ARM_CHAIN = ('LeftShoulder', 'LeftArm', 'LeftForeArm', 'LeftHand',
+             'RightShoulder', 'RightArm', 'RightForeArm', 'RightHand')
+# The rest stance leaves the ankles 0.36 m apart — a T-pose, not a stand. Lean
+# each leg inward about the world forward (Y) axis until the ankles land in the
+# 0.2-0.3 m range a relaxed stand wants. The foot is counter-rolled by the same
+# angle, so the sole stays level instead of rolling onto its outer edge.
+LEG_ADDUCT_DEG = 3.4
+# Both sole ends this low above the ground count as flat, in metres.
+SOLE_TOLERANCE = 0.03
 
 
 def blender_binary():
@@ -68,7 +97,7 @@ if os.environ.get('PERSON_STAGE') != 'bake':  # host side: python3 make_person.p
     sys.exit(0)
 
 import bpy  # noqa: E402  (only reachable inside Blender)
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 try:  # Blender 4.2+ extensions load under bl_ext.
     from bl_ext.blender_org.mpfb.services.humanservice import HumanService
@@ -204,6 +233,135 @@ def ground(rig, objs):
     bpy.context.view_layer.update()
 
 
+def lean_bone(rig, name, degrees):
+    """Rotate a posed bone about the world forward (Y) axis without moving its
+    head: the whole leg below the hip leans, the knee stays straight."""
+    pb = rig.pose.bones[name]
+    rot = Matrix.Rotation(math.radians(degrees), 3, Vector((0.0, 1.0, 0.0)))
+    m = pb.matrix.copy()
+    leaned = (rot @ m.to_3x3()).to_4x4()
+    leaned.translation = m.to_translation()
+    pb.matrix = leaned
+    bpy.context.view_layer.update()
+
+
+def rest_stand(rig, objs):
+    """M2.F2e: the Idle's lower body. The walk mean crouches (knees only
+    flex), rolls the pelvis and points the toes; the rig's own rest stance is
+    the relaxed stand, so those bones go back to it, the ankles lean to a
+    stance width, and the dressed figure is grounded on flat soles."""
+    for name in STAND_REST:
+        pb = rig.pose.bones[name]
+        # LeftHandFinger1 and RightHandFinger1 are not in the CMU skeleton, so
+        # retarget never set their mode; force it or the quaternion keys are
+        # written but not evaluated.
+        pb.rotation_mode = 'QUATERNION'
+        pb.rotation_quaternion = (1.0, 0.0, 0.0, 0.0)
+    rig.pose.bones['Hips'].location = (0.0, 0.0, 0.0)
+    bpy.context.view_layer.update()
+    # Left is +x (the rig faces -y): a positive lean about +y carries the left
+    # ankle toward the centre line, and the mirrored negative does the right.
+    for side, sign in (('Left', 1.0), ('Right', -1.0)):
+        lean_bone(rig, f'{side}UpLeg', sign * LEG_ADDUCT_DEG)
+        lean_bone(rig, f'{side}Foot', -sign * LEG_ADDUCT_DEG)
+    ground(rig, objs)
+
+
+def aim_bone(rig, name, direction):
+    """Swing a posed bone's axis to `direction` (armature space) about its
+    head; the roll follows the shortest arc."""
+    pb = rig.pose.bones[name]
+    current = (pb.matrix.to_3x3() @ Vector((0.0, 1.0, 0.0))).normalized()
+    swing = current.rotation_difference(direction.normalized()).to_matrix()
+    m = pb.matrix.copy()
+    aimed = (swing @ m.to_3x3()).to_4x4()
+    aimed.translation = m.to_translation()
+    pb.matrix = aimed
+    bpy.context.view_layer.update()
+
+
+def finger_local_normal(rig, body, side):
+    """The fan plane's normal in the finger bone's rest frame, measured from
+    the bind mesh itself: the fingers are a flat, wide set, so the thinnest
+    principal axis of their vertices is the palm normal."""
+    import numpy as np
+    wanted = {f'{side}FingerBase', f'{side}HandFinger1'}
+    ids = [g.index for g in body.vertex_groups if g.name in wanted]
+    pts = [rig.matrix_world.inverted() @ body.matrix_world @ v.co
+           for v in body.data.vertices
+           if sum(g.weight for g in v.groups if g.group in ids) > 0.5]
+    if len(pts) < 8:
+        return None
+    arr = np.array([[p.x, p.y, p.z] for p in pts])
+    _, vecs = np.linalg.eigh(np.cov((arr - arr.mean(axis=0)).T))
+    normal = Vector(vecs[:, 0])
+    fb = rig.data.bones[f'{side}FingerBase']
+    return (fb.matrix_local.to_3x3().inverted() @ normal).normalized()
+
+
+def relax_hands(rig, body):
+    """M2.F2e: the bind hand fans its fingers open, and the CMU rig's one bone
+    per finger set cannot close the fan. Hang the fingers down with the fan
+    edge-on to the street and the palm to the thigh — a loose hand with the
+    fingers together — then curl the tips and rest the thumb along the index."""
+    down = Vector((0.0, 0.0, -1.0))
+    for side, medial, curl in (('Left', -1.0, 1.0), ('Right', 1.0, -1.0)):
+        n_local = finger_local_normal(rig, body, side)
+        if n_local is None:
+            continue
+        base = rig.pose.bones[f'{side}FingerBase']
+        to_body = Vector((medial, 0.0, 0.0))
+        u1 = Vector((0.0, 1.0, 0.0))
+        u2 = (n_local - u1 * u1.dot(n_local)).normalized()
+        u3 = u1.cross(u2)
+        wanted = Matrix((down, to_body, down.cross(to_body))).transposed()
+        local = Matrix((u1, u2, u3)).transposed()
+        m = (wanted @ local.transposed()).to_4x4()
+        m.translation = base.matrix.to_translation()
+        base.matrix = m
+        bpy.context.view_layer.update()
+        lean_bone(rig, f'{side}HandFinger1', 16.0 * curl)
+        thumb = 'LThumb' if side == 'Left' else 'RThumb'
+        aim_bone(rig, thumb, Vector((medial * 0.18, -0.38, -0.91)))
+
+
+def hang_arms(rig, objs, hang):
+    """Re-apply the mean pose's shoulder-to-hand world orientations over the
+    rest torso, so the arms hang exactly as M2.F2d shipped them while the
+    chest stands straight. The fingers stay at rest under the posed hands:
+    together, not fanned by the CMU finger joints."""
+    for name in ARM_CHAIN:
+        pb = rig.pose.bones[name]
+        hung = hang[name].to_4x4()
+        hung.translation = (pb.matrix.to_translation())
+        pb.matrix = hung
+        bpy.context.view_layer.update()
+    ground(rig, objs)
+
+
+def report_stand(rig, shoes):
+    """Print the Idle stance the task is judged on: ankle separation in
+    0.2-0.3 m, both sole ends within SOLE_TOLERANCE of the ground."""
+    left = rig.matrix_world @ rig.pose.bones['LeftFoot'].head
+    right = rig.matrix_world @ rig.pose.bones['RightFoot'].head
+    print(f'  [idle] ankle separation {abs(left.x - right.x):.3f} m')
+    deps = bpy.context.evaluated_depsgraph_get()
+    mesh = shoes.evaluated_get(deps).to_mesh()
+    pts = [shoes.matrix_world @ v.co for v in mesh.vertices]
+    shoes.evaluated_get(deps).to_mesh_clear()
+    for label, sign in (('left', 1.0 if left.x > right.x else -1.0),
+                        ('right', -1.0 if left.x > right.x else 1.0)):
+        foot = [p for p in pts if p.x * sign > 0.0]
+        if not foot:
+            continue
+        lo = min(p.y for p in foot)
+        span = max(p.y for p in foot) - lo
+        heel = min(p.z for p in foot if p.y > lo + span * 0.66)
+        toe = min(p.z for p in foot if p.y < lo + span * 0.33)
+        flat = 'flat' if max(heel, toe) <= SOLE_TOLERANCE else 'RAISED'
+        print(f'  [idle] {label} sole heel {heel:+.3f} m, toe {toe:+.3f} m — {flat}')
+
+
 def key_pose(rig, frame):
     bpy.context.preferences.edit.keyframe_new_interpolation_type = 'LINEAR'
     for pb in rig.pose.bones:
@@ -256,11 +414,17 @@ def mean_walk_pose(source, rig, objs, start, cycle):
 def bake_idle(rig, source, objs, start, cycle):
     """A new action, not the still-active walk: the mean stand keyed at two
     identical frames — a held pose that loops cleanly, so standing still reads
-    as standing, not as a walk frozen mid-cadence."""
+    as standing, not as a walk frozen mid-cadence. The mean hangs the arms;
+    rest_stand puts the hips, legs, feet and fingers back to a stand (M2.F2e)."""
     idle = bpy.data.actions.new('Idle')
     bpy.context.view_layer.objects.active = rig
     rig.animation_data.action = idle
     mean_walk_pose(source, rig, objs, start, cycle)
+    hang = {name: rig.pose.bones[name].matrix.to_3x3().copy() for name in ARM_CHAIN}
+    body = objs[0]
+    rest_stand(rig, objs)
+    hang_arms(rig, objs, hang)
+    relax_hands(rig, body)
     key_pose(rig, 1)
     key_pose(rig, 2)
     return idle
@@ -440,6 +604,7 @@ def main():
     dress = (body, hair, suit, shoes)
     walk = bake_walk(source, rig, dress, start, cycle)
     idle = bake_idle(rig, source, dress, start, cycle)
+    report_stand(rig, shoes)
     bpy.data.objects.remove(source, do_unlink=True)
     if bvh_action and bvh_action.users == 0:
         bpy.data.actions.remove(bvh_action)
