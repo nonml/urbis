@@ -36,7 +36,7 @@ let fcTarget = null;
 
 export function bindProbe(parts) {
   const {
-    seed, generate, save, camera, renderer, street, city, people, player, car: heroCar,
+    seed, generate, save, camera, renderer, street, city, map, lamps, people, player, car: heroCar,
     mission, wanted, dispatch, interior, clock, news, arc, fixed, composer,
     getProfile, getWantedStatus, getInputLog, isReplayDone, getReplayError,
   } = parts;
@@ -57,6 +57,9 @@ export function bindProbe(parts) {
       };
     },
     draws: () => renderer.info.render.calls,
+    // The lamp instances the render rig draws (M5.T4b): it is rebuilt from the
+    // map's furniture after a road op, so a drag that lays a street adds lamps.
+    drawnLamps: () => lamps.drawn(),
     hack: () => parts.fireHack(),
     dark: () => [...parts.dark],
     cooldown: () => +hackCooldownLeft(street).toFixed(1),
@@ -115,6 +118,14 @@ export function bindProbe(parts) {
     city: () => ({
       time: +city.time.toFixed(2),
       demand: { ...city.demand },
+      // The live map's furniture plan (M5.T4b): the lamp rig is built from it,
+      // and a road op rewrites it, so tests read the same plan the street draws.
+      furniture: map?.furniture ? {
+        lamps: map.furniture.lamps.map((l) => ({ x: l.x, z: l.z, zone: l.zone })),
+        parked: map.furniture.parked.map((p) => [...p]),
+        boxes: map.furniture.boxes.map((b) => [...b]),
+        junctions: map.furniture.junctions.map((j) => ({ x: j.x, z: j.z })),
+      } : null,
       parcels: city.parcels.map((p) => ({
         id: p.id, kind: p.kind,
         x: p.x, z: p.z, use: p.use, zone: p.powerZone, stage: STAGES[p.stage],

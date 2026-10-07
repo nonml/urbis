@@ -26,7 +26,9 @@ import { STREET, createInterior, tickInterior, useDoor, occupiedParcel } from '.
 import { serialize, deserialize } from './sim/save.js';
 import { loadSave, writeSave, clearSave } from './savestore.js';
 import { buildScene, updateScene } from './game/scene.js';
-import { cityMirrorStale, requestCityMirror, tickCityMirror, tickSteam } from './render/setdress.js';
+import {
+  cityMirrorStale, requestCityMirror, tickCityMirror, tickSteam, refreshLampDressing,
+} from './render/setdress.js';
 import { firePulse, fireSparks, tickHackFx } from './render/hackfx.js';
 import { SUBSTATIONS } from './sim/anchors.js';
 import { createRenderer, createComposer, fitRenderer } from './render/atmosphere.js';
@@ -79,7 +81,14 @@ const {
   fadedDraws, growth, vacant, decline, arcMarker, npcRig, traffic, heroRig, police,
   avatar, shops, interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig,
 } = renderParts;
+// The lamp light pools are additive glow, not world: a pick under one names the
+// asphalt it lies on, never the quad (M5.T4b; the city view's kerbs take the
+// same route).
+for (const m of lampPoolMeshes) m.raycast = () => {};
 let streamOrigin = null, policeHold = false;
+// The furniture plan the lamp rig was last built from (M5.T4b): a road op
+// replaces it, and the frame that sees the new object redraws the street kit.
+const lampPlan = { furniture: map.furniture };
 const newsLine = buildNews();
 const hud = buildHud(newsLine);
 const { lotNote } = hud;
@@ -196,7 +205,7 @@ if (REPLAY) {
 bindProbe({
   capture: CAPTURE, seed: SEED, generate: GENERATE, save: doSave,
   camera, cam, renderer, scene, fireHack, toggleVehicle, enterDoor,
-  dark: DARK, camPivot: CAM_PIVOT, street, city, people, player, car: heroCar,
+  dark: DARK, camPivot: CAM_PIVOT, street, city, map, lamps, people, player, car: heroCar,
   mission, wanted, dispatch, interior, clock, news, arc, cityView, cityRig, fixed,
   composer, avatar, towers, skyline, growth, decline, lotNote, police, chunks, outskirts,
   getProfile: () => lastProfile, getWantedStatus: () => lastWantedStatus,
@@ -275,6 +284,20 @@ function render() {
   // Draw the actor between the last two fixed steps (M0-1), `alpha` of the way.
   blend(player, fixed.alpha, playerDraw); playerDraw.mode = player.mode;
   blend(heroCar, fixed.alpha, carDraw);
+  // A road op replans the map's furniture (M5.T4b): rebuild the lamp rig and
+  // the pools and smears merged from the old plan, so the street the player
+  // just laid is lit like one the world was born with. The rebuild seats the
+  // added lamps in the pools it already draws, so no extra draw lands (law 3).
+  if (map.furniture !== lampPlan.furniture) {
+    const wasCones = lamps.cones;
+    lampPlan.furniture = map.furniture;
+    lamps.rebuild(map);
+    if (lamps.cones !== wasCones) {
+      const at = fadedDraws.indexOf(wasCones);
+      if (at >= 0) fadedDraws[at] = lamps.cones;
+    }
+    refreshLampDressing(lamps, lampPoolMeshes, streakMeshes, signs.streakSources);
+  }
   // The frame's scene updates (M3.T4b) live in game/scene.js.
   updateScene(sceneCtx, { driving, braking, playerDraw, carDraw });
   const hx = driving ? carDraw.x : playerDraw.x, hz = driving ? carDraw.z : playerDraw.z;
