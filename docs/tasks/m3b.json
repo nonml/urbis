@@ -1,0 +1,276 @@
+{
+  "milestone": "M3 the city as data, part 2 (the renderer follows the map, traffic, districts, save)",
+  "tasks": [
+    {
+      "id": "M3.T22",
+      "lane": "engine-render",
+      "goal": "Row shells pooled (overrides `ZONING.md`'s no-instancing line; ROADMAP M3 says why). Row buildings leave the merged street wall for per-architecture shell pools in new `render/buildings.js` (the `render/zoning.js` pattern); each slot carries its parcel id and district; its check first",
+      "files": [
+        "src/render/buildings.js",
+        "src/render/block.js",
+        "tests/accept/m3-render.spec.js"
+      ],
+      "needs": [],
+      "commit": "M3.T22 (M3-5): row shells pooled",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-render.spec.js"
+    },
+    {
+      "id": "M3.T23",
+      "lane": "engine-render",
+      "goal": "Towers and caps pooled. Pinned towers and end caps join the pools; the merged shell path in `buildTowers` is deleted (law 6, no dead tech)",
+      "files": [
+        "src/render/buildings.js",
+        "src/render/block.js"
+      ],
+      "needs": [
+        "M3.T22"
+      ],
+      "commit": "M3.T23 (M3-5): towers and caps pooled",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T24",
+      "lane": "engine-render",
+      "goal": "Podiums and shop glass pooled, keyed to their parcel, so a bulldoze frees them with the shell",
+      "files": [
+        "src/render/buildings.js",
+        "src/render/block.js"
+      ],
+      "needs": [
+        "M3.T23"
+      ],
+      "commit": "M3.T24 (M3-5): podiums and shop glass pooled,",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T25",
+      "lane": "engine-render",
+      "goal": "Posters and roof caps pooled (`posterWall`, `roofline`); `buildTowers` keeps only what is not a building",
+      "files": [
+        "src/render/buildings.js",
+        "src/render/block.js"
+      ],
+      "needs": [
+        "M3.T24"
+      ],
+      "commit": "M3.T25 (M3-5): posters and roof caps pooled",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T26",
+      "lane": "engine-render",
+      "goal": "Road pools. Carriageway, walks, kerbs and markings as pooled pieces per edge and junction (`buildGround`, `buildMarkings` today merge them)",
+      "files": [
+        "src/render/roads.js",
+        "src/render/block.js"
+      ],
+      "needs": [
+        "M3.T25"
+      ],
+      "commit": "M3.T26 (M3-5): road pools",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T27",
+      "lane": "engine-render",
+      "goal": "Tiles rebuild. A map version change sends the dirty tiles to the chunk manager, which reclaims their slots inside its 1.5 ms a frame; the outskirts clear where a road now runs",
+      "files": [
+        "src/render/chunks.js",
+        "src/game/scene.js",
+        "src/render/outskirts.js"
+      ],
+      "needs": [
+        "M3.T26"
+      ],
+      "commit": "M3.T27 (M3-5): tiles rebuild",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-5: **The render follows the map:** every building and road piece is a slot in a fixed-size instance pool; after a `bulldoze`, `__game.pick()` at that building finds ground within 10 frames, and no frame spends more than 1.5 ms rebuilding; draws are the same before and after 50 buildings are added or removed, and at most 175 (checked by `tests/accept/m3-render.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T28",
+      "lane": "engine-sim",
+      "goal": "Check, red. `m3-traffic.test.js` (Node: no jumps, red lights, removed and added roads) and `m3-traffic.spec.js` (the same in the browser, plus the 8:00 walkers)",
+      "files": [
+        "tests/accept/m3-traffic.test.js",
+        "tests/accept/m3-traffic.spec.js"
+      ],
+      "needs": [],
+      "commit": "M3.T28 (M3-6): check, red",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) The check is red by design: mark each test `test.fail(true, \"<criterion> red: <what fails today>\")`, as M1.T1 did (tests/accept/m1-rezone-ab.test.js); the task that makes it pass drops the marker. Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-traffic.test.js"
+    },
+    {
+      "id": "M3.T29",
+      "lane": "engine-sim",
+      "goal": "Car following. New `sim/traffic.js`: a car holds an edge, a lane, a distance along it and a route; it keeps a gap to the car ahead and turns at nodes. Settles the lane side `world.js:laneCenterLine` flags (N-S drives right, E-W left today). Node tests only; nothing wired",
+      "files": [
+        "src/sim/traffic.js",
+        "tests/traffic.test.js"
+      ],
+      "needs": [
+        "M3.T28"
+      ],
+      "commit": "M3.T29 (M3-6): car following",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/traffic.test.js"
+    },
+    {
+      "id": "M3.T30",
+      "lane": "engine-sim",
+      "goal": "Trips. Cars get trips between parcels and A* routes; they appear and go only 60 m or more from the camera and out of its view; `tickStreet`'s wrap for cars is deleted and `street.js` hands cars to `traffic.js`",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/street.js"
+      ],
+      "needs": [
+        "M3.T29"
+      ],
+      "commit": "M3.T30 (M3-6): trips",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T31",
+      "lane": "engine-sim",
+      "goal": "Signals. Every junction of two ways runs a two-phase light; cars stop at the line on red; signal heads drawn as a pool",
+      "files": [
+        "src/sim/traffic.js",
+        "src/render/lamps.js"
+      ],
+      "needs": [
+        "M3.T30"
+      ],
+      "commit": "M3.T31 (M3-6): signals",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T32",
+      "lane": "engine-sim",
+      "goal": "Traffic is drawn from the sim. `render/traffic.js` reads position and yaw from `sim/traffic.js` instead of `axis` and `dir`; drawn between steps (M0-9)",
+      "files": [
+        "src/render/traffic.js"
+      ],
+      "needs": [
+        "M3.T30"
+      ],
+      "commit": "M3.T32 (M3-6): traffic is drawn from the sim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T33",
+      "lane": "engine-sim",
+      "goal": "Walkers on the graph. Walkers hold a walkway and a route and cross at junctions; the wrap for walkers is deleted",
+      "files": [
+        "src/sim/street.js",
+        "src/sim/walkers.js"
+      ],
+      "needs": [
+        "M3.T30"
+      ],
+      "commit": "M3.T33 (M3-6): walkers on the graph",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T34",
+      "lane": "engine-sim",
+      "goal": "Commuters are residents. At the rushes a walker is a resident going between their home and job parcels (`people.js`); `commute.js`'s turning round is deleted; `render/npcs.js` reads position and yaw; drawn between steps (M0-9)",
+      "files": [
+        "src/sim/walkers.js",
+        "src/sim/commute.js",
+        "src/render/npcs.js"
+      ],
+      "needs": [
+        "M3.T33"
+      ],
+      "commit": "M3.T34 (M3-6): commuters are residents",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T35",
+      "lane": "engine-sim",
+      "goal": "The commute flow. Every resident's trips laid on edges by hour; the visible cars near the player are drawn from it; a person's commute time feeds the economy (late workers, lost trade)",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/economy.js"
+      ],
+      "needs": [
+        "M3.T34"
+      ],
+      "commit": "M3.T35 (M3-6, M3-9): the commute flow",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: **Routed traffic:** cars and walkers travel trips along the graph; no car or walker moves farther between frames than its speed allows, except when it appears or goes at least 60 m from the camera and out of its view; cars stop at a red light; after `removeRoad` no car is on that road within 10 game seconds; after `addRoad` a car drives it within 60 game seconds; at 8:00 at least 60% of visible walkers are residents heading to their job's parcel (checked by `tests/accept/m3-traffic.spec.js`; `tests/accept/m3-traffic.test.js`) The criterion this serves: M3-9: **Sim cost:** on a test map of 2,000 buildings, 60 visible cars, 150 visible walkers and the commute flow of every resident, one 50 ms sim step takes at most 4 ms on this Mac (checked by `scripts/simbench.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T36",
+      "lane": "engine-sim",
+      "goal": "Districts in the sim. `map.districts` with bounds; `districtAt(x, z)` replaces `zoneAt`; `street.zones` and the economy's districts run N, named by the map, not `['south', 'north']`; its check first",
+      "files": [
+        "src/sim/street.js",
+        "src/sim/economy.js",
+        "src/sim/map.js",
+        "tests/accept/m3-districts.test.js"
+      ],
+      "needs": [
+        "M3.T27"
+      ],
+      "commit": "M3.T36 (M3-7): districts in the sim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-7: **Districts are areas:** `districtAt(x, z)` replaces `zoneAt(z)`; a test map of 6 districts runs 6 power zones and 6 economy districts; H blacks out the district the player stands in; M1-5 stays green (checked by `tests/accept/m3-districts.test.js`; M1-5) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-districts.test.js"
+    },
+    {
+      "id": "M3.T37",
+      "lane": "bench",
+      "goal": "Districts in the light (lane: engine-render). Window lighting takes a district id per vertex and a 16-entry uniform instead of two zones; the `DARK` array, glows, mirror re-shoots and H follow N districts; H targets the district the player stands in",
+      "files": [
+        "src/render/materials.js",
+        "src/game/scene.js",
+        "src/render/hackfx.js"
+      ],
+      "needs": [
+        "M3.T36"
+      ],
+      "commit": "M3.T37 (M3-7): districts in the light",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-7: **Districts are areas:** `districtAt(x, z)` replaces `zoneAt(z)`; a test map of 6 districts runs 6 power zones and 6 economy districts; H blacks out the district the player stands in; M1-5 stays green (checked by `tests/accept/m3-districts.test.js`; M1-5) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T38",
+      "lane": "save",
+      "goal": "Save v3. Seed, op log, state; compacts the log on save; a v2 save starts a new game with a one-line message; its check first",
+      "files": [
+        "src/sim/save.js",
+        "src/savestore.js",
+        "tests/accept/m3-save.spec.js"
+      ],
+      "needs": [],
+      "commit": "M3.T38 (M3-8): save v3",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-8: **The save holds edits:** a game after 200 operations saves and continues to the same map hash and state hash; the save is under 1 MB; a version-2 save starts a new game with a one-line message, never a crash (checked by `tests/accept/m3-save.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m3-save.spec.js"
+    },
+    {
+      "id": "M3.T39",
+      "lane": "bench",
+      "goal": "Sim bench. `scripts/simbench.mjs` builds a 2,000-building test map with 60 cars, 150 walkers and the full commute flow, and times 1,000 steps",
+      "files": [
+        "scripts/simbench.mjs"
+      ],
+      "needs": [
+        "M3.T35"
+      ],
+      "commit": "M3.T39 (M3-9): sim bench",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-9: **Sim cost:** on a test map of 2,000 buildings, 60 visible cars, 150 visible walkers and the commute flow of every resident, one 50 ms sim step takes at most 4 ms on this Mac (checked by `scripts/simbench.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M3.T40",
+      "lane": "traffic",
+      "goal": "A new road carries traffic within 60 game seconds: when addRoad adds edges, cars near them take trips over them, and the addRoad check's marker is dropped",
+      "files": [
+        "src/sim/traffic.js"
+      ],
+      "needs": [
+        "M3.T30",
+        "M3.T35"
+      ],
+      "test": "tests/accept/m3-traffic.test.js",
+      "commit": "M3.T40 (M3-6): a new road carries traffic",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing."
+    }
+  ]
+}

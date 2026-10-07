@@ -1,0 +1,12 @@
+{
+  "id": "bench",
+  "name": "Painted Wooden Bench",
+  "type": "models",
+  "authors": {
+    "Poly Haven": "All"
+  },
+  "license": "CC0",
+  "source": "https://polyhaven.com/a/painted_wooden_bench",
+  "res": "1k",
+  "fmt": "glb"
+}

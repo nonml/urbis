@@ -1,0 +1,21 @@
+{
+  "milestone": "M2 model pipeline: trellis.cpp evaluation (held until the M3 board finishes; move to docs/tasks/ to run)",
+  "tasks": [
+    {
+      "id": "M2.E1",
+      "lane": "assets",
+      "goal": "Evaluate trellis.cpp (GGML/Metal) against the installed trellis2mlx. Build trellis.cpp from source for macOS, download the Q8 GGUF set into a folder outside the repo, generate one car from a CC0 reference image at --res 512 --seed 42, and record wall time, peak RSS, disk and a 3-view render of the GLB in tools/models/README.md, ending with a one-paragraph switch-or-stay recommendation for the operator",
+      "files": [
+        "tools/models/trellis_cpp.sh",
+        "tools/models/README.md",
+        "tools/models/evidence/"
+      ],
+      "needs": [
+        "M2.T1",
+        "M2.T2"
+      ],
+      "commit": "M2.E1 (M2-0): trellis.cpp evaluated on this Mac",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. This is an operator-approved evaluation, not a game feature: it decides whether the M2 pipeline switches from trellis2mlx (installed, 18.1 GB of weights, blocked on gated DINOv3) to trellis.cpp with the Q8 GGUF set (about 9.5 GB, ungated DINOv3 mirror, native Metal). Build it: cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release; cmake --build build -j (Metal is automatic on macOS; there is no prebuilt Mac binary). Weights: hf download ilintar/trellis2-gguf into a models folder outside the repo, Q8 files (q8/*.gguf). Feed a pre-cut RGBA reference image to skip BiRefNet, which has several open bugs (issues 41, 35, 26, 34). Use a CC0 car photo with no trademark; record its source URL. Run: ./build/trellis-cli <image> <out.glb> --models <dir> --res 512 --seed 42. Record wall time and peak RSS (/usr/bin/time -l), disk before and after, and render three views with tools/render_glb.py into tools/models/evidence/. Do not delete ~/.cache/huggingface or the trellis2mlx install, and do not change game code: the operator decides the switch. End tools/models/README.md with the numbers and a one-paragraph recommendation (switch or stay). The plan behind this: docs/ROADMAP.md M2 and docs/ASSETS.md Rung 2."
+    }
+  ]
+}
