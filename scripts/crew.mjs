@@ -50,6 +50,8 @@ const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
 // Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
 const STALL_MIN = Number(process.env.CREW_STALL_MIN ?? 10);
 const POLL_MS = 30_000;
+// Lanes live at once; CREW_MAX_LIVE overrides.
+const MAX_LIVE = Number(process.env.CREW_MAX_LIVE ?? 4);
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
 // One block per live worker, gate block*100+73, shot +91, score +95. Clear of
 // 4100-4499, where the OpenCode plugin derives each worktree's server port
@@ -349,6 +351,9 @@ async function assign(state, lane, task) {
   // Every block taken: wait for a lane to finish rather than share a port, which
   // makes a gate adopt another worktree's server or fail on a busy port.
   if (ports(state, lane).block === undefined) return null;
+  // The models run in the cloud, but every gate, build and bake runs on this Mac
+  // (8 cores, 16 GB): nine lanes at once drove the load average past 400.
+  if (Object.values(state.workers).filter((x) => x.live).length >= MAX_LIVE) return null;
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
