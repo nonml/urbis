@@ -3,21 +3,25 @@
 // and the profiler says where a commuter is heading.
 import { test, expect } from '@playwright/test';
 import fs from 'node:fs';
-import { createStreet, profilerTarget } from '../src/sim/street.js';
+import { createStreet } from '../src/sim/street.js';
+import { createMap } from '../src/sim/map.js';
+import { createHackables, syncHackables } from '../src/sim/hackables.js';
 
 test.use({ viewport: { width: 480, height: 270 } });
 
 test('a walker who has gone indoors cannot be profiled', () => {
-  const street = createStreet(1);
+  // The profiler aims through the hackables registry (M6.T2b): a walker indoors
+  // is not registered, so nothing can aim at them.
+  const map = createMap(1);
+  const street = createStreet(1, map);
   const n = street.npcs[0];
-  for (const m of street.npcs) m.out = false;
   n.out = true;
-  n.x = 0;
-  n.z = 5;
-  // Standing at the origin, facing +z: walker 0 is 5 m straight ahead.
-  expect(profilerTarget(street, 0, 0, 0, 1)?.npc).toBe(n);
+  const reg = createHackables({ map, street });
+  const has = () => [...reg.npcs.values()].some((e) => e.ref === n);
+  expect(has()).toBe(true);
   n.out = false;
-  expect(profilerTarget(street, 0, 0, 0, 1)).toBe(null);
+  syncHackables(reg, { map, street });
+  expect(has()).toBe(false);
 });
 
 test('main ticks the commute and every walker view skips the ones indoors', () => {
