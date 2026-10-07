@@ -1,1 +1,1 @@
-{"id": "building_house", "name": "Suburb house", "type": "models", "license": "generated", "fmt": "glb", "tris": 752, "size_m": {"w": 10.9, "h": 8.22, "d": 9.6}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M4.T9, M2 pipeline Blender stage; palette + glass materials"}
+{"id": "building_house", "name": "Suburb house", "type": "models", "license": "generated", "fmt": "glb", "tris": 752, "size_m": {"w": 10.9, "h": 8.22, "d": 9.6}, "origin": "base centre, Y-up, front +Z", "source": "tools/models/make_buildings.py"}
