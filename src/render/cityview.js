@@ -11,11 +11,13 @@
 // what the lot is zoned for: one draw, and only while the camera is up.
 import * as THREE from 'three';
 import { builtHeight } from '../sim/zoning.js';
+import { roadPreview } from '../sim/cityview.js';
 
 // Grounded paint, the colours a planning map would use: leaf green for homes,
-// slate blue for shops and offices, ochre for works, grey for unzoned land.
-export const ZONE_PAINT = { res: '#6b9651', com: '#4d7aa6', ind: '#c19436', none: '#8e8b84' };
-export const paintOf = (use) => ZONE_PAINT[use ?? 'none'];
+// slate blue for shops and offices, ochre for works, grey for open land and the
+// road tool's own mark.
+export const ZONE_PAINT = { res: '#6b9651', com: '#4d7aa6', ind: '#c19436', none: '#8e8b84',
+  road: '#cfc9bc' };export const paintOf = (use) => ZONE_PAINT[use ?? 'none'];
 
 // A kerb just outside the hoarding line and a little taller than it, so from
 // any side of an oblique view the fence never hides the far edge and the kerb
@@ -41,6 +43,12 @@ const FOG_REACH = 30;
 // hundred metres out, that wastes the depth buffer and the road paint shimmers
 // against the tarmac it lies on.
 const OVERVIEW_NEAR = 4;
+// The road drag's mark (M5.T3): one bar, road paint or refusal red, one draw.
+const PREVIEW_RISE = 0.6;
+const PREVIEW_WIDTH = 7;
+const PREVIEW_REFUSE = 0xd0563f;
+// How far a ground ray may travel: the camera's 400 m reach plus its distance.
+const GROUND_REACH = 2000;
 
 const ease = (t) => t * t * (3 - 2 * t);
 
@@ -72,9 +80,26 @@ function kerb(kerbs, i, x, z, sx, sz, rise) {
   kerbs.setColorAt(i, paint);
 }
 
+// A road op can sign new lots into the live city after the mesh was built; the
+// outlines grow with it, one draw at any count, with the unused instances gone.
+function growKerbs(rig, needed) {
+  const next = new THREE.InstancedMesh(rig.kerbs.geometry, rig.kerbs.material, needed);
+  next.setColorAt(0, white);
+  next.frustumCulled = false;
+  next.visible = rig.kerbs.visible;
+  rig.group.remove(rig.kerbs);
+  rig.group.add(next);
+  rig.kerbs = next;
+}
+
 // Four kerbs round every lot, risen by the eased lift so they grow out of the
 // ground as the camera climbs rather than popping in.
-function outline({ city, view, kerbs }, e, dist) {
+function outline(rig, e, dist) {
+  const { city, view } = rig;
+  const needed = city.parcels.length * 4;
+  if (needed > rig.kerbs.instanceMatrix.count) growKerbs(rig, needed);
+  const kerbs = rig.kerbs;
+  kerbs.count = needed;
   city.parcels.forEach((p, i) => {
     const hot = i === view.hover;
     const w = dist * KERB_PER_METRE * (hot ? HOVER_WIDEN : 1);
@@ -94,6 +119,32 @@ function outline({ city, view, kerbs }, e, dist) {
   kerbs.instanceColor.needsUpdate = true;
 }
 
+// The drag's mark, from the sim's own preview so it cannot disagree with it.
+function drawPreview(rig, show) {
+  const p = roadPreview(rig.view);
+  const { bar } = rig;
+  if (!show || !p || p.length <= 0) {
+    bar.visible = false;
+    return;
+  }
+  bar.position.set((p.from.x + p.to.x) / 2, 0, (p.from.z + p.to.z) / 2);
+  bar.scale.set(p.axis === 'x' ? p.length : PREVIEW_WIDTH, PREVIEW_RISE, p.axis === 'x' ? PREVIEW_WIDTH : p.length);
+  paint.set(p.reason ? PREVIEW_REFUSE : paintOf('road'));
+  bar.material.color.copy(paint);
+  bar.visible = true;
+}
+
+// The ground point (y = 0) under an NDC screen point: every road node stands
+// at zero (ops.js), so that is the plane the road drag snaps on.
+function ground(camera, x, y) {
+  raycaster.setFromCamera(ndc.set(x, y), camera);
+  const { origin, direction } = raycaster.ray;
+  if (Math.abs(direction.y) < 1e-6) return null;
+  const t = -origin.y / direction.y;
+  if (!(t > 0 && t < GROUND_REACH)) return null;
+  return { x: origin.x + direction.x * t, z: origin.z + direction.z * t };
+}
+
 function backOff(rig, camera, e) {
   rig.streetNear = rig.streetNear ?? camera.near;
   const near = rig.streetNear + (OVERVIEW_NEAR - rig.streetNear) * e;
@@ -108,6 +159,7 @@ function frame(rig, camera, streetAim, scene) {
   const { view, kerbs } = rig;
   const e = ease(view.lift);
   kerbs.visible = e > 0;
+  drawPreview(rig, e > 0);
   backOff(rig, camera, e);
   if (e === 0) return;
   off.subVectors(camera.position, streetAim);
@@ -168,11 +220,19 @@ export function buildCityView(city, view) {
   kerbs.setColorAt(0, white);
   kerbs.frustumCulled = false;
   kerbs.visible = false;
-  const rig = { city, view, kerbs, streetNear: null };
+  // The scene gets the group: kerbs can grow and the mark come and go inside.
+  const group = new THREE.Group();
+  group.add(kerbs);
+  const bar = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: paintOf('road'), fog: false }));
+  bar.frustumCulled = false;
+  bar.visible = false;
+  group.add(bar);
+  const rig = { city, view, kerbs, bar, group, streetNear: null };
   return {
-    mesh: kerbs,
+    mesh: group,
     frame: (camera, streetAim, scene) => frame(rig, camera, streetAim, scene),
     pick: (camera, x, y) => pick(rig, camera, x, y),
     screenOf: (camera, index) => screenOf(rig, camera, index),
+    ground: (camera, x, y) => ground(camera, x, y),
   };
 }

@@ -4,8 +4,8 @@
 import { isDark } from '../sim/street.js';
 import { STAGE } from '../sim/zoning.js';
 import {
-  TOOLS, chooseTool, hoverLot, layDownTool, lotStatus, orbitCityView, paintLot, toolOf,
-  zoomCityView,
+  TOOLS, chooseTool, hoverLot, layDownTool, lotStatus, moveRoad,
+  orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview, toolOf, zoomCityView,
 } from '../sim/cityview.js';
 import { paintOf } from '../render/cityview.js';
 
@@ -71,11 +71,13 @@ function buildPalette(view, city) {
     const row = document.createElement('div');
     row.id = `tool-${tool.id}`;
     row.dataset.tool = tool.id;
-    row.dataset.key = tool.key;
+    row.dataset.key = tool.key ?? '';
     row.dataset.cost = `${tool.cost(city, null)}`;
     row.title = toolLine(tool, city);
     row.style.cssText = 'cursor:pointer;padding:0 8px 0 6px;border-left:3px solid transparent;border-radius:2px';
-    row.innerHTML = `<b style="color:#fff">${tool.key.toUpperCase()}</b> &nbsp;${swatch(tool.use)}`
+    // The road tool has no key yet (the palette picks it up): no key badge.
+    const key = tool.key ? `<b style="color:#fff">${tool.key.toUpperCase()}</b> &nbsp;` : '';
+    row.innerHTML = `${key}${swatch(tool.use)}`
       + `${tool.name} <span style="opacity:0.65">$${tool.cost(city, null)}</span>`;
     row.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
@@ -94,14 +96,22 @@ function buildPalette(view, city) {
   return { panel, rows, help };
 }
 
-// What the held tool will do to the lot under the cursor, or why it refuses:
-// the cost shows before the click, not after it (M5-7).
+// What the held tool will do to the lot under the cursor (M5-7). A drag tool
+// has no lot under its cursor — its card is dragCard() while it is held.
 function toolNote(view, city, at) {
   const tool = toolOf(view);
-  if (!tool) return '';
+  if (!tool || tool.drag) return '';
   const why = tool.refuse(city, at);
   if (why) return `<br><span style="color:#e8977d">✕ ${why}</span>`;
   return `<br>◆ ${tool.preview(at).kind} · $${tool.cost(city, at)}`;
+}
+
+// The held road drag: its snapped length and cost, or why it cannot land.
+function dragCard(view) {
+  const p = roadPreview(view);
+  const line = `${p.length.toFixed(1)} m · $${p.cost}`;
+  const why = p.reason ? `<br><span style="color:#e8977d">✕ ${p.reason}</span>` : '';
+  return `${swatch('road')}<b style="color:#fff">NEW STREET</b><br>${line}${why}`;
 }
 
 function readout(view, city, street, index) {
@@ -115,11 +125,18 @@ function readout(view, city, street, index) {
     + `<br>${standing}<br>${line}${toolNote(view, city, p)}`;
 }
 
-// A press on the canvas in the overview is a click if it barely moves, and a
-// drag — orbit sideways, tilt up and down — once it travels. The wheel zooms.
-// The right button, or Esc, sets the tool down (M5.T1).
+// The ground point under a canvas pixel, through the renderer's own ray.
+function groundAt({ rig, camera }, x, y) {
+  const ndcX = (x / window.innerWidth) * 2 - 1;
+  const ndcY = -(y / window.innerHeight) * 2 + 1;
+  return rig.ground(camera, ndcX, ndcY);
+}
+
+// A press is a click if it barely moves and a drag — orbit or tilt — once it
+// travels. With the road tool held a press on a road node starts a road drag
+// (M5.T3); the right button or Esc sets the tool down (M5.T1).
 function bindPointer(ui) {
-  const { canvas, view, city } = ui;
+  const { canvas, view, city, camera } = ui;
   window.addEventListener('contextmenu', (e) => {
     if (view.mode !== 'city') return;
     e.preventDefault();
@@ -132,7 +149,11 @@ function bindPointer(ui) {
       ui.press = null;
       return;
     }
-    if (e.button === 0) ui.press = { lastX: e.clientX, lastY: e.clientY, travel: 0 };
+    if (e.button !== 0) return;
+    const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false };
+    const at = groundAt(ui, e.clientX, e.clientY);
+    if (toolOf(view)?.drag && at && pressRoad(view, at.x, at.z)) press.road = true;
+    ui.press = press;
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && view.mode === 'city') layDownTool(view);
@@ -146,10 +167,17 @@ function bindPointer(ui) {
     press.travel += Math.hypot(dx, dy);
     press.lastX = e.clientX;
     press.lastY = e.clientY;
+    if (press.road) {
+      const at = groundAt(ui, e.clientX, e.clientY);
+      if (at) moveRoad(view, at.x, at.z);
+      return;
+    }
     if (press.travel > CLICK_SLOP) orbitCityView(view, -dx * ORBIT_PER_PX, dy * TILT_PER_PX);
   });
   window.addEventListener('pointerup', () => {
-    if (ui.press && ui.press.travel <= CLICK_SLOP) paintLot(view, city);
+    const { press } = ui;
+    if (press?.road) releaseRoad(view);
+    else if (press && press.travel <= CLICK_SLOP) paintLot(view, city);
     ui.press = null;
   });
   canvas.addEventListener('wheel', (e) => {
@@ -175,7 +203,8 @@ function holdStreetRig(ui) {
 
 function hover({ view, pointer, rig, camera }) {
   if (view.mode !== 'city' || view.lift < 1 || !pointer) return hoverLot(view, -1);
-  const x = (pointer.x / window.innerWidth) * 2 - 1;
+  // A road drag is not about a lot: no lot under its cursor to read out.
+  if (view.drag || toolOf(view)?.drag) return hoverLot(view, -1);  const x = (pointer.x / window.innerWidth) * 2 - 1;
   const y = -(pointer.y / window.innerHeight) * 2 + 1;
   return hoverLot(view, rig.pick(camera, x, y));
 }
@@ -198,11 +227,11 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
 }
 
 function showCard({ view, city, street, pointer, card }) {
-  if (view.hover < 0 || !pointer) {
+  if (!pointer || (view.hover < 0 && !view.drag)) {
     card.style.display = 'none';
     return;
   }
-  card.innerHTML = readout(view, city, street, view.hover);
+  card.innerHTML = view.drag ? dragCard(view) : readout(view, city, street, view.hover);
   card.style.display = 'block';
   card.style.left = `${pointer.x + 16}px`;
   card.style.top = `${pointer.y + 16}px`;

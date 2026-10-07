@@ -11,6 +11,10 @@
 // ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
 import { STAGE, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
+import { nodeAt } from './map.js';
+import { addRoad } from './ops.js';
+import { MAX_BUILD_GRADIENT } from './terrain.js';
+import { ROAD_HALF_WIDTH } from './world.js';
 
 // Seconds for the whole rise, and for the whole descent.
 const LIFT_SECS = 1.6;
@@ -62,7 +66,22 @@ function zoneTool(id, key, use, name, blurb) {
   };
 }
 
+// The road drag (M5.T3) is the one tool that is not a lot brush: a press on a
+// road node, a drag along one axis on the half-metre grid, a release that hands
+// the snapped ends to addRoad. It has no key yet — the palette picks it up.
+const ROAD_PRICE = 40;          // dollars per metre, until M5.T17 meters costs
+
+export const ROAD_TOOL = {
+  id: 'road',
+  use: 'road',
+  name: 'road',
+  blurb: 'drags a new street into open land',
+  drag: true,
+  cost: () => ROAD_PRICE,
+};
+
 export const TOOLS = {
+  road: ROAD_TOOL,
   res: zoneTool('res', 'r', 'res', 'residential', 'zones a lot for homes'),
   com: zoneTool('com', 'c', 'com', 'commercial', 'zones a lot for shops'),
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
@@ -72,8 +91,9 @@ export const TOOLS = {
 // A tool names its own key (M5.T1), so the key table the panel and `cityKey`
 // read is the frame's, not a second one to keep in step. `BRUSH_KEYS` stays the
 // key -> use view the palette has always exported.
-const TOOL_BY_KEY = new Map(Object.values(TOOLS).map((tool) => [tool.key, tool]));
-export const BRUSH_KEYS = Object.fromEntries(Object.values(TOOLS).map((tool) => [tool.key, tool.use]));
+const keyed = Object.values(TOOLS).filter((tool) => tool.key);
+const TOOL_BY_KEY = new Map(keyed.map((tool) => [tool.key, tool]));
+export const BRUSH_KEYS = Object.fromEntries(keyed.map((tool) => [tool.key, tool.use]));
 
 // The tool the brush holds, or null once the player puts it down.
 export function toolOf(view) {
@@ -82,9 +102,10 @@ export function toolOf(view) {
 }
 
 // Right click or Esc: the brush is set down and stops painting until a key
-// picks one up again (M5.T1).
+// picks one up again (M5.T1), and any road drag it was holding is dropped.
 export function layDownTool(view) {
   view.active = false;
+  view.drag = null;
 }
 
 // The rise frames the lots, whichever corner of the district it starts from.
@@ -101,7 +122,7 @@ const levelOf = (p) => p.stage + p.progress;
 
 export function createCityView(city, map = worldMap()) {
   const home = lotCentre(city);
-  return {
+  const view = {
     mode: 'street',        // where the camera is heading: 'street' or 'city'
     lift: 0,               // 0 on the street rig, 1 at the overview
     home,
@@ -115,9 +136,12 @@ export function createCityView(city, map = worldMap()) {
     brush: 'res',
     active: true,          // false once the player lays the tool down
     hover: -1,
+    drag: null,            // the road drag's snapped ends, while one is held
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
   };
+  WORLDS.set(view, { city, map });
+  return view;
 }
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
@@ -129,6 +153,7 @@ export function toggleCityView(view, streetYaw) {
   if (view.mode === 'city') {
     view.mode = 'street';
     view.hover = -1;
+    view.drag = null;
     return;
   }
   view.mode = 'city';
@@ -184,10 +209,133 @@ export function paintLot(view, city) {
   if (view.mode !== 'city' || view.lift < 1 || view.hover < 0) return false;
   const tool = toolOf(view);
   const at = city.parcels[view.hover];
-  if (!tool || tool.refuse(city, at)) return false;
+  if (!tool || tool.drag || tool.refuse(city, at)) return false;
   return tool.op(city, at);
 }
 
+// ---------------------------------------------------------------------------
+// The road drag (M5.T3). A press grabs the road node nearest the cursor; the
+// drag runs along one axis on the half-metre grid (ops.js); the release hands
+// the snapped ends to addRoad. roadPreview() feeds the mark render/cityview.js
+// draws and the metres ui/cityview.js shows.
+const ROAD_PICK = 12;           // metres from the press to the node it may grab
+const ROAD_MIN = 4;             // metres: shorter than this is a misclick
+const ROAD_GRID = 0.5;          // the grid the road graph stands on (ops.js)
+const ROAD_SAMPLE = 4;          // metres between ground samples along a drag
+const WORLDS = new WeakMap();   // view -> { city, map }, for the road op
+
+const onGrid = (v) => Math.round(v / ROAD_GRID) * ROAD_GRID;
+
+// The live city grows the lots in city.parcels; the map is the whole record,
+// and a road op plans new lots into map.parcels (ops.js). Sign them in too.
+function adoptLots(view, city, map) {
+  const lots = (map.parcels ?? []).filter((p) => p.kind === 'lot');
+  city.parcels.length = 0;
+  city.parcels.push(...lots);
+  view.level = lots.map(levelOf);
+  view.trend = lots.map(() => 0);
+  view.hover = -1;
+}
+
+// The carriageway's footprint: the drag line swept half a road to each side.
+function roadBand(from, to, axis) {
+  const half = ROAD_HALF_WIDTH;
+  return axis === 'x'
+    ? { minX: Math.min(from.x, to.x), maxX: Math.max(from.x, to.x), minZ: from.z - half, maxZ: from.z + half }
+    : { minX: from.x - half, maxX: from.x + half, minZ: Math.min(from.z, to.z), maxZ: Math.max(from.z, to.z) };
+}
+
+const overlaps = (b, x0, x1, z0, z1) => b.minX < x1 && b.maxX > x0 && b.minZ < z1 && b.maxZ > z0;
+
+// Is the ground under the drag steeper than the ground places buildings by?
+function roadTooSteep(map, from, to) {
+  const heightAt = map.terrain?.heightAt;
+  if (!heightAt) return false;
+  const len = Math.hypot(to.x - from.x, to.z - from.z);
+  const steps = Math.max(1, Math.ceil(len / ROAD_SAMPLE));
+  let prev = heightAt(from.x, from.z);
+  for (let i = 1; i <= steps; i++) {
+    const t = i / steps;
+    const h = heightAt(from.x + (to.x - from.x) * t, from.z + (to.z - from.z) * t);
+    if (Math.abs(h - prev) > MAX_BUILD_GRADIENT * (len / steps)) return true;
+    prev = h;
+  }
+  return false;
+}
+
+// A drag that doubles a road lays nothing, so the preview must say so.
+function roadDoubles(map, from, to, axis) {
+  const at = (id) => map.graph.nodes.find((n) => n.id === id);
+  return map.graph.edges.some((e) => {
+    const a = at(e.a);
+    const b = at(e.b);
+    if (!a || !b) return false;
+    const fixed = axis === 'x' ? a.z === b.z && a.z === from.z : a.x === b.x && a.x === from.x;
+    if (!fixed) return false;
+    const lo = axis === 'x' ? Math.min(a.x, b.x) : Math.min(a.z, b.z);
+    const hi = axis === 'x' ? Math.max(a.x, b.x) : Math.max(a.z, b.z);
+    const d0 = axis === 'x' ? Math.min(from.x, to.x) : Math.min(from.z, to.z);
+    const d1 = axis === 'x' ? Math.max(from.x, to.x) : Math.max(from.z, to.z);
+    return lo < d1 && hi > d0;
+  });
+}
+
+// The first reason a straight road between the snapped ends cannot stand.
+function roadRefuse(map, from, to, axis) {
+  const band = roadBand(from, to, axis);
+  const wet = (map.water ?? []).some(([cx, cz, hw, hd]) => overlaps(band, cx - hw, cx + hw, cz - hd, cz + hd));
+  if (wet) return 'over water';
+  const blocked = (map.parcels ?? []).some((p) => (p.kind !== 'lot' || p.stage > 0)
+    && overlaps(band, p.x - p.w / 2, p.x + p.w / 2, p.z - p.d / 2, p.z + p.d / 2));
+  if (blocked) return 'through buildings';
+  if (roadTooSteep(map, from, to)) return 'too steep';
+  if (roadDoubles(map, from, to, axis)) return 'already a road';
+  return null;
+}
+
+// The drag's live numbers, or null when no drag is on.
+export function roadPreview(view) {
+  const d = view.drag;
+  if (!d) return null;
+  const reason = d.length < ROAD_MIN
+    ? `drag at least ${ROAD_MIN} m`
+    : roadRefuse(WORLDS.get(view).map, d.from, d.to, d.axis);
+  return { ...d, cost: Math.round(d.length * ROAD_PRICE), reason };
+}
+
+// A press with the road tool: grab the road node nearest the ground point.
+export function pressRoad(view, x, z) {
+  if (view.mode !== 'city' || view.lift < 1) return false;
+  const hit = nodeAt(WORLDS.get(view).map, x, z);
+  if (!hit || hit.dist > ROAD_PICK) return false;
+  const n = hit.node;
+  view.drag = { from: { x: n.x, z: n.z }, to: { x: n.x, z: n.z }, axis: null, length: 0 };
+  return true;
+}
+
+// The drag's free end: the ground point on the dominant axis, grid-snapped.
+export function moveRoad(view, x, z) {
+  const d = view.drag;
+  if (!d) return;
+  const axis = Math.abs(x - d.from.x) >= Math.abs(z - d.from.z) ? 'x' : 'z';
+  d.axis = axis;
+  d.to = axis === 'x' ? { x: onGrid(x), z: d.from.z } : { x: d.from.x, z: onGrid(z) };
+  d.length = Math.abs(d.to.x - d.from.x) + Math.abs(d.to.z - d.from.z);
+}
+
+// The release: addRoad on the snapped ends, then sign its new lots into the
+// live city. A refused drag is dropped without touching the map.
+export function releaseRoad(view) {
+  const preview = roadPreview(view);
+  view.drag = null;
+  if (!preview || preview.reason) return false;
+  const { map, city } = WORLDS.get(view);
+  const version = map.version;
+  addRoad(map, preview.from, preview.to);
+  if (map.version === version) return false;
+  adoptLots(view, city, map);
+  return true;
+}
 // WASD pans the overview, relative to the way it faces, the same axes the
 // player walks on. The pivot stays over the district floor.
 function pan(view, keys, dt) {
