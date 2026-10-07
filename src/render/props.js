@@ -230,12 +230,9 @@ export function buildTrees() {
   const dealt = spots.map((_, i) => i % TREE_CANOPIES.length);
   const counts = TREE_CANOPIES.map((_, v) => dealt.filter((d) => d === v).length);
   const trunks = new THREE.InstancedMesh(trunkGeo, trunkMat, spots.length);
-  trunks.userData.model = 'tree-trunk';
   const branches = new THREE.InstancedMesh(branchGeo, branchMat, spots.length);
-  branches.userData.model = 'tree-branch';
   const canopyMeshes = TREE_CANOPIES.map(({ model, clumps, seed }, v) => {
     const m = new THREE.InstancedMesh(buildCanopyGeo(clumps, seed), canopyMat, counts[v]);
-    m.userData.model = model;
     m.name = model;
     m.castShadow = true;
     return m;

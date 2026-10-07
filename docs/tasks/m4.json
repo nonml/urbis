@@ -1,0 +1,260 @@
+{
+  "milestone": "M4 a city, not a street",
+  "tasks": [
+    {
+      "id": "M4.T1",
+      "lane": "city",
+      "goal": "Checks, red. `m4-districts.test.js` (districts, kinds, buildings, free lots, five seeds) and `m4-local.test.js` (a blackout's reach, through the commute links)",
+      "files": [
+        "tests/accept/m4-districts.test.js",
+        "tests/accept/m4-local.test.js"
+      ],
+      "needs": [],
+      "commit": "M4.T1 (M4-1, M4-5): checks, red",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-districts.test.js"
+    },
+    {
+      "id": "M4.T2",
+      "lane": "city",
+      "goal": "Terrain module. The heightfield moves from `world.js` to new `sim/terrain.js`, built from the map; `buildable(x, z, w, d)` answers water and gradient; no behaviour change on today's seeds",
+      "files": [
+        "src/sim/world.js",
+        "src/sim/terrain.js",
+        "src/sim/map.js"
+      ],
+      "needs": [
+        "M4.T1"
+      ],
+      "commit": "M4.T2 (M4-3): terrain module",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-3: **Hills:** the ground off the roads has relief, and the player, cars and people stand on it, never sunk into it or floating (checked by `tests/accept/m4-terrain.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T3",
+      "lane": "city",
+      "goal": "The town plan. Seed \u2192 a coarse grid of 4-6 district cells about 600 m across, each with a kind (towers, housing, works, suburb), an east-west river corridor of 60 m (about 30 m of water, 7 m banks, 8 m setback; the spec's targets), and arterial roads joining the cells",
+      "files": [
+        "src/sim/townplan.js",
+        "src/sim/map.js"
+      ],
+      "needs": [
+        "M4.T2"
+      ],
+      "commit": "M4.T3 (M4-1, M4-2): the town plan",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) The criterion this serves: M4-2: **A river** at least 25 m wide crosses the city, with **at least 2 bridges** you can drive over, and nothing is built on the water or within 8 m of it (the world-scale placement rules) (checked by `tests/accept/m4-river.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T4",
+      "lane": "city",
+      "goal": "Districts from cells. `generateDistrict` takes a cell and a kind (avenue gap, crossing count, height and style range); all districts' roads join into one graph through the arterials",
+      "files": [
+        "src/sim/citygen.js",
+        "src/sim/map.js"
+      ],
+      "needs": [
+        "M4.T3"
+      ],
+      "commit": "M4.T4 (M4-1): districts from cells",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T5",
+      "lane": "city",
+      "goal": "Buildings by kind. `planBuildings` per kind: towers as today; housing as mid-rise rows; works as wide sheds on deep lots; suburb as detached houses on plots with gardens; every footprint asks `buildable`",
+      "files": [
+        "src/sim/layout.js"
+      ],
+      "needs": [
+        "M4.T4"
+      ],
+      "commit": "M4.T5 (M4-1, M4-2): buildings by kind",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) The criterion this serves: M4-2: **A river** at least 25 m wide crosses the city, with **at least 2 bridges** you can drive over, and nothing is built on the water or within 8 m of it (the world-scale placement rules) (checked by `tests/accept/m4-river.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T6",
+      "lane": "city",
+      "goal": "Hills. Relief off the roads across the town; roads graded flat with the existing blend (`FLAT_BLEND`); junctions level",
+      "files": [
+        "src/sim/terrain.js"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T6 (M4-3): hills",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-3: **Hills:** the ground off the roads has relief, and the player, cars and people stand on it, never sunk into it or floating (checked by `tests/accept/m4-terrain.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T7",
+      "lane": "city",
+      "goal": "Bridges. Where a road crosses the river corridor, its edge becomes kind `bridge`, its deck level with the road; nothing else may cross water; its check first",
+      "files": [
+        "src/sim/map.js",
+        "src/sim/terrain.js",
+        "src/sim/ops.js",
+        "tests/accept/m4-river.spec.js"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T7 (M4-2): bridges",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-2: **A river** at least 25 m wide crosses the city, with **at least 2 bridges** you can drive over, and nothing is built on the water or within 8 m of it (the world-scale placement rules) (checked by `tests/accept/m4-river.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-river.spec.js"
+    },
+    {
+      "id": "M4.T8",
+      "lane": "city",
+      "goal": "River and bridges drawn. The water material from main before `354d937` (the commit that took the river channel out: `git show 354d937^`), inside the spec's albedo bounds (`world-scale-design.md`, \"What carries forward\"), banks, bridge decks and railings as pools; lit, and in sight down at least two avenues",
+      "files": [
+        "src/render/river.js",
+        "src/render/roads.js"
+      ],
+      "needs": [
+        "M4.T7"
+      ],
+      "commit": "M4.T8 (M4-2): river and bridges drawn",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-2: **A river** at least 25 m wide crosses the city, with **at least 2 bridges** you can drive over, and nothing is built on the water or within 8 m of it (the world-scale placement rules) (checked by `tests/accept/m4-river.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T9",
+      "lane": "assets",
+      "goal": "Suburb and works buildings (lane: assets). House, low-rise flat and shed models through the M2 pipeline, added to the building pools",
+      "files": [
+        "src/render/buildings.js",
+        "public/assets/models/"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T9 (M4-1): suburb and works buildings",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T10",
+      "lane": "city",
+      "goal": "Movers on hills. Player, hero car, traffic, walkers and police sample the terrain; nobody sinks or floats; `m4-terrain.spec.js`",
+      "files": [
+        "src/sim/player.js",
+        "src/sim/vehicle.js",
+        "src/sim/traffic.js",
+        "src/sim/walkers.js",
+        "src/sim/wanted.js",
+        "tests/accept/m4-terrain.spec.js"
+      ],
+      "needs": [
+        "M4.T6"
+      ],
+      "commit": "M4.T10 (M4-3): movers on hills",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-3: **Hills:** the ground off the roads has relief, and the player, cars and people stand on it, never sunk into it or floating (checked by `tests/accept/m4-terrain.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-terrain.spec.js"
+    },
+    {
+      "id": "M4.T11",
+      "lane": "city",
+      "goal": "Economy by kind. A district's starting mix follows its kind (housing more homes, works more jobs); M1's checks stay green",
+      "files": [
+        "src/sim/economy.js"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T11 (M4-1): economy by kind",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T12",
+      "lane": "city",
+      "goal": "Story places across the town. A substation per district, pursuit homes, arc places, interiors' frames and the spawn (in the towers district) placed by the map, not by the first district",
+      "files": [
+        "src/sim/anchors.js",
+        "src/sim/spawn.js",
+        "src/sim/landmarks.js"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T12 (M4-1): story places across the town",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T13",
+      "lane": "city",
+      "goal": "Outskirts around the town. The farmland bands follow the town's outline instead of one district's edge",
+      "files": [
+        "src/render/outskirts.js",
+        "src/render/landscape.js"
+      ],
+      "needs": [
+        "M4.T5"
+      ],
+      "commit": "M4.T13 (M4-8): outskirts around the town",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T14",
+      "lane": "city",
+      "goal": "The drive check. `m4-drive.spec.js`: a key-driving helper that steers along the graph route by pressing keys; spawn to the farthest district centre in under 3 minutes, five seeds",
+      "files": [
+        "tests/accept/m4-drive.spec.js",
+        "tests/accept/lib/input.js"
+      ],
+      "needs": [
+        "M4.T10"
+      ],
+      "commit": "M4.T14 (M4-4): the drive check",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-4: Holding the keys, the player drives from the spawn to the centre of the farthest district in under **3 minutes**, on all five seeds (checked by `tests/accept/m4-drive.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-drive.spec.js"
+    },
+    {
+      "id": "M4.T15",
+      "lane": "city",
+      "goal": "The preset goes. The 15 `HAND_` tables and `LOTS`, `KEEP_OUT`, `ROW_RUNS`, `SOUTH_TOWERS`, `TERMINUS_TOWERS` are deleted; every test runs on a generated seed",
+      "files": [
+        "tests/"
+      ],
+      "needs": [
+        "M4.T12"
+      ],
+      "commit": "M4.T15 (M4-6): the preset goes",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-6: The hand-made preset is deleted: every seed, including the one the tests use, is generated (`PROCGEN.md` stage 7); `grep` finds no `HAND_` table (checked by `grep`; the gate) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T16",
+      "lane": "city",
+      "goal": "Draws at the busiest pose. Measure on five seeds; if any frame passes 175, this becomes the streaming task (world-scale plank 3, `render/chunks.js` already built) and is split before it starts",
+      "files": [
+        "scripts/shot.mjs"
+      ],
+      "needs": [
+        "M4.T13"
+      ],
+      "commit": "M4.T16 (M4-7): draws at the busiest pose",
+      "notes": "Size S, or split: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-7: Draws at or under 175 on every frame at the busiest pose of each seed. **If a bigger city cannot fit, the task is streaming (world-scale plank 3), not fewer districts** (checked by `scripts/shot.mjs` peak per frame) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M4.T17",
+      "lane": "city",
+      "goal": "A road in from outside. One regional road enters at an edge of the map and joins the arterials; through-traffic and commuters from outside appear and leave at its far end, out of sight; its check first",
+      "files": [
+        "src/sim/townplan.js",
+        "src/sim/map.js",
+        "src/sim/traffic.js",
+        "tests/accept/m4-outside.test.js"
+      ],
+      "needs": [
+        "M4.T4"
+      ],
+      "commit": "M4.T17 (M4-9): a road in from outside",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-9: **A road in from outside:** on all five seeds one regional road enters at an edge of the map and joins the arterials; through-traffic and commuters from outside drive it, appearing and leaving at its far end out of sight (checked by `tests/accept/m4-outside.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m4-outside.test.js"
+    },
+    {
+      "id": "M4.T18",
+      "lane": "city",
+      "goal": "Close. Locality (M4-5) green; the district sweep, day and night, five seeds; one commit per defect",
+      "files": [],
+      "needs": [],
+      "commit": "M4.T18 (M4-5, M4-8): close",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    }
+  ]
+}
