@@ -119,6 +119,27 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M5.T4b",
+      "lane": "build-ui",
+      "goal": "The new street's lamps are there and lit. M5.T4 (3008c3f) re-plans map.furniture after a road op, but in the game after a mouse drag `__game.city().furniture.lamps` has no lamp within 12 m of the new road, and the shots show no lamp along it. Plan lamps along every road a player lays, redraw the lamp pool (and the other street kit) after any road op, and add `__game.drawnLamps()` to src/game/probe.js returning the number of lamp instances drawn. The road check now asks for lamps planned along the new street and more lamps drawn after the drag than before.",
+      "files": [
+        "src/sim/furniture.js",
+        "src/sim/ops.js",
+        "src/render/lamps.js",
+        "src/render/setdress.js",
+        "src/render/cityview.js",
+        "src/game/probe.js",
+        "src/main.js",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M5.T4"
+      ],
+      "test": "tests/accept/m5-roads.spec.js",
+      "commit": "M5.T4b (M5-1): a laid street is lit",
+      "notes": "Size S. Draws stay at or under 175: grow the existing lamp instance pool, never a mesh per lamp. Look at docs/shots/m5-road-22.png before finishing: lamp glow along the new road at night. Commit as you go."
+    },
+    {
       "id": "M5.T5",
       "lane": "build-ui",
       "goal": "Bulldoze tool. Any building or road under the cursor highlights with its cost; a click runs `bulldoze` or `removeRoad`; removing a road that would cut buildings off asks first, in the page (the browser's `confirm` is not used)",
