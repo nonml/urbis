@@ -95,9 +95,18 @@ function growKerbs(rig, needed) {
   next.setColorAt(0, white);
   next.frustumCulled = false;
   next.visible = rig.kerbs.visible;
+  unpickable(next);
   rig.group.remove(rig.kerbs);
   rig.group.add(next);
   rig.kerbs = next;
+}
+
+// The zone kerbs are planning chrome, not world: a raw pick under one should
+// name the land it outlines, the way the bulldozer's own picker reads parcels
+// and roads and never the overlay (M5.T3d). Without this a screen shot's pick
+// over open land beside a lot answers 'kerb' and the ground under it is hidden.
+function unpickable(mesh) {
+  mesh.raycast = () => {};
 }
 
 // Four kerbs round every lot, risen by the eased lift so they grow out of the
@@ -288,6 +297,7 @@ export function buildCityView(city, view) {
   kerbs.setColorAt(0, white);
   kerbs.frustumCulled = false;
   kerbs.visible = false;
+  unpickable(kerbs);
   // The scene gets the group: kerbs can grow and the mark come and go inside.
   const group = new THREE.Group();
   group.add(kerbs);

@@ -298,6 +298,33 @@ function roadBox(a, b) {
   };
 }
 
+// The overview draws a 1.3 m dashed boundary on a free lot's edge (render/
+// vacant.js), so it reaches 0.65 m past the footprint. A lot an op plans keeps
+// a metre of that clear of the back, so the marker stands inside the reach the
+// op dirties and the open land 20 m off a new road stays open ground (M5.T3d).
+const MARKER_CLEAR = 1;
+
+// A planned lot's depth, held clear of its own boundary marker. The lot fronts
+// one road span: its plot runs BUILD_LINE..BUILD_LINE+depth from that centre-
+// line, and the depth is the footprint's width on a z-running road, its depth
+// on an x-running one. The front edge stays where the plan put it.
+function clearOfMarker(map, [x, z, w, d], byId) {
+  const road = frontageRoad(map, { x, z, w, d }, byId);
+  if (!road) return [x, z, w, d];
+  const a = byId.get(road.edge.a);
+  const b = byId.get(road.edge.b);
+  if (!a || !b) return [x, z, w, d];
+  const cap = ROW_DEPTH_MAX - MARKER_CLEAR;
+  if (a.x === b.x) {
+    const depth = Math.min(w, cap);
+    if (depth === w) return [x, z, w, d];
+    return [a.x + (Math.sign(x - a.x) || 1) * (BUILD_LINE + depth / 2), z, depth, d];
+  }
+  const depth = Math.min(d, cap);
+  if (depth === d) return [x, z, w, d];
+  return [x, a.z + (Math.sign(z - a.z) || 1) * (BUILD_LINE + depth / 2), w, depth];
+}
+
 // The parcel shape sim/map.js gives a lot (lotParcel), for a lot a road op
 // plans: a whole empty parcel, not a stub. map.js is not imported for it
 // because map.js imports this module's layout, so the shape is kept in step by
@@ -360,8 +387,9 @@ function replanFrontage(map, box, byId) {
   // plan's own.
   for (const { id, lot } of lots) {
     if (waterBlocked(map.water ?? [], ...lot)) continue;
-    map.parcels.push(newLotParcel(id, lot));
-    map.lots.push(lot);
+    const shape = clearOfMarker(map, lot, byId);
+    map.parcels.push(newLotParcel(id, shape));
+    map.lots.push(shape);
   }
   for (const b of buildings) {
     if (waterBlocked(map.water ?? [], b.x, b.z, b.w, b.d)) continue;

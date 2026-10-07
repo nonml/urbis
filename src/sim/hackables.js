@@ -289,11 +289,11 @@ export function hackablesNear(reg, x, z, range = HACK_RANGE) {
 }
 
 // Aim (M6.T2, M6-1): the nearest registered thing inside the view cone and in
-// sight, at most HACK_RANGE away — street.js profilerTarget's replacement, every
+// sight, at most HACK_RANGE away — the one pick the HUD's highlight names, every
 // kind aiming through the registry. A 2D ray over the parcel footprints blocks a
 // wall; an empty lot is open ground.
 
-// ~30° off the view axis — profilerTarget's cone, kept.
+// ~30° off the view axis, the cone the profiler always used.
 export const AIM_COS = 0.86;
 // A thing on the lens has no heading, so it cannot be aimed.
 const AIM_MIN_DIST = 0.5;

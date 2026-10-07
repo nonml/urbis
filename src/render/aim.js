@@ -1,6 +1,6 @@
 // Aim highlight (M6.T2, M6-1): the panel over the thing the sim's aimTarget
 // picks — its name and its default hack's cost. Reads sim state, never writes
-// it (law 5); DOM only, 0 draws. M6.T3 hands it the frame's target.
+// it (law 5); DOM only, 0 draws. M6.T2b hands it the frame's target.
 import * as THREE from 'three';
 
 const MARK_Y = 1.6;    // the aim point a thing's label hangs from, metres

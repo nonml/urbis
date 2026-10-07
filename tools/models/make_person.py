@@ -4,9 +4,10 @@
 # assets_cc0, CC0): skin material, low-poly eyes, short hair, a casual suit and
 # shoes, all fitted and weight-copied onto the body. The CMU mocap walk vendored
 # at tools/models/mocap/cmu-08_01-walk.bvh has its joints copied pose-for-pose
-# onto the rig for one full gait cycle, grounded every frame; a second `Idle`
-# clip holds the cycle's closest-to-rest frame, two identical keys, so the
-# avatar stands still instead of walking in place while it is not moving. All
+# onto the rig for one full gait cycle, grounded every frame; M2.F2d: a second
+# `Idle` clip is the mean of that cycle — arms hanging where the swing centres
+# them, the walk's own slight elbow bend, both legs under the hips — keyed twice
+# so a still frame is a relaxed stand and not a cadence frozen mid-step. All
 # parts are merged, decimated under the tri budget, vertex-coloured and
 # exported to PERSON_OUT (default public/assets/models/person.glb): one skinned
 # mesh, one material, `Walk` + `Idle`.
@@ -178,12 +179,25 @@ def retarget(source, rig, frame):
     bpy.context.view_layer.update()
 
 
-def ground(rig, body):
-    """Put the lowest point of the posed body on z = 0: feet on the pavement."""
+def dressed_low(objs):
+    """Lowest world z of every dressed part in the current pose. The bare body
+    stops at its own sole; the fitted shoes hang past it once the feet are
+    posed, so grounding on the body alone left the dressed figure ankle-deep
+    in the pavement."""
     deps = bpy.context.evaluated_depsgraph_get()
-    mesh = body.evaluated_get(deps).to_mesh()
-    low = min((body.matrix_world @ v.co).z for v in mesh.vertices)
-    body.evaluated_get(deps).to_mesh_clear()
+    low = None
+    for ob in objs:
+        mesh = ob.evaluated_get(deps).to_mesh()
+        z = min((ob.matrix_world @ v.co).z for v in mesh.vertices)
+        ob.evaluated_get(deps).to_mesh_clear()
+        low = z if low is None else min(low, z)
+    return low
+
+
+def ground(rig, objs):
+    """Put the lowest point of the posed, dressed figure on z = 0: soles on
+    the pavement."""
+    low = dressed_low(objs)
     hips = rig.pose.bones['Hips']
     rest = hips.bone.matrix_local.to_3x3()
     hips.location = hips.location + rest.inverted() @ Vector((0.0, 0.0, -low))
@@ -197,28 +211,57 @@ def key_pose(rig, frame):
     rig.pose.bones['Hips'].keyframe_insert(data_path='location', frame=frame)
 
 
-def bake_walk(source, rig, body, start, cycle):
+def bake_walk(source, rig, objs, start, cycle):
     for frame in range(start, start + cycle + 1):
         retarget(source, rig, frame)
-        ground(rig, body)
+        ground(rig, objs)
         key_pose(rig, frame)
     action = rig.animation_data.action
     action.name = 'Walk'
     return action
 
 
-def bake_idle(rig, source, body, rest_frame):
-    """A new action, not the still-active one: the walk's closest-to-rest
-    frame, retargeted and keyed at two identical frames — a held stand that
-    loops cleanly, so standing still reads as standing, not as a walk frozen
-    mid-cadence."""
+def mean_walk_pose(source, rig, objs, start, cycle):
+    """The stand the walk itself implies: each joint's mean orientation over
+    one gait cycle, hips averaged too. The swing's centre leaves the arms
+    hanging by the sides with the walk's own slight elbow bend, and both legs
+    average under the hips, so the weight rests on both feet. A held walk frame
+    keeps one foot mid-step whatever frame is picked; the mean has no step in
+    it."""
+    quats = {pb.name: [] for pb in rig.pose.bones}
+    hips = Vector((0.0, 0.0, 0.0))
+    for frame in range(start, start + cycle):
+        retarget(source, rig, frame)
+        ground(rig, objs)
+        for pb in rig.pose.bones:
+            q = pb.rotation_quaternion.copy()
+            # Quaternions are a double cover: average one hemisphere or the
+            # sum of two mirrored samples cancels to zero.
+            if quats[pb.name] and q.dot(quats[pb.name][0]) < 0.0:
+                q.negate()
+            quats[pb.name].append(q)
+        hips = hips + rig.pose.bones['Hips'].location
+    for pb in rig.pose.bones:
+        avg = quats[pb.name][0]
+        for q in quats[pb.name][1:]:
+            avg = avg + q
+        pb.rotation_quaternion = avg.normalized()
+    rig.pose.bones['Hips'].location = hips / cycle
+    # ground() reads the evaluated mesh; without this the depsgraph still holds
+    # the last sampled walk frame, and the correction grounds the wrong pose.
+    bpy.context.view_layer.update()
+    ground(rig, objs)
+
+
+def bake_idle(rig, source, objs, start, cycle):
+    """A new action, not the still-active walk: the mean stand keyed at two
+    identical frames — a held pose that loops cleanly, so standing still reads
+    as standing, not as a walk frozen mid-cadence."""
     idle = bpy.data.actions.new('Idle')
     bpy.context.view_layer.objects.active = rig
     rig.animation_data.action = idle
-    retarget(source, rig, rest_frame)
-    ground(rig, body)
+    mean_walk_pose(source, rig, objs, start, cycle)
     key_pose(rig, 1)
-    retarget(source, rig, rest_frame)
     key_pose(rig, 2)
     return idle
 
@@ -381,8 +424,8 @@ def main():
         # The low-poly eyes join without usable weights and their pale sphere
         # spread over the torso; the sockets read fine at game distance, so the
         # eyes stay unequipped until eyetrack is a real thing.
-        equip(body, 'hair', 'short02', asset_type='hair',
-              material_type='MAKESKIN')
+        hair = equip(body, 'hair', 'short02', asset_type='hair',
+                     material_type='MAKESKIN')
         suit = equip(body, 'clothes', 'male_casualsuit02', asset_type='Clothes',
                      material_type='MAKESKIN')
         shoes = equip(body, 'clothes', 'shoes05', asset_type='Clothes',
@@ -394,10 +437,9 @@ def main():
     source = import_walk()
     bvh_action = bpy.data.actions.get(source.animation_data.action.name)
     start, cycle = gait_window(source)
-    walk = bake_walk(source, rig, body, start, cycle)
-    rest_frame = min(range(start, start + cycle),
-                     key=lambda f: abs(foot_separation(source, f)))
-    idle = bake_idle(rig, source, body, rest_frame)
+    dress = (body, hair, suit, shoes)
+    walk = bake_walk(source, rig, dress, start, cycle)
+    idle = bake_idle(rig, source, dress, start, cycle)
     bpy.data.objects.remove(source, do_unlink=True)
     if bvh_action and bvh_action.users == 0:
         bpy.data.actions.remove(bvh_action)
@@ -405,8 +447,7 @@ def main():
     rig.animation_data.action = walk
 
     parts = {'eyes': ObjectService.find_object_of_type_amongst_nearest_relatives(body, 'Eyes'),
-             'hair': ObjectService.find_object_of_type_amongst_nearest_relatives(body, 'Hair'),
-             'suit': suit, 'shoes': shoes}
+             'hair': hair, 'suit': suit, 'shoes': shoes}
     paint(body, parts)
     merge(body, parts)
     tris = decimate(body)
