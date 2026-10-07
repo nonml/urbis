@@ -146,6 +146,21 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M5.T10b",
+      "lane": "assets",
+      "needs": [
+        "M5.T10"
+      ],
+      "goal": "Finish the service buildings: commit the Blender script that makes them, credit them, replace the clinic's red cross with a green cross, and give the park real trees",
+      "files": [
+        "tools/models/",
+        "public/assets/models/",
+        "public/assets/CREDITS.md"
+      ],
+      "commit": "M5.T10b (M5-5): service buildings, reproducible and clean",
+      "notes": "Size S-M. 9a66150 shipped six GLBs with info.json saying 'Blender-authored' but no script in tools/models/, and no CREDITS.md lines. (1) Commit tools/models/make_services.py that rebuilds all six GLBs from scratch (python3 tools/models/make_services.py, runs Blender headless), same sizes, origin base centre, Y-up, front +Z, each under 15,000 triangles. (2) The clinic shows a red cross on white: that is the protected Red Cross emblem (Geneva Conventions), not allowed in a game. Use a green cross on white (the pharmacy/clinic sign) instead. (3) The park's trees are faceted icosahedron blobs, which VGA-084 bans: use layered leaf-card canopies on a tapered trunk with branches, or reuse the street-tree approach, still under the triangle cap. (4) One CREDITS.md line per model naming the script. Render all six to docs/shots/m5-services.png with Blender (a grey ground, sun, a camera seeing all six) and look at it before finishing."
+    },
+    {
       "id": "M5.T11",
       "lane": "build-sim",
       "goal": "Services as parcels. Parcel kind `service` with a type; a place tool for each on an empty lot; a door and a room from the `INTERIORS.md` pattern (`parcelItems` gets a set per service); every service has a catchment radius and a capacity (patients, pupils, cells, trucks), written in `CITYVIEW.md`: its effect reaches only parcels in its catchment, up to its capacity",

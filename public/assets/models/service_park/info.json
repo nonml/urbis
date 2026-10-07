@@ -1,0 +1,1 @@
+{"id": "service_park", "name": "Park", "type": "models", "license": "generated", "fmt": "glb", "tris": 1256, "size_m": {"w": 11.9, "h": 3.75, "d": 11.8}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M5.T10, M2 pipeline Blender stage; palette + glass materials"}

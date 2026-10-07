@@ -1,5 +1,7 @@
-// Street lighting: instanced poles + heads + cones + glows, per-zone pools.
-// Zones (z<0 / z>=0) can go dark for the blackout hack — no draw-count change.
+// Street lighting: the street_lamp_01 model on the kerb, instanced through the
+// model pool per zone, plus the light shaft and glare that make a lit street.
+// Zones (z<0 / z>=0) can go dark for the blackout hack — one material set per
+// zone, so a zone's lanterns and their light die together.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { getGlowTex } from './signs.js';
@@ -7,6 +9,7 @@ import { blink } from '../sim/street.js';
 import { worldMap } from '../sim/patrol.js';
 import { WORLD_FURNITURE } from '../sim/furniture.js';
 import { signalGreen, signalHeads } from '../sim/traffic.js';
+import { loadModelPool } from './models.js';
 
 // Which street a fixture belongs to comes from the map's district; how it
 // stands on that street is this file's business.
@@ -78,9 +81,12 @@ function handLamps(district) {
     },
   ];
 }
-const HEAD_Y = 7;
-const HEAD_LIT = new THREE.Color(0xffe2b0);
-const HEAD_DARK = new THREE.Color(0x11100c);
+// The Poly Haven post-top lantern is 3.87 m; the glow, shaft and light pool
+// hang off its glass at ~3.35 m. Kept at 1:1 scale — a bigger street lamp is a
+// different lamp, and this one is real.
+const LAMP_MODEL = 'assets/models/street_lamp_01/street_lamp_01_1k.gltf';
+const LANTERN_Y = 3.35;
+const LANTERN_EMIT = new THREE.Color(0xffd9a0);
 const GLOW_COLOR = 0xffc98a;
 const GLOW_SIZE = 3.2;
 const GLOW_OPACITY = 0.38;
@@ -138,6 +144,19 @@ function setLens(mesh, dummy, idx, head, y) {
   mesh.setMatrixAt(idx, dummy.matrix);
 }
 
+// What the M2-5 check reads: the kit the renderer actually instanced. The
+// model pool resolves a frame or two after boot, so the test waits on these
+// counts instead of guessing. Render-only; the sim never sees it.
+export function reportKit(fields) {
+  if (typeof window === 'undefined') return;
+  const kit = window.__streetKit ?? { models: [] };
+  window.__streetKit = {
+    ...kit,
+    ...fields,
+    models: [...kit.models, ...(fields.models ?? []).filter((m) => !kit.models.includes(m))],
+  };
+}
+
 export function buildLamps(map = worldMap()) {
   // On a generated world the plan places the lamps; the hand preset keeps its table.
   const LAMPS = (map.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(map.district);
@@ -145,17 +164,33 @@ export function buildLamps(map = worldMap()) {
   const poolsByZone = [[], []];
   const dummy = new THREE.Object3D();
 
-  const poleGeo = mergeGeometries([
-    (() => { const g = new THREE.CylinderGeometry(0.09, 0.12, HEAD_Y, 8); g.translate(0, HEAD_Y / 2, 0); return g; })(),
-    (() => { const g = new THREE.BoxGeometry(1.9, 0.1, 0.1); g.translate(-0.85, HEAD_Y, 0); return g; })(),
-  ]);
-  const poleMat = new THREE.MeshStandardMaterial({ color: 0x14171d, roughness: 0.35, metalness: 0.8 });
-  const poles = new THREE.InstancedMesh(poleGeo, poleMat, LAMPS.length);
-  const headGeo = new THREE.BoxGeometry(0.55, 0.14, 0.3);
-  const headMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-  const heads = new THREE.InstancedMesh(headGeo, headMat, LAMPS.length);
+  // The lantern: street_lamp_01 through the pool loader (M2.T2), one pool per
+  // power zone, so a blackout takes one side of the street dark and leaves the
+  // other lit (VGA-010). Each pool's meshes carry userData.model for M2-6.
+  const lanternMats = [[], []];
+  let pending = 0;
+  for (const zone of [0, 1]) {
+    const mine = LAMPS.filter((l) => l.zone === zone);
+    pending += 1;
+    loadModelPool(LAMP_MODEL, mine.length).then((pool) => {
+      mine.forEach((l) => {
+        dummy.position.set(l.x, 0, l.z);
+        dummy.rotation.set(0, l.rotY, 0);
+        dummy.scale.set(1, 1, 1);
+        dummy.updateMatrix();
+        pool.set(pool.claim(), dummy.matrix);
+      });
+      for (const mesh of pool.meshes) {
+        if (/glass|bulb/i.test(mesh.material.name ?? '')) lanternMats[zone].push(mesh.material);
+      }
+      group.add(pool.group);
+      pending -= 1;
+      if (pending === 0) reportKit({ lamps: LAMPS.length, models: ['street_lamp_01'] });
+    }).catch(() => { pending -= 1; });
+  }
+
   // Shafts fade head-to-ground via a gradient alphaMap: light falloff, not a
-  // solid pyramid. Same instanced mesh, +0 draws (VGA-082 partial).
+  // solid pyramid. Same instanced mesh, +1 draw (VGA-082 partial).
   const shaftTex = (() => {
     const c = document.createElement('canvas');
     c.width = 4;
@@ -169,7 +204,7 @@ export function buildLamps(map = worldMap()) {
     g.fillRect(0, 0, 4, 128);
     return new THREE.CanvasTexture(c);
   })();
-  const coneGeo = new THREE.ConeGeometry(1.5, HEAD_Y, 20, 1, true);
+  const coneGeo = new THREE.ConeGeometry(1.5, LANTERN_Y, 20, 1, true);
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xffc98a, transparent: true, opacity: 0.05, alphaMap: shaftTex,
     blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false,
@@ -181,30 +216,21 @@ export function buildLamps(map = worldMap()) {
   const glowLevel = new THREE.Color();
 
   LAMPS.forEach((l, i) => {
-    dummy.position.set(l.x, 0, l.z);
-    dummy.rotation.set(0, l.rotY, 0);
+    dummy.position.set(l.x, LANTERN_Y, l.z);
+    dummy.rotation.set(0, 0, 0);
     dummy.scale.set(1, 1, 1);
     dummy.updateMatrix();
-    poles.setMatrixAt(i, dummy.matrix);
-    dummy.position.set(l.hx, HEAD_Y, l.hz);
-    dummy.rotation.set(0, 0, 0);
-    dummy.updateMatrix();
-    heads.setMatrixAt(i, dummy.matrix);
-    heads.setColorAt(i, HEAD_LIT);
     glows.setMatrixAt(i, dummy.matrix);
     glows.setColorAt(i, glowLevel.setScalar(GLOW_OPACITY));
-    dummy.position.set(l.hx, HEAD_Y / 2, l.hz);
+    dummy.position.set(l.x, LANTERN_Y / 2, l.z);
     dummy.updateMatrix();
     cones.setMatrixAt(i, dummy.matrix);
 
-    poolsByZone[l.zone].push({ x: l.hx, z: l.hz, size: 11, color: '#b97c3a' });
+    poolsByZone[l.zone].push({ x: l.x, z: l.z, size: 11, color: '#b97c3a' });
   });
-  poles.instanceMatrix.needsUpdate = true;
-  heads.instanceMatrix.needsUpdate = true;
   cones.instanceMatrix.needsUpdate = true;
   glows.instanceMatrix.needsUpdate = true;
-  if (heads.instanceColor) heads.instanceColor.needsUpdate = true;
-  group.add(poles, heads, cones, glows);
+  group.add(cones, glows);
 
   // The signal pool: one head per junction approach from the sim's placement,
   // the housing facing the traffic that must stop for it.
@@ -243,7 +269,6 @@ export function buildLamps(map = worldMap()) {
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const zoneLight = [1, 1];
   let nightF = 1;
-  const litColor = new THREE.Color();
   const m4 = new THREE.Matrix4();
   const q0 = new THREE.Quaternion();
   const v3 = new THREE.Vector3();
@@ -256,37 +281,40 @@ export function buildLamps(map = worldMap()) {
     LAMPS.forEach((l, i) => {
       const v = zoneLight[l.zone];
       const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(time, i * 1.7 + l.zone);
-      litColor.copy(HEAD_DARK).lerp(HEAD_LIT, b);
-      heads.setColorAt(i, litColor);
       if (b <= 0.02) {
         cones.setMatrixAt(i, zero);
       } else {
         const s = 0.25 + 0.75 * b;
-        v3.set(l.hx, (HEAD_Y / 2) * b, l.hz);
+        v3.set(l.x, (LANTERN_Y / 2) * b, l.z);
         s3.set(s, Math.max(b, 0.02), s);
         m4.compose(v3, q0, s3);
         cones.setMatrixAt(i, m4);
       }
       glows.setColorAt(i, glowLevel.setScalar(b > 0.02 ? GLOW_OPACITY * nightF * b : 0));
     });
+    // The lantern glass and bulb carry the light: daylight dulls them, a
+    // blackout puts them out for their zone only.
+    for (const zone of [0, 1]) {
+      const b = zoneLight[zone] >= 1 ? 1 : zoneLight[zone] <= 0 ? 0 : blink(time, zone * 3.7);
+      const lit = (0.15 + 0.85 * nightF) * b;
+      for (const mat of lanternMats[zone]) mat.emissiveIntensity = 1.5 * lit;
+    }
     SIGNALS.forEach((h, i) => {
       const green = signalGreen(h.axis, time);
       lenses.setColorAt(i * 2, green ? LENS_RED_OFF : LENS_RED);
       lenses.setColorAt(i * 2 + 1, green ? LENS_GREEN : LENS_GREEN_OFF);
     });
-    heads.instanceColor.needsUpdate = true;
     cones.instanceMatrix.needsUpdate = true;
     glows.instanceColor.needsUpdate = true;
     if (lenses.instanceColor) lenses.instanceColor.needsUpdate = true;
   }
 
-  // Daylight: heads go dull, cones and glows fade with the night.
+  // Daylight: lantern glass goes dull, cones and glows fade with the night.
   function setDaylight(n) {
     nightF = n;
-    headMat.color.setScalar(0.35 + 0.65 * n);
     coneMat.opacity = 0.03 * n;
   }
 
-  const headPositions = LAMPS.map((l) => new THREE.Vector3(l.hx, HEAD_Y, l.hz));
+  const headPositions = LAMPS.map((l) => new THREE.Vector3(l.x, LANTERN_Y, l.z));
   return { group, poolsByZone, setZoneLight, setDaylight, tick, heads: headPositions, cones };
 }
