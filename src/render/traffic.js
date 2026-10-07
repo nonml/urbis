@@ -463,9 +463,13 @@ function curbPose(car, out) {
 // Bodies draw per silhouette (M2-5): one InstancedMesh per fleet shape, so a
 // car submits its own ~6.5k triangles instead of the folded 32.5k all five
 // shapes cost. Five draws, and the fleet still stays inside M2-1's eleven-draw
-// guard. `slot[i]` maps a car index to its shape's instance slot.
+// guard. `slot[i]` maps a car index to its shape's instance slot, and each
+// frame packs only the cars the culler keeps, so a shape's slots and count are
+// its visible instances, not every car in the city.
 function shapePool(geos, material, slot) {
   const group = new THREE.Group();
+  const colors = new Array(slot.length);
+  let write = geos.map(() => 0);
   const meshes = geos.map((g, s) => {
     const m = new THREE.InstancedMesh(g, material, slot.filter(([sh]) => sh === s).length);
     m.name = 'fleet-car-body';
@@ -477,20 +481,43 @@ function shapePool(geos, material, slot) {
   return {
     group,
     meshes,
-    setColorAt(i, color) {
-      const [s, k] = slot[i];
-      meshes[s].setColorAt(k, color);
-      meshes[s].instanceColor.needsUpdate = true;
-    },
+    beginFrame() { write = geos.map(() => 0); },
+    setColorAt(i, color) { colors[i] = color; },
     setMatrixAt(i, matrix) {
-      const [s, k] = slot[i];
+      const [s] = slot[i];
+      const k = write[s]++;
       meshes[s].setMatrixAt(k, matrix);
+      if (colors[i]) meshes[s].setColorAt(k, colors[i]);
     },
     flush() {
-      for (const m of meshes) m.instanceMatrix.needsUpdate = true;
+      meshes.forEach((m, s) => {
+        m.count = write[s];
+        m.instanceMatrix.needsUpdate = true;
+        if (m.instanceColor) m.instanceColor.needsUpdate = true;
+      });
     },
     instanceMatrix: { needsUpdate: false },
   };
+}
+
+// Per-instance culling, the view-space cull three does per object applied at
+// the fleet's scale: a car whose 3 m sphere is outside the lens costs no
+// triangles and comes back through the same margin. The matrix is the last
+// rendered frame's, a frame behind the camera the loop is about to place —
+// 1 m of slack on a car whose half-length is 2.2 m.
+const _frustum = new THREE.Frustum();
+const _screen = new THREE.Matrix4();
+const _carSphere = new THREE.Sphere(new THREE.Vector3(), 3.2);
+function viewCuller(camera) {
+  if (!camera) return null;
+  _screen.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+  _frustum.setFromProjectionMatrix(_screen);
+  return _frustum;
+}
+function inView(frustum, p) {
+  if (!frustum) return true;
+  _carSphere.center.set(p.x, 1.0, p.z);
+  return frustum.intersectsSphere(_carSphere);
 }
 
 export function buildTraffic(street) {
@@ -579,12 +606,22 @@ export function buildTraffic(street) {
 export function updateTraffic(rig, street, camera = null) {
   const { bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, poses } = rig;
   const alpha = drawAlpha();
+  const frustum = viewCuller(camera);
+  bodies.beginFrame?.();
+  let nWheels = 0;
+  let nGlass = 0;
+  let nTrim = 0;
   street.cars.forEach((c, i) => {
     const p = c.parked ? curbPose(c, poses[i]) : blend(c, alpha, poses[i]);
-    bodies.setMatrixAt(i, placeShape(dummy, p, 0));
-    glass.setMatrixAt(i, placeShape(dummy, p, 0));
-    trim.setMatrixAt(i, placeShape(dummy, p, 0));
-    wheels.setMatrixAt(i, placeShape(dummy, p, 0));
+    if (inView(frustum, p)) {
+      // The packed slot carries this car's shape: the folded glass/trim/wheels
+      // read iShape per instance, so repacking must repoint it.
+      if (rig.iShape) rig.iShape.setX(nWheels, c.shape ?? 0);
+      bodies.setMatrixAt(i, placeShape(dummy, p, 0));
+      glass.setMatrixAt(nGlass++, placeShape(dummy, p, 0));
+      trim.setMatrixAt(nTrim++, placeShape(dummy, p, 0));
+      wheels.setMatrixAt(nWheels++, placeShape(dummy, p, 0));
+    }
     const m = placeOnCar(dummy, p, 0);
     if (c.parked) {
       // Dark and quiet: parked cars wear no headlight glow.
@@ -616,6 +653,10 @@ export function updateTraffic(rig, street, camera = null) {
   });
   bodies.instanceMatrix.needsUpdate = true;
   if (bodies.flush) bodies.flush();
+  if (rig.iShape) rig.iShape.needsUpdate = true;
+  wheels.count = nWheels;
+  glass.count = nGlass;
+  trim.count = nTrim;
   wheels.instanceMatrix.needsUpdate = true;
   beams.instanceMatrix.needsUpdate = true;
   tails.instanceMatrix.needsUpdate = true;
