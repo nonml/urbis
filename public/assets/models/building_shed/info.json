@@ -1,0 +1,1 @@
+{"id": "building_shed", "name": "Works shed", "type": "models", "license": "generated", "fmt": "glb", "tris": 488, "size_m": {"w": 26.5, "h": 11.0, "d": 17.15}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M4.T9, M2 pipeline Blender stage; palette + glass materials"}
