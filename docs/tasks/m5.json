@@ -42,6 +42,24 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M5.T3b",
+      "lane": "build-ui",
+      "goal": "Make M5-1 real: `tests/accept/m5-roads.spec.js` passes on all five seeds. M5.T3 landed the drag with no check run. Today the check stops at its first line: on every seed `roadSite` finds no 120 m straight run from a road node into clear land. Only 0-9 node directions stay inside `map.district.drive` (53-165 m wide), and `addRoad` refuses every one of those (returns NOOP). Find why and fix the game, not the check: either the drive bounds do not cover the land a player can build on, or `planRoad` refuses good ground. Then the mouse drag with `#tool-road` must lay it, lots must appear on both sides, and the car must drive its length.",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/map.js",
+        "src/sim/cityview.js",
+        "src/render/cityview.js",
+        "src/ui/cityview.js"
+      ],
+      "needs": [
+        "M5.T3"
+      ],
+      "test": "tests/accept/m5-roads.spec.js",
+      "commit": "M5.T3b (M5-1): a dragged road is a road on all five seeds",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. If the check itself is wrong (it asks for land the plan never promised), stop and say so with numbers; do not work around it. Every new game generates the whole city from its seed: derive, never hard-code positions."
+    },
+    {
       "id": "M5.T4",
       "lane": "build-sim",
       "goal": "A new road is a street. Lamps, signals and furniture planned along it; lots planned on both sides (M3.T20); the outskirts gone from its path (M3.T27)",
