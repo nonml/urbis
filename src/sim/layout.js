@@ -11,7 +11,7 @@
 // hands them out.
 //
 // Pure sim (law 5): no three.js, no DOM.
-import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
+import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH, buildable } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { BUILD_LINE, PINNED_TOWERS, pinnedBuildings } from './landmarks.js';
 import { capsFor } from './vistas.js';
@@ -24,6 +24,11 @@ export const CROSSING_BAND = ROAD_HALF_WIDTH + WALKWAY_WIDTH;
 export const ROW_END_GAP = 2;
 // Deepest a row building may run back from the building line (its x size).
 export const ROW_DEPTH_MAX = 12;
+// The deepest plot a kind may reach back (M4.T5): a yard behind a works shed
+// and a back garden behind a suburb house want more room than a row of homes,
+// so those kinds take a deeper plot, while the fair share between two avenues
+// and the default cap still win. towers and housing keep ROW_DEPTH_MAX.
+export const ROW_DEPTH_KIND = { works: 32, suburb: 20 };
 // Between two avenues each row stops this short of the halfway line, so the
 // backs of facing rows never touch, cornices included.
 export const BACK_GAP = 1.5;
@@ -43,13 +48,15 @@ export const PIN_CLEAR = 1.2;
 
 // How deep the buildings on one avenue side may be: ROW_DEPTH_MAX on a side
 // that faces no other avenue; between two avenues, half the gap minus the
-// building line and BACK_GAP, capped at ROW_DEPTH_MAX.
+// building line and BACK_GAP, capped at ROW_DEPTH_MAX. A kind that keeps a
+// yard or a garden behind its building (M4.T5) has its own, deeper cap.
 export function rowDepth(district, ax, side) {
+  const max = ROW_DEPTH_KIND[district.kind] ?? ROW_DEPTH_MAX;
   const xs = district.avenues.map((a) => a.x).sort((p, q) => p - q);
   const neighbour = xs[xs.indexOf(ax) + side];
-  if (neighbour === undefined) return ROW_DEPTH_MAX;
+  if (neighbour === undefined) return max;
   const fair = Math.abs(neighbour - ax) / 2 - BUILD_LINE - BACK_GAP;
-  return Math.min(ROW_DEPTH_MAX, fair);
+  return Math.min(max, fair);
 }
 
 // Where a row may stand on one avenue side, as sorted [z0, z1] runs: the
@@ -434,6 +441,8 @@ const CORE_STYLE = { name: 'core', kinds: [0, 1, 2, 5], h: [28, 52], front: [12,
 const TOWER_STYLE = { name: 'tower', kinds: [2, 3, 5], h: [18, 36], front: [9, 16] };
 const GLASS_STYLE = { name: 'glass', kinds: [1, 2, 4, 5], h: [18, 40], front: [9, 16] };
 const BRICK_STYLE = { name: 'brick', kinds: [3, 4, 2], h: [12, 26], front: [7, 13] };
+const STYLE_BY_NAME = Object.fromEntries(
+  [CORE_STYLE, TOWER_STYLE, GLASS_STYLE, BRICK_STYLE].map((s) => [s.name, s]));
 
 export function rowStyle(district, ax, z) {
   const order = district.avenues.findIndex((a) => a.x === ax);
@@ -444,6 +453,43 @@ export function rowStyle(district, ax, z) {
   return BRICK_STYLE;
 }
 
+// ---------------------------------------------------------------------------
+// Per-kind buildings (M4.T5). A cell's kind (citygen.KIND_SPECS) decides how
+// its frontage fills: housing runs mid-rise terraces, works wide sheds on deep
+// plots, suburb detached houses with side and back gardens. towers is absent
+// on purpose — a towers cell keeps rowStyle's wall of today, so the hand map
+// and the generated downtown do not move. Every footprint asks buildable
+// (M4.T2) before it is placed — the ground's water and gradient verdict — so a
+// footprint the terrain refuses is left as open frontage.
+
+// front: metres along the avenue; depth: metres back from the building line
+// (the rest of the plot stays behind); gap: metres between neighbours (the
+// side garden of a house, the yard strip of a shed); styles/h: what a cell
+// falls back to if citygen carried none.
+const KIND_BUILD = {
+  housing: { front: [8, 14], depth: [9, 12], gap: [0, 0], styles: ['brick', 'tower'], h: [10, 26] },
+  works: { front: [20, 36], depth: [10, 16], gap: [1.5, 1.5], styles: ['brick'], h: [7, 16] },
+  suburb: { front: [9, 13], depth: [7, 9], gap: [4, 9], styles: ['brick'], h: [6, 12] },
+};
+
+// The row-style fields one kinded building wears: a name from the district's
+// own style list and its own height range (citygen, M4.T4) when it has them,
+// the kind's frontage, and the facade pool of the named style. Kindless
+// districts never reach here — they keep rowStyle, untouched.
+function kindStyle(district, shape, rand) {
+  const names = district.styles ?? shape.styles;
+  const name = names[Math.floor(rand() * names.length)];
+  return {
+    ...(STYLE_BY_NAME[name] ?? BRICK_STYLE), name,
+    front: shape.front, h: district.heights ?? shape.h,
+  };
+}
+
+// One value from a [low, high] range, a fixed number when both ends match.
+function rollRange(range, rand) {
+  return range[0] + rand() * (range[1] - range[0]);
+}
+
 // Each row in the plan cut into the buildings the street wall draws:
 // { ax, side, z, d, w, h, kind, style } — d the party-walled front along the
 // row, w the depth back from the building line, h the height, kind a facade
@@ -452,19 +498,24 @@ export function rowStyle(district, ax, z) {
 // a caller that already holds it (WORLD_BUILDINGS) never derives it twice.
 export function planBuildings(district, seed, plan = planLayout(district, seed)) {
   const rand = mulberry32(seed);
+  const shape = KIND_BUILD[district.kind] ?? null;
   const out = [];
   for (const row of plan.rows) {
     for (const [r0, r1] of row.runs) {
       let at = r0;
       while (r1 - at >= MIN_RUN) {
-        const st = rowStyle(district, row.ax, at);
+        const st = shape ? kindStyle(district, shape, rand) : rowStyle(district, row.ax, at);
         let front = st.front[0] + rand() * (st.front[1] - st.front[0]);
         if (r1 - at - front < MIN_RUN) front = r1 - at;
         const h = Math.round(st.h[0] + rand() * (st.h[1] - st.h[0]));
         const kind = st.kinds[Math.floor(rand() * st.kinds.length)];
-        const w = Math.min(10 + rand() * 2, row.depth);
-        out.push({ ax: row.ax, side: row.side, z: at + front / 2, d: front - 1.2, w, h, kind, style: st.name });
-        at += front;
+        const deep = shape ? rollRange(shape.depth, rand) : 10 + rand() * 2;
+        const w = Math.min(deep, row.depth);
+        const z = at + front / 2;
+        const d = front - 1.2;
+        const x = row.ax + row.side * (BUILD_LINE + w / 2);
+        if (buildable(x, z, w, d).ok) out.push({ ax: row.ax, side: row.side, z, d, w, h, kind, style: st.name });
+        at += front + (shape ? rollRange(shape.gap, rand) : 0);
       }
     }
   }
