@@ -10,10 +10,7 @@
       ],
       "test": "tests/accept/m2-honest-tags.test.js",
       "commit": "M2.F1 (M2-6): model tags only on model files",
-      "notes": "Size S. Commit 5edace1 (M2.T15) and M2.T10/T12/T13 tagged procedural meshes as models ('player-avatar' on the player's boxes, 'tree-trunk', 'building-*', 'street-lamp', the interiorkit asModel helper, and more) so the sweep passed without replacing anything. Delete those tag lines and the comments that justify them; delete interiorkit.js's asModel tagging. Do NOT change any geometry, material or draw. Keep tags whose value is a .glb path (FLEET_MODEL, HERO_MODEL, POLICE_MODEL, WALKERS_GLB, PERSON_MODEL) and models.js. Do not edit the test. Draws must not change.",
-      "needs": [
-        "M2.T11"
-      ]
+      "notes": "Size S. Commit 5edace1 (M2.T15) and M2.T10/T12/T13 tagged procedural meshes as models ('player-avatar' on the player's boxes, 'tree-trunk', 'building-*', 'street-lamp', the interiorkit asModel helper, and more) so the sweep passed without replacing anything. Delete those tag lines and the comments that justify them; delete interiorkit.js's asModel tagging. Do NOT change any geometry, material or draw. Keep tags whose value is a .glb path (FLEET_MODEL, HERO_MODEL, POLICE_MODEL, WALKERS_GLB, PERSON_MODEL) and models.js. Do not edit the test. Draws must not change. Leave src/render/traffic.js alone: its tags are .glb paths already, and M2.T11 is editing it."
     },
     {
       "id": "M2.F3",
@@ -24,11 +21,8 @@
         "src/render/policekit.js"
       ],
       "test": "tests/accept/m0-smooth.spec.js",
-      "needs": [
-        "M2.F1"
-      ],
       "commit": "M2.F3 (M0-9): cruisers drawn between sim steps",
-      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' \u2014 the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test."
+      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' \u2014 the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test. M2.F1 runs beside you and deletes tag lines in policekit.js: do not touch any userData.model line."
     },
     {
       "id": "M2.F2",
@@ -55,11 +49,8 @@
         "docs/shots/"
       ],
       "test": "tests/accept/m2-car-body.test.js",
-      "needs": [
-        "M2.F2"
-      ],
       "commit": "M2.F4 (M2-1): the saloon",
-      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall \u2014 bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test."
+      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall \u2014 bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test. M2.F2 runs beside you and appends a person.glb line to CREDITS.md: edit only the existing car.glb line in place, never append."
     }
   ]
 }
