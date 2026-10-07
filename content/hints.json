@@ -2,5 +2,9 @@
   { "key": "z", "text": "city view" },
   { "key": "e", "text": "open a door" },
   { "key": "f", "text": "enter a car" },
-  { "key": "h", "text": "blackout a district" }
+  { "key": "h", "text": "blackout a district" },
+  { "key": "r", "text": "zone homes" },
+  { "key": "c", "text": "zone shops" },
+  { "key": "i", "text": "zone works" },
+  { "key": "x", "text": "clear a lot" }
 ]
