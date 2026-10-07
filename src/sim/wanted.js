@@ -18,6 +18,12 @@ import { snap } from '../game/loop.js';
 
 export const MAX_HEAT = 3;
 export const PURSUIT_SPEED = 10;
+
+// The ground under a mover (M4.T10): the map's own field when it has one
+// (M4.T2, the field the render draws); the load-time world field is the hand
+// preset's fallback.
+const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
+
 const SEARCH_SPEED = 7;
 const CATCH_DIST_FOOT = 3.5;
 const CATCH_DIST_CAR = 4.5;
@@ -50,8 +56,8 @@ export const TIERS = [
   { chase: 2, spikes: true, roadblock: true, heli: true, searchSecs: 25 },
 ];
 
-function makeUnit(x, z, yaw) {
-  return { active: false, leaving: false, leaveT: 0, exit: null, x, y: heightAt(x, z), z, yaw, speed: 0 };
+function makeUnit(x, z, yaw, map) {
+  return { active: false, leaving: false, leaveT: 0, exit: null, x, y: groundAt(map, x, z), z, yaw, speed: 0 };
 }
 
 export function createWanted(map = worldMap()) {
@@ -66,7 +72,7 @@ export function createWanted(map = worldMap()) {
     seenAt: -Infinity,
     lkp: { x: 0, z: 0, yaw: 0 },
     search: { active: false, x: 0, z: 0, r: 0, since: 0 },
-    pursuit: map.anchors.pursuitHomes.map((h, i) => makeUnit(h.x, h.z, i === 0 ? 0 : Math.PI)),
+    pursuit: map.anchors.pursuitHomes.map((h, i) => makeUnit(h.x, h.z, i === 0 ? 0 : Math.PI, map)),
     response: createResponse(),
     events: [],
   };
@@ -104,7 +110,7 @@ function syncUnits(w, x, z, map) {
       if (!u.active) {
         const at = spawnNode(x, z, SPAWN_DIST, taken, map);
         taken.push(at);
-        Object.assign(u, { x: at.x, z: at.z, y: heightAt(at.x, at.z), yaw: Math.atan2(x - at.x, z - at.z), speed: 0 });
+        Object.assign(u, { x: at.x, z: at.z, y: groundAt(map, at.x, at.z), yaw: Math.atan2(x - at.x, z - at.z), speed: 0 });
       }
       u.active = true;
       u.leaving = false;
@@ -236,7 +242,7 @@ function drive(map, u, gx, gz, cruise, dt) {
   );
   u.x = inside.x;
   u.z = inside.z;
-  u.y = heightAt(u.x, u.z);
+  u.y = groundAt(map, u.x, u.z);
 }
 
 function steerUnits(w, dt, hero, time, map) {

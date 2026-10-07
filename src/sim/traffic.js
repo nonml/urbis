@@ -25,6 +25,12 @@
 import { mulberry32 } from './rng.js';
 import { DAY_SECS, START_HOUR } from './clock.js';
 import { frontageRoad } from './map.js';
+import { heightAt } from './world.js';
+
+// The ground under a car (M4.T10): the map's own field when it has one
+// (M4.T2, the field the render draws); the load-time world field is the hand
+// preset's fallback.
+const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
 
 export const CAR_LEN = 4.5;
 export const LANE_OFF = 2.4;
@@ -408,7 +414,7 @@ export function createTraffic(map, seed, count = 0) {
 function makeCar(state) {
   const c = {
     id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null,
-    axis: 'z', speed: 0, prev: {}, x: 0, z: 0, yaw: 0,
+    axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
   };
   if (!assignTrip(state, c, null, false)) assignTrip(state, c, null, true);
   return c;
@@ -438,6 +444,7 @@ function assignTrip(state, c, from, allowInView) {
     c.route = route; c.leg = 0; c.dir = dir; c.s = s0; c.v = 0; c.turn = null;
     c.goal = to.node; c.axis = edge.axis; c.speed = 0;
     Object.assign(c, p);
+    c.y = groundAt(state.map, p.x, p.z);
     c.prev.x = p.x;
     c.prev.z = p.z;
     return true;
@@ -657,6 +664,9 @@ export function tick(state, dt) {
     }
     beginTurn(state, c, edge, len);
   }
+  // One pass after the step puts every car on the ground, whichever branch
+  // moved it — lane, turn or held at the line (M4.T10).
+  for (const c of state.cars) c.y = groundAt(state.map, c.x, c.z);
 }
 
 // Leave the edge's lane for the next edge's lane through the node. The car is

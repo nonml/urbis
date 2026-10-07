@@ -5,11 +5,16 @@ import { worldMap } from './patrol.js';
 export const WALK_SPEED = 3.4;
 export const HURRY_SPEED = 6.0;
 
+// The ground under a mover (M4.T10): the map's own field when it has one
+// (M4.T2, the field the render draws); the load-time world field is the hand
+// preset's fallback.
+const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
+
 export function createPlayer(map = worldMap()) {
   const { x, z, yaw } = map.spawn.player;
   return {
     x,
-    y: heightAt(x, z),
+    y: groundAt(map, x, z),
     z,
     yaw,
     speed: 0,
@@ -45,5 +50,5 @@ export function tickPlayer(player, input, dt, map = worldMap()) {
   // Every tick, not only the moving ones: a spawn preset moves x and z behind
   // this function's back, and standing still on a bank is exactly the case
   // where floating shows.
-  player.y = heightAt(player.x, player.z);
+  player.y = groundAt(map, player.x, player.z);
 }
