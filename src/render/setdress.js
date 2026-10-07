@@ -2,7 +2,8 @@
 // Shops + puddles are static merges (2 draws); steam is 3 live sprites.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getGlowTex } from './signs.js';
+import { getGlowTex, buildPools } from './signs.js';
+import { buildStreaks } from './streaks.js';
 import { mulberry32 } from '../sim/rng.js';
 import { zoneAt } from '../sim/street.js';
 import { loadPBRMaps, standardFromMaps, wetness } from './materials.js';
@@ -141,6 +142,35 @@ export function buildStreetKit() {
   place(BUS_STOP_MODEL, BUS_STOPS, 'shelters');
   reportKit({ models: ['metal_trash_can'] });
   return group;
+}
+
+// A road op replans the map's lamps (M5.T4b). The light pools and the
+// wet-road smears were merged from the plan the world was born with, so they
+// are refilled in place from the new one: the same meshes, the same draws, and
+// the new street's glow lands on the asphalt the player just laid.
+export function refreshLampDressing(lamps, poolMeshes, streakMeshes, signSources) {
+  for (const zone of [0, 1]) {
+    const quads = lamps.poolsByZone[zone] ?? [];
+    const mesh = poolMeshes[zone];
+    if (!mesh || quads.length === 0) continue;
+    const fresh = buildPools(quads);
+    mesh.geometry.dispose();
+    mesh.geometry = fresh.geometry;
+    mesh.material.dispose();
+    mesh.material = fresh.material;
+  }
+  const fresh = buildStreaks([
+    ...signSources,
+    ...lamps.heads.map((h) => ({ x: h.x, z: h.z, color: '#c98a4a', len: 9, width: 1.3 })),
+  ]);
+  for (const zone of [0, 1]) {
+    const mesh = streakMeshes[zone];
+    if (!mesh) continue;
+    mesh.geometry.dispose();
+    mesh.geometry = fresh[zone].geometry;
+    mesh.material.dispose();
+    mesh.material = fresh[zone].material;
+  }
 }
 
 export function buildShops(texLoader, maxAniso) {

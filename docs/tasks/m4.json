@@ -129,6 +129,23 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-2: **A river** at least 25 m wide crosses the city, with **at least 2 bridges** you can drive over, and nothing is built on the water or within 8 m of it (the world-scale placement rules) (checked by `tests/accept/m4-river.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M4.T8b",
+      "lane": "city",
+      "goal": "The river looks like water. After M4.T8 (2980add), from the city view over the river in daylight the water is the same dark grey as the ground and has no name the pick can read; the bridges are hard to make out. Give the river a water material that reads as water from above and from the street (blue-green, lighter than black, with the sky's reflection), name its mesh 'river' and the bridge decks 'bridge', and make banks and railings read against the water.",
+      "files": [
+        "src/render/river.js",
+        "src/render/roads.js",
+        "src/render/landscape.js",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M4.T8"
+      ],
+      "test": "tests/accept/m4-river-look.spec.js",
+      "commit": "M4.T8b (M4-2): the river looks like water",
+      "notes": "Size S. Draws stay at or under 175. Look at docs/shots/m4-river-73.png before finishing: a river you would recognise, with bridges over it. Commit as you go."
+    },
+    {
       "id": "M4.T9",
       "lane": "assets",
       "goal": "Suburb and works buildings (lane: assets). House, low-rise flat and shed models through the M2 pipeline, added to the building pools",
