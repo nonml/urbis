@@ -27,6 +27,11 @@ export function loadPersonAvatar(avatar) {
     avatar.mixer = new THREE.AnimationMixer(gltf.scene);
     avatar.walk = avatar.mixer.clipAction(walk);
     avatar.idle = idle && avatar.mixer.clipAction(idle);
+    // A clip poses bones only while its action plays; the walk used to sit
+    // outside the mixer, so its fade to full weight moved the skeleton nowhere
+    // and the mesh fell back to the bind T-pose. Both clips play; the weights
+    // below cross-fade them.
+    avatar.walk.play();
     avatar.idle?.play();
     avatar.walkWeight = 0;
     for (const m of [...avatar.group.children]) avatar.group.remove(m);
@@ -277,7 +282,15 @@ export function updatePlayer(avatar, player, dt) {
   // leaking into a still frame — the walk only plays while walking.
   if (avatar.mixer) {
     const moving = player.speed > IDLE_SPEED;
-    const fade = Math.min(1, dt / BLEND_TIME);
+    // scene.js calls this with the blended draw pose only, so dt arrives
+    // undefined; fall back to the clock, clamped like the loop's 50 ms so a
+    // stalled tab cannot jump the blend. A missing dt used to make this
+    // weight NaN, and a NaN weight binds no clip at all: the mesh sat in its
+    // bind pose, arms out, however still the player stood.
+    const now = performance.now();
+    const step = Math.min(Number.isFinite(dt) ? dt : (now - (avatar.lastUpdateMs ?? now)) / 1000, 0.05);
+    avatar.lastUpdateMs = now;
+    const fade = Math.min(1, step / BLEND_TIME);
     const target = moving ? 1 : 0;
     if (avatar.walkWeight === undefined) avatar.walkWeight = target;
     avatar.walkWeight += (target - avatar.walkWeight) * fade;

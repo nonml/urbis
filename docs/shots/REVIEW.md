@@ -4,6 +4,29 @@ Every shot is judged here before it counts as evidence (AGENTS.md, "How to work"
 step 5). One entry per shot: the slice, the verdict, and each defect by id. Open
 defects stay in the table at the bottom until a commit fixes them.
 
+## 2026-10-07 — M2.F2e, the player stands on both feet (`m2-0-person`)
+
+`docs/shots/m2-0-person.png`, the hand map street pose at the spawn, day (key t),
+same camera as M2.F2d. Reviewed against the F2d shot and a 200x300 crop of the player:
+
+- **Shows the feature.** Centre frame, from behind: the legs now stand apart with a
+  visible gap between the trouser legs, the feet are flat and planted at a stance
+  width, and the jacket hem meets the trousers with no pinched dark blob at the
+  crotch. The hands hang compact, fingers together down the sides — no splayed fan.
+  Measured at bake (`make_person.py`): ankle separation 0.267 m (0.2-0.3 asked),
+  both soles heel +0.009 m / toe +0.000 m over the ground. The walk clip is unchanged.
+- **Clear view.** `__game.frameCheck()` blocked 0 — nothing but the player within
+  2 m of the lens. The player fills the centre; the white car ahead sits behind.
+- **Nothing broken.** Legs are straight, the pelvis level, no floating or
+  intersecting parts in the crop. Draws unchanged: 153 now, peak 153 (the pose
+  re-keys the same skinned mesh, so no cost).
+- **Toy or neon?** The baked MPFB person, one mesh, one material; no raw primitives
+  added and no neon.
+- **Readable.** A player sees a person standing relaxed on the pavement, not
+  mid-step and not on their toes.
+
+Open defects in frame, not this slice's: **D16** the hero car's slab (mid-frame).
+
 ## 2026-10-06 — M1.T4/M1.T2 evidence, re-shot on the plan's five seeds
 
 `tests/accept/m1-zone-shows.spec.js` (M1-1) re-ran on seeds 7, 11, 22, 33, 73 and

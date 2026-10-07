@@ -149,7 +149,7 @@ function buildGroundFrame(map) {
   });
   const mesh = new THREE.Mesh(displaceToTerrain(mergeGeometries(geos), terrainOf(map)),
     new THREE.MeshStandardMaterial({ color: GROUND_HEX, roughness: 1, metalness: 0 }));
-  mesh.name = 'build ground';
+  mesh.name = 'ground';
   mesh.position.y = -GROUND_SINK;
   mesh.receiveShadow = true;
   return mesh;

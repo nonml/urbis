@@ -198,6 +198,53 @@ function edgeLines(map, nodes, out) {
   }
 }
 
+// The dress a road a player dragged (way 'op') carries (M5.T3d): a walk and a
+// kerb per side, centre dashes and edge lines, so a new street reads between
+// its lots the way a generated avenue does. The district's own ways keep the
+// tables above; only the graph's op edges are walked here. End lines stop a
+// road's half-width short of each end, so paint never runs into a junction.
+function opDress(map, nodes) {
+  const walks = [];
+  const kerbs = [];
+  const markings = [];
+  const dash = 3;
+  const clear = ROAD_HALF + 0.6;
+  for (const e of map.graph.edges) {
+    if (e.way !== 'op') continue;
+    const a = nodes.get(e.a);
+    const b = nodes.get(e.b);
+    if (!a || !b) continue;
+    const vertical = a.x === b.x;
+    const len = Math.abs(vertical ? b.z - a.z : b.x - a.x);
+    if (len <= 2 * clear) continue;
+    const mid = (vertical ? a.z + b.z : a.x + b.x) / 2;
+    const walkOff = ROAD_HALF + WALKWAY_WIDTH / 2;
+    const kerbOff = ROAD_HALF + KERB_WIDTH / 2;
+    for (const side of [-1, 1]) {
+      walks.push(vertical
+        ? slab(a.x + side * walkOff, 0, mid, WALKWAY_WIDTH, WALK_RISE, len)
+        : slab(mid, 0, a.z + side * walkOff, len, WALK_RISE, WALKWAY_WIDTH));
+      kerbs.push(vertical
+        ? slab(a.x + side * kerbOff, KERB_RISE / 2, mid, KERB_WIDTH, KERB_RISE, len)
+        : slab(mid, KERB_RISE / 2, a.z + side * kerbOff, len, KERB_RISE, KERB_WIDTH));
+    }
+    const lo = (vertical ? Math.min(a.z, b.z) : Math.min(a.x, b.x)) + clear;
+    const hi = (vertical ? Math.max(a.z, b.z) : Math.max(a.x, b.x)) - clear;
+    for (const v of rhythmIn(3, 6, lo + dash / 2 + 0.5, hi - dash / 2 - 0.5)) {
+      if (vertical) mark(markings, a.x, v, 0.10, dash);
+      else mark(markings, v, a.z, dash, 0.10);
+    }
+    for (const side of [-1, 1]) {
+      if (vertical) {
+        for (const [zc, span] of zoneSplit(lo, hi)) mark(markings, a.x + side * EDGE_LINE_OUT, zc, 0.10, span);
+      } else {
+        mark(markings, (lo + hi) / 2, a.z + side * EDGE_LINE_OUT, hi - lo, 0.10);
+      }
+    }
+  }
+  return { walks, kerbs, markings };
+}
+
 // Every road piece of a map, before a pool exists, keyed to the edge or
 // junction it belongs to. `extras` are the pieces block.js wires for the map
 // (the hand preset's promenade, the mid-block zebras). Pure, so a test can
@@ -205,6 +252,7 @@ function edgeLines(map, nodes, out) {
 export function roadPieces(map = worldMap(), extras = {}) {
   const nodes = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const paving = pavingPieces(map, nodes);
+  const op = opDress(map, nodes);
   const markings = [];
   dashPieces(map, nodes, markings);
   zebraPieces(map, markings);
@@ -217,9 +265,9 @@ export function roadPieces(map = worldMap(), extras = {}) {
   }
   return {
     carriageway: carriagewayPieces(map, nodes),
-    walks: [...paving.walks, ...(extras.walks ?? [])],
-    kerbs: [...paving.kerbs, ...(extras.kerbs ?? [])],
-    markings: [...markings, ...(extras.markings ?? [])],
+    walks: [...paving.walks, ...op.walks, ...(extras.walks ?? [])],
+    kerbs: [...paving.kerbs, ...op.kerbs, ...(extras.kerbs ?? [])],
+    markings: [...markings, ...op.markings, ...(extras.markings ?? [])],
     manholes,
     bridges: bridgePieces(map),
   };
@@ -349,7 +397,13 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.7, metalness: 0.4 }),
     pieces.manholes, ROAD_SLACK,
   );
-  for (const pool of [road, walks, kerbs, markings]) group.add(pool.group);
+  // Every piece a road is drawn from answers to the name 'road', so a pick
+  // (game/probe.js) can say what the tarmac under a point is (M5.T3d).
+  for (const pool of [road, walks, kerbs, markings]) {
+    for (const mesh of pool.meshes) mesh.name = 'road';
+    group.add(pool.group);
+  }
+  manholes.mesh.name = 'road';
   group.add(manholes.mesh);
   // Bridge decks and railings ride their own pools (M4.T8): one draw each
   // whatever the map does, rewritten by the same update a road op triggers.

@@ -67,6 +67,7 @@ for (const seed of SEEDS) {
       { x: (site.from.x + site.to.x) / 2, z: (site.from.z + site.to.z) / 2 });
     await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     const before = await page.evaluate(() => window.__game.city().parcels.map((p) => p.id));
+    const lampsBefore = await page.evaluate(() => window.__game.drawnLamps?.() ?? 0);
     const from = await page.evaluate((p) => window.__game.screenOf(p.x, 0.5, p.z), site.from);
     const to = await page.evaluate((p) => window.__game.screenOf(p.x, 0.5, p.z), site.to);
     const onCanvas = (px) => page.evaluate((p) => document.elementFromPoint(p.x, p.y)?.id === 'scene', px);
@@ -95,6 +96,13 @@ for (const seed of SEEDS) {
       const hits = await page.evaluate(([x, y]) => window.__game.pick(x, y, window.innerWidth, window.innerHeight), [px.x, px.y]);
       expect(hits[0]?.path ?? 'nothing', `seed ${seed}: ${what} is drawn`).toMatch(name);
     }
+    // M5.T4 plans lamps along the new street (map.furniture); they must be drawn
+    // too, not only planned: __game.drawnLamps() counts the lamp instances drawn.
+    const planned = (await page.evaluate(() => (window.__game.city().furniture?.lamps ?? []).map((l) => ({ x: l.x, z: l.z }))))
+      .filter((l) => { const h = projectOnSegment(l.x, l.z, site.from, site.to); return h.dist < 12 && h.t > 0.05 && h.t < 0.95; }).length;
+    expect(planned, `seed ${seed}: lamps planned along the new street`).toBeGreaterThan(0);
+    const lampsAfter = await page.evaluate(() => window.__game.drawnLamps?.() ?? 0);
+    expect(lampsAfter, `seed ${seed}: the new street's lamps are drawn (${lampsBefore} before)`).toBeGreaterThan(lampsBefore);
     mkdirSync(SHOTS, { recursive: true });
     writeFileSync(`${SHOTS}/m5-road-${seed}.png`,
       Buffer.from((await page.evaluate(() => window.__game.shot())).split(',')[1], 'base64'));

@@ -18,6 +18,7 @@ import {
 import { waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
 import { createTerrain } from './terrain.js';
+import { planFurniture } from './furniture.js';
 
 // A placed building is sized from its footprint with the rule the city rolls
 // for a lot (zoning.js makeParcel): three storeys at the least, slender enough
@@ -298,6 +299,33 @@ function roadBox(a, b) {
   };
 }
 
+// The overview draws a 1.3 m dashed boundary on a free lot's edge (render/
+// vacant.js), so it reaches 0.65 m past the footprint. A lot an op plans keeps
+// a metre of that clear of the back, so the marker stands inside the reach the
+// op dirties and the open land 20 m off a new road stays open ground (M5.T3d).
+const MARKER_CLEAR = 1;
+
+// A planned lot's depth, held clear of its own boundary marker. The lot fronts
+// one road span: its plot runs BUILD_LINE..BUILD_LINE+depth from that centre-
+// line, and the depth is the footprint's width on a z-running road, its depth
+// on an x-running one. The front edge stays where the plan put it.
+function clearOfMarker(map, [x, z, w, d], byId) {
+  const road = frontageRoad(map, { x, z, w, d }, byId);
+  if (!road) return [x, z, w, d];
+  const a = byId.get(road.edge.a);
+  const b = byId.get(road.edge.b);
+  if (!a || !b) return [x, z, w, d];
+  const cap = ROW_DEPTH_MAX - MARKER_CLEAR;
+  if (a.x === b.x) {
+    const depth = Math.min(w, cap);
+    if (depth === w) return [x, z, w, d];
+    return [a.x + (Math.sign(x - a.x) || 1) * (BUILD_LINE + depth / 2), z, depth, d];
+  }
+  const depth = Math.min(d, cap);
+  if (depth === d) return [x, z, w, d];
+  return [x, a.z + (Math.sign(z - a.z) || 1) * (BUILD_LINE + depth / 2), w, depth];
+}
+
 // The parcel shape sim/map.js gives a lot (lotParcel), for a lot a road op
 // plans: a whole empty parcel, not a stub. map.js is not imported for it
 // because map.js imports this module's layout, so the shape is kept in step by
@@ -360,8 +388,9 @@ function replanFrontage(map, box, byId) {
   // plan's own.
   for (const { id, lot } of lots) {
     if (waterBlocked(map.water ?? [], ...lot)) continue;
-    map.parcels.push(newLotParcel(id, lot));
-    map.lots.push(lot);
+    const shape = clearOfMarker(map, lot, byId);
+    map.parcels.push(newLotParcel(id, shape));
+    map.lots.push(shape);
   }
   for (const b of buildings) {
     if (waterBlocked(map.water ?? [], b.x, b.z, b.w, b.d)) continue;
@@ -405,6 +434,7 @@ function roadEdit(map, box, change) {
   const driveBefore = map.bounds && map.district ? { ...map.district.drive } : null;
   const boundsBefore = map.bounds ? { ...map.bounds } : null;
   const terrainBefore = map.terrain ?? null;
+  const furnitureBefore = map.furniture ?? null;
   change();
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
   const kept = replanFrontage(map, box, byId);
@@ -413,6 +443,10 @@ function roadEdit(map, box, change) {
   // terrain is derived from the graph and the parcels, so a new road that
   // leaves the old flats gets ground of its own instead of standing over hills.
   if (terrainBefore && map.graph) map.terrain = createTerrain(map);
+  // The streets a road op leaves carry their own furniture (M5.T4): the lamps,
+  // boxes and junctions of every `way: 'op'` edge, planned with the district's
+  // own. A generated map has a plan; the hand preset keeps none.
+  if (furnitureBefore) map.furniture = planFurniture(map.district, map.seed, map.graph);
   // A road op settles the drivable box on the graph it leaves (M5.T3b): the car
   // is clamped to the exact box of the roads, so a road that leaves the old box
   // hands the car its whole length, and the city view pans the build margin.
@@ -450,6 +484,7 @@ function roadEdit(map, box, change) {
     if (driveBefore) Object.assign(map.district.drive, driveBefore);
     if (boundsBefore) Object.assign(map.bounds, boundsBefore);
     if (terrainBefore) map.terrain = terrainBefore;
+    if (furnitureBefore) map.furniture = furnitureBefore;
     map.version = version;
     markDirty(map, box);
   };
