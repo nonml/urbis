@@ -26,8 +26,66 @@ export const REACH = { start: 200, min: 60, max: 220 };
 const PAN_SPEED = 60;
 const HURRY_PAN = 2.2;
 
-// The palette, keyed R C I X: three uses and the eraser.
-export const BRUSH_KEYS = { r: 'res', c: 'com', i: 'ind', x: null };
+// ---------------------------------------------------------------------------
+// The tool frame (M5.T1). A tool is what a brush key selects: the operation it
+// runs, what it costs the city, the mark its cursor would draw, and the first
+// reason it cannot act where it is pointed. Prices are provisional — M5.T17
+// gives the city a budget and M5.T19 reads them for refusal — but the
+// signatures already take the map and the parcel, so a metered cost (per metre
+// of road, per floor) lands without changing the frame. `preview(at)` returns
+// the mark render/cityview.js draws under the cursor from M5.T3 on.
+const TOOL_PRICE = { res: 100, com: 120, ind: 150, unzone: 20 };
+
+function zoneTool(id, key, use, name, blurb) {
+  return {
+    id,
+    key,
+    use,
+    name,
+    blurb,
+    // zoneParcel is the op until M5.T17 brings M3's logged ops into the city
+    // view (M5.T19, M5.T26): it is the one that refuses non-lots and answers
+    // whether the zoning changed.
+    op: (map, at) => zoneParcel(map, map.parcels.indexOf(at), use),
+    cost: (map, at) => TOOL_PRICE[id],
+    preview: (at) => ({
+      kind: use === null ? 'unzone' : `zone ${use}`,
+      use,
+      box: at && { x: at.x, z: at.z, w: at.w, d: at.d },
+    }),
+    refuse: (map, at) => {
+      if (!at) return 'no lot under the cursor';
+      if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not rezoned`;
+      if (at.zoned === use) return use === null ? 'already open land' : 'already zoned that';
+      return null;
+    },
+  };
+}
+
+export const TOOLS = {
+  res: zoneTool('res', 'r', 'res', 'residential', 'zones a lot for homes'),
+  com: zoneTool('com', 'c', 'com', 'commercial', 'zones a lot for shops'),
+  ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
+  unzone: zoneTool('unzone', 'x', null, 'unzone', 'clears a lot back to open land'),
+};
+
+// A tool names its own key (M5.T1), so the key table the panel and `cityKey`
+// read is the frame's, not a second one to keep in step. `BRUSH_KEYS` stays the
+// key -> use view the palette has always exported.
+const TOOL_BY_KEY = new Map(Object.values(TOOLS).map((tool) => [tool.key, tool]));
+export const BRUSH_KEYS = Object.fromEntries(Object.values(TOOLS).map((tool) => [tool.key, tool.use]));
+
+// The tool the brush holds, or null once the player puts it down.
+export function toolOf(view) {
+  if (view.active === false) return null;
+  return view.brush === null ? TOOLS.unzone : TOOLS[view.brush] ?? null;
+}
+
+// Right click or Esc: the brush is set down and stops painting until a key
+// picks one up again (M5.T1).
+export function layDownTool(view) {
+  view.active = false;
+}
 
 // The rise frames the lots, whichever corner of the district it starts from.
 function lotCentre(city) {
@@ -55,6 +113,7 @@ export function createCityView(city, map = worldMap()) {
     tilt: TILT.start,
     reach: REACH.start,
     brush: 'res',
+    active: true,          // false once the player lays the tool down
     hover: -1,
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
@@ -87,13 +146,22 @@ export function cityKey(view, key, streetYaw) {
     toggleCityView(view, streetYaw);
     return true;
   }
-  if (view.mode !== 'city' || !(key in BRUSH_KEYS)) return false;
-  view.brush = BRUSH_KEYS[key];
+  const tool = view.mode === 'city' ? TOOL_BY_KEY.get(key) : null;
+  if (!tool) return false;
+  chooseTool(view, tool);
   return true;
 }
 
+// Picking a tool up is one rule, wherever it comes from — its key (cityKey) or
+// its panel row (ui/cityview.js).
+export function chooseTool(view, tool) {
+  view.brush = tool.use;
+  view.active = true;
+}
+
 export function chooseBrush(view, use) {
-  if (use === null || Object.values(BRUSH_KEYS).includes(use)) view.brush = use;
+  const tool = use === null ? TOOLS.unzone : TOOLS[use];
+  if (tool) chooseTool(view, tool);
 }
 
 // A drag in the overview: sideways orbits, up and down tilts inside the band.
@@ -110,11 +178,14 @@ export function hoverLot(view, index) {
   view.hover = view.mode === 'city' ? index : -1;
 }
 
-// A click: the brush goes on the lot under the cursor. Returns whether the
-// lot's zoning changed.
+// A click: the tool goes on the lot under the cursor. Returns whether the
+// lot's zoning changed. A tool the player put down paints nothing.
 export function paintLot(view, city) {
   if (view.mode !== 'city' || view.lift < 1 || view.hover < 0) return false;
-  return zoneParcel(city, view.hover, view.brush);
+  const tool = toolOf(view);
+  const at = city.parcels[view.hover];
+  if (!tool || tool.refuse(city, at)) return false;
+  return tool.op(city, at);
 }
 
 // WASD pans the overview, relative to the way it faces, the same axes the

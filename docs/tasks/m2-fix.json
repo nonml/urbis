@@ -1,0 +1,101 @@
+{
+  "milestone": "M2 rework: the director's audit of 2026-10-07 found Muse Spark's M2 work labelled hand-built boxes as models and shipped no person",
+  "tasks": [
+    {
+      "id": "M2.F1",
+      "lane": "honest",
+      "goal": "Honest model tags. Remove every `userData.model` tag in src/render that is not set from a .glb path, so the VGA-084 sweep lists every hand-built box, cylinder, cone and quad again",
+      "files": [
+        "src/render/"
+      ],
+      "test": "tests/accept/m2-honest-tags.test.js",
+      "commit": "M2.F1 (M2-6): model tags only on model files",
+      "notes": "Size S. Commit 5edace1 (M2.T15) and M2.T10/T12/T13 tagged procedural meshes as models ('player-avatar' on the player's boxes, 'tree-trunk', 'building-*', 'street-lamp', the interiorkit asModel helper, and more) so the sweep passed without replacing anything. Delete those tag lines and the comments that justify them; delete interiorkit.js's asModel tagging. Do NOT change any geometry, material or draw. Keep tags whose value is a .glb path (FLEET_MODEL, HERO_MODEL, POLICE_MODEL, WALKERS_GLB, PERSON_MODEL) and models.js. Do not edit the test. Draws must not change. Leave src/render/traffic.js alone: its tags are .glb paths already, and M2.T11 is editing it."
+    },
+    {
+      "id": "M2.F3",
+      "lane": "police",
+      "goal": "Smooth cruisers. The pipeline cruiser pool that M2.T7 added must draw every cruiser between its last two sim steps every frame, as the old kit did (M0-9)",
+      "files": [
+        "src/render/police.js",
+        "src/render/policekit.js"
+      ],
+      "test": "tests/accept/m0-smooth.spec.js",
+      "commit": "M2.F3 (M0-9): cruisers drawn between sim steps",
+      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' \u2014 the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test. M2.F1 runs beside you and deletes tag lines in policekit.js: do not touch any userData.model line."
+    },
+    {
+      "id": "M2.F2",
+      "lane": "people",
+      "goal": "Ship the person. Run tools/models/make_person.py so public/assets/models/person.glb is committed: an MPFB body, rigged, with a CMU walk clip; the player in the game is that person, not the boxes",
+      "files": [
+        "tools/models/",
+        "public/assets/models/",
+        "public/assets/CREDITS.md",
+        "docs/shots/"
+      ],
+      "test": "tests/accept/m2-person-ships.test.js",
+      "commit": "M2.F2 (M2-0, M2-2): person.glb ships",
+      "notes": "Size M, slow: a Blender bake. M2.T4 only made person.glb in a temp dir inside its test, so the game never had it and still shows the box figure; its evidence shot docs/shots/m2-0-person.png shows no person at all. Export to public/assets/models/person.glb (under 1.5 MB, under 15k triangles), add a CREDITS.md line naming person.glb (MPFB output CC0, CMU mocap). Then retake docs/shots/m2-0-person.png with scripts/shot.mjs from the play camera: the person must fill the lower middle of the frame, standing on the pavement, feet on the ground. If MPFB or Blender is missing, stop and say exactly what is missing. Do not edit the test."
+    },
+    {
+      "id": "M2.F4",
+      "lane": "car",
+      "goal": "A real car. Replace car.glb (trellis 'showcase racer': red shards on a flat grey plane) with a believable modern four-door saloon made directly as a Blender script, as docs/ROADMAP.md M2 allows when a generated model comes out wrong",
+      "files": [
+        "tools/models/",
+        "public/assets/models/car/",
+        "public/assets/CREDITS.md",
+        "docs/shots/"
+      ],
+      "test": "tests/accept/m2-car-body.test.js",
+      "commit": "M2.F4 (M2-1): the saloon",
+      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall \u2014 bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test. M2.F2 runs beside you and appends a person.glb line to CREDITS.md: edit only the existing car.glb line in place, never append. A previous attempt left tools/models/make_saloon.py in this worktree: run it, check the result, export car.glb, then the shot. Keep the car under 6,500 triangles: 30 of them must fit the 600 k frame (M2.T11)."
+    },
+    {
+      "id": "M2.F2b",
+      "lane": "people",
+      "goal": "Make the shipped person visible. After M2.F2 the play shot shows no one where the player stands: the box figure is removed and person.glb does not appear in its place",
+      "files": [
+        "src/render/player.js",
+        "src/game/probe.js",
+        "tools/models/",
+        "public/assets/models/person.glb",
+        "docs/shots/"
+      ],
+      "test": "tests/accept/m2-person-visible.spec.js",
+      "commit": "M2.F2b (M2-0, M2-2): the person is on screen",
+      "notes": "Size S-M. Evidence: docs/shots/m2-0-person.png at c594e03 shows the street, the car, and no person. Find why (scale, units, rotation, root offset, culling of the skinned mesh with frustumCulled, materials, or the mixer) by measuring, not guessing. First add `avatarBox()` to the probe in src/game/probe.js: returns { skinned: true once the GLB has replaced the boxes, min, max (world, THREE.Box3().setFromObject(avatar.group, true)), player: [x, y, z] of the drawn player, onScreen: the box centre projects inside the camera's view }. Keep the player at most 2 draws with shadow. Then retake docs/shots/m2-0-person.png with scripts/shot.mjs: the person must be clearly visible, standing, in the lower middle of the frame. Do not edit the test."
+    },
+    {
+      "id": "M2.F4b",
+      "lane": "car",
+      "needs": [
+        "M2.T11"
+      ],
+      "goal": "Finish the saloon in the street. In docs/shots/m2-car.png (6b7a8d5) every car, hero and parked, sits on a dark rectangular block hanging below the body; the white paint blows out to flat white under the lamps; the tail lights are flat dark squares",
+      "files": [
+        "src/render/traffic.js",
+        "tools/models/",
+        "public/assets/models/car/",
+        "docs/shots/"
+      ],
+      "commit": "M2.F4b (M2-1): the saloon sits on its wheels",
+      "notes": "Size S. Measure first: find which mesh draws the dark block (the hero rig and the fleet in src/render/traffic.js still build box parts that the old slab body hid, or the GLB has a plinth) and remove it; the wheels must touch the road and the body sit on them, no gap. Paint: no car colour brighter than a light grey (about #c8c8c8) and roughness at least 0.35 so a lamp gives a highlight, not a white-out. Tail lights: red lenses on the body's rear face, lit at night by the existing tail pool. Traffic+parked draws stay at most 11, the hero at most 9; draws must not rise. Retake docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; check it yourself before finishing: no block under any car. tests/accept/m2-car-body.test.js and tests/accept/m2-cars.spec.js must stay green."
+    },
+    {
+      "id": "M2.F2c",
+      "lane": "people",
+      "goal": "Dress the player. On main (b98d173) the person is a bald, grey, unclothed MPFB base body, and it holds a mid-stride pose while standing still. Make it a believable city pedestrian: clothes, hair, real skin, shoes; an idle pose when not moving and the walk only while walking",
+      "files": [
+        "tools/models/",
+        "public/assets/models/person.glb",
+        "public/assets/CREDITS.md",
+        "src/render/player.js",
+        "docs/shots/"
+      ],
+      "commit": "M2.F2c (M2-0, M2-2): the player is dressed",
+      "notes": "Size M, a Blender bake. In tools/models/make_person.py use MPFB's own CC0 system assets (MakeHuman's system asset pack: clothes, hair, shoes, skin material): a dark rain jacket or coat, trousers, shoes, short hair, a natural skin tone; grounded modern, never neon. If the asset pack is not installed, stop and say exactly which download is missing. Stay at or under 15k triangles and 1.5 MB, one skinned mesh or at most 2 draws with shadow. Add an `Idle` clip (a CMU standing clip, or the walk's contact frame held) and in src/render/player.js blend to Idle when player speed is 0 and to Walk when moving. Update the CREDITS line. Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose and look at it before finishing: clothed, hair, standing upright at idle. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green."
+    }
+  ]
+}

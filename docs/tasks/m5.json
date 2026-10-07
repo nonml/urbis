@@ -1,0 +1,604 @@
+{
+  "milestone": "M5 the building toolset",
+  "tasks": [
+    {
+      "id": "M5.T1",
+      "lane": "build-ui",
+      "goal": "The tool frame. A tool is `{ op, cost(map, at), preview(at), refuse(map, at) \u2192 reason }`; the R C I X brushes become tools; the city-view panel lists tools with their keys and costs; hovering a tool names what it does and its cost; a right click or Esc puts it down",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js"
+      ],
+      "needs": [],
+      "commit": "M5.T1 (M5-7): the tool frame",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-7: Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down (checked by `tests/accept/m5-cost.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T2",
+      "lane": "build-ui",
+      "goal": "Checks, red. `m5-roads.spec.js`, `m5-bulldoze.spec.js`, `m5-noroad.test.js`",
+      "files": [
+        "tests/accept/"
+      ],
+      "needs": [
+        "M5.T1"
+      ],
+      "commit": "M5.T2 (M5-1, M5-2, M5-3): checks, red",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) The criterion this serves: M5-3: **Bulldoze a road:** A/B, removing a generated road: no car uses it within 10 game seconds, commuters who used it arrive later than in B, and a building with no other road declines with the reason \"no road\" (checked by `tests/accept/m5-noroad.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T3",
+      "lane": "build-ui",
+      "goal": "Road drag. Press on a road node, drag: a grid-snapped preview with its length and cost; release lays it with `addRoad`; it refuses over water, through buildings or up too steep, saying which",
+      "files": [
+        "src/sim/cityview.js",
+        "src/render/cityview.js",
+        "src/ui/cityview.js"
+      ],
+      "needs": [
+        "M5.T2"
+      ],
+      "commit": "M5.T3 (M5-1): road drag",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T4",
+      "lane": "build-sim",
+      "goal": "A new road is a street. Lamps, signals and furniture planned along it; lots planned on both sides (M3.T20); the outskirts gone from its path (M3.T27)",
+      "files": [
+        "src/sim/furniture.js",
+        "src/sim/ops.js"
+      ],
+      "needs": [
+        "M5.T3",
+        "M4.T7"
+      ],
+      "commit": "M5.T4 (M5-1): a new road is a street",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T5",
+      "lane": "build-ui",
+      "goal": "Bulldoze tool. Any building or road under the cursor highlights with its cost; a click runs `bulldoze` or `removeRoad`; removing a road that would cut buildings off asks first, in the page (the browser's `confirm` is not used)",
+      "files": [
+        "src/sim/cityview.js",
+        "src/render/cityview.js",
+        "src/ui/cityview.js"
+      ],
+      "needs": [
+        "M5.T2"
+      ],
+      "commit": "M5.T5 (M5-2): bulldoze tool",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T6",
+      "lane": "build-sim",
+      "goal": "No road, no life. A parcel with `noRoad` declines with the reason \"no road\" in its lot note and the news",
+      "files": [
+        "src/sim/zoning.js",
+        "src/sim/news.js"
+      ],
+      "needs": [
+        "M5.T5"
+      ],
+      "commit": "M5.T6 (M5-3): no road, no life",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-3: **Bulldoze a road:** A/B, removing a generated road: no car uses it within 10 game seconds, commuters who used it arrive later than in B, and a building with no other road declines with the reason \"no road\" (checked by `tests/accept/m5-noroad.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T7",
+      "lane": "build-sim",
+      "goal": "Story places move. A bulldozed arc place, door or pursuit home moves to the nearest building of the same use; the journal says so",
+      "files": [
+        "src/sim/anchors.js",
+        "src/sim/arc.js"
+      ],
+      "needs": [
+        "M5.T5",
+        "M4.T12"
+      ],
+      "commit": "M5.T7 (M5-2): story places move",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T8",
+      "lane": "build-sim",
+      "goal": "Height cap. A parcel field `cap`; growth stops at it; Shift with a brush paints a low-rise cap",
+      "files": [
+        "src/sim/zoning.js",
+        "src/sim/cityview.js"
+      ],
+      "needs": [
+        "M5.T1",
+        "M5.T3",
+        "M5.T5"
+      ],
+      "commit": "M5.T8 (M5-4): height cap",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-4: A new lot zoned R shows its first floor within 60 game seconds (M1-1's bar); a lot capped at low-rise stops at LOW; a brush dragged across the map zones every empty lot the stroke crosses, and one undo takes the stroke back (checked by `tests/accept/m5-newland.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T9",
+      "lane": "build-ui",
+      "goal": "New land grows. `m5-newland.spec.js`: a lot on a new road zoned R shows its first floor within 60 game seconds; a capped lot stops at LOW",
+      "files": [
+        "tests/accept/m5-newland.spec.js"
+      ],
+      "needs": [
+        "M5.T4",
+        "M5.T8"
+      ],
+      "commit": "M5.T9 (M5-4): new land grows",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-4: A new lot zoned R shows its first floor within 60 game seconds (M1-1's bar); a lot capped at low-rise stops at LOW; a brush dragged across the map zones every empty lot the stroke crosses, and one undo takes the stroke back (checked by `tests/accept/m5-newland.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-newland.spec.js"
+    },
+    {
+      "id": "M5.T10",
+      "lane": "assets",
+      "goal": "Service buildings (lane: assets). Substation, police station, fire station, clinic, school and park models through the M2 pipeline, under 15,000 triangles each, added to the pools",
+      "files": [
+        "public/assets/models/",
+        "src/render/buildings.js"
+      ],
+      "needs": [
+        "M2.F4"
+      ],
+      "commit": "M5.T10 (M5-5): service buildings",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T10b",
+      "lane": "assets",
+      "needs": [
+        "M5.T10"
+      ],
+      "goal": "Finish the service buildings: commit the Blender script that makes them, credit them, replace the clinic's red cross with a green cross, and give the park real trees",
+      "files": [
+        "tools/models/",
+        "public/assets/models/",
+        "public/assets/CREDITS.md"
+      ],
+      "commit": "M5.T10b (M5-5): service buildings, reproducible and clean",
+      "notes": "Size S-M. 9a66150 shipped six GLBs with info.json saying 'Blender-authored' but no script in tools/models/, and no CREDITS.md lines. (1) Commit tools/models/make_services.py that rebuilds all six GLBs from scratch (python3 tools/models/make_services.py, runs Blender headless), same sizes, origin base centre, Y-up, front +Z, each under 15,000 triangles. (2) The clinic shows a red cross on white: that is the protected Red Cross emblem (Geneva Conventions), not allowed in a game. Use a green cross on white (the pharmacy/clinic sign) instead. (3) The park's trees are faceted icosahedron blobs, which VGA-084 bans: use layered leaf-card canopies on a tapered trunk with branches, or reuse the street-tree approach, still under the triangle cap. (4) One CREDITS.md line per model naming the script. Render all six to docs/shots/m5-services.png with Blender (a grey ground, sun, a camera seeing all six) and look at it before finishing."
+    },
+    {
+      "id": "M5.T11",
+      "lane": "build-sim",
+      "goal": "Services as parcels. Parcel kind `service` with a type; a place tool for each on an empty lot; a door and a room from the `INTERIORS.md` pattern (`parcelItems` gets a set per service); every service has a catchment radius and a capacity (patients, pupils, cells, trucks), written in `CITYVIEW.md`: its effect reaches only parcels in its catchment, up to its capacity",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/interior.js",
+        "src/sim/cityview.js"
+      ],
+      "needs": [
+        "M5.T10",
+        "M4.T7",
+        "M5.T1",
+        "M5.T3",
+        "M5.T5"
+      ],
+      "commit": "M5.T11 (M5-5): services as parcels",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T12",
+      "lane": "build-sim",
+      "goal": "Substation. A district with two comes back from a blackout in half the dark time (`street.js` `darkUntil`); A/B check first",
+      "files": [
+        "src/sim/street.js",
+        "tests/accept/m5-substation.spec.js"
+      ],
+      "needs": [
+        "M5.T11"
+      ],
+      "commit": "M5.T12 (M5-5): substation",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-substation.spec.js"
+    },
+    {
+      "id": "M5.T13",
+      "lane": "build-sim",
+      "goal": "Police station. Cruisers start from the nearest station and drive (`wanted.js` `syncUnits` spawns at `SPAWN_DIST` from the player today); a crime within 100 m is reached at least 30% faster; A/B check first",
+      "files": [
+        "src/sim/wanted.js",
+        "tests/accept/m5-police.spec.js"
+      ],
+      "needs": [
+        "M5.T11",
+        "M4.T10"
+      ],
+      "commit": "M5.T13 (M5-5): police station",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-police.spec.js"
+    },
+    {
+      "id": "M5.T14",
+      "lane": "build-sim",
+      "goal": "Fire alarm and fire station. A sim event \"alarm\" a building can have (M6's hack sets one off); it clears in half the time within 300 m of a station; A/B check first",
+      "files": [
+        "src/sim/alarms.js",
+        "tests/accept/m5-fire.test.js"
+      ],
+      "needs": [
+        "M5.T11"
+      ],
+      "commit": "M5.T14 (M5-5): fire alarm and fire station",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-fire.test.js"
+    },
+    {
+      "id": "M5.T15",
+      "lane": "build-sim",
+      "goal": "Clinic and school. Wealth recovers at least 20% faster in their district (`WEALTH_RISE_SECS`, 25 s today); A/B check first",
+      "files": [
+        "src/sim/economy.js",
+        "tests/accept/m5-clinic.test.js"
+      ],
+      "needs": [
+        "M5.T11",
+        "M4.T11"
+      ],
+      "commit": "M5.T15 (M5-5): clinic and school",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-clinic.test.js"
+    },
+    {
+      "id": "M5.T16",
+      "lane": "build-sim",
+      "goal": "Park. Home demand within 100 m rises by at least 0.05; A/B check first",
+      "files": [
+        "src/sim/economy.js",
+        "tests/accept/m5-park.test.js"
+      ],
+      "needs": [
+        "M5.T11",
+        "M4.T11"
+      ],
+      "commit": "M5.T16 (M5-5): park",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-5: **Services, one test each:** placed by mouse on a lot; stands as a building with a door into a room (`INTERIORS.md` pattern); its effect shown by A/B: substation halves the dark time; police station cuts the time for a cruiser to reach a crime within 100 m of it by at least 30% *(provisional)*; fire station halves the time to clear a fire alarm; clinic and school make wealth recover at least 20% faster *(provisional)*; park raises home demand within 100 m by at least 0.05 *(provisional)*; every service reaches only the parcels in its catchment, up to its capacity (both in `CITYVIEW.md`), so a second clinic in the same catchment adds capacity, not a second boost (checked by `tests/accept/m5-<service>.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-park.test.js"
+    },
+    {
+      "id": "M5.T17",
+      "lane": "build-sim",
+      "goal": "Budget, sim. City money; income each game minute = tax \u00d7 floor area per use; upkeep per road metre and per service; a higher tax lowers that use's demand; in debt, services shut, farthest police station first, and the news says so; formula in `ECONOMY.md`",
+      "files": [
+        "src/sim/budget.js",
+        "src/sim/economy.js",
+        "src/sim/news.js",
+        "tests/accept/m5-budget.test.js"
+      ],
+      "needs": [
+        "M5.T11",
+        "M4.T11"
+      ],
+      "commit": "M5.T17 (M5-6): budget, sim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-6: **Budget:** income and upkeep match their stated formula each game minute; raising the homes tax by 10 points lowers home demand against B; in debt, the farthest police station shuts within 60 game seconds and the news says so (checked by `tests/accept/m5-budget.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-budget.test.js"
+    },
+    {
+      "id": "M5.T18",
+      "lane": "build-ui",
+      "goal": "Budget, panel. Tax per use and the money line in the city view",
+      "files": [
+        "src/ui/cityview.js"
+      ],
+      "needs": [
+        "M5.T17"
+      ],
+      "commit": "M5.T18 (M5-6): budget, panel",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-6: **Budget:** income and upkeep match their stated formula each game minute; raising the homes tax by 10 points lowers home demand against B; in debt, the farthest police station shuts within 60 game seconds and the news says so (checked by `tests/accept/m5-budget.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T19",
+      "lane": "build-ui",
+      "goal": "Cost and refusal. Every tool shows its cost before it acts; one the money cannot pay refuses and says so; `m5-cost.spec.js`",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "tests/accept/m5-cost.spec.js"
+      ],
+      "needs": [
+        "M5.T17",
+        "M5.T8",
+        "M5.T11"
+      ],
+      "commit": "M5.T19 (M5-7): cost and refusal",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-7: Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down (checked by `tests/accept/m5-cost.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-cost.spec.js"
+    },
+    {
+      "id": "M5.T20",
+      "lane": "build-ui",
+      "goal": "Overlay frame. One pooled lot-tint layer with per-instance colour, 2 draws at most; a key cycles overlays",
+      "files": [
+        "src/render/overlays.js",
+        "src/sim/cityview.js"
+      ],
+      "needs": [
+        "M5.T1",
+        "M5.T8",
+        "M5.T11"
+      ],
+      "commit": "M5.T20 (M5-8): overlay frame",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T21",
+      "lane": "build-ui",
+      "goal": "Five overlays. Demand, power, police cover (distance to a station), land value (its formula written down), traffic (edge load from the commute flow); each matches the sim on 5 sampled lots; plus a coverage overlay per service (its catchment, shaded by how full it is)",
+      "files": [
+        "src/render/overlays.js",
+        "tests/accept/m5-overlays.spec.js"
+      ],
+      "needs": [
+        "M5.T20",
+        "M5.T13"
+      ],
+      "commit": "M5.T21 (M5-8): five overlays",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-overlays.spec.js"
+    },
+    {
+      "id": "M5.T22",
+      "lane": "build-sim",
+      "goal": "Save v4. Money, tax rates, caps and services; a v3 save continues with defaults",
+      "files": [
+        "src/sim/save.js"
+      ],
+      "needs": [
+        "M5.T17"
+      ],
+      "commit": "M5.T22 (M5-9): save v4",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-9: A game with built and bulldozed roads, services, caps and tax rates saves and continues with the same roads, buildings, lots, services and money (checked by `tests/accept/m5-save.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T23",
+      "lane": "build-ui",
+      "goal": "The save check. Build roads, bulldoze, place services, set caps and taxes; save; reload; all the same",
+      "files": [
+        "tests/accept/m5-save.spec.js"
+      ],
+      "needs": [
+        "M5.T22"
+      ],
+      "commit": "M5.T23 (M5-9): the save check",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-9: A game with built and bulldozed roads, services, caps and tax rates saves and continues with the same roads, buildings, lots, services and money (checked by `tests/accept/m5-save.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-save.spec.js"
+    },
+    {
+      "id": "M5.T24",
+      "lane": "build-sim",
+      "goal": "Road types in the sim. Edges get `lanes` (2 or 4) and `oneWay`; `traffic.js` uses them; `upgradeRoad(edge, type)` as an op with an undo; A/B check first",
+      "files": [
+        "src/sim/map.js",
+        "src/sim/ops.js",
+        "src/sim/traffic.js",
+        "tests/accept/m5-roadtypes.test.js"
+      ],
+      "needs": [
+        "M5.T4",
+        "M4.T2",
+        "M4.T3",
+        "M4.T4",
+        "M4.T7",
+        "M4.T10",
+        "M4.T17"
+      ],
+      "commit": "M5.T24 (M5-10): road types in the sim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-10: **Road types:** the player lays a 2-lane street, a 4-lane avenue and a one-way, and upgrades a street to an avenue in place for the difference in cost; A/B in M3's traffic: at the same lights, an avenue carries at least 1.8 times *(provisional: twice the lanes, less what the junction's turns take)* the cars of a street through one junction in the evening rush hour (checked by `tests/accept/m5-roadtypes.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-roadtypes.test.js"
+    },
+    {
+      "id": "M5.T25",
+      "lane": "build-ui",
+      "goal": "Road types in the tool, and drawn. The drag picks a type; a click on a road offers the upgrade and its cost; the road pools draw the 4-lane width and one-way arrows",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "src/render/roads.js"
+      ],
+      "needs": [
+        "M5.T24",
+        "M4.T8",
+        "M5.T8",
+        "M5.T11"
+      ],
+      "commit": "M5.T25 (M5-10): road types in the tool, and drawn",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-10: **Road types:** the player lays a 2-lane street, a 4-lane avenue and a one-way, and upgrades a street to an avenue in place for the difference in cost; A/B in M3's traffic: at the same lights, an avenue carries at least 1.8 times *(provisional: twice the lanes, less what the junction's turns take)* the cars of a street through one junction in the evening rush hour (checked by `tests/accept/m5-roadtypes.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T26",
+      "lane": "build-sim",
+      "goal": "Undo. Ctrl+Z in the city view undoes the last act within 10 game seconds through M3's undo, and refunds its cost",
+      "files": [
+        "src/sim/cityview.js",
+        "src/game/input.js"
+      ],
+      "needs": [
+        "M5.T19",
+        "M5.T1",
+        "M5.T3",
+        "M5.T5",
+        "M5.T20",
+        "M5.T25"
+      ],
+      "commit": "M5.T26 (M5-7): undo",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-7: Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down (checked by `tests/accept/m5-cost.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T27",
+      "lane": "build-ui",
+      "goal": "Demand bars. Three bars for the district under the cursor, read from the economy",
+      "files": [
+        "src/ui/cityview.js"
+      ],
+      "needs": [
+        "M5.T1"
+      ],
+      "commit": "M5.T27 (M5-8): demand bars",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T28",
+      "lane": "build-sim",
+      "goal": "Pollution. Works lots pollute by stage, and busy roads make noise by their edge load in M3's commute flow; home demand and land value (M5.T21's formula) fall within 60 m; the news names the cause; A/B check first",
+      "files": [
+        "src/sim/pollution.js",
+        "src/sim/economy.js",
+        "src/sim/news.js",
+        "tests/accept/m5-pollution.test.js"
+      ],
+      "needs": [
+        "M5.T21",
+        "M4.T11"
+      ],
+      "commit": "M5.T28 (M5-11): pollution",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-11: **Pollution:** A/B, a works lot grown to HIGH: a home lot 40 m from it grows slower and has a lower land value than in B; a home lot 200 m away is within 1% of B *(provisional)*; the news names the cause; a busy road (its edge load in M3's commute flow) makes noise that does the same (checked by `tests/accept/m5-pollution.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-pollution.test.js"
+    },
+    {
+      "id": "M5.T29",
+      "lane": "build-ui",
+      "goal": "Pollution overlay, the sixth",
+      "files": [
+        "src/render/overlays.js"
+      ],
+      "needs": [
+        "M5.T28"
+      ],
+      "commit": "M5.T29 (M5-8): pollution overlay,",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M5.T30",
+      "lane": "build-ui",
+      "goal": "Milestones. Population tiers written in `ZONING.md`; a locked tool refuses with \"unlocks at N people\"; the city view always shows the population and the next tier, and reaching a tier says on screen what it unlocked; the scripted-player test",
+      "files": [
+        "src/sim/milestones.js",
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "docs/ZONING.md",
+        "tests/accept/m5-milestones.test.js"
+      ],
+      "needs": [
+        "M5.T19",
+        "M5.T8",
+        "M5.T11",
+        "M5.T26"
+      ],
+      "commit": "M5.T30 (M5-12): milestones",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-12: **Milestones:** a new game starts with roads, zoning, bulldoze, substation and park; police station and clinic unlock at the first population tier, fire station, school and road types at the second (tiers in `ZONING.md`); a scripted player who zones every free lot reaches the first tier within 20 game minutes on all five seeds; a locked tool refuses with \"unlocks at N people\"; the city view always shows the population and the next tier, and reaching a tier says on screen what it unlocked (checked by `tests/accept/m5-milestones.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-milestones.test.js"
+    },
+    {
+      "id": "M5.T31",
+      "lane": "build-ui",
+      "goal": "Junction control. Click a junction in the city view: lights, stop signs or yield; cars in M3's traffic obey; A/B check first",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "tests/accept/m5-junctions.test.js"
+      ],
+      "needs": [
+        "M5.T1",
+        "M4.T10",
+        "M4.T17",
+        "M5.T8",
+        "M5.T11",
+        "M5.T24",
+        "M5.T26"
+      ],
+      "commit": "M5.T31 (M5-14): junction control",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-14: **Junctions:** the player sets any junction to lights, stop signs or yield; cars in M3's traffic obey it (no car passes a stop line without stopping); A/B, the mean wait at that junction differs from B (checked by `tests/accept/m5-junctions.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-junctions.test.js"
+    },
+    {
+      "id": "M5.T32",
+      "lane": "build-ui",
+      "goal": "History. A panel of population, jobs, the jobless, the city's money and demand per use over the last 5 game days, on a 2D canvas; the economy keeps the series; its check first",
+      "files": [
+        "src/ui/history.js",
+        "src/sim/economy.js",
+        "tests/accept/m5-history.spec.js"
+      ],
+      "needs": [
+        "M5.T17",
+        "M4.T11",
+        "M5.T15",
+        "M5.T16",
+        "M5.T28"
+      ],
+      "commit": "M5.T32 (M5-15): history",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-15: **History:** a panel shows population, jobs, the jobless, the city's money and demand per use over the last 5 game days, equal to the sim's own series (checked by `tests/accept/m5-history.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-history.spec.js"
+    },
+    {
+      "id": "M5.T33",
+      "lane": "build-ui",
+      "goal": "Drag zoning. Hold the mouse with a brush and drag: every empty lot the stroke crosses is zoned, its total cost shown before release; one undo takes the stroke back; checked in `m5-newland.spec.js`",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "tests/accept/m5-newland.spec.js"
+      ],
+      "needs": [
+        "M5.T9",
+        "M5.T26",
+        "M5.T8",
+        "M5.T11"
+      ],
+      "commit": "M5.T33 (M5-4): drag zoning",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-4: A new lot zoned R shows its first floor within 60 game seconds (M1-1's bar); a lot capped at low-rise stops at LOW; a brush dragged across the map zones every empty lot the stroke crosses, and one undo takes the stroke back (checked by `tests/accept/m5-newland.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-newland.spec.js"
+    },
+    {
+      "id": "M5.T34",
+      "lane": "build-ui",
+      "goal": "Problem icons. One pooled icon layer in the city view (1 draw): every building held back shows its first cause, from `decline.js` and the services' reach; a click opens today's reason card; M12's causes join the same table; its check first",
+      "files": [
+        "src/render/problems.js",
+        "src/sim/decline.js",
+        "src/ui/cityview.js",
+        "tests/accept/m5-problems.spec.js"
+      ],
+      "needs": [
+        "M5.T11"
+      ],
+      "commit": "M5.T34 (M5-16): problem icons",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-16: **Problems show:** in the city view, every building held back from growing shows an icon over it for its first cause (no road, no demand, no power, no service in reach; M12 adds no water and no collection), and a click on it opens the reason card; all the icons together cost at most 1 draw and match `decline.js`'s causes on 5 sampled buildings (checked by `tests/accept/m5-problems.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-problems.spec.js"
+    },
+    {
+      "id": "M5.T35",
+      "lane": "build-ui",
+      "goal": "Pause and speed. In the city view Space pauses and resumes; three buttons run 1, 2 or 4 sim steps a frame through M0's speed; leaving the city view sets 1; its check first",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "src/game/loop.js",
+        "tests/accept/m5-speed.spec.js"
+      ],
+      "needs": [
+        "M5.T1",
+        "M5.T8",
+        "M5.T11",
+        "M5.T26"
+      ],
+      "commit": "M5.T35 (M5-17): pause and speed",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-17: **Speed:** in the city view, Space pauses and resumes, and three buttons run the sim at 1, 2 and 4 times (M0-2's steps); a paused city keeps the same state hash for 10 s; leaving the city view always sets the street back to 1 (checked by `tests/accept/m5-speed.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-speed.spec.js"
+    },
+    {
+      "id": "M5.T36",
+      "lane": "build-ui",
+      "goal": "Close. The sweep of the city view and the street at every new road, gap and service; one commit per defect; the M5 keys' hints (M7.T12)",
+      "files": [
+        "content/hints.json"
+      ],
+      "needs": [],
+      "commit": "M5.T36 (M5-13): close",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-13: The sweep of the city view and the street at every new road, bulldozed gap and service has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    }
+  ]
+}

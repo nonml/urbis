@@ -1,0 +1,11 @@
+{
+  "name": "m2-real",
+  "notes": "VGA-084 done-when (M2-6): the play frame at the spawn by day, at night and in a blackout, on all five seeds. The sweep lists every picked building, car, person, tree or prop mesh with no userData.model.",
+  "prefix": "m2-real",
+  "defaults": { "weather": "rain" },
+  "poses": [
+    { "name": "day", "hour": 12 },
+    { "name": "night", "hour": 22 },
+    { "name": "blackout", "hour": 22, "blackout": true }
+  ]
+}

@@ -153,12 +153,16 @@ export function buildShops(texLoader, maxAniso) {
   // names out with its lamps. Six materials became two.
   const mats = signGeos.map((geos, zone) => {
     const mat = new THREE.MeshBasicMaterial({ map: signTex });
-    if (geos.length) group.add(new THREE.Mesh(mergeGeometries(geos), mat));
+    if (geos.length) {
+      const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+      group.add(mesh);
+    }
     return { mat, zone, seed: zone * 2.6 + 3 };
   });
   const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
   const capMat = standardFromMaps(plate, { roughness: 0.62, metalness: 0.25, envMapIntensity: 0.9, color: 0x8b949f });
-  group.add(new THREE.Mesh(mergeGeometries(brackets), capMat));
+  const bracketMesh = new THREE.Mesh(mergeGeometries(brackets), capMat);
+  group.add(bracketMesh);
   group.add(buildStreetKit());
   return { group, mats };
 }
@@ -295,7 +299,8 @@ export function buildBeacons(points) {
     geos.push(g);
   }
   const mat = new THREE.MeshBasicMaterial({ color: 0xff2a20 });
-  return { mesh: new THREE.Mesh(mergeGeometries(geos), mat), mat };
+  const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
+  return { mesh, mat };
 }
 
 export function buildStars() {

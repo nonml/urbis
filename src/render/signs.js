@@ -233,10 +233,12 @@ export function buildSigns(map = worldMap()) {
   });
   const faceGeo = mergeGeometries(faces);
   faceGeo.setAttribute('color', faceAttr);
-  group.add(new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(SIGNS, ATLAS_ROWS), vertexColors: true })));
+  const faceMesh = new THREE.Mesh(faceGeo, new THREE.MeshBasicMaterial({ map: signAtlas(SIGNS, ATLAS_ROWS), vertexColors: true }));
+  group.add(faceMesh);
   const glows = buildGlows(glowPlacements);
   group.add(glows);
-  group.add(new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 })));
+  const armMesh = new THREE.Mesh(mergeGeometries(arms), new THREE.MeshBasicMaterial({ color: 0x0a0c10 }));
+  group.add(armMesh);
   const alleys = buildAlleyGlows(zoneMats);
   if (alleys.mesh) group.add(alleys.mesh);
   const tick = makeTick(faceAttr, alleys.attr, glows);

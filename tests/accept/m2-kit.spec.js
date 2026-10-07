@@ -63,13 +63,8 @@ test('M2.T11 node: benches, bins and bus stops are models through the pool loade
   expect(dress, 'kit goes through the model pool').toMatch(/loadModelPool|loadPropInstances/);
 });
 
-test('M2.T11 node: grown-lot rooms use models, not box()', () => {
-  const sets = readFileSync('src/render/interiorsets.js', 'utf8');
-  expect(sets, 'parcel rooms tag their parts as models').toMatch(/asModel\(out, 'parcel-/);
-  expect(sets, 'the noodle bar tags its parts as models').toMatch(/asModel\(out, 'ramen-/);
-  const kit = readFileSync('src/render/interiorkit.js', 'utf8');
-  expect(kit, 'tags read like the pool loader tags meshes').toMatch(/userData\.model/);
-});
+// Grown-lot rooms as models (M2-5) are not done: Muse's T12 only tagged their
+// box() parts, and M2.F1 removed the tags. A real rooms task replaces them.
 
 async function boot(page) {
   const errors = [];

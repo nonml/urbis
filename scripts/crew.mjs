@@ -42,7 +42,7 @@ const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..')
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
 // CREW_TIERS overrides the ladder, e.g. an A/B of a challenger above the incumbent.
 const TIERS = (process.env.CREW_TIERS
-  ?? 'opencode-go/muse-spark-1.3-contributor,opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
+  ?? 'opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
 // Muse Spark's thinking levels top out at xhigh.
 const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
@@ -50,6 +50,10 @@ const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
 // Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
 const STALL_MIN = Number(process.env.CREW_STALL_MIN ?? 10);
 const POLL_MS = 30_000;
+// Lanes live at once; CREW_MAX_LIVE overrides.
+const MAX_LIVE = Number(process.env.CREW_MAX_LIVE ?? 3);
+// Browsers per check: each is ~0.5 GB, and four lanes of four filled the 16 GB.
+const GATE_WORKERS = Number(process.env.CREW_GATE_WORKERS ?? 2);
 // Each worker gets its own block of ports: gate 4x73, shots 4x91, scorecard 4x95.
 // One block per live worker, gate block*100+73, shot +91, score +95. Clear of
 // 4100-4499, where the OpenCode plugin derives each worktree's server port
@@ -349,6 +353,10 @@ async function assign(state, lane, task) {
   // Every block taken: wait for a lane to finish rather than share a port, which
   // makes a gate adopt another worktree's server or fail on a busy port.
   if (ports(state, lane).block === undefined) return null;
+  // The models run in the cloud, but every gate, build and bake runs on this Mac
+  // (8 cores, 16 GB): nine lanes at once drove the load average past 400, and four
+  // still left 645 MB free.
+  if (Object.values(state.workers).filter((x) => x.live).length >= MAX_LIVE) return null;
   const dir = worktree(lane);
   freshLane(state, lane, dir);
   if (task.test) bringTest(dir, task.test);
@@ -416,7 +424,7 @@ async function gateFault(w) {
     if (w.task.brief) out = await shAsync('npm', ['run', 'gate'], w.dir, env);
     else {
       for (const check of STATIC_CHECKS) await shAsync('npm', ['run', check], w.dir, env);
-      out = await shAsync('npx', ['playwright', 'test', '--workers', '4', ...specsFor(w)], w.dir, env);
+      out = await shAsync('npx', ['playwright', 'test', '--workers', String(GATE_WORKERS), ...specsFor(w)], w.dir, env);
     }
     w.draws = out.match(/draws: (\d+)/)?.[1] ?? null;
     return null;
@@ -518,7 +526,26 @@ async function judge(state, w) {
   return escalate(w, `failed its check ${w.tries} times`);
 }
 
+// A worker that asks a question waits on it, quiet but not stalled: nudging or
+// aborting it would throw the question away (M2.T11, 2026-10-07). Say it once and
+// leave it waiting until the director answers through /question/<id>/reply.
+async function question(w) {
+  const { url } = await client(w.dir);
+  const asks = await fetch(`${url}/question`).then((r) => r.json(), () => []);
+  const q = asks.find((a) => a.sessionID === w.session);
+  if (!q) {
+    delete w.asked;
+    return null;
+  }
+  if (w.asked === q.id) return null;
+  w.asked = q.id;
+  const opts = q.questions.map((x) => `${x.question} [${x.options.map((o) => o.label).join(' | ')}]`).join(' ');
+  return `${w.name}: ${w.task?.id ?? w.brief} NEEDS THE DIRECTOR (question ${q.id}): ${opts}`;
+}
+
 async function tend(state, w) {
+  const asked = await question(w).catch(() => null);
+  if (asked || w.asked) return asked;
   const i = await sessionInfo(w);
   const news = i.busy ? await supervise(w, i) : await judge(state, w);
   state.tasks[w.task.id].model = w.model;

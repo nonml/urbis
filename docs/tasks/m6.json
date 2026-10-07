@@ -1,0 +1,449 @@
+{
+  "milestone": "M6 the hacking toolset",
+  "tasks": [
+    {
+      "id": "M6.T1",
+      "lane": "hack-sim",
+      "goal": "The registry. Every hackable thing (junction, car, camera, pipe, crane, building, person, bridge, control box, planning office) is registered from the map with its position, kind, hacks and costs, and kept current as the map changes",
+      "files": [
+        "src/sim/hackables.js"
+      ],
+      "needs": [],
+      "commit": "M6.T1 (M6-1): the registry",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-1: **Aim:** a hackable thing within 40 m and in sight highlights with its name and cost; nothing behind a wall does, on all five seeds (checked by `tests/accept/m6-aim.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M6.T2",
+      "lane": "hack-render",
+      "goal": "Aim. The nearest registered thing within 40 m, inside a view cone and in sight (a 2D ray against parcel footprints), highlighted with its name and cost; replaces `profilerTarget`; `m6-aim.spec.js` first",
+      "files": [
+        "src/sim/hackables.js",
+        "src/render/aim.js",
+        "tests/accept/m6-aim.spec.js"
+      ],
+      "needs": [
+        "M6.T1"
+      ],
+      "commit": "M6.T2 (M6-1): aim",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-1: **Aim:** a hackable thing within 40 m and in sight highlights with its name and cost; nothing behind a wall does, on all five seeds (checked by `tests/accept/m6-aim.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-aim.spec.js"
+    },
+    {
+      "id": "M6.T2b",
+      "lane": "hack-render",
+      "needs": [
+        "M6.T2"
+      ],
+      "goal": "Wire the aim. src/render/aim.js (M6.T2) is imported by nothing and the HUD still uses street.js profilerTarget; make the registry aim the one the player sees: the highlight and the 'name \u00b7 \u20a1cost' label drawn every frame from the registry pick, profilerTarget deleted",
+      "files": [
+        "src/render/aim.js",
+        "src/game/hud.js",
+        "src/main.js",
+        "src/sim/street.js",
+        "src/sim/hackables.js",
+        "docs/shots/"
+      ],
+      "test": "tests/accept/m6-aim-wired.test.js",
+      "commit": "M6.T2b (M6-1): the aim is the one the player sees",
+      "notes": "Size S. Delete profilerTarget and move its callers to the registry pick; the profiler's existing behaviour on walkers must keep working through the registry (people are registered things). tests/accept/m6-aim.spec.js stays green; draws must not rise by more than 1 (declare it). Take docs/shots/m6-aim.png with scripts/shot.mjs facing something hackable: the highlight and label must be visible. Do not edit the test."
+    },
+    {
+      "id": "M6.T3",
+      "lane": "hack-render",
+      "goal": "Fire and menu. One key fires a thing's default hack; holding it opens a menu of its hacks",
+      "files": [
+        "src/game/input.js",
+        "src/ui/hackmenu.js"
+      ],
+      "needs": [
+        "M6.T2",
+        "M5.T26",
+        "M6.T2b"
+      ],
+      "commit": "M6.T3 (M6-4): fire and menu",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M6.T4",
+      "lane": "hack-sim",
+      "goal": "Battery. A meter whose refill rate and every hack's cost are written in new `docs/HACKING.md` (feel values, rule 10); each hack spends its cost; one it cannot pay refuses and says why; HUD meter; `m6-battery.test.js` first",
+      "files": [
+        "src/sim/battery.js",
+        "src/game/hud.js",
+        "tests/accept/m6-battery.test.js",
+        "docs/HACKING.md"
+      ],
+      "needs": [
+        "M6.T3"
+      ],
+      "commit": "M6.T4 (M6-3): battery",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-3: **Battery:** each hack spends its cost; one the battery cannot pay for does not fire and the HUD says why; the meter refills at the rate written in `docs/HACKING.md`; holding Q (Focus) slows the game to 0.3 times speed for up to 4 s and spends battery while held (checked by `tests/accept/m6-battery.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-battery.test.js"
+    },
+    {
+      "id": "M6.T5",
+      "lane": "hack-sim",
+      "goal": "Control boxes. One per district on a street, placed by the map; breaking in is holding E for 3 s (tap E stays the door key), seen by walkers and police nearby; until then only the profiler and the blackout work there; `m6-access.spec.js` first",
+      "files": [
+        "src/sim/hackables.js",
+        "src/sim/anchors.js",
+        "tests/accept/m6-access.spec.js"
+      ],
+      "needs": [
+        "M6.T3",
+        "M4.T12",
+        "M5.T7",
+        "M6.T2"
+      ],
+      "commit": "M6.T5 (M6-2): control boxes",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-2: **Access:** every district on all five seeds has a control box on a street; before it is broken into, only the profiler and the blackout work in that district; afterwards every M6 hack does (checked by `tests/accept/m6-access.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-access.spec.js"
+    },
+    {
+      "id": "M6.T6",
+      "lane": "hack-sim",
+      "goal": "Police see hacks. A hack fired in a unit's sight raises heat (`wanted.js` `raise`, cause `hack`); dispatch has a line per hack kind",
+      "files": [
+        "src/sim/wanted.js",
+        "src/sim/dispatch.js"
+      ],
+      "needs": [
+        "M6.T3",
+        "M4.T10",
+        "M5.T13"
+      ],
+      "commit": "M6.T6 (M6-4): police see hacks",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M6.T7",
+      "lane": "hack-sim",
+      "goal": "Traffic signals. All-green at a junction; cars brake and jam; commuters through it late; the block's shops lose trade; a cruiser in it stuck",
+      "files": [
+        "src/sim/traffic.js",
+        "tests/accept/m6-signals.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T10",
+        "M4.T17",
+        "M5.T24",
+        "M5.T31"
+      ],
+      "commit": "M6.T7 (M6-4): traffic signals",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-signals.spec.js"
+    },
+    {
+      "id": "M6.T8",
+      "lane": "hack-render",
+      "goal": "Bollards. Posts rise across a junction; a car that hits them stops dead; traffic reroutes; a chasing cruiser stops",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/wanted.js",
+        "src/render/bollards.js",
+        "tests/accept/m6-bollards.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T10",
+        "M4.T17",
+        "M5.T13",
+        "M5.T24",
+        "M5.T31",
+        "M6.T7"
+      ],
+      "commit": "M6.T8 (M6-4): bollards",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-bollards.spec.js"
+    },
+    {
+      "id": "M6.T9",
+      "lane": "hack-render",
+      "goal": "Steam pipe. A street shut for 60 s with a steam column; its shops lose trade; cars and police reroute",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/economy.js",
+        "src/render/hackfx.js",
+        "tests/accept/m6-steam.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T10",
+        "M4.T11",
+        "M4.T17",
+        "M5.T15",
+        "M5.T16",
+        "M5.T17",
+        "M5.T24",
+        "M5.T28",
+        "M5.T31",
+        "M5.T32",
+        "M6.T7"
+      ],
+      "commit": "M6.T9 (M6-4): steam pipe",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-steam.spec.js"
+    },
+    {
+      "id": "M6.T10",
+      "lane": "hack-render",
+      "goal": "Bridge. A lifting span rises; nothing crosses; commuters to the far side late; that side's jobs dip",
+      "files": [
+        "src/sim/traffic.js",
+        "src/render/river.js",
+        "tests/accept/m6-bridge.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T8",
+        "M4.T10",
+        "M4.T17",
+        "M5.T24",
+        "M5.T31",
+        "M6.T7"
+      ],
+      "commit": "M6.T10 (M6-4): bridge",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-bridge.spec.js"
+    },
+    {
+      "id": "M6.T11",
+      "lane": "hack-sim",
+      "goal": "Car hijack. One car brakes, swerves or floors it; a crash blocks the road, or a pursuer is taken out",
+      "files": [
+        "src/sim/traffic.js",
+        "src/sim/wanted.js",
+        "tests/accept/m6-hijack.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T10",
+        "M4.T17",
+        "M5.T13",
+        "M5.T24",
+        "M5.T31",
+        "M6.T8",
+        "M6.T9",
+        "M6.T10"
+      ],
+      "commit": "M6.T11 (M6-4): car hijack",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-hijack.spec.js"
+    },
+    {
+      "id": "M6.T12",
+      "lane": "hack-sim",
+      "goal": "Street camera, the hack. Cameras registered on buildings; cut one and the police are blind in that street (`patrol.js` `canSee`)",
+      "files": [
+        "src/sim/hackables.js",
+        "src/sim/patrol.js",
+        "tests/accept/m6-camera.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M6.T2"
+      ],
+      "commit": "M6.T12 (M6-4): street camera, the hack",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-camera.spec.js"
+    },
+    {
+      "id": "M6.T13",
+      "lane": "hack-render",
+      "goal": "Street camera, the view. The view jumps into the camera; profile from there; jump to any camera in view; Esc returns",
+      "files": [
+        "src/game/camera.js",
+        "src/render/aim.js"
+      ],
+      "needs": [
+        "M6.T12"
+      ],
+      "commit": "M6.T13 (M6-4): street camera, the view",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M6.T14",
+      "lane": "hack-render",
+      "goal": "Radio jam. Dispatch turns to static; for 20 s the police cannot raise the tier or call units",
+      "files": [
+        "src/sim/wanted.js",
+        "src/ui/dispatch.js",
+        "tests/accept/m6-jam.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T10",
+        "M5.T13",
+        "M6.T11"
+      ],
+      "commit": "M6.T14 (M6-4): radio jam",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-jam.spec.js"
+    },
+    {
+      "id": "M6.T15",
+      "lane": "hack-sim",
+      "goal": "Calls. A call generator: a profiled person's call as subtitles, drawn from what the economy has queued (the next firm move, a closing shop)",
+      "files": [
+        "src/sim/calls.js",
+        "src/sim/economy.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T11",
+        "M5.T15",
+        "M5.T16",
+        "M5.T17",
+        "M5.T28",
+        "M5.T32",
+        "M6.T9"
+      ],
+      "commit": "M6.T15 (M6-4): calls",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M6.T16",
+      "lane": "hack-sim",
+      "goal": "Eavesdrop. Fires the call; some calls tip the next city event before it happens",
+      "files": [
+        "src/sim/hackables.js",
+        "tests/accept/m6-eavesdrop.spec.js"
+      ],
+      "needs": [
+        "M6.T15",
+        "M6.T2"
+      ],
+      "commit": "M6.T16 (M6-4): eavesdrop",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-eavesdrop.spec.js"
+    },
+    {
+      "id": "M6.T17",
+      "lane": "hack-sim",
+      "goal": "Bank transfer. A person's balance drains into the player's; they stop spending; enough in one district and its shops lose trade",
+      "files": [
+        "src/sim/people.js",
+        "src/sim/economy.js",
+        "tests/accept/m6-bank.test.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M4.T11",
+        "M5.T15",
+        "M5.T16",
+        "M5.T17",
+        "M5.T28",
+        "M5.T32",
+        "M6.T9"
+      ],
+      "commit": "M6.T17 (M6-4): bank transfer",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-bank.test.js"
+    },
+    {
+      "id": "M6.T18",
+      "lane": "hack-render",
+      "goal": "Crane. Stop: the site stalls. Drop: the lot loses a stage and the site shuts for a minute",
+      "files": [
+        "src/sim/zoning.js",
+        "src/render/zoning.js",
+        "tests/accept/m6-crane.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M5.T6",
+        "M5.T8"
+      ],
+      "commit": "M6.T18 (M6-4): crane",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-crane.spec.js"
+    },
+    {
+      "id": "M6.T19",
+      "lane": "hack-sim",
+      "goal": "Fire alarm. Sets off M5's alarm event: the building empties onto the pavement; its shop shuts for 2 minutes",
+      "files": [
+        "src/sim/alarms.js",
+        "src/sim/walkers.js",
+        "tests/accept/m6-alarm.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M5.T14",
+        "M4.T10"
+      ],
+      "commit": "M6.T19 (M6-4): fire alarm",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-alarm.spec.js"
+    },
+    {
+      "id": "M6.T20",
+      "lane": "hack-sim",
+      "goal": "Planning office. A building per district; inside, a lot's permit fast-tracked (full pace for a minute) or frozen (no progress for 2 minutes)",
+      "files": [
+        "src/sim/zoning.js",
+        "src/sim/interior.js",
+        "tests/accept/m6-permit.spec.js"
+      ],
+      "needs": [
+        "M6.T6",
+        "M5.T6",
+        "M5.T8",
+        "M5.T11",
+        "M6.T18"
+      ],
+      "commit": "M6.T20 (M6-4): planning office",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-permit.spec.js"
+    },
+    {
+      "id": "M6.T21",
+      "lane": "hack-render",
+      "goal": "Reach. One Node test runs every hack's A/B and checks M4-5's rule: nothing outside its reach changes",
+      "files": [
+        "tests/accept/m6-reach.test.js"
+      ],
+      "needs": [
+        "M6.T7",
+        "M6.T20"
+      ],
+      "commit": "M6.T21 (M6-4): reach",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-reach.test.js"
+    },
+    {
+      "id": "M6.T22",
+      "lane": "hack-sim",
+      "goal": "Focus. Holding Q slows the game to 0.3 times speed for up to 4 s (the fixed-step loop runs fewer steps a frame) and spends battery while held, at the rate in `HACKING.md`; its check first",
+      "files": [
+        "src/game/loop.js",
+        "src/sim/battery.js",
+        "src/game/input.js",
+        "tests/accept/m6-focus.spec.js"
+      ],
+      "needs": [
+        "M6.T4",
+        "M5.T26",
+        "M5.T35",
+        "M6.T3"
+      ],
+      "commit": "M6.T22 (M6-3): focus",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-3: **Battery:** each hack spends its cost; one the battery cannot pay for does not fire and the HUD says why; the meter refills at the rate written in `docs/HACKING.md`; holding Q (Focus) slows the game to 0.3 times speed for up to 4 s and spends battery while held (checked by `tests/accept/m6-battery.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m6-focus.spec.js"
+    },
+    {
+      "id": "M6.T23",
+      "lane": "hack-render",
+      "goal": "Close. The sweep of every hack's shot; one commit per defect; the M6 keys' hints (M7.T12)",
+      "files": [
+        "content/hints.json"
+      ],
+      "needs": [
+        "M5.T36"
+      ],
+      "commit": "M6.T23 (M6-5): close",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-5: The sweep of every M6 hack's shot has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    }
+  ]
+}

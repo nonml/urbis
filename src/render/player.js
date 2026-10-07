@@ -14,12 +14,18 @@ export function loadPersonAvatar(avatar) {
     const skinned = gltf.scene.getObjectByProperty('isSkinnedMesh', true);
     const clip = (gltf.animations ?? []).find((c) => /walk/i.test(c.name));
     if (!skinned || !clip) return;
-    avatar.mixer = new THREE.AnimationMixer(skinned);
+    // The armature, not the bare mesh: the clip's tracks bind bones by name and
+    // a bone outside the drawn tree never gets its world matrix updated, so the
+    // skin collapsed at the group origin. gltf.scene carries both the bones and
+    // the skinned mesh as one subtree, grounded at feet y=0.
+    avatar.mixer = new THREE.AnimationMixer(gltf.scene);
     avatar.mixer.clipAction(clip).play();
     for (const m of [...avatar.group.children]) avatar.group.remove(m);
     skinned.castShadow = true;
     skinned.userData.model = PERSON_MODEL;
-    avatar.group.add(skinned);
+    avatar.group.add(gltf.scene);
+    // M2.F2b: the box figure is gone and the GLB is in the group.
+    avatar.skinned = true;
   }).catch(() => {});
 }
 
