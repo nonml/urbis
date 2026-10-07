@@ -96,6 +96,22 @@
       ],
       "commit": "M2.F2c (M2-0, M2-2): the player is dressed",
       "notes": "Size M, a Blender bake. In tools/models/make_person.py use MPFB's own CC0 system assets (MakeHuman's system asset pack: clothes, hair, shoes, skin material): a dark rain jacket or coat, trousers, shoes, short hair, a natural skin tone; grounded modern, never neon. If the asset pack is not installed, stop and say exactly which download is missing. Stay at or under 15k triangles and 1.5 MB, one skinned mesh or at most 2 draws with shadow. Add an `Idle` clip (a CMU standing clip, or the walk's contact frame held) and in src/render/player.js blend to Idle when player speed is 0 and to Walk when moving. Update the CREDITS line. Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose and look at it before finishing: clothed, hair, standing upright at idle. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green."
+    },
+    {
+      "id": "M2.F2d",
+      "lane": "people",
+      "goal": "A natural standing pose. Since M2.F2c (b9671f3) the dressed player stands with both arms held straight out to the sides when not moving, like a T-pose, because the `Idle` clip holds a walk frame that the rig reads as rest. Make Idle a relaxed stand: arms hanging at the sides, slight bend at the elbows, weight on both feet; keep the walk as it is.",
+      "files": [
+        "tools/models/make_person.py",
+        "public/assets/models/person.glb",
+        "src/render/player.js",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M2.F2c"
+      ],
+      "commit": "M2.F2d (M2-0): the player stands naturally",
+      "notes": "Size S. Rebake with `python3 tools/models/make_person.py` (about 10 s). Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose in daylight (key t), and look at it before finishing: arms down at the sides. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green. Commit as you go: a lane that stalls loses uncommitted work."
     }
   ]
 }

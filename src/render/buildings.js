@@ -10,7 +10,9 @@
 // blackout's power zone. ZONING.md's no-instancing line is superseded by M3.
 // The facade pools wear the tower facade materials; their instanced UV rescale
 // (materials.js) reads the instance matrix columns, so a unit shell tiles the
-// same FACADE_TILE window grid the merged towers baked in.
+// same FACADE_TILE window grid the merged towers baked in. The suburb,
+// housing and works buildings load their own models through the M2 pool loader
+// (M4.T9, loadBuildingPools below).
 import * as THREE from 'three';
 import { loadModelPool } from './models.js';
 
@@ -281,6 +283,85 @@ export async function loadServicePools() {
   }
   return {
     group, pools, place,
+    // One draw per material an occupied pool actually draws.
+    draws: () => [...pools.values()].reduce(
+      (n, p) => n + p.meshes.filter((m) => m.count > 0).length, 0),
+  };
+}
+
+// The suburb and works buildings (M4.T9): a detached house, a low-rise flat
+// and a works shed, one model per kind through the M2 pool loader (models.js)
+// — meshes merged by material, so an occupied kind costs its material count
+// in draws however many stand, and an empty one costs nothing. `front +Z` is
+// the model's own facing and its origin is the base centre. A generated
+// district plans its own footprints (layout.js, M4.T5), so `place` turns each
+// instance to the row's street face and scales it to that building's
+// frontage, depth and height instead of standing a unit box on the lot. Slots
+// are reclaimed whole on every `place`, the shape loadServicePools uses,
+// because a rezone rewrites the planned list (M3.T20).
+export const BUILDING_KINDS = ['house', 'flat', 'shed'];
+// Which model a district kind's rows wear (citygen.KIND_SPECS, M4.T4).
+export const BUILDING_KIND_BY_DISTRICT = { suburb: 'house', housing: 'flat', works: 'shed' };
+// A whole generated town's worth of one kind: fixed at build like every pool,
+// so a kind added or bulldozed moves no draw (law 3). A slot past capacity is
+// dropped, never grown.
+export const BUILDING_CAPACITY = 1024;
+export const BUILDING_MODEL = (kind) => `assets/models/building_${kind}/building_${kind}.glb`;
+
+// The model's own metre extents: the union of its merged material groups, so
+// `place` can fit an instance to the footprint the plan rolled.
+function modelSize(pool) {
+  const box = new THREE.Box3();
+  for (const mesh of pool.meshes) {
+    if (!mesh.geometry.boundingBox) mesh.geometry.computeBoundingBox();
+    box.union(mesh.geometry.boundingBox);
+  }
+  return box.getSize(new THREE.Vector3());
+}
+
+// `buildings` is buildingsOf's shape (layout.js): { kind, x, z, w, d, h,
+// face }, where `d` is the frontage along the avenue and `w` the depth back
+// from the building line, `face` the way the front looks. `yaw` overrides the
+// face when a caller already holds one. A kind with no model is skipped, so a
+// caller can hand the whole planned list and let this place what it can.
+export async function loadBuildingPools() {
+  const group = new THREE.Group();
+  const pools = new Map();
+  const sizes = new Map();
+  for (const kind of BUILDING_KINDS) {
+    const pool = await loadModelPool(BUILDING_MODEL(kind), BUILDING_CAPACITY);
+    pools.set(kind, pool);
+    sizes.set(kind, modelSize(pool));
+    group.add(pool.group);
+  }
+  const placed = new Map();
+  const at = new THREE.Vector3(), turn = new THREE.Quaternion(), scale = new THREE.Vector3();
+  const matrix = new THREE.Matrix4();
+  function place(buildings = []) {
+    for (const [kind, ids] of placed) {
+      for (const i of ids) pools.get(kind).free(i);
+    }
+    placed.clear();
+    for (const b of buildings) {
+      const pool = pools.get(b.kind);
+      if (!pool) continue;
+      const i = pool.claim();
+      if (i < 0) continue;
+      // Model local +Z is the front and local X the frontage: after the yaw
+      // that faces the street, X runs along the avenue, so `d` scales X and
+      // `w` scales Z. A missing footprint keeps the model's own metres.
+      const size = sizes.get(b.kind);
+      scale.set((b.d ?? size.x) / size.x, (b.h ?? size.y) / size.y, (b.w ?? size.z) / size.z);
+      const [fx, fz] = Array.isArray(b.face) ? b.face : [0, 1];
+      turn.setFromAxisAngle(UP, b.yaw ?? Math.atan2(fx, fz));
+      at.set(b.x, b.y ?? 0, b.z);
+      pool.set(i, matrix.compose(at, turn, scale));
+      if (!placed.has(b.kind)) placed.set(b.kind, []);
+      placed.get(b.kind).push(i);
+    }
+  }
+  return {
+    group, pools, sizes, place,
     // One draw per material an occupied pool actually draws.
     draws: () => [...pools.values()].reduce(
       (n, p) => n + p.meshes.filter((m) => m.count > 0).length, 0),

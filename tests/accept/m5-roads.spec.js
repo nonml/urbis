@@ -85,11 +85,15 @@ for (const seed of SEEDS) {
     // and at a point 20 m off it hits something. fd0cdbd laid the road in the
     // sim over a black void, with no tarmac and no ground in the shot.
     const mid = { x: (site.from.x + site.to.x) / 2, z: (site.from.z + site.to.z) / 2 };
+    const third = (k) => ({ x: site.from.x + (site.to.x - site.from.x) * k / 3, z: site.from.z + (site.to.z - site.from.z) * k / 3 });
     const off = site.from.x === site.to.x ? { x: mid.x + 20, z: mid.z } : { x: mid.x, z: mid.z + 20 };
-    for (const [what, p] of [['the new road', mid], ['the land beside it', off]]) {
+    // dab1614 passed that with ground only: the road's own length was not drawn.
+    // So the first thing hit at each third of the road is a mesh named as road.
+    for (const [what, p, name] of [['the new road at 1/3', third(1), /road/i], ['the new road at 2/3', third(2), /road/i],
+      ['the land beside it', off, /ground|terrain|land/i]]) {
       const px = await page.evaluate((q) => window.__game.screenOf(q.x, 0, q.z), p);
       const hits = await page.evaluate(([x, y]) => window.__game.pick(x, y, window.innerWidth, window.innerHeight), [px.x, px.y]);
-      expect(hits.length, `seed ${seed}: ${what} is drawn`).toBeGreaterThan(0);
+      expect(hits[0]?.path ?? 'nothing', `seed ${seed}: ${what} is drawn`).toMatch(name);
     }
     mkdirSync(SHOTS, { recursive: true });
     writeFileSync(`${SHOTS}/m5-road-${seed}.png`,

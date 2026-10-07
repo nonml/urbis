@@ -143,6 +143,23 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M4.T9b",
+      "lane": "assets",
+      "goal": "Make the M4.T9 buildings reproducible. c433c73 committed building_house.glb, building_flat.glb and building_shed.glb as 'Blender-authored', but no script that makes them is in the repo, and CREDITS.md has no line for them. Write tools/models/make_buildings.py (plain `python3 tools/models/make_buildings.py` runs Blender in the background, like make_saloon.py) that rebuilds all three GLBs, with the same sizes and tri counts within 10%, and add their CREDITS line.",
+      "files": [
+        "tools/models/make_buildings.py",
+        "public/assets/models/building_flat/",
+        "public/assets/models/building_house/",
+        "public/assets/models/building_shed/",
+        "public/assets/CREDITS.md"
+      ],
+      "needs": [
+        "M4.T9"
+      ],
+      "commit": "M4.T9b (M4-1): the suburb and works buildings are reproducible",
+      "notes": "Size S. Read tools/models/make_saloon.py first and follow its shape. Run the script and commit the GLBs it writes. Commit as you go: a lane that stalls loses uncommitted work."
+    },
+    {
       "id": "M4.T10",
       "lane": "city",
       "goal": "Movers on hills. Player, hero car, traffic, walkers and police sample the terrain; nobody sinks or floats; `m4-terrain.spec.js`",
@@ -268,7 +285,27 @@
       "lane": "city",
       "goal": "Close. Locality (M4-5) green; the district sweep, day and night, five seeds; one commit per defect",
       "files": [],
-      "needs": [],
+      "needs": [
+        "M4.T1",
+        "M4.T10",
+        "M4.T11",
+        "M4.T12",
+        "M4.T13",
+        "M4.T14",
+        "M4.T15",
+        "M4.T16",
+        "M4.T17",
+        "M4.T2",
+        "M4.T3",
+        "M4.T4",
+        "M4.T5",
+        "M4.T6",
+        "M4.T6b",
+        "M4.T7",
+        "M4.T8",
+        "M4.T9",
+        "M4.T9b"
+      ],
       "commit": "M4.T18 (M4-5, M4-8): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
       "test": "tests/accept/m4-local.test.js"

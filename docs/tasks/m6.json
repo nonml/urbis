@@ -440,7 +440,30 @@
         "content/hints.json"
       ],
       "needs": [
-        "M5.T36"
+        "M5.T36",
+        "M6.T1",
+        "M6.T10",
+        "M6.T11",
+        "M6.T12",
+        "M6.T13",
+        "M6.T14",
+        "M6.T15",
+        "M6.T16",
+        "M6.T17",
+        "M6.T18",
+        "M6.T19",
+        "M6.T2",
+        "M6.T20",
+        "M6.T21",
+        "M6.T22",
+        "M6.T2b",
+        "M6.T3",
+        "M6.T4",
+        "M6.T5",
+        "M6.T6",
+        "M6.T7",
+        "M6.T8",
+        "M6.T9"
       ],
       "commit": "M6.T23 (M6-5): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-5: The sweep of every M6 hack's shot has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
