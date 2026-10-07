@@ -377,48 +377,73 @@ function fleetVariant(base, s) {
   return g;
 }
 
-// The five variants folded into one geometry, the policekit.js way: every
-// vertex carries aShape, every instance carries iShape, and the patched
-// material folds the other four shapes onto a point. One draw per material
-// for the whole fleet, whatever the body count (law 4).
-function foldFleetVariants(partGeos) {
-  const clean = partGeos.map(fleetPart);
-  const base = mergeGeometries(clean);
-  if (!base) return null;
-  return mergeGeometries(FLEET_SHAPES.map((f, i) => tagShape(fleetVariant(base, f.s), i)));
+// The five variants fold into one geometry for the procedural stand-ins: every
+// vertex carries aShape, every instance carries iShape, and the patched material
+// folds the other four shapes onto a point. One draw per material for the whole
+// fleet, whatever the body count (law 4). The loaded fleet merges per shape
+// (fleetSolid) instead, so the stand-ins' folded copies never reach the loaded
+// frame.
+
+// The M2.F4 saloon splits glass, trim, lamps and wheels into their own
+// primitives. Drawing those as folded meshes submitted five collapsed copies
+// of every part per instance (the fold's shape patch), which at the spawn was
+// most of the frame's triangles. The fleet draws one mesh per silhouette, so
+// merge every part into that mesh's geometry instead and let a vertex colour
+// carry the part's albedo (paint stays white for its own instanceColor/detail
+// map). Wheels merge too: the per-shape scale then keeps them under their own
+// arches, which the separate unscaled wheel pool never did.
+const WHITE = new THREE.Color(0xffffff);
+function colorPart(geo, color) {
+  const c = new Float32Array(geo.attributes.position.count * 3);
+  for (let i = 0; i < c.length; i += 3) {
+    c[i] = color.r;
+    c[i + 1] = color.g;
+    c[i + 2] = color.b;
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(c, 3));
+  return geo;
+}
+
+function fleetSolid(out) {
+  const parts = [
+    ...out.paintGeos.map((g) => colorPart(fleetPart(g), WHITE)),
+    ...out.trimGeos.map((g) => colorPart(fleetPart(g), out.trimMat?.color ?? WHITE)),
+    ...out.wheelGeos.map((g) => colorPart(fleetPart(g), out.wheelMat?.color ?? WHITE)),
+  ];
+  return parts.length ? mergeGeometries(parts) : null;
 }
 
 // Fill the fleet's bodies once the GLB lands; the procedural shells below
-// stand in until then so the street is never empty. Paint, trim and wheels
-// each keep their pool — same meshes, same draws — and the separate glass
-// band retires, its glazing baked into the paint atlas. Parked cars ride the
-// same swap: they are slots in the same pools, not a second fleet.
+// stand in until then so the street is never empty. The loaded car merges into
+// the per-shape body meshes (fleetSolid), so the glass, trim and wheel pools
+// retire with the old folded stand-ins. Parked cars ride the same swap: they
+// are slots in the same pools, not a second fleet.
 function loadFleetModels(rig) {
   new GLTFLoader().loadAsync(FLEET_MODEL).then(async (gltf) => {
     gltf.scene.updateMatrixWorld(true);
     const out = { paintGeos: [], trimGeos: [], wheelGeos: [] };
     gltf.scene.traverse((o) => { if (o.isMesh) heroSort(o, out); });
-    if (!out.paintGeos.length || (!out.trimGeos.length && !out.wheelGeos.length)) return;
-    const base = mergeGeometries(out.paintGeos.map(fleetPart));
-    const trim = out.trimGeos.length ? foldFleetVariants(out.trimGeos) : null;
-    const wheels = out.wheelGeos.length ? foldFleetVariants(out.wheelGeos) : null;
-    if (!base || !trim || !wheels) return;
-    for (const g of [trim, wheels]) g.setAttribute('iShape', rig.iShape);
+    if (!out.paintGeos.length) return;
+    const solid = fleetSolid(out);
+    if (!solid) return;
+    // One material for the merged solid: the paint detail map and the fleet's
+    // per-car instanceColor, with vertex colours carrying what paint does not.
+    const solidMat = out.paintMat.clone();
+    solidMat.vertexColors = true;
     rig.bodies.meshes.forEach((mesh, s) => {
       mesh.geometry.dispose();
-      mesh.geometry = fleetVariant(base, FLEET_SHAPES[s].s);
-      mesh.material = out.paintMat;
+      mesh.geometry = fleetVariant(solid, FLEET_SHAPES[s].s);
+      mesh.material = solidMat;
       mesh.userData.model = FLEET_MODEL;
     });
     rig.trim.geometry.dispose();
-    rig.trim.geometry = trim;
-    rig.trim.material = patchCarShape(out.trimMat, 'car-fleet-trim');
-    rig.trim.userData.model = FLEET_MODEL;
+    rig.trim.geometry = new THREE.BufferGeometry();
     rig.wheels.geometry.dispose();
-    rig.wheels.geometry = wheels;
-    rig.wheels.material = patchCarShape(out.wheelMat ?? out.trimMat, 'car-fleet-wheel');
-    rig.wheels.userData.model = FLEET_MODEL;
+    rig.wheels.geometry = new THREE.BufferGeometry();
+    rig.trim.visible = false;
+    rig.wheels.visible = false;
     rig.glass.visible = false;
+    rig.solid = true;
     rig.credited = (await fetch('assets/CREDITS.md').then((r) => r.text()).catch(() => ''))
       .includes('models/car/car.glb');
     rig.modelReady = true;
@@ -583,7 +608,7 @@ export function buildTraffic(street) {
   group.add(bodies.group, wheels, beams, tails, glass, trim, pools);
   const rig = {
     bodies, wheels, beams, tails, glass, trim, pools, glows, dummy, iShape,
-    model: FLEET_MODEL, modelReady: false, credited: false,
+    model: FLEET_MODEL, modelReady: false, credited: false, solid: false,
     // One blended pose per car, reused every frame (M0-9).
     poses: street.cars.map(() => ({})),
     inspect() {
@@ -614,13 +639,17 @@ export function updateTraffic(rig, street, camera = null) {
   street.cars.forEach((c, i) => {
     const p = c.parked ? curbPose(c, poses[i]) : blend(c, alpha, poses[i]);
     if (inView(frustum, p)) {
-      // The packed slot carries this car's shape: the folded glass/trim/wheels
-      // read iShape per instance, so repacking must repoint it.
-      if (rig.iShape) rig.iShape.setX(nWheels, c.shape ?? 0);
       bodies.setMatrixAt(i, placeShape(dummy, p, 0));
-      glass.setMatrixAt(nGlass++, placeShape(dummy, p, 0));
-      trim.setMatrixAt(nTrim++, placeShape(dummy, p, 0));
-      wheels.setMatrixAt(nWheels++, placeShape(dummy, p, 0));
+      // The loaded car is one merged mesh per silhouette; only the procedural
+      // stand-ins pack the folded glass/trim/wheel pools.
+      if (!rig.solid) {
+        // The packed slot carries this car's shape: the folded glass/trim/wheels
+        // read iShape per instance, so repacking must repoint it.
+        if (rig.iShape) rig.iShape.setX(nWheels, c.shape ?? 0);
+        glass.setMatrixAt(nGlass++, placeShape(dummy, p, 0));
+        trim.setMatrixAt(nTrim++, placeShape(dummy, p, 0));
+        wheels.setMatrixAt(nWheels++, placeShape(dummy, p, 0));
+      }
     }
     const m = placeOnCar(dummy, p, 0);
     if (c.parked) {
