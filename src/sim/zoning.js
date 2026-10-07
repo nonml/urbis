@@ -20,7 +20,14 @@ import {
   demandFor,
   tickEconomy,
 } from './economy.js';
-import { TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
+import { REASONS, TREND, hasFloors, judge, reoccupy, vacate } from './decline.js';
+
+// A parcel no road reaches is cut off from the city's life: it declines on the
+// missing road alone, whatever the market says (ops.js marks it `noRoad`, M5-3).
+// The cause reads in the lot note and the news; decline.js's reason table holds
+// the words, so zoning — the system that acts on it — registers its line.
+export const NO_ROAD = 'no-road';
+REASONS[NO_ROAD] = () => 'no road';
 
 // The shell stands this far inside the hoarding line on every side. It lives
 // here, not in render/zoning.js, because the interiors derive their door face
@@ -249,11 +256,22 @@ export function createCity(seed, map = worldMap()) {
   // Every building and lot is one live parcel in the map (sim/map.js): the lots
   // the city grows, then the standing row, tower and cap parcels. This replaces
   // the map's opening lot stubs, so one lot is one object, not two.
-  const standing = (map.parcels ?? []).filter((p) => p.kind !== 'lot');
-  for (const p of standing) p.powerZone = zoneAt(p.z);
+  const buildings = (map.parcels ?? []).filter((p) => p.kind !== 'lot');
+  for (const p of buildings) p.powerZone = zoneAt(p.z);
+  // The fixed buildings keep their order, with the rows last: a road op splices
+  // frontage rows out of map.parcels (ops.js replanFrontage), so the towers and
+  // caps ahead of them keep the parcel index a walker's spot — and M5-3's A/B —
+  // reads across the edit.
+  const standing = [
+    ...buildings.filter((p) => p.kind !== 'row'),
+    ...buildings.filter((p) => p.kind === 'row'),
+  ];
   map.parcels = [...parcels, ...standing];
   const economy = createEconomy(parcels, builtHeight, rng.sim, map);
-  return { time: 0, parcels, economy, demand: cityDemand(economy) };
+  // `parcels` is the lots (the city view zones and the renderer draws it), and
+  // `standing` the fixed buildings a road op can cut off (M5.T6); one map, two
+  // lists, because only the lots are the player's to move.
+  return { time: 0, parcels, standing, economy, demand: cityDemand(economy) };
 }
 
 // The pace a lot works at, as a share of its stage a second. While the player's
@@ -335,10 +353,28 @@ export function zoneParcel(city, index, use) {
   return true;
 }
 
+// A parcel the roads no longer reach declines on the missing road alone: the
+// market and the stage have nothing to do with it, so it overrides both. A road
+// back clears the cause. Reads in the lot note and the news (news.js).
+function noRoad(p) {
+  if (p.noRoad) {
+    p.trend = TREND.DECLINING;
+    p.why = NO_ROAD;
+    return true;
+  }
+  if (p.why === NO_ROAD) {
+    p.trend = TREND.STEADY;
+    p.why = null;
+  }
+  return false;
+}
+
 export function tickZoning(city, dt, street, hold = -1) {
   city.time += dt;
   updateDemand(city, dt, street);
   city.parcels.forEach((p, i) => {
+    // A cut-off lot does no work at all: growth, clearing and the market wait.
+    if (noRoad(p)) return;
     // Only a lot grows or declines on its own. A row, tower or cap is a fixed
     // parcel the player edits (M3.T18), never one the market moves.
     if (p.kind !== 'lot') return;
@@ -355,6 +391,9 @@ export function tickZoning(city, dt, street, hold = -1) {
       clearLot(p, dt);
     }
   });
+  // The standing buildings are the map's parcels, not the city's (createCity);
+  // a road op leaves one cut off and the same cause declines it here.
+  (city.standing ?? []).forEach(noRoad);
 }
 
 // How tall the parcel stands right now: the finished stage plus the share of the

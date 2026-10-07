@@ -10,7 +10,8 @@ import { buildArcUI, updateArcUI } from '../render/arcui.js';
 import { buildDispatchHud, updateDispatchHud } from '../ui/dispatch.js';
 import { buildDoorHud, updateDoorHud, fadeThroughDoor } from '../render/doorhud.js';
 import { buildProfiler, updateProfiler } from '../render/profiler.js';
-import { profilerTarget, zoneAt, hackCooldownLeft } from '../sim/street.js';
+import { buildAim, updateAim } from '../render/aim.js';
+import { zoneAt, hackCooldownLeft } from '../sim/street.js';
 import { focusParcel } from '../sim/decline.js';
 import { isBusted } from '../sim/wanted.js';
 import { STREET, doorEnds } from '../sim/interior.js';
@@ -19,10 +20,6 @@ import { STREET, doorEnds } from '../sim/interior.js';
 const DRAW_BUDGET = 175;
 // The status line refreshes four times a second, on the player's clock.
 const STATUS_SECS = 0.25;
-// Profiler lock: acquire by facing cone, hold while within 14m.
-const LOCK_RANGE = 14;
-
-let lockedNpc = null;
 
 // Dev pose presets for scripted verification (?spawn=east): where the player
 // stands and where the follow cam looks for evidence shots (scripts/shot.mjs).
@@ -87,6 +84,7 @@ export function buildHud(newsLine) {
   const radio = buildDispatchHud();
   const doorHud = buildDoorHud();
   buildProfiler();
+  buildAim();
   const el = document.getElementById('hud');
   const prompt = box('prompt', [
     'position:fixed', 'bottom:44px', 'left:50%', 'transform:translateX(-50%)',
@@ -131,25 +129,6 @@ function stackBottomLeft(els) {
   }
 }
 
-// The profiler's sticky lock: the HUD owns which NPC is targeted, the sim only
-// reads the profile the frame reports.
-export function acquire(street, x, z, yaw) {
-  const fx = Math.sin(yaw);
-  const fz = Math.cos(yaw);
-  if (lockedNpc) {
-    const d = Math.hypot(lockedNpc.x - x, lockedNpc.z - z);
-    if (d <= LOCK_RANGE && d >= 0.4) return { npc: lockedNpc, dist: d };
-    lockedNpc = null;
-  }
-  const t = profilerTarget(street, x, z, fx, fz);
-  if (t) lockedNpc = t.npc;
-  return t;
-}
-
-export function clearTarget() {
-  lockedNpc = null;
-}
-
 function hackStatus(street, player, heroCar, dark) {
   const zone = zoneAt(player.mode === 'drive' ? heroCar.z : player.z);
   const left = hackCooldownLeft(street, zone);
@@ -163,16 +142,21 @@ function hackStatus(street, player, heroCar, dark) {
 }
 
 // Everything in the frame that is not a measured number: the panels, the arc,
-// the lot note, the door prompt and the profiler. Returns the profile the frame
-// reported, which main hands to the mission and the next step. `frame.doing` is
-// the commuter's destination line, computed by main.
+// the lot note, the door prompt, the registry aim and the walker profile.
+// Returns the profile the frame reported, which main hands to the mission and
+// the next step. `frame.doing` is the commuter's destination line, computed by
+// main. `frame.target` is the registry pick ({ entry, dist }); the profiler is
+// the person case of it.
 export function updateHud(hud, ctx, frame) {
   const { city, street, dispatch, arc, interior, cam, camera } = ctx;
   const { driving, hx, hz, target, targetPerson, doing, nearHero } = frame;
   updateEconomyPanel(hud.economyPanel, city);
   updateDispatchHud(hud.radio, dispatch, street.time);
   updateArcUI(hud.arcUI, arc, hx, hz, street.time);
-  const profile = driving ? null : updateProfiler(camera, target, targetPerson, doing);
+  const person = !driving && target?.entry.kind === 'person'
+    ? { npc: target.entry.ref, dist: target.dist } : null;
+  const profile = driving ? null : updateProfiler(camera, person, targetPerson, doing);
+  updateAim(camera, driving ? null : target);
   showLotNote(hud.lotNote, interior.space === STREET
     ? focusParcel(city.parcels, hx, hz, Math.sin(cam.yaw), Math.cos(cam.yaw)) : null);
   updateDoorHud(hud.doorHud, driving ? null : interior.near);
