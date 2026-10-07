@@ -101,7 +101,8 @@
         "M5.T5"
       ],
       "commit": "M5.T6 (M5-3): no road, no life",
-      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-3: **Bulldoze a road:** A/B, removing a generated road: no car uses it within 10 game seconds, commuters who used it arrive later than in B, and a building with no other road declines with the reason \"no road\" (checked by `tests/accept/m5-noroad.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-3: **Bulldoze a road:** A/B, removing a generated road: no car uses it within 10 game seconds, commuters who used it arrive later than in B, and a building with no other road declines with the reason \"no road\" (checked by `tests/accept/m5-noroad.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-noroad.test.js"
     },
     {
       "id": "M5.T7",
@@ -116,7 +117,8 @@
         "M4.T12"
       ],
       "commit": "M5.T7 (M5-2): story places move",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m5-bulldoze.spec.js"
     },
     {
       "id": "M5.T8",
