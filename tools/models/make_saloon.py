@@ -118,10 +118,13 @@ def paint_texture(material):
     # The game's hero/traffic sort classifies a part as paint by the presence
     # of a baseColorTexture (render/traffic.js heroSort), so the paint material
     # must carry one. A near-white 8x8 lets the fleet's per-car instanceColor
-    # tint it; the hero car reads as the light grey the pixel holds.
+    # tint it; the hero car reads as the light grey the pixel holds. The byte is
+    # capped at 0.78 (= #c7) by M2.F4b: 0.82 blew out to flat white under the
+    # street lamps. Blender writes the pixel straight to the PNG, so the stored
+    # byte is the sRGB the driver sees.
     path = os.path.join(tempfile.gettempdir(), "urbis_saloon_paint.png")
     img = bpy.data.images.new("SaloonPaint", 8, 8, alpha=False)
-    img.pixels = [0.82, 0.83, 0.85, 1.0] * (8 * 8)
+    img.pixels = [0.78, 0.785, 0.79, 1.0] * (8 * 8)
     img.filepath_raw = path
     img.file_format = "PNG"
     img.save()
@@ -286,7 +289,7 @@ def main():
     sc.unit_settings.length_unit = "METERS"
     sc.unit_settings.scale_length = 1.0
 
-    paint = principled("Paint", (0.80, 0.81, 0.83), 0.30, 0.15)
+    paint = principled("Paint", (0.78, 0.785, 0.79), 0.42, 0.15)
     paint_texture(paint)
     glass = principled("Glass", (0.02, 0.03, 0.05), 0.08, 0.35)
     tyre = principled("Tyre", (0.018, 0.018, 0.02), 0.92, 0.0)
@@ -304,10 +307,16 @@ def main():
         ((-0.55, 0.75, -2.075), (0.38, 0.20, 0.10)),
     ], light)
 
-    trim_parts = boxes("TrimParts", [
+    # Bumpers are the car's length and its lowest painted line: they must wear
+    # the body colour. In dark trim they read as a rectangular plinth the car
+    # sat on (M2.F4b) and hid the wheels from a rear-quarter camera.
+    bumpers = boxes("Bumpers", [
         ((0.0, 0.38, 2.18), (1.72, 0.40, 0.24)),    # front bumper
-        ((0.0, 0.52, 2.12), (0.72, 0.20, 0.12)),    # grille
         ((0.0, 0.37, -2.16), (1.72, 0.38, 0.28)),   # rear bumper
+    ], paint)
+
+    trim_parts = boxes("TrimParts", [
+        ((0.0, 0.52, 2.12), (0.72, 0.20, 0.12)),    # grille
         ((0.855, 0.30, 0.0), (0.07, 0.14, 2.0)),    # right rocker
         ((-0.855, 0.30, 0.0), (0.07, 0.14, 2.0)),   # left rocker
         ((0.90, 1.02, 0.40), (0.13, 0.09, 0.17)),   # right mirror
@@ -322,7 +331,7 @@ def main():
         make_wheel("Wheel_RR", TRACK_X, AXLE_R, tyre),
     ]
 
-    objs = [body, lights, trim_parts] + wheels
+    objs = [body, bumpers, lights, trim_parts] + wheels
     for o in objs:
         add_uvs(o)
         crease_and_smooth(o)

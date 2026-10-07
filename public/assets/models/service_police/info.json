@@ -1,1 +1,1 @@
-{"id": "service_police", "name": "Police station", "type": "models", "license": "generated", "fmt": "glb", "tris": 912, "size_m": {"w": 11.0, "h": 8.85, "d": 10.75}, "origin": "base centre, Y-up, front +Z", "source": "Blender-authored for M5.T10, M2 pipeline Blender stage; palette + glass materials"}
+{"id": "service_police", "name": "Police station", "type": "models", "license": "generated", "fmt": "glb", "tris": 2256, "size_m": {"w": 11.0, "h": 8.85, "d": 10.75}, "origin": "base centre, Y-up, front +Z", "source": "tools/models/make_services.py"}
