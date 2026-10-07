@@ -19,7 +19,7 @@ were copied (no preview renders). Each folder keeps its upstream `info.json`.
 - Poly Haven Sandstone Blocks 08 — CC0 — https://polyhaven.com/a/sandstone_blocks_08 — tower facade (VGA-084.2a)
 - Poly Haven Street Lamp 01 / fire hydrant / metal trash can (GLTF, CC0, Josh Dean + authors in per-folder info.json) — vendored under models/, unwired: GLB→instanced pipeline lands in its own slice
 - `models/car/car.glb` — generated: a modern four-door saloon built in Blender by `tools/models/make_saloon.py` (CC0) — 2,534 tris, 4.60 × 1.93 × 1.45 m, bonnet/glass cabin/boot, wheels as separate Wheel_FL/FR/RL/RR nodes — hero/traffic car body (M2.F4)
-- `models/person.glb` — generated: MPFB (MakeHuman Community, CC0 output) body with its `cmu_mb` game rig, walk retargeted from CMU mocap trial 08_01 (cgspeed MotionBuilder-friendly BVH conversion; CMU's database is free for all uses) by `tools/models/make_person.py` — 9,500 tris, one 1.0 s `Walk` cycle — the player (M2.F2)
+- `models/person.glb` — generated: MPFB (MakeHuman Community) body dressed from the MakeHuman system asset pack (makehuman_system_assets_cc0, CC0): middleage caucasian male skin, low-poly eyes, short02 hair, male casualsuit02 and shoes05, with the `cmu_mb` game rig; walk retargeted from CMU mocap trial 08_01 (cgspeed MotionBuilder-friendly BVH conversion; CMU's database is free for all uses) and an `Idle` clip holding the cycle's rest frame, both by `tools/models/make_person.py` — 14,000 tris, one skinned mesh — the player (M2.F2c)
 
 Technique mined alongside (from their `AssetLoader.js` + buildings materials):
 albedo/emissive maps in sRGB, data maps (normal/rough/metal) linear, RepeatWrapping,
