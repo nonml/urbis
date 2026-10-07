@@ -14,12 +14,18 @@ export function loadPersonAvatar(avatar) {
     const skinned = gltf.scene.getObjectByProperty('isSkinnedMesh', true);
     const clip = (gltf.animations ?? []).find((c) => /walk/i.test(c.name));
     if (!skinned || !clip) return;
-    avatar.mixer = new THREE.AnimationMixer(skinned);
+    // The armature, not the bare mesh: the clip's tracks bind bones by name and
+    // a bone outside the drawn tree never gets its world matrix updated, so the
+    // skin collapsed at the group origin. gltf.scene carries both the bones and
+    // the skinned mesh as one subtree, grounded at feet y=0.
+    avatar.mixer = new THREE.AnimationMixer(gltf.scene);
     avatar.mixer.clipAction(clip).play();
     for (const m of [...avatar.group.children]) avatar.group.remove(m);
     skinned.castShadow = true;
     skinned.userData.model = PERSON_MODEL;
-    avatar.group.add(skinned);
+    avatar.group.add(gltf.scene);
+    // M2.F2b: the box figure is gone and the GLB is in the group.
+    avatar.skinned = true;
   }).catch(() => {});
 }
 
@@ -167,9 +173,6 @@ export function buildPlayer() {
     ...coatFabric(0.5),
   });
   const coat = new THREE.Mesh(coatGeo, coatMat);
-  // The procedural fallback wears the same model tag the GLB takes (M2-6), so
-  // the sweep reads a person either way; loadPersonAvatar replaces the tag.
-  coat.userData.model = 'player-avatar';
   coat.castShadow = true;
   const headGeo = new THREE.SphereGeometry(0.13, 18, 12);
   headGeo.scale(0.92, 1.12, 1.0);
@@ -178,7 +181,6 @@ export function buildPlayer() {
     new THREE.MeshStandardMaterial({ map: heroFaceTexture(), roughness: 0.6 })
   );
   head.position.y = 1.70;
-  head.userData.model = 'player-avatar';
   const legMat = new THREE.MeshStandardMaterial({ color: 0x090b0e, roughness: 0.85 });
   // Trousers with a knee: the calf steps forward out of the thigh, so the leg
   // bends where a leg bends instead of at the midpoint of one flat cylinder.
@@ -197,10 +199,8 @@ export function buildPlayer() {
   ]);
   const legL = new THREE.Mesh(legGeo, legMat);
   legL.position.set(-0.11, 0.72, 0);
-  legL.userData.model = 'player-avatar';
   const legR = new THREE.Mesh(legGeo, legMat);
   legR.position.set(0.11, 0.72, 0);
-  legR.userData.model = 'player-avatar';
   // A sleeve that ends in a wrist and a hand, not a capped pipe: the capsule
   // rounds the cuff, the palm is a small sphere below it.
   const armGeo = mergeGeometries([
@@ -210,10 +210,8 @@ export function buildPlayer() {
   bakeVerticalShade(weaveUVs(armGeo), 1.40);
   const armL = new THREE.Mesh(armGeo, coatMat);
   armL.position.set(-0.278, 1.40, 0);
-  armL.userData.model = 'player-avatar';
   const armR = new THREE.Mesh(armGeo, coatMat);
   armR.position.set(0.278, 1.40, 0);
-  armR.userData.model = 'player-avatar';
   // One dark-kit mesh: a capsule pack with a rounded flap, capsule straps, the
   // belt and buckle, and the hair cap. All one material, so the back of the
   // hero gains the only object the player stares at all game without costing a
@@ -249,7 +247,6 @@ export function buildPlayer() {
       color: 0x0a0e14, roughness: 0.8, metalness: 0.2, vertexColors: true,
     })
   );
-  backpack.userData.model = 'player-avatar';
   group.add(coat, head, legL, legR, armL, armR, backpack);
   const avatar = { group, legL, legR, armL, armR };
   loadPersonAvatar(avatar);
