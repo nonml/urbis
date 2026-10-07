@@ -1,120 +1,242 @@
 #!/usr/bin/env python3
-# M2.T4: MPFB proportions as boxes (deterministic without Blender), CMU gait as
-# ±30° thigh swing, knee bend, counter-swinging arms, 3 cm hip bob, 1 s loop.
-# Writes PERSON_OUT (default public/assets/models/person.glb): one skinned
-# mesh, one Walk clip, ~150 triangles of the 10,000 budget. Stdlib only.
-import json, math, os, struct
+# M2.F2 (M2-0, M2-2): the player person, a real model instead of boxes.
+# Plain `python3 make_person.py` locates Blender and runs this same file inside
+# `blender --background`; the bpy half is the PERSON_STAGE=bake branch below.
+#
+# In Blender: MPFB builds a realistic human body and its cmu_mb rig; the CMU
+# mocap walk vendored at tools/models/mocap/cmu-08_01-walk.bvh has its joints
+# copied pose-for-pose onto the rig for one full gait cycle, grounded every
+# frame; the body is decimated under the tri budget, vertex-coloured and
+# exported to PERSON_OUT (default public/assets/models/person.glb): one skinned
+# mesh, one `Walk` clip, one material.
+import os
+import shutil
+import subprocess
+import sys
+from pathlib import Path
 
+ROOT = Path(__file__).resolve().parent
+BVH = ROOT / 'mocap' / 'cmu-08_01-walk.bvh'
+DEFAULT_OUT = 'public/assets/models/person.glb'
 TRI_BUDGET = 10000
-OUT = os.environ.get('PERSON_OUT', 'public/assets/models/person.glb')
 
-# name, parent, rest position.
-BONES = [('hips', -1, (0.0, 0.95, 0.0)), ('thighL', 0, (-0.11, 0.90, 0.0)),
-    ('shinL', 1, (-0.11, 0.48, 0.01)), ('thighR', 0, (0.11, 0.90, 0.0)),
-    ('shinR', 3, (0.11, 0.48, 0.01)), ('spine', 0, (0.0, 1.30, 0.0)),
-    ('armL', 5, (-0.30, 1.42, 0.0)), ('armR', 5, (0.30, 1.42, 0.0))]
-BI = {name: i for i, (name, _, _) in enumerate(BONES)}
+# Skin, coat, trousers, shoes, in linear RGB (glTF COLOR_0 is linear).
+SKIN = (0.31, 0.21, 0.145)
+COAT = (0.024, 0.075, 0.09)
+TROUSERS = (0.016, 0.02, 0.026)
+SHOES = (0.01, 0.01, 0.012)
 
-# bone, center, size. One bone per box, weight 1: no candy-wrapper knees.
-# Symmetric pairs generated, so left and right can never drift apart.
-PARTS = [('hips', (0, 0.99, 0), (0.30, 0.20, 0.19)),
-    ('spine', (0, 1.30, 0), (0.34, 0.44, 0.22)),
-    ('spine', (0, 1.70, 0), (0.20, 0.24, 0.22))]
-for s, b in ((-1, 'L'), (1, 'R')):
-    PARTS += [('thigh' + b, (s * 0.11, 0.69, 0), (0.13, 0.42, 0.15)),
-        ('shin' + b, (s * 0.11, 0.27, 0.01), (0.11, 0.42, 0.13)),
-        ('shin' + b, (s * 0.11, 0.035, 0.05), (0.11, 0.07, 0.26)),
-        ('arm' + b, (s * 0.30, 1.25, 0), (0.09, 0.36, 0.10)),
-        ('arm' + b, (s * 0.30, 1.00, 0), (0.08, 0.16, 0.09))]
 
-# Outward-CCW quads over the 8 corners; doubleSided in the material backs it.
-C = [(-1, -1, -1), (1, -1, -1), (1, 1, -1), (-1, 1, -1),
-     (-1, -1, 1), (1, -1, 1), (1, 1, 1), (-1, 1, 1)]
-FACES = [
-    ((0, 0, -1), [0, 3, 2, 0, 2, 1]), ((0, 0, 1), [4, 5, 6, 4, 6, 7]),
-    ((-1, 0, 0), [0, 4, 7, 0, 7, 3]), ((1, 0, 0), [1, 2, 6, 1, 6, 5]),
-    ((0, -1, 0), [0, 1, 5, 0, 5, 4]), ((0, 1, 0), [3, 7, 6, 3, 6, 2]),
-]
+def blender_binary():
+    for cand in (os.environ.get('BLENDER'), shutil.which('blender'),
+                 '/Applications/Blender.app/Contents/MacOS/Blender',
+                 '/usr/bin/blender'):
+        if cand and Path(cand).exists():
+            return cand
+    sys.exit('Blender not found: install it with `bash tools/models/setup.sh`, '
+             'or set BLENDER to the binary. The person is a Blender bake.')
 
-QX = lambda a: (math.sin(a / 2), 0.0, 0.0, math.cos(a / 2))
-T = [0.0, 0.25, 0.5, 0.75, 1.0]
-WALK = [  # node, path, per-key values over T.
-    ('thighL', 'rotation', [QX(a) for a in (0, -0.55, 0, 0.55, 0)]),
-    ('thighR', 'rotation', [QX(a) for a in (0, 0.55, 0, -0.55, 0)]),
-    ('shinL', 'rotation', [QX(a) for a in (-0.12, -0.55, -0.12, -0.12, -0.12)]),
-    ('shinR', 'rotation', [QX(a) for a in (-0.12, -0.12, -0.12, -0.55, -0.12)]),
-    ('armL', 'rotation', [QX(a) for a in (0, 0.45, 0, -0.45, 0)]),
-    ('armR', 'rotation', [QX(a) for a in (0, -0.45, 0, 0.45, 0)]),
-    ('hips', 'translation', [(0.0, y, 0.0) for y in (0.95, 0.92, 0.95, 0.92, 0.95)]),
-]
+
+def configured_out():
+    return Path(os.environ.get('PERSON_OUT', DEFAULT_OUT)).resolve()
+
+
+def run_blender():
+    if not BVH.is_file():
+        sys.exit(f'CMU walk clip missing: {BVH}')
+    env = {**os.environ, 'PERSON_STAGE': 'bake', 'PERSON_OUT': str(configured_out())}
+    subprocess.run([blender_binary(), '--background', '--python-exit-code', '1',
+                    '--python', str(Path(__file__).resolve())], check=True, env=env)
+    out = configured_out()
+    if not out.is_file():
+        sys.exit(f'Blender finished but {out} was not written')
+    print(f'{out}: {out.stat().st_size / 1024:.1f} KB')
+
+
+if os.environ.get('PERSON_STAGE') != 'bake':  # host side: python3 make_person.py
+    run_blender()
+    sys.exit(0)
+
+import bpy  # noqa: E402  (only reachable inside Blender)
+from mathutils import Vector  # noqa: E402
+
+try:  # Blender 4.2+ extensions load under bl_ext.
+    from bl_ext.blender_org.mpfb.services.humanservice import HumanService
+except ImportError:  # older MPFB installs
+    try:
+        from mpfb.services.humanservice import HumanService
+    except ImportError as exc:
+        sys.exit('MPFB is not installed in Blender: run `bash tools/models/setup.sh` '
+                 f'({exc})')
+
+
+def clear_scene():
+    for ob in list(bpy.data.objects):
+        bpy.data.objects.remove(ob, do_unlink=True)
+
+
+def import_walk():
+    bpy.ops.import_anim.bvh(filepath=str(BVH), axis_forward='-Z', axis_up='Y',
+                            rotate_mode='XYZ', global_scale=1.0, use_fps_scale=False,
+                            update_scene_fps=False, update_scene_duration=True)
+    source = bpy.context.object
+    source.name = 'CMU walk'
+    return source
+
+
+def gait_window(source):
+    """One full gait cycle: the lag at which the two feet's forward separation
+    best repeats itself, so the clip loops seam-free instead of playing the
+    whole trial. start is the stride's widest frame, where a cycle begins."""
+    end = bpy.context.scene.frame_end
+    sep = []
+    for f in range(1, end + 1):
+        bpy.context.scene.frame_set(f)
+        bpy.context.view_layer.update()
+        sep.append(source.pose.bones['LeftFoot'].head.y
+                   - source.pose.bones['RightFoot'].head.y)
+    mean = sum(sep) / len(sep)
+    signal = [v - mean for v in sep]
+    best_lag = max(range(20, len(signal) // 2),
+                   key=lambda lag: sum(signal[i] * signal[i + lag]
+                                       for i in range(len(signal) - lag)) / (len(signal) - lag))
+    start = max(range(10, len(signal) - 10), key=lambda i: signal[i])
+    return start + 1, best_lag
+
+
+def retarget(source, rig, frame):
+    """Copy each joint's world orientation from the CMU skeleton to the fitted
+    rig: same topology, same facing, so the pose transfers exactly and the
+    mesh's own joint lengths produce a human of its own build."""
+    bpy.context.scene.frame_set(frame)
+    bpy.context.view_layer.update()
+
+    def visit(pb, parent_pose):
+        desired = pb.matrix.to_3x3()
+        target = rig.pose.bones.get(pb.name)
+        if target:
+            rest = target.bone.matrix_local.to_3x3()
+            if pb.parent is None:
+                basis = rest.inverted() @ desired
+            else:
+                parent_rest = target.parent.bone.matrix_local.to_3x3()
+                basis = rest.inverted() @ parent_rest @ parent_pose.inverted() @ desired
+            target.rotation_mode = 'QUATERNION'
+            target.rotation_quaternion = basis.to_quaternion()
+        for child in pb.children:
+            visit(child, desired)
+
+    for pb in source.pose.bones:
+        if pb.parent is None:
+            visit(pb, None)
+    bpy.context.view_layer.update()
+
+
+def ground(rig, body):
+    """Put the lowest point of the posed body on z = 0: feet on the pavement."""
+    deps = bpy.context.evaluated_depsgraph_get()
+    mesh = body.evaluated_get(deps).to_mesh()
+    low = min((body.matrix_world @ v.co).z for v in mesh.vertices)
+    body.evaluated_get(deps).to_mesh_clear()
+    hips = rig.pose.bones['Hips']
+    rest = hips.bone.matrix_local.to_3x3()
+    hips.location = hips.location + rest.inverted() @ Vector((0.0, 0.0, -low))
+    bpy.context.view_layer.update()
+
+
+def bake_walk(source, rig, body, start, cycle):
+    bpy.context.preferences.edit.keyframe_new_interpolation_type = 'LINEAR'
+    for frame in range(start, start + cycle + 1):
+        retarget(source, rig, frame)
+        ground(rig, body)
+        for pb in rig.pose.bones:
+            pb.keyframe_insert(data_path='rotation_quaternion', frame=frame)
+        rig.pose.bones['Hips'].keyframe_insert(data_path='location', frame=frame)
+    action = rig.animation_data.action
+    action.name = 'Walk'
+    return action
+
+
+def decimate(body):
+    bpy.context.view_layer.objects.active = body
+    body.select_set(True)
+    if body.data.shape_keys:
+        bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
+    for mod in list(body.modifiers):
+        if mod.type == 'MASK':
+            bpy.ops.object.modifier_apply(modifier=mod.name)
+    tris = sum(len(p.vertices) - 2 for p in body.data.polygons)
+    mod = body.modifiers.new('Budget', 'DECIMATE')
+    mod.ratio = min(1.0, (TRI_BUDGET - 500) / max(1, tris))
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    return sum(len(p.vertices) - 2 for p in body.data.polygons)
+
+
+def paint(body):
+    groups = {g.index: g.name for g in body.vertex_groups}
+    layer = body.data.color_attributes.new(name='Col', type='FLOAT_COLOR', domain='POINT')
+    for v in body.data.vertices:
+        best = max(v.groups, key=lambda g: g.weight, default=None)
+        name = groups.get(best.group, '') if best else ''
+        if any(k in name for k in ('Hand', 'Head', 'Neck')):
+            col = SKIN
+        elif any(k in name for k in ('Arm', 'Shoulder')):
+            col = COAT
+        elif any(k in name for k in ('UpLeg', 'Leg')):
+            col = TROUSERS
+        elif any(k in name for k in ('Foot', 'Toe')):
+            col = SHOES
+        else:
+            col = COAT if v.co.z > 1.04 else TROUSERS
+        layer.data[v.index].color = (*col, 1.0)
+    mat = bpy.data.materials.new('person')
+    mat.use_nodes = True
+    nodes = mat.node_tree.nodes
+    bsdf = nodes.get('Principled BSDF')
+    vcol = nodes.new('ShaderNodeVertexColor')
+    vcol.layer_name = 'Col'
+    mat.node_tree.links.new(vcol.outputs['Color'], bsdf.inputs['Base Color'])
+    bsdf.inputs['Roughness'].default_value = 0.65
+    body.data.materials.clear()
+    body.data.materials.append(mat)
+
+
+def export(body, rig, out):
+    for ob in bpy.data.objects:
+        ob.select_set(False)
+    body.select_set(True)
+    rig.select_set(True)
+    bpy.context.view_layer.objects.active = rig
+    bpy.ops.export_scene.gltf(
+        filepath=str(out), export_format='GLB', use_selection=True, export_apply=True,
+        export_texcoords=False, export_normals=True, export_skins=True,
+        export_animations=True, export_animation_mode='ACTIONS',
+        export_optimize_animation_size=True, export_anim_slide_to_zero=True,
+        export_vertex_color='MATERIAL')
+
 
 def main():
-    pos, nrm, jnt, wgt = [], [], [], []
-    for bone, (cx, cy, cz), (sx, sy, sz) in PARTS:
-        j = BI[bone]
-        for n, quad in FACES:
-            for ci in quad:
-                x, y, z = C[ci]
-                pos += [cx + x * sx / 2, cy + y * sy / 2, cz + z * sz / 2]
-                nrm += list(n)
-                jnt += [j, 0, 0, 0]
-                wgt += [1.0, 0.0, 0.0, 0.0]
-    n = len(pos) // 3
-    tris = n // 3
-    assert tris < TRI_BUDGET, f'over budget: {tris} triangles'
-    ibm = []
-    for _, _, (x, y, z) in BONES:
-        ibm += [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, -x, -y, -z, 1]
-    bin_parts, views, accs = [], [], []
-
-    def push(data, ctype, atype, count):
-        views.append({'buffer': 0, 'byteOffset': sum(map(len, bin_parts)), 'byteLength': len(data)})
-        bin_parts.append(data)
-        accs.append({'bufferView': len(views) - 1, 'componentType': ctype, 'type': atype, 'count': count})
-        return len(accs) - 1
-
-    F = lambda v: struct.pack('<%df' % len(v), *v)
-
-    a_pos = push(F(pos), 5126, 'VEC3', n)
-    a_nrm = push(F(nrm), 5126, 'VEC3', n)
-    jd = b''.join(struct.pack('BBBB', *jnt[i:i + 4]) for i in range(0, len(jnt), 4))
-    a_jnt = push(jd, 5121, 'VEC4', n)
-    a_wgt = push(F(wgt), 5126, 'VEC4', n)
-    a_ibm = push(F(ibm), 5126, 'MAT4', len(BONES))
-    a_time = push(F(T), 5126, 'SCALAR', len(T))
-    samplers, channels = [], []
-    for node, path, keys in WALK:
-        flat = [v for key in keys for v in key]
-        a_out = push(F(flat), 5126, 'VEC4' if path == 'rotation' else 'VEC3', len(keys))
-        samplers.append({'input': a_time, 'output': a_out})
-        channels.append({'sampler': len(samplers) - 1, 'target': {'node': BI[node], 'path': path}})
-    nodes = []
-    for i, (name, p, rest) in enumerate(BONES):
-        base = BONES[p][2] if p >= 0 else (0, 0, 0)
-        nd = {'name': name, 'translation': [a - b for a, b in zip(rest, base)]}
-        kids = [j for j, (_, q, _) in enumerate(BONES) if q == i]
-        if kids:
-            nd['children'] = kids
-        nodes.append(nd)
-    nodes.append({'name': 'PersonMesh', 'mesh': 0, 'skin': 0})
-    doc = {'asset': {'version': '2.0', 'generator': 'make_person.py (M2.T4)'}, 'scene': 0,
-        'scenes': [{'nodes': [0, len(nodes) - 1]}], 'nodes': nodes,
-        'skins': [{'joints': list(range(len(BONES))), 'inverseBindMatrices': a_ibm}],
-        'meshes': [{'primitives': [{'attributes': {'POSITION': a_pos, 'NORMAL': a_nrm,
-        'JOINTS_0': a_jnt, 'WEIGHTS_0': a_wgt}, 'material': 0}]}],
-        'materials': [{'name': 'coat', 'doubleSided': True, 'pbrMetallicRoughness': {
-        'baseColorFactor': [0.05, 0.13, 0.15, 1.0], 'roughnessFactor': 0.6, 'metallicFactor': 0.1}}],
-        'animations': [{'name': 'Walk', 'samplers': samplers, 'channels': channels}],
-        'accessors': accs, 'bufferViews': views, 'buffers': [{'byteLength': sum(len(p) for p in bin_parts)}]}
-    jb = json.dumps(doc).encode()
-    jb += b' ' * (-len(jb) % 4)
-    bb = b''.join(bin_parts)
-    bb += b'\x00' * (-len(bb) % 4)
-    glb = struct.pack('<III', 0x46546C67, 2, 12 + 8 + len(jb) + 8 + len(bb))
-    glb += struct.pack('<I', len(jb)) + b'JSON' + jb
-    glb += struct.pack('<I', len(bb)) + b'BIN\x00' + bb
-    open(OUT, 'wb').write(glb)
-    print(f'{OUT}: {n} verts, {tris} tris, {len(BONES)} joints, {len(glb) / 1024:.1f} KB')
+    out = configured_out()
+    out.parent.mkdir(parents=True, exist_ok=True)
+    clear_scene()
+    # The CMU trials are captured at 120 fps; keep the clip a real second long.
+    bpy.context.scene.render.fps = 120
+    bpy.context.scene.render.fps_base = 1.0
+    body = HumanService.create_human()
+    rig = HumanService.add_builtin_rig(body, 'cmu_mb')
+    source = import_walk()
+    bvh_action = bpy.data.actions.get(source.animation_data.action.name)
+    start, cycle = gait_window(source)
+    bake_walk(source, rig, body, start, cycle)
+    bpy.data.objects.remove(source, do_unlink=True)
+    if bvh_action and bvh_action.users == 0:
+        bpy.data.actions.remove(bvh_action)
+    tris = decimate(body)
+    paint(body)
+    export(body, rig, out)
+    print(f'M2.F2 person: {len(body.data.vertices)} verts, {tris} tris, '
+          f'{len(rig.data.bones)} joints, walk frames {start}..{start + cycle}, '
+          f'{out.stat().st_size / 1024:.1f} KB')
 
 
 if __name__ == '__main__':
