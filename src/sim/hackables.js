@@ -6,7 +6,7 @@
 // Static entries derive from the map and rebuild when map.version moves; live
 // ones (cars, walkers, growing lots) update in place through syncHackables().
 // Deterministic and pure (law 5): map data only, no RNG, no three.js, no DOM.
-// Aim (M6.T2) reads it through hackablesNear().
+// Aim (M6.T2) reads it through aimTarget(): nearest, in the view cone, in sight.
 import { STAGE, districtAt as areaAt, frontageRoad, projectOnSegment } from './map.js';
 import { ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 
@@ -286,6 +286,58 @@ export function hackablesNear(reg, x, z, range = HACK_RANGE) {
     if (dist <= range) out.push({ entry: e, dist });
   }
   return out.sort((a, b) => a.dist - b.dist);
+}
+
+// Aim (M6.T2, M6-1): the nearest registered thing inside the view cone and in
+// sight, at most HACK_RANGE away — street.js profilerTarget's replacement, every
+// kind aiming through the registry. A 2D ray over the parcel footprints blocks a
+// wall; an empty lot is open ground.
+
+// ~30° off the view axis — profilerTarget's cone, kept.
+export const AIM_COS = 0.86;
+// A thing on the lens has no heading, so it cannot be aimed.
+const AIM_MIN_DIST = 0.5;
+
+// The t-range of the segment inside [lo, hi], or null when it misses entirely.
+function axisRange(s, d, lo, hi) {
+  if (Math.abs(d) < 1e-9) return s >= lo && s <= hi ? [0, 1] : null;
+  const a = (lo - s) / d;
+  const b = (hi - s) / d;
+  return a < b ? [a, b] : [b, a];
+}
+
+// True when the segment crosses the footprint's box, t within [0, 1].
+function crossesBox(x0, z0, x1, z1, p) {
+  const tx = axisRange(x0, x1 - x0, p.x - p.w / 2, p.x + p.w / 2);
+  const tz = axisRange(z0, z1 - z0, p.z - p.d / 2, p.z + p.d / 2);
+  if (!tx || !tz) return false;
+  return Math.max(tx[0], tz[0], 0) <= Math.min(tx[1], tz[1], 1);
+}
+
+// Is the segment clear of walls? `skipId` is the target's own parcel, since a
+// building's aim point sits inside its own footprint.
+export function sightClear(map, x0, z0, x1, z1, skipId = null) {
+  for (const p of map.parcels ?? []) {
+    if (p.id === skipId) continue;
+    if (p.kind === 'lot' && p.stage < STAGE.LOW) continue;
+    if (crossesBox(x0, z0, x1, z1, p)) return false;
+  }
+  return true;
+}
+
+// The aim pick: down (fx, fz) from (px, pz), nearest in the cone with a clear
+// line, or null — the render half is src/render/aim.js.
+export function aimTarget(reg, px, pz, fx, fz, range = HACK_RANGE) {
+  const len = Math.hypot(fx, fz) || 1;
+  const ux = fx / len;
+  const uz = fz / len;
+  for (const { entry, dist } of hackablesNear(reg, px, pz, range)) {
+    if (dist < AIM_MIN_DIST) continue;
+    if (((entry.x - px) * ux + (entry.z - pz) * uz) / dist < AIM_COS) continue;
+    if (!sightClear(reg.map, px, pz, entry.x, entry.z, entry.ref?.id ?? null)) continue;
+    return { entry, dist };
+  }
+  return null;
 }
 
 export function hackableById(reg, id) {

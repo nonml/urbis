@@ -29,6 +29,25 @@
       "test": "tests/accept/m6-aim.spec.js"
     },
     {
+      "id": "M6.T2b",
+      "lane": "hack-render",
+      "needs": [
+        "M6.T2"
+      ],
+      "goal": "Wire the aim. src/render/aim.js (M6.T2) is imported by nothing and the HUD still uses street.js profilerTarget; make the registry aim the one the player sees: the highlight and the 'name \u00b7 \u20a1cost' label drawn every frame from the registry pick, profilerTarget deleted",
+      "files": [
+        "src/render/aim.js",
+        "src/game/hud.js",
+        "src/main.js",
+        "src/sim/street.js",
+        "src/sim/hackables.js",
+        "docs/shots/"
+      ],
+      "test": "tests/accept/m6-aim-wired.test.js",
+      "commit": "M6.T2b (M6-1): the aim is the one the player sees",
+      "notes": "Size S. Delete profilerTarget and move its callers to the registry pick; the profiler's existing behaviour on walkers must keep working through the registry (people are registered things). tests/accept/m6-aim.spec.js stays green; draws must not rise by more than 1 (declare it). Take docs/shots/m6-aim.png with scripts/shot.mjs facing something hackable: the highlight and label must be visible. Do not edit the test."
+    },
+    {
       "id": "M6.T3",
       "lane": "hack-render",
       "goal": "Fire and menu. One key fires a thing's default hack; holding it opens a menu of its hacks",
@@ -38,7 +57,8 @@
       ],
       "needs": [
         "M6.T2",
-        "M5.T26"
+        "M5.T26",
+        "M6.T2b"
       ],
       "commit": "M6.T3 (M6-4): fire and menu",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-4: **Every M6 hack, one test each:** fired by aim and key; its \"player sees\" visible at the play camera within 2 s; its \"city does\" shown by A/B within 5 game minutes; nothing outside its reach changes (M4-5's rule); the news line or dispatch names it; police who see it raise heat (checked by `tests/accept/m6-<hack>.spec.js`; shots `docs/shots/m6-<hack>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
