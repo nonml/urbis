@@ -112,6 +112,22 @@
       ],
       "commit": "M2.F2d (M2-0): the player stands naturally",
       "notes": "Size S. Rebake with `python3 tools/models/make_person.py` (about 10 s). Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose in daylight (key t), and look at it before finishing: arms down at the sides. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green. Commit as you go: a lane that stalls loses uncommitted work."
+    },
+    {
+      "id": "M2.F2e",
+      "lane": "people",
+      "goal": "Fix the standing pose's hips and legs. Since M2.F2d (8830e04) the arms hang down, good, but seen from behind in daylight: the hips collapse into a pinched dark blob where the jacket meets the trousers, the legs are pressed together with no gap, he stands on his toes, and the fingers splay. A relaxed stand is: feet flat and about shoulder-width apart (0.2-0.3 m between ankles), knees straight, pelvis level, hands loose with fingers together.",
+      "files": [
+        "tools/models/make_person.py",
+        "public/assets/models/person.glb",
+        "src/render/player.js",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M2.F2d"
+      ],
+      "commit": "M2.F2e (M2-0): the player stands on both feet",
+      "notes": "Size S. Rebake with `python3 tools/models/make_person.py`. Print the Idle pose's ankle separation and heel/toe heights from Blender and keep them in range. Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose in daylight (key t), crop the player to 200x300 px and look at it closely before finishing. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green. Commit as you go."
     }
   ]
 }
