@@ -144,11 +144,24 @@ function cruiserMesh(geo, mat, name, shadow) {
   return mesh;
 }
 
-// Empty until the GLB lands; lamps draw from frame one, bodies follow, as the
-// hero car does. Paint alone casts: the shadow reads from the shell.
+// The pool's meshes exist from frame one as empty stand-ins, as the traffic
+// fleet's shells do, so the drawn pose kit.mesh records for a cruiser exists
+// before the GLB lands (M0-9) and the model swaps the geometry and material in
+// place. Lamps draw from frame one, bodies follow. Paint alone casts: the
+// shadow reads from the shell.
 function buildCruiserPool() {
   const group = new THREE.Group();
-  const pool = { group, paint: null, trim: null, livery: null, n: 0, ready: false };
+  const shell = (name, shadow) => cruiserMesh(
+    new THREE.BufferGeometry(), new THREE.MeshBasicMaterial(), name, shadow
+  );
+  const pool = {
+    group,
+    paint: shell('police-cruiser-body', true),
+    trim: shell('police-cruiser-trim', false),
+    livery: shell('police-cruiser-livery', false),
+    n: 0, ready: false,
+  };
+  group.add(pool.paint, pool.trim, pool.livery);
   new GLTFLoader().loadAsync(POLICE_MODEL).then((gltf) => {
     gltf.scene.updateMatrixWorld(true);
     const out = { paintGeos: [], trimGeos: [], paintMat: null, trimMat: null };
@@ -158,21 +171,23 @@ function buildCruiserPool() {
     const trim = mergeGeometries([...out.trimGeos, ...cruiserBars()].map(modelClean));
     const livery = mergeGeometries(cruiserPanels().map(modelClean));
     if (!paint || !trim || !livery) return;
-    pool.paint = cruiserMesh(paint, out.paintMat, 'police-cruiser-body', true);
+    pool.paint.geometry = paint;
+    pool.paint.material = out.paintMat;
     for (let i = 0; i < MAX_CRUISERS; i++) pool.paint.setColorAt(i, LIVERY_TINT);
     pool.paint.instanceColor.needsUpdate = true;
-    pool.trim = cruiserMesh(trim, out.trimMat, 'police-cruiser-trim', false);
-    pool.livery = cruiserMesh(livery, new THREE.MeshStandardMaterial({
+    pool.trim.geometry = trim;
+    pool.trim.material = out.trimMat;
+    pool.livery.geometry = livery;
+    pool.livery.material = new THREE.MeshStandardMaterial({
       color: LIVERY_WHITE, roughness: 0.35, metalness: 0.1,
-    }), 'police-cruiser-livery', false);
-    group.add(pool.paint, pool.trim, pool.livery);
+    });
     pool.ready = true;
   }).catch(() => {});
   return pool;
 }
 
 function placeCruiser(pool, dummy, x, y, z, yaw) {
-  if (!pool.ready || pool.n >= MAX_CRUISERS) return;
+  if (pool.n >= MAX_CRUISERS) return;
   dummy.position.set(x, y, z);
   dummy.rotation.set(0, yaw, 0);
   dummy.scale.set(1, 1, 1);
@@ -352,8 +367,12 @@ export function buildKit() {
   mesh.visible = false;
   mesh.count = 0;
   const cruisers = buildCruiserPool();
+  // kit.mesh is the mesh the frame records each cruiser's drawn pose on (M0-9),
+  // as the old one-part kit did; the barricade, stinger and helicopter fold
+  // into props.
   return {
-    mesh, mat, parts: mesh.geometry.attributes.iPart, n: 0, dummy: new THREE.Object3D(), cruisers,
+    mesh: cruisers.paint, props: mesh,
+    mat, parts: mesh.geometry.attributes.iPart, n: 0, dummy: new THREE.Object3D(), cruisers,
   };
 }
 
@@ -364,7 +383,7 @@ export function beginKit(kit, rotorAngle) {
 }
 
 // One instance of `part` at (x, y, z) turned to `yaw`; `stretch` scales local x.
-// CRUISER rides the model pool, everything else the folding kit mesh.
+// CRUISER rides the model pool, everything else the folding props mesh.
 export function placeKit(kit, part, x, y, z, yaw, stretch = 1) {
   if (part === KIT.CRUISER) {
     placeCruiser(kit.cruisers, kit.dummy, x, y, z, yaw);
@@ -375,16 +394,16 @@ export function placeKit(kit, part, x, y, z, yaw, stretch = 1) {
   kit.dummy.rotation.set(0, yaw, 0);
   kit.dummy.scale.set(stretch, 1, 1);
   kit.dummy.updateMatrix();
-  kit.mesh.setMatrixAt(kit.n, kit.dummy.matrix);
+  kit.props.setMatrixAt(kit.n, kit.dummy.matrix);
   kit.parts.setX(kit.n, part);
   kit.n++;
 }
 
 export function endKit(kit, castShadow) {
-  kit.mesh.count = kit.n;
-  kit.mesh.visible = kit.n > 0;
-  kit.mesh.castShadow = castShadow;
-  kit.mesh.instanceMatrix.needsUpdate = true;
+  kit.props.count = kit.n;
+  kit.props.visible = kit.n > 0;
+  kit.props.castShadow = castShadow;
+  kit.props.instanceMatrix.needsUpdate = true;
   kit.parts.needsUpdate = true;
   const c = kit.cruisers;
   if (!c.ready) return;
