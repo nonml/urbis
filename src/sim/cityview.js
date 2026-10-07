@@ -12,7 +12,7 @@
 import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt } from './map.js';
-import { addRoad, bulldoze, removeRoad } from './ops.js';
+import { SERVICES, addRoad, bulldoze, placeService, removeRoad } from './ops.js';
 import { MAX_ROAD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
@@ -103,6 +103,37 @@ export const BULLDOZE_TOOL = {
   },
 };
 
+// A service tool (M5.T11): one per type in SERVICES, placing a finished
+// service on an empty lot. The catchment radius and the capacity live with the
+// service (sim/ops.js), not on the tool; the tool carries only what the click
+// needs — what it refuses and what it costs. No key: the palette picks it up.
+function serviceTool(type) {
+  const def = SERVICES[type];
+  return {
+    id: type,
+    use: type,
+    type,
+    name: def.name,
+    blurb: `builds a ${def.name} on an empty lot`,
+    cost: () => def.cost,
+    refuse: (city, at) => {
+      if (!at) return 'no lot under the cursor';
+      if (at.kind === 'service') {
+        return at.type === type
+          ? `${def.name} already stands here`
+          : `${SERVICES[at.type]?.name ?? 'a service'} already stands here`;
+      }
+      if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not built over`;
+      if (at.stage !== STAGE.EMPTY) return 'bulldoze the building first';
+      return null;
+    },
+    preview: (at) => ({
+      kind: `service ${type}`,
+      box: at && { x: at.x, z: at.z, w: at.w, d: at.d },
+    }),
+  };
+}
+
 export const TOOLS = {
   road: ROAD_TOOL,
   bulldoze: BULLDOZE_TOOL,
@@ -110,6 +141,7 @@ export const TOOLS = {
   com: zoneTool('com', 'c', 'com', 'commercial', 'zones a lot for shops'),
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
   unzone: zoneTool('unzone', 'x', null, 'unzone', 'clears a lot back to open land'),
+  ...Object.fromEntries(Object.keys(SERVICES).map((type) => [type, serviceTool(type)])),
 };
 
 // A tool names its own key (M5.T1), so the key table the panel and `cityKey`
@@ -259,11 +291,24 @@ export function paintLot(view, city, shift = view.shift) {
   const tool = toolOf(view);
   if (!tool || tool.drag) return false;
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
+  if (tool.type) return buildService(view, city, tool);
   if (view.hover < 0) return false;
   const at = city.parcels[view.hover];
   const zoned = tool.refuse(city, at) ? false : tool.op(city, at);
   const capped = shift ? capParcel(city, view.hover, tool.use === null ? STAGE.HIGH : STAGE.LOW) : false;
   return zoned || capped;
+}
+
+// A service is an op on the map (M5.T11): the map owns the version, the dirty
+// tiles and the undo, and the lot keeps its object in the city's own list, so
+// the renderer and the interior read the service the same frame it lands.
+function buildService(view, city, tool) {
+  const { map } = WORLDS.get(view);
+  const at = view.hover >= 0 ? city.parcels[view.hover] : null;
+  if (tool.refuse(city, at)) return false;
+  const version = map.version;
+  placeService(map, at, tool.type);
+  return map.version !== version;
 }
 
 // ---------------------------------------------------------------------------
@@ -280,9 +325,11 @@ const WORLDS = new WeakMap();   // view -> { city, map }, for the road op
 const onGrid = (v) => Math.round(v / ROAD_GRID) * ROAD_GRID;
 
 // The live city grows the lots in city.parcels; the map is the whole record,
-// and a road op plans new lots into map.parcels (ops.js). Sign them in too.
+// and a road op plans new lots into map.parcels (ops.js). Sign them in too,
+// and keep the services the player placed (M5.T11) in the live list so their
+// doors and rooms stay with the city across a road op.
 function adoptLots(view, city, map) {
-  const lots = (map.parcels ?? []).filter((p) => p.kind === 'lot');
+  const lots = (map.parcels ?? []).filter((p) => p.kind === 'lot' || p.kind === 'service');
   city.parcels.length = 0;
   city.parcels.push(...lots);
   view.level = lots.map(levelOf);

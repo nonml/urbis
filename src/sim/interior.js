@@ -318,12 +318,79 @@ function streetFace(p) {
   return best;
 }
 
-// Fixtures along the walls, leaving the entry corridor clear: everything sits
-// outside a ∈ [-0.7, 0.8] or deeper than the arrival at d = PARCEL_ARRIVE_IN.
-// A shop, a residential lobby, a workshop — bigger at MID and above.
-function parcelItems(use, stage, a, d) {
+// A service room's fixtures, one set per type (M5.T11; sim/ops.js SERVICES
+// names them). The same corridor rule the grown lots keep: a is clear of
+// [-0.7, 0.8] unless the fixture is deeper than the arrival at d = 2.6, so the
+// door spot and the arrival stay standable. A type with no set gets the park's
+// dressing: a room, and no claim about what the service does.
+function serviceItems(type, a, d) {
   const [a0, a1] = a;
   const [d0, d1] = d;
+  const wide = a1 - a0 >= 3.2;
+  const deep = d1 - d0 >= 4.6;
+  const chairs = (aa) => (wide && deep
+    ? [{ kind: 'cafe', a: aa, d: [Math.max(d0 + 3.2, d1 - 2.6), d1 - 1.3], top: 0.95 }]
+    : []);
+  const sets = {
+    // Transformer banks down the walls, cable drums in, the yard gate behind.
+    substation: () => [
+      { kind: 'shelf', a: [a0, a0 + 0.45], d: [d0 + 0.7, d1 - 0.8], top: 2.4 },
+      { kind: 'shelf', a: [a1 - 0.45, a1], d: [d0 + 0.7, d1 - 0.8], top: 2.4 },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.5], d: [d0 + 0.7, d0 + 1.25], top: 0.9 },
+      { kind: 'roller', a: [-1.3, 1.3], d: [d1 - 0.1, d1 - 0.04], top: 2.6, solid: false },
+    ],
+    // Front desk, the lockers, the cells off the back wall.
+    police: () => [
+      { kind: 'counter', a: [a0, a0 + 0.6], d: [d0 + 0.7, d1 - 0.6], top: 1.05 },
+      { kind: 'mailboxes', a: [a1 - 0.4, a1], d: [d0 + 0.6, d0 + 2.4], top: 1.6 },
+      { kind: 'flatdoor', a: [a0 + 0.4, a0 + 1.4], d: [d1 - 0.1, d1 - 0.04], top: 2.15, solid: false },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.5], d: [d0 + 0.7, d0 + 1.25], top: 0.9 },
+    ],
+    // The apparatus bay: gear racking both sides, the roller door at the back.
+    fire: () => [
+      { kind: 'shelf', a: [a0, a0 + 0.45], d: [d0 + 0.7, d1 - 0.9], top: 2.6 },
+      { kind: 'shelf', a: [a1 - 0.45, a1], d: [d0 + 0.7, d1 - 1.4], top: 2.6 },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.7], d: [d0 + 0.7, d0 + 1.3], top: 0.9 },
+      { kind: 'roller', a: [-1.5, 1.5], d: [d1 - 0.1, d1 - 0.04], top: 2.8, solid: false },
+    ],
+    // Reception, supplies, the practice door at the back, waiting chairs.
+    clinic: () => [
+      { kind: 'counter', a: [a0, a0 + 0.6], d: [d0 + 0.7, d1 - 0.6], top: 1.05 },
+      { kind: 'shelf', a: [a1 - 0.45, a1 - 0.05], d: [d0 + 0.7, d1 - 1.3], top: 2.05 },
+      { kind: 'flatdoor', a: [a0 + 0.3, a0 + 1.3], d: [d1 - 0.1, d1 - 0.04], top: 2.15, solid: false },
+      { kind: 'plant', a: [a1 - 0.95, a1 - 0.35], d: [d0 + 0.5, d0 + 1.0], top: 1.2 },
+      ...chairs([a1 - 1.9, a1 - 0.4]),
+    ],
+    // Bookcases, the long desk, a plant by the door.
+    school: () => [
+      { kind: 'shelf', a: [a0, a0 + 0.45], d: [d0 + 0.7, d1 - 0.8], top: 2.05 },
+      { kind: 'shelf', a: [a1 - 0.45, a1], d: [d0 + 0.7, d1 - 1.6], top: 2.05 },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.5], d: [d0 + 0.7, d0 + 1.25], top: 0.9 },
+      { kind: 'plant', a: [a1 - 0.95, a1 - 0.35], d: [d0 + 0.5, d0 + 1.0], top: 1.2 },
+      ...chairs([a0 + 0.9, a0 + 2.4]),
+    ],
+    // A park pavilion: planters and benches, open in the middle.
+    park: () => [
+      { kind: 'plant', a: [a0 + 0.2, a0 + 0.8], d: [d0 + 0.6, d0 + 1.2], top: 1.3 },
+      { kind: 'plant', a: [a1 - 0.8, a1 - 0.2], d: [d0 + 0.6, d0 + 1.2], top: 1.3 },
+      { kind: 'plant', a: [a1 - 0.95, a1 - 0.35], d: [d1 - 2.4, d1 - 1.8], top: 1.5 },
+      { kind: 'crates', a: [a0 + 0.7, a0 + 1.5], d: [d1 - 1.6, d1 - 1.05], top: 0.9 },
+      ...chairs([a0 + 0.8, a0 + 2.3]),
+    ],
+  };
+  return (sets[type] ?? sets.park)();
+}
+
+// Fixtures along the walls, leaving the entry corridor clear: everything sits
+// outside a ∈ [-0.7, 0.8] or deeper than the arrival at d = PARCEL_ARRIVE_IN.
+// A shop, a residential lobby, a workshop — bigger at MID and above — or a
+// service's own room (M5.T11).
+function parcelItems(p, a, d) {
+  const [a0, a1] = a;
+  const [d0, d1] = d;
+  if (p.kind === 'service') return serviceItems(p.type, a, d);
+  const use = p.use;
+  const stage = p.stage;
   const big = stage >= STAGE.MID;
   if (use === 'res') {
     const items = [
@@ -390,11 +457,12 @@ export function parcelSpace(p, i) {
     parcel: i,
     use: p.use,
     stage: p.stage,
+    service: p.kind === 'service' ? p.type : null,
     frame: { x: side.x, z: side.z, out: side.out },
     floor: PARCEL_FLOOR,
     height: PARCEL_ROOM_HEIGHT,
     room: { a, d },
-    items: parcelItems(p.use, p.stage, a, d),
+    items: parcelItems(p, a, d),
     rig: { dist: 2.7, pitch: 0.5 },
     lights: parcelLights(a, d),
   };
@@ -424,7 +492,8 @@ function parcelEnds(place) {
   return [
     {
       space: STREET, x: spot.x, z: spot.z,
-      arrive: { x: arrive.x, z: arrive.z, yaw: frameYaw(fr) }, label: 'ENTER',
+      arrive: { x: arrive.x, z: arrive.z, yaw: frameYaw(fr) },
+      label: place.service ? `ENTER ${place.service.toUpperCase()}` : 'ENTER',
     },
     {
       space: place.id, x: doorIn.x, z: doorIn.z,
@@ -443,15 +512,17 @@ export function createInterior(city = null) {
 }
 
 // Rebuild what the city currently offers: a place and a door for every grown
-// lot. Called every tick, after the city moved. `hold` is the parcel the player
-// is standing in — sim/zoning.js defers its decline while they are inside.
+// lot, and for every service the player placed (M5.T11) — a service always
+// stands finished, whether its use is named or not. Called every tick, after
+// the city moved. `hold` is the parcel the player is standing in —
+// sim/zoning.js defers its decline while they are inside.
 export function syncInterior(state) {
   if (!state.city) return;
   const places = new Map(PLACES);
   const links = LINKS.slice();
   let hold = -1;
   state.city.parcels.forEach((p, i) => {
-    if (p.use === null || p.stage < STAGE.LOW) return;
+    if (p.kind !== 'service' && (p.use === null || p.stage < STAGE.LOW)) return;
     const place = parcelPlace(p, i);
     places.set(place.id, place);
     links.push({ id: `${place.id}-door`, parcelUse: p.use, ends: parcelEnds(place) });
