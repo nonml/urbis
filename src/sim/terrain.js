@@ -17,6 +17,7 @@
 // both call in and neither is called back. A cycle that works by luck is worse
 // than a long file; a cycle that cannot exist is better than both.
 import { mulberry32 } from './rng.js';
+import { SETBACK } from './townplan.js';
 
 // Carriageway half-width. It lives in this file because the flat road
 // footprints need it and terrain.js imports nothing from world.js (the one-way
@@ -157,11 +158,13 @@ function wildness(x, z) {
   return smoothstep01(rectDistance(x, z, ...DISTRICT_RELIEF) / WILD_BLEND);
 }
 
-// A footprint is over water when its box overlaps a water rect; map.water rects
+// A footprint is refused near water when its box comes within the building
+// setback of a water rect — on the water or within 8 m of it
+// (townplan.SETBACK), the world-scale placement rule (M4-2). map.water rects
 // share the [cx, cz, hw, hd] shape of the flat footprints.
-function overWater(water, x, z, w, d) {
+export function waterBlocked(water, x, z, w, d) {
   return water.some(([cx, cz, hw, hd]) =>
-    Math.abs(x - cx) <= hw + w / 2 && Math.abs(z - cz) <= hd + d / 2);
+    Math.abs(x - cx) <= hw + SETBACK + w / 2 && Math.abs(z - cz) <= hd + SETBACK + d / 2);
 }
 
 function gradientAt(heightAt, x, z) {
@@ -203,10 +206,11 @@ export function createTerrain(map) {
   };
 
   // What a w x d footprint centred on (x, z) would stand on: `water` when any
-  // part of it is over map water, `gradient` the steepest rise in metres per
-  // metre across it, `ok` the placement verdict — dry and gentle enough.
+  // part of it is over map water or its setback, `gradient` the steepest rise
+  // in metres per metre across it, `ok` the placement verdict — dry and gentle
+  // enough.
   const buildable = (x, z, w, d) => {
-    const wet = overWater(water, x, z, w, d);
+    const wet = waterBlocked(water, x, z, w, d);
     const gradient = footprintGradient(heightAt, x, z, w, d);
     return { ok: !wet && gradient <= MAX_BUILD_GRADIENT, water: wet, gradient };
   };

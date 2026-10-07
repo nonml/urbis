@@ -5,7 +5,7 @@
 // Pure sim (law 5): no three.js, no DOM. A map is built in a process booted on
 // its seed: planLayout still reads its own load-time towers (M3.T14 removes it).
 import { generateDistrict } from './citygen.js';
-import { createTerrain } from './terrain.js';
+import { createTerrain, waterBlocked } from './terrain.js';
 import { planTown } from './townplan.js';
 import { BUILD_LINE, buildingsOf, planLayout } from './layout.js';
 import { HAND_PINNED, placePinned } from './landmarks.js';
@@ -116,6 +116,40 @@ function districtsGraph(cells, town, district) {
   return graph;
 }
 
+// A road crossing the water is a bridge (M4.T7): its edge takes kind `bridge`
+// and keeps its own lanes and its nodes' y — the road's own level — so the
+// deck is flush with the road at both ends. Generation cuts an arterial at
+// the corridor edge, so one edge spans bank to bank. Roads run along one axis
+// (D2), so an edge crosses a water rect strictly inside it; a road lying along
+// the water's edge or ending on it does not cross.
+const BRIDGE_EPS = 1e-6;
+
+function crossesWater(a, b, water) {
+  const minX = Math.min(a.x, b.x);
+  const maxX = Math.max(a.x, b.x);
+  const minZ = Math.min(a.z, b.z);
+  const maxZ = Math.max(a.z, b.z);
+  return water.some(([cx, cz, hw, hd]) => minX < cx + hw - BRIDGE_EPS
+    && maxX > cx - hw + BRIDGE_EPS && minZ < cz + hd - BRIDGE_EPS
+    && maxZ > cz - hd + BRIDGE_EPS);
+}
+
+// Mark every edge that crosses map water as a bridge. `water` is the map's
+// water, the same [cx, cz, hw, hd] rects terrain.buildable refuses; a road op
+// (sim/ops.js) marks the pieces its own new road brings over the water with
+// the same rule.
+export function markBridges(graph, water) {
+  if (!water || water.length === 0) return graph;
+  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
+  for (const edge of graph.edges) {
+    if (edge.kind === 'bridge') continue;
+    const a = byId.get(edge.a);
+    const b = byId.get(edge.b);
+    if (a && b && crossesWater(a, b, water)) edge.kind = 'bridge';
+  }
+  return graph;
+}
+
 // Every avenue cut where a crossing meets it, every crossing cut where an
 // avenue meets it, as nodes and edges.
 function buildGraph(district) {
@@ -176,12 +210,20 @@ export function createMap(seed) {
   // with the arterials into map.graph. The load-time district still fills the
   // map until M4.T5 moves the buildings onto the cells.
   const town = planTown(seed);
+  const water = town.river.rects;
   const cells = town.cells.map((cell) => generateDistrict(seed, cell, cell.kind));
   const plan = planLayout(district, seed);
   plan.pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings);
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
+  const graph = markBridges(districtsGraph(cells, town, district), water);
   const buildings = buildingsOf(plan);
+  // The city's own land is never on the water or within its setback (M4-2):
+  // a lot the load-time district's plan put there is refused, so nothing can
+  // grow on the river. (The legacy street wall stands where planBuildings put
+  // it — m3-parcels pins that derivation — and goes with the hand tables in
+  // M4.T15.)
+  const lots = plan.lots.filter(([x, z, w, d]) => !waterBlocked(water, x, z, w, d));
   const map = {
     seed,
     version: 0,
@@ -193,20 +235,22 @@ export function createMap(seed) {
     // One district per town-plan cell, in cell order: its kind, its own roads,
     // and the height and style range its buildings may take (M4.T4, M4.T5).
     cells,
-    // All districts' roads, cut into one graph through the arterials (M4.T4).
-    graph: districtsGraph(cells, town, district),
+    // All districts' roads, cut into one graph through the arterials (M4.T4),
+    // every water crossing kind `bridge` (M4.T7).
+    graph,
     town,
-    // The town's water (M4.T3): terrain.buildable refuses a footprint in it
-    // (M4.T5), and M4.T8 draws it. Rects are terrain's [cx, cz, hw, hd].
-    water: town.river.rects,
+    // The town's water (M4.T3): terrain.buildable refuses a footprint in it or
+    // its setback (M4.T5, M4.T7), and M4.T8 draws it. Rects are terrain's
+    // [cx, cz, hw, hd].
+    water,
     buildings,
     // Every building the renderer draws, and every lot, is one parcel with an
     // id: nothing the city shows a footprint for is anonymous (M3-3).
     parcels: [
-      ...plan.lots.map(lotParcel),
+      ...lots.map(lotParcel),
       ...buildings.map(buildingParcel),
     ],
-    lots: plan.lots,
+    lots,
     furniture: planFurniture(district, seed),
     dressing: {
       ...dressing,
