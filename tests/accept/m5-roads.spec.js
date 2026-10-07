@@ -81,6 +81,16 @@ for (const seed of SEEDS) {
     const side = (p) => Math.sign((site.to.x - site.from.x) * (p.z - site.from.z) - (site.to.z - site.from.z) * (p.x - site.from.x));
     expect(added.some((p) => side(p) < 0) && added.some((p) => side(p) > 0),
       `seed ${seed}: new lots on both sides (${added.length} added)`).toBe(true);
+    // The new road and the land beside it are drawn: a pick at the road's middle
+    // and at a point 20 m off it hits something. fd0cdbd laid the road in the
+    // sim over a black void, with no tarmac and no ground in the shot.
+    const mid = { x: (site.from.x + site.to.x) / 2, z: (site.from.z + site.to.z) / 2 };
+    const off = site.from.x === site.to.x ? { x: mid.x + 20, z: mid.z } : { x: mid.x, z: mid.z + 20 };
+    for (const [what, p] of [['the new road', mid], ['the land beside it', off]]) {
+      const px = await page.evaluate((q) => window.__game.screenOf(q.x, 0, q.z), p);
+      const hits = await page.evaluate(([x, y]) => window.__game.pick(x, y, window.innerWidth, window.innerHeight), [px.x, px.y]);
+      expect(hits.length, `seed ${seed}: ${what} is drawn`).toBeGreaterThan(0);
+    }
     mkdirSync(SHOTS, { recursive: true });
     writeFileSync(`${SHOTS}/m5-road-${seed}.png`,
       Buffer.from((await page.evaluate(() => window.__game.shot())).split(',')[1], 'base64'));

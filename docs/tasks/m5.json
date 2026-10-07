@@ -60,6 +60,29 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. If the check itself is wrong (it asks for land the plan never promised), stop and say so with numbers; do not work around it. Every new game generates the whole city from its seed: derive, never hard-code positions."
     },
     {
+      "id": "M5.T3c",
+      "lane": "build-ui",
+      "goal": "Finish the road drag. After M5.T3b (fd0cdbd), on main `tests/accept/m5-roads.spec.js` fails on seeds 7 and 22 with \"new lots on both sides (0 added)\", though the board ran it green in the lane. Its shots also show the new road laid over a black void: no tarmac and no ground, only lot outlines. The check now also picks the road's middle and a point 20 m off it, and both must hit something drawn. Make the new road draw as a road, make the land a player can build on draw as ground, and make the check pass on all five seeds on main. M4.T6 (hills, d78a347) landed between the lane's run and main; check whether the new relief makes `buildable` refuse the new lots.",
+      "files": [
+        "src/sim/ops.js",
+        "src/sim/map.js",
+        "src/sim/cityview.js",
+        "src/render/cityview.js",
+        "src/render/roads.js",
+        "src/ui/cityview.js",
+        "src/render/landscape.js",
+        "src/render/outskirts.js",
+        "src/sim/terrain.js",
+        "src/sim/layout.js"
+      ],
+      "needs": [
+        "M5.T3b"
+      ],
+      "test": "tests/accept/m5-roads.spec.js",
+      "commit": "M5.T3c (M5-1): a dragged road is drawn, on drawn ground",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. Draws stay at or under 175: instance or merge, never one mesh per road piece. Every new game generates the whole city from its seed: derive, never hard-code positions."
+    },
+    {
       "id": "M5.T4",
       "lane": "build-sim",
       "goal": "A new road is a street. Lamps, signals and furniture planned along it; lots planned on both sides (M3.T20); the outskirts gone from its path (M3.T27)",
@@ -69,7 +92,8 @@
       ],
       "needs": [
         "M5.T3",
-        "M4.T7"
+        "M4.T7",
+        "M5.T3c"
       ],
       "commit": "M5.T4 (M5-1): a new road is a street",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-1: **Roads:** on all five seeds the player drags a road of at least 100 m from an existing road into open land with the mouse, drives its full length with the keys, and finds new lots on both sides (checked by `tests/accept/m5-roads.spec.js`; shot `docs/shots/m5-road-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
