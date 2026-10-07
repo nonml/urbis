@@ -13,8 +13,9 @@
 // the save's op log (M3.T38) replays.
 import {
   STAGE, STAGES, USES, USE_BY_KIND, BUILD_MARGIN, buildingParcel, frontageRoad, graphBounds,
-  markDirty, projectOnSegment,
+  markBridges, markDirty, projectOnSegment,
 } from './map.js';
+import { waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
 import { createTerrain } from './terrain.js';
 
@@ -354,11 +355,16 @@ function replanFrontage(map, box, byId) {
   const { lots, buildings } = planNewFrontage(
     map.graph.edges, map.graph.nodes, box, blocked, map.seed, map.district,
   );
+  // The op keeps its frontage off the water and its setback too (M4-2): a lot
+  // or row the replan would put there is refused, as createMap refuses the
+  // plan's own.
   for (const { id, lot } of lots) {
+    if (waterBlocked(map.water ?? [], ...lot)) continue;
     map.parcels.push(newLotParcel(id, lot));
     map.lots.push(lot);
   }
   for (const b of buildings) {
+    if (waterBlocked(map.water ?? [], b.x, b.z, b.w, b.d)) continue;
     if (map.buildings) map.buildings.push(b);
     map.parcels.push(buildingParcel(b));
   }
@@ -464,6 +470,13 @@ export function addRoad(map, a, b) {
   if (!axis) return NOOP;
   const plan = planRoad(map, from, to, axis);
   if (!plan) return NOOP;
+  // A new road over the water becomes a bridge like the generated ones
+  // (M4.T7): only the pieces new to the graph are marked, so every edge the
+  // undo snapshots keeps the kind it had.
+  markBridges({
+    nodes: plan.nodes,
+    edges: plan.edges.filter((e) => !map.graph.edges.includes(e)),
+  }, map.water);
   return roadEdit(map, roadBox(from, to), () => {
     map.graph.nodes.length = 0;
     map.graph.nodes.push(...plan.nodes);
