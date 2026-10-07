@@ -223,9 +223,12 @@ export const beamGeo = mergeGeometries([
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(-0.55, 0.7, 2.11); return g; })(),
   (() => { const g = new THREE.PlaneGeometry(0.35, 0.18); g.translate(0.55, 0.7, 2.11); return g; })(),
 ]);
+// Tail lens quads ride the saloon's rear lens boxes (face at z -2.125): 1.5 cm
+// proud of it, 1 cm inside its bezel, so the red is the surface the chase
+// camera sees instead of a plane buried inside the box (M2.F4b).
 export const tailGeo = mergeGeometries([
-  (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(-0.55, 0.75, -2.11); return g; })(),
-  (() => { const g = new THREE.PlaneGeometry(0.3, 0.12); g.rotateY(Math.PI); g.translate(0.55, 0.75, -2.11); return g; })(),
+  (() => { const g = new THREE.PlaneGeometry(0.36, 0.18); g.rotateY(Math.PI); g.translate(-0.55, 0.75, -2.14); return g; })(),
+  (() => { const g = new THREE.PlaneGeometry(0.36, 0.18); g.rotateY(Math.PI); g.translate(0.55, 0.75, -2.14); return g; })(),
 ]);
 // Saloon glass; the fleet folds all five bands into one geometry below.
 const canopyGeo = carGlassGeo(CAR_SPECS[0]);
@@ -430,6 +433,9 @@ function loadFleetModels(rig) {
     // per-car instanceColor, with vertex colours carrying what paint does not.
     const solidMat = out.paintMat.clone();
     solidMat.vertexColors = true;
+    // A hard floor (M2.F4b): below 0.35 a street lamp gave a white-out, not a
+    // highlight, whatever the model file said.
+    solidMat.roughness = Math.max(0.35, solidMat.roughness);
     rig.bodies.meshes.forEach((mesh, s) => {
       mesh.geometry.dispose();
       mesh.geometry = fleetVariant(solid, FLEET_SHAPES[s].s);
@@ -557,7 +563,7 @@ export function buildTraffic(street) {
   // Metalness down, env down, roughness up a touch: the paint keeps its
   // colour, and there is still enough gloss for shop and street light to land on it.
   const paintMat = new THREE.MeshStandardMaterial({
-    roughness: 0.32, metalness: 0.14, envMapIntensity: 1.05,
+    roughness: 0.42, metalness: 0.14, envMapIntensity: 1.05,
   });
   const shapeCounts = FLEET_SHAPES.map(() => 0);
   const slots = street.cars.map((c) => {
@@ -757,6 +763,7 @@ function loadHeroBody(rig) {
     const out = { paintGeos: [], trimGeos: [], wheelGeos: [] };
     gltf.scene.traverse((o) => { if (o.isMesh) heroSort(o, out); });
     if (!out.paintGeos.length) return;
+    out.paintMat.roughness = Math.max(0.35, out.paintMat.roughness);
     const paint = heroBodyMesh(out.paintGeos, out.paintMat, 'hero-body', true);
     rig.group.add(paint);
     rig.paint = paint;
