@@ -9,7 +9,7 @@
 // and pure maths (law 5). The camera and the lot outlines are
 // render/cityview.js; the pointer, the palette and the readout are
 // ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
-import { STAGE, builtHeight, zoneParcel } from './zoning.js';
+import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt } from './map.js';
 import { addRoad, bulldoze, removeRoad } from './ops.js';
@@ -163,6 +163,7 @@ export function createCityView(city, map = worldMap()) {
     reach: REACH.start,
     brush: 'res',
     active: true,          // false once the player lays the tool down
+    shift: false,          // Shift held: a brush click paints a low cap (M5.T8)
     hover: -1,
     drag: null,            // the road drag's snapped ends, while one is held
     pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
@@ -249,16 +250,20 @@ export function hoverPick(view, city, target) {
 
 // A click: the tool goes on the lot under the cursor, or — with the bulldozer —
 // on the whole parcel or road the cursor holds. Returns whether the world
-// changed. A tool the player put down acts nowhere.
-export function paintLot(view, city) {
+// changed. A tool the player put down acts nowhere. `shift` is the cap brush
+// (M5.T8): a zone tool paints the lot low-rise, the eraser lifts the cap back
+// off. It lands even where the zone itself is already set, so a lot the player
+// has no reason to rezone can still be capped.
+export function paintLot(view, city, shift = view.shift) {
   if (view.mode !== 'city' || view.lift < 1) return false;
   const tool = toolOf(view);
   if (!tool || tool.drag) return false;
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
   if (view.hover < 0) return false;
   const at = city.parcels[view.hover];
-  if (tool.refuse(city, at)) return false;
-  return tool.op(city, at);
+  const zoned = tool.refuse(city, at) ? false : tool.op(city, at);
+  const capped = shift ? capParcel(city, view.hover, tool.use === null ? STAGE.HIGH : STAGE.LOW) : false;
+  return zoned || capped;
 }
 
 // ---------------------------------------------------------------------------
@@ -462,6 +467,9 @@ function pan(view, keys, dt) {
 
 // After tickZoning, every frame. `keys` is the set of held keys, lower-case.
 export function tickCityView(view, city, dt, keys) {
+  // Shift held is the cap brush (M5.T8): the held key reaches the click through
+  // here, where the frame loop already reads it for the hurried pan.
+  view.shift = keys.has('shift');
   const goal = view.mode === 'city' ? 1 : 0;
   const step = dt / LIFT_SECS;
   view.lift = goal > view.lift ? Math.min(goal, view.lift + step) : Math.max(goal, view.lift - step);
@@ -481,7 +489,8 @@ export function lotStatus(view, city, index, dark) {
   const p = city.parcels[index];
   const settled = p.use === p.zoned;
   if (settled && p.zoned === null) return 'unzoned';
-  if (settled && p.stage === STAGE.HIGH && view.trend[index] === 0) return 'complete';
+  // A lot at its cap is as finished as it will ever be, not waiting on demand.
+  if (settled && p.stage >= capOf(p) && view.trend[index] === 0) return 'complete';
   if (dark) return 'stalled';
   if (!settled) return 'clearing';
   if (view.trend[index] > 0) return 'growing';

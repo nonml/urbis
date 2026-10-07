@@ -116,6 +116,9 @@ function makeParcel(rand, [x, z, w, d], index) {
     // Whether the player's zone still owns this lot's first floors
     // (sim/cityview.js): set by zoneParcel, spent when the lot reaches LOW.
     painted: false,
+    // The tallest stage the lot may reach (M5.T8). HIGH is no cap; the player
+    // paints LOW with Shift and a brush (cityview.js capParcel).
+    cap: STAGE.HIGH,
     stage,
     progress: rand() * START_PROGRESS,
     powerZone: zoneAt(z),
@@ -289,9 +292,10 @@ function growthRate(p, demand) {
 // and lands at the top of the one beneath, the same height it just left. A
 // building empties before it sheds anything (vacate).
 function tickParcel(p, demand, dt, powered) {
+  const cap = capOf(p);
   const seeded = p.painted && p.stage < STAGE.LOW;
   const bar = seeded ? 0 : p.stage === STAGE.EMPTY ? BREAK_GROUND_AT : GROW_AT;
-  const grows = p.stage < STAGE.HIGH && demand >= bar;
+  const grows = p.stage < cap && demand >= bar;
   const lets = demand >= GROW_AT && p.vacancy > 0;
   const slumps = !grows && demand < DECLINE_AT;
   judge(p, { gaining: grows || (lets && hasFloors(p)), losing: slumps && p.stage > STAGE.EMPTY, powered });
@@ -303,7 +307,7 @@ function tickParcel(p, demand, dt, powered) {
     p.progress += dt * growthRate(p, demand);
     if (p.progress >= 1) {
       p.stage += 1;
-      p.progress = p.stage === STAGE.HIGH ? 0 : p.progress - 1;
+      p.progress = p.stage >= cap ? 0 : p.progress - 1;
       // The order is fulfilled at the low block; the market owns the lot after.
       if (p.stage >= STAGE.LOW) p.painted = false;
     }
@@ -315,7 +319,7 @@ function tickParcel(p, demand, dt, powered) {
     }
     p.progress = Math.max(0, p.progress);
   }
-  p.building = p.stage >= STAGE.SITE && p.stage < STAGE.HIGH && (grows || p.progress > 0);
+  p.building = p.stage >= STAGE.SITE && p.stage < cap && (grows || p.progress > 0);
 }
 
 // A lot whose building no longer fits its zoning clears first: it comes down a
@@ -350,6 +354,25 @@ export function zoneParcel(city, index, use) {
   // The player's hand, not the market's: the lot's first floors go up on the
   // player's order alone (tickParcel, growthRate), spent at the low block.
   if (use !== null) p.painted = true;
+  return true;
+}
+
+// The tallest stage a parcel may reach (M5.T8). `cap` is a stage index; the
+// seed's lots and the map's standing buildings open uncapped (HIGH). An absent
+// field reads as HIGH, so a parcel from the hand tables behaves as it always did.
+export function capOf(p) {
+  return p.cap ?? STAGE.HIGH;
+}
+
+// The player's cap brush (M5.T8): Shift with a zone brush paints the lot
+// low-rise. Growth stops at the cap; what already stands stays until the market
+// clears it (clearLot) — a cap is not an order to demolish. The eraser paints
+// HIGH, lifting the cap back off. Returns whether the cap changed.
+export function capParcel(city, index, cap) {
+  const p = city.parcels[index];
+  if (!p || p.kind !== 'lot' || !Number.isInteger(cap) || cap < STAGE.EMPTY || cap > STAGE.HIGH) return false;
+  if (capOf(p) === cap) return false;
+  p.cap = cap;
   return true;
 }
 
