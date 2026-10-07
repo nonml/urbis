@@ -4,8 +4,9 @@
 import { isDark } from '../sim/street.js';
 import { STAGE } from '../sim/zoning.js';
 import {
-  TOOLS, chooseTool, hoverLot, layDownTool, lotStatus, moveRoad,
-  orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview, toolOf, zoomCityView,
+  TOOLS, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
+  lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview,
+  toolOf, zoomCityView,
 } from '../sim/cityview.js';
 import { paintOf } from '../render/cityview.js';
 
@@ -45,6 +46,13 @@ const CARD = [
   'color:#e4e1da', 'background:rgba(4,8,16,0.82)', 'border:1px solid rgba(255,255,255,0.16)',
   'padding:6px 10px', 'border-radius:4px', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
   'white-space:nowrap',
+].join(';');
+// The road ask (M5.T5), in the page: the browser's confirm is never used.
+const ASK = [
+  'position:fixed', 'left:50%', 'top:46%', 'transform:translate(-50%,-50%)', 'z-index:7',
+  'display:none', 'text-align:center', 'font:12px/1.7 ui-monospace,Menlo,monospace',
+  'color:#e4e1da', 'background:rgba(4,8,16,0.94)', 'border:1px solid rgba(208,86,63,0.6)',
+  'padding:12px 16px', 'border-radius:6px', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
 ].join(';');
 
 function swatch(use) {
@@ -114,6 +122,24 @@ function dragCard(view) {
   return `${swatch('road')}<b style="color:#fff">NEW STREET</b><br>${line}${why}`;
 }
 
+// The bulldozer's cursor (M5.T5): what is under it, what it costs, or why not.
+function targetCard(view, city) {
+  const tool = toolOf(view);
+  const pick = view.pick;
+  const why = tool.refuse(city, pick);
+  if (why) {
+    return `${swatch('bulldoze')}<b style="color:#fff">BULLDOZE</b>`
+      + `<br><span style="color:#e8977d">✕ ${why}</span>`;
+  }
+  const what = pick.kind === 'road'
+    ? `road · ${pick.length.toFixed(0)} m`
+    : pick.parcel.kind === 'lot'
+      ? `lot · ${STAGE_NAME[pick.parcel.stage]}`
+      : `${pick.parcel.kind} · ${USE_NAME[pick.parcel.use] ?? 'building'}`;
+  return `${swatch('bulldoze')}<b style="color:#fff">BULLDOZE</b>`
+    + `<br>${what}<br>◆ demolish · $${tool.cost(city, pick)}`;
+}
+
 function readout(view, city, street, index) {
   const p = city.parcels[index];
   const status = lotStatus(view, city, index, isDark(street, p.powerZone));
@@ -150,6 +176,7 @@ function bindPointer(ui) {
       return;
     }
     if (e.button !== 0) return;
+    dismissRoad(view);   // a new click answers any ask still standing
     const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false };
     const at = groundAt(ui, e.clientX, e.clientY);
     if (toolOf(view)?.drag && at && pressRoad(view, at.x, at.z)) press.road = true;
@@ -201,11 +228,16 @@ function holdStreetRig(ui) {
   cam.dist = ui.parked.dist;
 }
 
-function hover({ view, pointer, rig, camera }) {
-  if (view.mode !== 'city' || view.lift < 1 || !pointer) return hoverLot(view, -1);
+function hover({ view, city, pointer, rig, camera }) {
+  const nothing = () => { hoverLot(view, -1); hoverPick(view, city, null); };
+  if (view.mode !== 'city' || view.lift < 1 || !pointer) return nothing();
   // A road drag is not about a lot: no lot under its cursor to read out.
-  if (view.drag || toolOf(view)?.drag) return hoverLot(view, -1);  const x = (pointer.x / window.innerWidth) * 2 - 1;
+  if (view.drag || toolOf(view)?.drag) return nothing();
+  const x = (pointer.x / window.innerWidth) * 2 - 1;
   const y = -(pointer.y / window.innerHeight) * 2 + 1;
+  // The bulldozer holds a whole parcel or a road (M5.T5); a brush holds a lot.
+  if (toolOf(view)?.id === 'bulldoze') return hoverPick(view, city, rig.pickTarget(camera, x, y));
+  hoverPick(view, city, null);
   return hoverLot(view, rig.pick(camera, x, y));
 }
 
@@ -227,14 +259,28 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
 }
 
 function showCard({ view, city, street, pointer, card }) {
-  if (!pointer || (view.hover < 0 && !view.drag)) {
+  if (!pointer || (view.hover < 0 && !view.drag && !view.pick)) {
     card.style.display = 'none';
     return;
   }
-  card.innerHTML = view.drag ? dragCard(view) : readout(view, city, street, view.hover);
+  card.innerHTML = view.drag ? dragCard(view)
+    : toolOf(view)?.id === 'bulldoze' ? targetCard(view, city)
+      : readout(view, city, street, view.hover);
   card.style.display = 'block';
   card.style.left = `${pointer.x + 16}px`;
   card.style.top = `${pointer.y + 16}px`;
+}
+
+// The page's own ask before a road that would strand buildings goes (M5.T5):
+// a centred panel, not the browser's confirm.
+function showAsk({ view, ask }) {
+  if (!view.confirm) {
+    ask.style.display = 'none';
+    return;
+  }
+  const n = view.confirm.cuts;
+  ask.querySelector('#askline').textContent = `${n} building${n === 1 ? '' : 's'} would lose their only road.`;
+  ask.style.display = 'block';
 }
 
 // Wires the overview's input and HUD. Returns the per-frame update, which runs
@@ -244,8 +290,25 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   card.id = 'lotcard';
   card.style.cssText = CARD;
   document.body.appendChild(card);
+  // The road ask (M5.T5) is built once; its buttons are wired once.
+  const ask = document.createElement('div');
+  ask.id = 'cityask';
+  ask.style.cssText = ASK;
+  ask.innerHTML = '<b style="color:#fff">Demolish this road?</b>'
+    + '<div id="askline" style="opacity:0.8;margin:2px 0 8px"></div>'
+    + '<button id="ask-yes">Demolish it</button> <button id="ask-no">Keep the road</button>';
+  document.body.appendChild(ask);
+  ask.querySelector('#ask-yes').addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    confirmRoad(view, city);
+  });
+  ask.querySelector('#ask-no').addEventListener('pointerdown', (e) => {
+    e.stopPropagation();
+    dismissRoad(view);
+  });
   const ui = {
-    canvas, cam, camera, city, street, view, rig, card, ...buildPalette(view, city),
+    canvas, cam, camera, city, street, view, rig, card, ask,
+    ...buildPalette(view, city),
     pointer: null, press: null, parked: null, hoverTool: null,
   };
   for (const { row, tool } of ui.rows) {
@@ -258,6 +321,7 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
     hover(ui);
     showPalette(ui);
     showCard(ui);
+    showAsk(ui);
   }
   return { update };
 }
