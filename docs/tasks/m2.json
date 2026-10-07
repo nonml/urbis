@@ -1,0 +1,232 @@
+{
+  "milestone": "M2 strip the toy (the model pipeline, the pools and the weather look)",
+  "tasks": [
+    {
+      "id": "M2.T1",
+      "lane": "assets",
+      "goal": "Install and measure. Blender, the trellis2mlx environment and its weights, and MPFB, by one script; the README records free disk before and after, and the versions",
+      "files": [
+        "tools/models/setup.sh",
+        "tools/models/README.md"
+      ],
+      "needs": [],
+      "commit": "M2.T1 (M2-0): install and measure",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-0: **The pipeline works on this Mac before anything depends on it:** one car through trellis.cpp and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used (checked by `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T2",
+      "lane": "assets",
+      "goal": "Pool loader. `loadModelPool(name, count)` in `src/render/models.js`: one GLB in, one `InstancedMesh` per material out, with set and free slot calls; the hydrant and bin move onto it with the same draws; every mesh it makes carries `userData.model` (the file), which the sweep reads for M2-6",
+      "files": [
+        "src/render/models.js",
+        "src/render/props.js"
+      ],
+      "needs": [],
+      "commit": "M2.T2 (M2-0): pool loader",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-0: **The pipeline works on this Mac before anything depends on it:** one car through trellis.cpp and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used (checked by `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T3",
+      "lane": "assets",
+      "goal": "One car, end to end. A CC0 or generated reference image through trellis.cpp (`tools/models/trellis_cpp.sh`; M2.E1's car, `tools/models/evidence/car.glb`, is the starting point \u2014 re-run with `TRELLIS_FORCE=1` for another reference), then `tools/models/clean_car.py` in Blender: under 8,000 triangles, metres, Y-up, origin at the base, wheels as separate nodes; export; credit; shown in the game by the pool loader. README: minutes, peak memory",
+      "files": [
+        "tools/models/clean_car.py",
+        "public/assets/models/",
+        "public/assets/CREDITS.md"
+      ],
+      "needs": [
+        "M2.T1",
+        "M2.T2"
+      ],
+      "commit": "M2.T3 (M2-0): one car, end to end",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-0: **The pipeline works on this Mac before anything depends on it:** one car through trellis.cpp and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used (checked by `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png`) The route is trellis.cpp, not trellis2mlx: `tools/models/trellis_cpp.sh` already builds it and makes a car (M2.E1); `tools/models/evidence/car.glb` is a 110k-triangle starting point, so clean_car.py may take that as input rather than re-running the 16-minute generation. If you regenerate, log the wall time and peak RSS in tools/models/README.md like M2.E1 did. Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T4",
+      "lane": "engine-render",
+      "goal": "One person, end to end. MPFB body by script, CMU walk fitted, exported as a skinned GLB under 10,000 triangles; the player's render uses it as one `SkinnedMesh` with an animation mixer; its check first",
+      "files": [
+        "tools/models/make_person.py",
+        "src/render/player.js",
+        "tests/accept/m2-people.spec.js"
+      ],
+      "needs": [
+        "M2.T1"
+      ],
+      "commit": "M2.T4 (M2-0, M2-2): one person, end to end",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-0: **The pipeline works on this Mac before anything depends on it:** one car through trellis.cpp and one walking MPFB person, each produced by a script in `tools/models/` that DeepSeek runs, load in the game; a play-camera shot of each has no defect in the sweep; the README records minutes per model, peak memory and disk used (checked by `tools/models/README.md`; `docs/shots/m2-0-car.png`, `m2-0-person.png`) The criterion this serves: M2-2: **People:** the player is a rigged model; pedestrians are one instanced pool with a baked walk (a vertex animation texture), **at most 2 draws for every walker**; the limbs of both move between frames while they walk (checked by `tests/accept/m2-people.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-people.spec.js"
+    },
+    {
+      "id": "M2.T5",
+      "lane": "engine-render",
+      "goal": "Hero car. The hero car body from M2.T3's pipeline replaces the slab (D16); doors, lights and the brake glow keep working; at most 9 draws; its check first",
+      "files": [
+        "src/render/traffic.js",
+        "tests/accept/m2-cars.spec.js"
+      ],
+      "needs": [
+        "M2.T3"
+      ],
+      "commit": "M2.T5 (M2-1): hero car",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-1: **Cars:** the hero car, traffic and police cruisers render from model files listed in `public/assets/CREDITS.md`; no box geometry in any car body; traffic and parked cars together at most 11 draws (today's), the hero car at most 9 (checked by `tests/accept/m2-cars.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-cars.spec.js"
+    },
+    {
+      "id": "M2.T6",
+      "lane": "engine-render",
+      "goal": "Traffic. Five body shapes from the pipeline replace `CAR_SHAPES`; parked and moving cars share the pools; at most 11 draws (today's)",
+      "files": [
+        "src/render/traffic.js"
+      ],
+      "needs": [
+        "M2.T5"
+      ],
+      "commit": "M2.T6 (M2-1): traffic",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-1: **Cars:** the hero car, traffic and police cruisers render from model files listed in `public/assets/CREDITS.md`; no box geometry in any car body; traffic and parked cars together at most 11 draws (today's), the hero car at most 9 (checked by `tests/accept/m2-cars.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T7",
+      "lane": "engine-render",
+      "goal": "Police. The cruiser body and the roadblock and spike kit from the pipeline replace the primitives in `policekit.js`",
+      "files": [
+        "src/render/policekit.js",
+        "src/render/police.js"
+      ],
+      "needs": [
+        "M2.T6"
+      ],
+      "commit": "M2.T7 (M2-1): police",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-1: **Cars:** the hero car, traffic and police cruisers render from model files listed in `public/assets/CREDITS.md`; no box geometry in any car body; traffic and parked cars together at most 11 draws (today's), the hero car at most 9 (checked by `tests/accept/m2-cars.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T8",
+      "lane": "assets2",
+      "goal": "Walker bake. `tools/models/bake_vat.py`: 4 MPFB bodies \u00d7 walk and idle, baked to a vertex animation texture and a base mesh",
+      "files": [
+        "tools/models/bake_vat.py",
+        "public/assets/models/"
+      ],
+      "needs": [
+        "M2.T4"
+      ],
+      "commit": "M2.T8 (M2-2): walker bake",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-2: **People:** the player is a rigged model; pedestrians are one instanced pool with a baked walk (a vertex animation texture), **at most 2 draws for every walker**; the limbs of both move between frames while they walk (checked by `tests/accept/m2-people.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T9",
+      "lane": "assets2",
+      "goal": "Walker pool. `render/npcs.js` draws every walker from the baked pool: per-instance body, coat tint and phase; all walkers at most 2 draws; limbs move between frames",
+      "files": [
+        "src/render/npcs.js"
+      ],
+      "needs": [
+        "M2.T8"
+      ],
+      "commit": "M2.T9 (M2-2): walker pool",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-2: **People:** the player is a rigged model; pedestrians are one instanced pool with a baked walk (a vertex animation texture), **at most 2 draws for every walker**; the limbs of both move between frames while they walk (checked by `tests/accept/m2-people.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T10",
+      "lane": "engine-render",
+      "goal": "Trees. 3 tree models (Blender's Sapling add-on or the pipeline) replace the icosahedron canopies; mountains lose their cones; its check first",
+      "files": [
+        "src/render/props.js",
+        "src/render/landscape.js",
+        "tests/accept/m2-landscape.spec.js"
+      ],
+      "needs": [
+        "M2.T2"
+      ],
+      "commit": "M2.T10 (M2-4): trees",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-4: **Landscape:** trees render from a model; no icosahedron or cone in any tree or mountain (checked by `tests/accept/m2-landscape.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-landscape.spec.js"
+    },
+    {
+      "id": "M2.T11",
+      "lane": "layout",
+      "goal": "Street kit. `street_lamp_01` becomes the lamp; benches, bins and bus stops from the pipeline; the hydrant and bin cut to under 5,000 triangles each; its check first",
+      "files": [
+        "src/render/lamps.js",
+        "src/render/setdress.js",
+        "public/assets/models/",
+        "tests/accept/m2-kit.spec.js",
+        "src/render/traffic.js"
+      ],
+      "needs": [
+        "M2.T2",
+        "M2.T3",
+        "M2.T8",
+        "M2.F4"
+      ],
+      "commit": "M2.T11 (M2-5): street kit",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-5: **Street kit and rooms:** `street_lamp_01` is the street lamp; benches, bins and bus stops are models; the grown-lot rooms use models, not `box()`; no street prop over 5,000 triangles, and the frame's triangles at the spawn drop under 600 k (checked by `tests/accept/m2-kit.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Director 2026-10-07: you may edit src/render/traffic.js only to draw the fleet per shape (no fold); traffic+parked draws stay at most 11. Do not touch car.glb: M2.F4 replaces it. Director 2026-10-07: your commit 9a41242 is on this lane already (street kit, fleet per shape, 684,668 tris). M2.F4's new car.glb is now on main; measure again and close the gap to 600 k.",
+      "test": "tests/accept/m2-kit.spec.js"
+    },
+    {
+      "id": "M2.T12",
+      "lane": "engine-render",
+      "goal": "Rooms. The grown-lot rooms and the noodle bar draw their furniture from models, not `box()`",
+      "files": [
+        "src/render/interiorkit.js",
+        "src/render/interiorsets.js"
+      ],
+      "needs": [
+        "M2.T2"
+      ],
+      "commit": "M2.T12 (M2-5): rooms",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-5: **Street kit and rooms:** `street_lamp_01` is the street lamp; benches, bins and bus stops are models; the grown-lot rooms use models, not `box()`; no street prop over 5,000 triangles, and the frame's triangles at the spawn drop under 600 k (checked by `tests/accept/m2-kit.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T13",
+      "lane": "engine-render",
+      "goal": "Building kit (after the building pools). The six facade materials, rooflines and cornices already built (`render/block.js:476-486`, `05daf90`) move into the pools with the buildings (M3.T22-T25); this adds what is not built: window reveals at least 0.15 m deep, window frames, shopfronts and roof plant as pooled parts on every building parcel; at most 12 more draws; its check first",
+      "files": [
+        "src/render/buildings.js",
+        "tests/accept/m2-streetwall.spec.js"
+      ],
+      "needs": [
+        "M3.T25"
+      ],
+      "commit": "M2.T13 (M2-3): building kit",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-3: **Buildings** (after M3-5): on all five seeds, every facade has window reveals at least 0.15 m deep, at least 3 facade materials appear, and frontage stays at or above `check:overlap`'s ratchet (98.2%); the kit's pooled parts (frames, shopfronts, roof plant) cost no more than 12 draws (checked by `tests/accept/m2-streetwall.spec.js`; `npm run check:overlap`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "test": "tests/accept/m2-streetwall.spec.js"
+    },
+    {
+      "id": "M2.T14",
+      "lane": "layout",
+      "goal": "Frontage on generated seeds. `check:overlap` measures the hand map's rows only (98.3% worst row today, ratchet 98.2%); it runs on the five seeds too, and if a row falls under the ratchet, the row cut in `planBuildings` closes the gaps",
+      "files": [
+        "scripts/check_overlap.mjs",
+        "src/sim/layout.js"
+      ],
+      "needs": [
+        "M3.T6"
+      ],
+      "commit": "M2.T14 (M2-3): frontage on generated seeds",
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-3: **Buildings** (after M3-5): on all five seeds, every facade has window reveals at least 0.15 m deep, at least 3 facade materials appear, and frontage stays at or above `check:overlap`'s ratchet (98.2%); the kit's pooled parts (frames, shopfronts, roof plant) cost no more than 12 draws (checked by `tests/accept/m2-streetwall.spec.js`; `npm run check:overlap`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    },
+    {
+      "id": "M2.T15",
+      "lane": "engine-render",
+      "goal": "VGA-084 sweep. Night, day and blackout poses on five seeds; one commit per defect found; the sweep lists every picked building, car, person, tree or prop mesh with no `userData.model`",
+      "files": [
+        "src/render/",
+        "src/sim/",
+        "public/assets/models/",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M2.T7",
+        "M2.T9",
+        "M2.T10",
+        "M2.T12",
+        "M2.T14",
+        "M2.T3",
+        "M2.T8"
+      ],
+      "commit": "M2.T15 (M2-6): vGA-084 sweep",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M2-6: **VGA-084's done-when:** the sweep finds no building, car, person, mountain or tree in the play frame made of a raw box, cone, sphere, cylinder or icosahedron, at night, by day and in a blackout, on all five seeds (checked by the sweep, which lists every picked building, car, person, tree or prop mesh without `userData.model` (set by the pool loader, M2.T2); `docs/shots/m2-real-<seed>-night/day/blackout.png`) This is the M2-6 sweep: run the sweep at night, by day and in a blackout on five seeds, list every picked building, car, person, tree or prop mesh without `userData.model`, fix each defect (one commit per defect), and judge every shot in docs/shots/REVIEW.md before ticking. Raw-primitive models that M2 has not replaced yet are defects here, not exemptions. Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+    }
+  ]
+}
