@@ -5,6 +5,7 @@
 // Pure sim (law 5): no three.js, no DOM. A map is built in a process booted on
 // its seed: planLayout still reads its own load-time towers (M3.T14 removes it).
 import { generateDistrict } from './citygen.js';
+import { createTerrain } from './terrain.js';
 import { BUILD_LINE, buildingsOf, planLayout } from './layout.js';
 import { HAND_PINNED, placePinned } from './landmarks.js';
 import { planFurniture } from './furniture.js';
@@ -155,7 +156,7 @@ export function createMap(seed) {
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
   const buildings = buildingsOf(plan);
-  return {
+  const map = {
     seed,
     version: 0,
     // Tiles an edit has touched since the renderer last drained them (M3.T27).
@@ -185,6 +186,10 @@ export function createMap(seed) {
     },
     spawn: spawnFor(district),
   };
+  // The map's own ground (M4.T2): built last, from the map itself, so the flats
+  // and, from M4.T3, the water are the map's data and not a copy of it.
+  map.terrain = createTerrain(map);
+  return map;
 }
 
 // The graph node nearest a point, as { node, dist }.
