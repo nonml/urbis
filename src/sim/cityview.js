@@ -144,6 +144,29 @@ export const TOOLS = {
   ...Object.fromEntries(Object.keys(SERVICES).map((type) => [type, serviceTool(type)])),
 };
 
+// The city view's overlays (M5.T20), in the order the O key cycles them. The
+// list is the frame's one place an overlay is named; render/overlays.js maps
+// each id to the pooled lot tint it draws, and the later overlay tasks
+// (M5.T21's five, M5.T29's pollution, M12/M14's views) append here. `off` is
+// first so the view opens unpainted, exactly as the world looks today.
+export const OVERLAYS = [
+  { id: 'off', name: 'no overlay' },
+  { id: 'zone', name: 'zoning' },
+  { id: 'status', name: 'growth' },
+];
+
+// The overlay the view is on, never undefined: a save or a hand-written view
+// without the field reads as off.
+export function overlayOf(view) {
+  return OVERLAYS[view.overlay] ?? OVERLAYS[0];
+}
+
+// O: the next overlay in the ring, wrapped, and the one now showing.
+export function cycleOverlay(view) {
+  view.overlay = ((view.overlay ?? 0) + 1) % OVERLAYS.length;
+  return overlayOf(view);
+}
+
 // A tool names its own key (M5.T1), so the key table the panel and `cityKey`
 // read is the frame's, not a second one to keep in step. `BRUSH_KEYS` stays the
 // key -> use view the palette has always exported.
@@ -194,6 +217,7 @@ export function createCityView(city, map = worldMap()) {
     tilt: TILT.start,
     reach: REACH.start,
     brush: 'res',
+    overlay: 0,            // the overlay the O key cycles (M5.T20): OVERLAYS
     active: true,          // false once the player lays the tool down
     shift: false,          // Shift held: a brush click paints a low cap (M5.T8)
     hover: -1,
@@ -234,6 +258,12 @@ export function toggleCityView(view, streetYaw) {
 export function cityKey(view, key, streetYaw) {
   if (key === 'z') {
     toggleCityView(view, streetYaw);
+    return true;
+  }
+  // O cycles the lot overlays (M5.T20). The state is the view's, so the key
+  // lands wherever it is pressed; the tint only shows from the overview.
+  if (key === 'o') {
+    cycleOverlay(view);
     return true;
   }
   const tool = view.mode === 'city' ? TOOL_BY_KEY.get(key) : null;
