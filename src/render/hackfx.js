@@ -54,9 +54,6 @@ export function buildHackFx() {
   group.add(slitMesh);
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0x232a33, roughness: 0.4, metalness: 0.7 });
   const bodyMesh = new THREE.Mesh(mergeGeometries(bodies), bodyMat);
-  // Street cabinets are prop models for the VGA-084 sweep (M2-6).
-  bodyMesh.userData.model = 'substation-cabinet';
-  slitMesh.userData.model = 'substation-cabinet';
   bodyMesh.castShadow = true;
   group.add(bodyMesh);
 

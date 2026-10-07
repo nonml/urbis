@@ -617,7 +617,7 @@ export function updateCarPools(rig, cars, camera = null) {
 // carries its own glass, so the old canopy and box trim are deleted with it.
 // Beams, tails, glows, beacon and the real headlight spot stay exactly where
 // the saloon tuned them; the model is 4.41 m on the same +Z nose.
-export const HERO_MODEL = FLEET_MODEL;
+export const HERO_MODEL = 'assets/models/car/car.glb';
 
 // Sort one loaded mesh into paint, body trim or wheels. Paint wears the baked
 // atlas (it has a map); trim and wheels share the dark material, told apart
