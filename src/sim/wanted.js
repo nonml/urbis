@@ -10,6 +10,9 @@
 // drive off. Busted is still two and a half seconds within reach of a unit.
 import { clampToBounds, heightAt } from './world.js';
 import { canSee, nextWaypoint, spawnNode, worldMap } from './patrol.js';
+// The player's police stations are service parcels on the map (M5.T11), each
+// with its own catchment (M5.T13).
+import { SERVICES, servicesOf } from './ops.js';
 import { createResponse, heliSees, placeRoadblock, tickObstacles, tickResponse } from './response.js';
 // Pure numbers, no DOM and no three: the game loop's snapshot (M0-9) is taken
 // here so every cruiser and the helicopter carries the pose the step started
@@ -42,6 +45,24 @@ const SEARCH_CIRCLE_RATE = 0.25;
 // Units called in turn up this far from the suspect; units stood down drive
 // off and are gone once this far, or after this long.
 const SPAWN_DIST = 70;
+// A cruiser for a call inside a station's catchment starts from the station's
+// own street (M5.T13), not the stand-in; the radius is the station's service
+// catchment, so a station never answers past its own ground.
+function startPoint(map, x, z, taken) {
+  const r2 = SERVICES.police.radius * SERVICES.police.radius;
+  let best = null;
+  let bestD2 = Infinity;
+  for (const s of servicesOf(map.parcels, 'police')) {
+    const d2 = (s.x - x) ** 2 + (s.z - z) ** 2;
+    if (d2 <= r2 && d2 < bestD2) {
+      best = s;
+      bestD2 = d2;
+    }
+  }
+  return best
+    ? spawnNode(best.x, best.z, 0, taken, map)
+    : spawnNode(x, z, SPAWN_DIST, taken, map);
+}
 const LEAVE_GONE = 55;
 const LEAVE_SECS = 12;
 const CLOSE_IN = 6;
@@ -108,7 +129,7 @@ function syncUnits(w, x, z, map) {
   w.pursuit.forEach((u, i) => {
     if (i < want) {
       if (!u.active) {
-        const at = spawnNode(x, z, SPAWN_DIST, taken, map);
+        const at = startPoint(map, x, z, taken);
         taken.push(at);
         Object.assign(u, { x: at.x, z: at.z, y: groundAt(map, at.x, at.z), yaw: Math.atan2(x - at.x, z - at.z), speed: 0 });
       }

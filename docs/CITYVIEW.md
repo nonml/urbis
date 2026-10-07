@@ -101,6 +101,36 @@ tracks are free to change. The street-level *why* of a decline is the decline tr
 work; the district numbers are the economy track's. This readout is deliberately the
 minimum a player needs to know that their click did something.
 
+## Services
+
+The palette places services (`sim/ops.js` `SERVICES`, M5.T11). Each has a **radius** —
+metres between centres — and a **capacity** in what it serves: cells, pupils, patients,
+trucks, visitors, grids. `serviceReach()` hands a service the nearest buildings inside
+its radius, nearest first, until its capacity is full; a building reached once is never
+reached again, so a second service in the same catchment adds capacity rather than a
+second helping (M5-5). A **building** is a fixed parcel (a row, tower or cap) or a lot
+that has reached its low block or above; an empty lot or a site takes a capacity slot
+from nobody, and neither do services (M5.T11b).
+
+The capacities were measured, not tuned by eye: each service was placed on the seed's
+central empty lot — the empty lot nearest the centre of the lots' bounding box — and
+the buildings within its radius counted. Five seeds, one per process, because
+`worldMap()` caches the first seed's world tables: **7, 11, 22, 33, 73**.
+
+| Service | Radius | Capacity | Serves | Catchment (seeds 7 / 11 / 22 / 33 / 73) | Median |
+|---|---:|---:|---|---|---:|
+| substation | 200 m | 64 | grids | 38 / 71 / 80 / 80 / 98 | 80 |
+| police station | 100 m | 50 | cells | 22 / 56 / 67 / 63 / 65 | 63 |
+| fire station | 300 m | 64 | trucks | 38 / 71 / 80 / 80 / 98 | 80 |
+| clinic | 120 m | 58 | patients | 26 / 67 / 79 / 73 / 85 | 73 |
+| school | 150 m | 64 | pupils | 35 / 71 / 80 / 80 / 97 | 80 |
+| park | 100 m | 50 | visitors | 22 / 56 / 67 / 63 / 65 | 63 |
+
+Each capacity is `round(0.8 × median)`: the median seed's capacity covers 79% of its
+catchment for the police station and park (50/63), 79% for the clinic (58/73) and 80%
+for the school, fire station and substation (64/80), so the one service a player builds
+for a neighbourhood serves the neighbourhood instead of a handful of its nearest lots.
+
 ## The camera
 
 `render/cityview.js` never cuts the camera. Every frame `main.js` places the street rig
@@ -176,6 +206,7 @@ the previous frame left room for it, which is why the blackout overview tops out
 |---|---|
 | `src/sim/zoning.js` | `zoned`, `zoneParcel()`, `clearLot()`, the one `tickZoning()` branch |
 | `src/sim/cityview.js` | the tool's state machine: mode, lift, pivot, orbit, zoom, brush, hover, per-lot trend, `lotStatus()` |
+| `src/sim/ops.js` | the map edits: zone, bulldoze, place, the services and their reach (`SERVICES`, `serviceReach()`), the road ops |
 | `src/render/cityview.js` | camera blend, fog and near-plane, kerb outlines, lot picking |
 | `src/ui/cityview.js` | palette, lot readout, pointer/wheel input, parking the street rig |
 | `src/main.js` | imports, construction, the `Z R C I X` line in `keydown`, one tick line, two frame lines, the held inputs, `__game.cityview` |

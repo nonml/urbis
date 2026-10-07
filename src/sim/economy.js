@@ -41,6 +41,25 @@ export const INDUSTRY_PER_COMMERCE = 0.4;
 export const COMMERCE_PER_HOME = 1 / (1 + INDUSTRY_PER_COMMERCE);
 const COMMERCE_PER_HOME_HAND = 0.35;
 
+// The established district a town-plan kind opens with (M4.T11): the homes a
+// unit of its size holds, and the offices and works that keep them. towers is
+// the balanced downtown the model shipped with — one home, COMMERCE_PER_HOME
+// shops and their workshops. The other kinds lean where the town plan says they
+// should: housing and suburb stand on their homes (suburb quieter, fewer
+// shops), works on its jobs, more of them workshops. The lean is bounded by
+// zoning's hold band (0.28-0.55): a home costs its shops and its jobs, so a
+// district that holds more homes than its stores can serve would settle with
+// shops pinned and homes idle, and M1-4 is exactly that check. The numbers
+// below keep every use's settled demand inside the band, so the opening firm
+// queue is the only pressure on it — the same few minutes the balanced city
+// spends thinning its queue, and never one use held out of band for the run.
+const KIND_BASE = {
+  towers: { res: 1, com: COMMERCE_PER_HOME, ind: COMMERCE_PER_HOME * INDUSTRY_PER_COMMERCE },
+  housing: { res: 1.09, com: 0.76, ind: 0.30 },
+  suburb: { res: 1.07, com: 0.75, ind: 0.29 },
+  works: { res: 0.95, com: 0.70, ind: 0.34 },
+};
+
 // Firms from beyond the map looking for floor in the district — offices want
 // commercial floor, works want industrial — in the jobs they would bring. One
 // moves in or out every half-minute to minute and a bit, lot-sized, and the odds
@@ -162,11 +181,12 @@ const perUse = (fn) => Object.fromEntries(USES.map((use) => [use, fn(use)]));
 
 // A district's size is the floor area of its parcels (M3.T16): every building
 // already standing, measured parcel by parcel in the economy's people, not a
-// flat 0.4 rate over lot land. The base mix is one home, COMMERCE_PER_HOME shops
-// and their workshops per resident, so the measured floor divided by that sum is
-// the district's own size — the floor the model assumes its established district
-// holds is the floor its buildings actually hold. The hand preset has no
-// building parcels and keeps the shipped estimate (M4.T15 deletes it with it).
+// flat 0.4 rate over lot land. The balanced mix — one home, COMMERCE_PER_HOME
+// shops and their workshops per resident — turns that floor into the scale the
+// demand reads; KIND_BASE then says what the floor is worth by kind (M4.T11),
+// so a housing floor carries more homes, and a works floor more jobs, than a
+// downtown floor of the same measured area. The hand preset has no building
+// parcels and keeps the shipped estimate (M4.T15 deletes it with it).
 function districtSize(parcels, heightOf, calm) {
   const built = parcels.filter((p) => p.kind !== 'lot');
   if (!calm || built.length === 0) {
@@ -176,17 +196,31 @@ function districtSize(parcels, heightOf, calm) {
   return built.reduce((sum, p) => sum + floorPeople(p, heightOf), 0) / mix;
 }
 
-function makeDistrict(id, name, parcels, rand, calm, heightOf) {
+// What a district of `kind` opens with, in the economy's people: the kind's
+// homes, offices and works per unit of its size (KIND_BASE). A map without
+// kinds — the hand preset, and today's two power halves — keeps the shipped
+// balanced split: one home, COMMERCE_PER_HOME shops and their workshops for a
+// generated map, the preset's own 0.35 shops a home for the hand one.
+function baseMix(size, calm, kind) {
+  if (!calm) {
+    const shops = size * COMMERCE_PER_HOME_HAND;
+    return { res: size, com: shops, ind: shops * INDUSTRY_PER_COMMERCE };
+  }
+  const mix = KIND_BASE[kind] ?? KIND_BASE.towers;
+  return { res: size * mix.res, com: size * mix.com, ind: size * mix.ind };
+}
+
+function makeDistrict(id, name, parcels, rand, calm, heightOf, kind) {
   const size = districtSize(parcels, heightOf, calm);
-  const shops = size * (calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND);
   const firms = size * (calm ? FIRMS_USUAL : FIRMS_USUAL_HAND) * BOOT_FIRMS;
   return {
     id,
     name,
     calm,
     size,
-    // The established district. Its jobs match its homes.
-    base: { res: size, com: shops, ind: shops * INDUSTRY_PER_COMMERCE },
+    // The established district, its mix by kind. A generated map without kinds
+    // (the two power halves) keeps the balanced base, its jobs equal to homes.
+    base: baseMix(size, calm, kind),
     firms: { com: firms, ind: firms },
     wealth: 1,
     dark: false,
@@ -275,7 +309,9 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
     time: 0,
     rand,
     calm,
-    districts: defs.map((def) => makeDistrict(def.id, def.name, all.filter((p) => p.powerZone === def.id), rand, calm, heightOf)),
+    districts: defs.map((def) => makeDistrict(
+      def.id, def.name, all.filter((p) => p.powerZone === def.id), rand, calm, heightOf, def.kind,
+    )),
   };
   measureFloors(economy, parcels, heightOf);
   for (const d of economy.districts) {

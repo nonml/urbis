@@ -32,7 +32,7 @@
     {
       "id": "M4.T3",
       "lane": "city",
-      "goal": "The town plan. Seed \u2192 a coarse grid of 4-6 district cells about 600 m across, each with a kind (towers, housing, works, suburb), an east-west river corridor of 60 m (about 30 m of water, 7 m banks, 8 m setback; the spec's targets), and arterial roads joining the cells",
+      "goal": "The town plan. Seed → a coarse grid of 4-6 district cells about 600 m across, each with a kind (towers, housing, works, suburb), an east-west river corridor of 60 m (about 30 m of water, 7 m banks, 8 m setback; the spec's targets), and arterial roads joining the cells",
       "files": [
         "src/sim/townplan.js",
         "src/sim/map.js"
@@ -144,6 +144,24 @@
       "test": "tests/accept/m4-river-look.spec.js",
       "commit": "M4.T8b (M4-2): the river looks like water",
       "notes": "Size S. Draws stay at or under 175. Look at docs/shots/m4-river-73.png before finishing: a river you would recognise, with bridges over it. Commit as you go."
+    },
+    {
+      "id": "M4.T8c",
+      "lane": "city",
+      "goal": "Nothing is built in the river. On seed 7 the plan stands 8 buildings, 6 building rows and 5 lots inside the map's water rect, drawn as towers standing in the stream (docs/shots/m4-river-7.png). Every plan that places buildings, rows, lots or skyline towers must keep off map.water the way roads do; only bridges cross it.",
+      "files": [
+        "src/sim/layout.js",
+        "src/sim/map.js",
+        "src/sim/vistas.js",
+        "src/sim/zoning.js",
+        "docs/shots/"
+      ],
+      "needs": [
+        "M4.T8b"
+      ],
+      "test": "tests/accept/m4-dry-land.test.js",
+      "commit": "M4.T8c (M4-2): nothing stands in the river",
+      "notes": "Size S. Derive from map.water, never hard-code seed 7. Then run tests/accept/m4-river-look.spec.js and look at docs/shots/m4-river-7.png: water with bridges, no towers in it. Commit as you go."
     },
     {
       "id": "M4.T9",
@@ -321,7 +339,8 @@
         "M4.T7",
         "M4.T8",
         "M4.T9",
-        "M4.T9b"
+        "M4.T9b",
+        "M4.T8c"
       ],
       "commit": "M4.T18 (M4-5, M4-8): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",

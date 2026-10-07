@@ -22,7 +22,7 @@
       ],
       "test": "tests/accept/m0-smooth.spec.js",
       "commit": "M2.F3 (M0-9): cruisers drawn between sim steps",
-      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' \u2014 the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test. M2.F1 runs beside you and deletes tag lines in policekit.js: do not touch any userData.model line."
+      "notes": "Size S. Today m0-smooth fails: 'police draw 0 frame 6 d 0 at -5.4,-32->-5.4,-32' — the cruiser pool (kit.cruisers, added by 137220d) holds its pose between frames. Find where the old kit interpolated (git show 137220d) and give the cruiser pool the same treatment. Do not edit the test. M2.F1 runs beside you and deletes tag lines in policekit.js: do not touch any userData.model line."
     },
     {
       "id": "M2.F2",
@@ -50,7 +50,7 @@
       ],
       "test": "tests/accept/m2-car-body.test.js",
       "commit": "M2.F4 (M2-1): the saloon",
-      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall \u2014 bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test. M2.F2 runs beside you and appends a person.glb line to CREDITS.md: edit only the existing car.glb line in place, never append. A previous attempt left tools/models/make_saloon.py in this worktree: run it, check the result, export car.glb, then the shot. Keep the car under 6,500 triangles: 30 of them must fit the 600 k frame (M2.T11)."
+      "notes": "Size M. Write tools/models/make_saloon.py (Blender, bpy): a smooth saloon body 4.6 m long, 1.8 m wide, 1.45 m tall — bonnet, glass cabin with pillars, boot, wheel arches, separate wheels named Wheel_FL/FR/RL/RR at the same places as today, metres, Y-up, origin at the base, +Z nose, under 8k triangles, one paint material plus glass, tyre, trim and light materials. No flat plane under it. Plain grounded paint (grey, white, dark blue), never neon. Update info.json (name, source: tools/models/make_saloon.py, license CC0) and the CREDITS line. Keep src/ unchanged: traffic.js already loads car.glb for the hero car and traffic. Then take docs/shots/m2-car.png with scripts/shot.mjs on the hand map street pose; the car beside the player must read as a car. Do not edit the test. M2.F2 runs beside you and appends a person.glb line to CREDITS.md: edit only the existing car.glb line in place, never append. A previous attempt left tools/models/make_saloon.py in this worktree: run it, check the result, export car.glb, then the shot. Keep the car under 6,500 triangles: 30 of them must fit the 600 k frame (M2.T11)."
     },
     {
       "id": "M2.F2b",
@@ -128,6 +128,37 @@
       ],
       "commit": "M2.F2e (M2-0): the player stands on both feet",
       "notes": "Size S. Rebake with `python3 tools/models/make_person.py`. Print the Idle pose's ankle separation and heel/toe heights from Blender and keep them in range. Retake docs/shots/m2-0-person.png with scripts/shot.mjs on the hand map street pose in daylight (key t), crop the player to 200x300 px and look at it closely before finishing. tests/accept/m2-person-ships.test.js and tests/accept/m2-person-visible.spec.js must stay green. Commit as you go."
+    },
+    {
+      "id": "M2.F2f",
+      "lane": "people",
+      "goal": "The dressed person back in budget. Since M2.F2c dressed the player, public/assets/models/person.glb has 14,000 triangles and tests/accept/m2-people.spec.js fails its 10,000 bar; the crowd draws the same body. Cut the clothes and body in tools/models/make_person.py (decimate, drop hidden faces under clothes) to under 10,000 without losing the look in docs/shots.",
+      "files": [
+        "tools/models/make_person.py",
+        "public/assets/models/person.glb",
+        "docs/shots/"
+      ],
+      "needs": [],
+      "test": "tests/accept/m2-people.spec.js",
+      "commit": "M2.F2f (M2-2): the dressed person in budget",
+      "notes": "Size S. Rebake takes about 7 s. Compare the play shot before and after: same clothes, same pose."
+    },
+    {
+      "id": "M2.F5",
+      "lane": "assets",
+      "goal": "Real trees and mountains. M2.F1 removed the model tags Muse put on hand-built boxes, so tests/accept/m2-landscape.spec.js now fails honestly: the mountains and trees are not models. Build them in a tools/models/ script (like make_person.py), ship the GLBs in public/assets/models/, and load them through the model pool so the mountains are one smooth model mesh and the trees draw from 3 tree models, each tagged by the loader. Grounded and natural: no lollipop trees, no stepped boxes.",
+      "files": [
+        "tools/models/",
+        "public/assets/models/",
+        "src/render/landscape.js",
+        "src/render/trees.js",
+        "src/render/models.js",
+        "docs/shots/"
+      ],
+      "needs": [],
+      "test": "tests/accept/m2-landscape.spec.js",
+      "commit": "M2.F5 (M2-4): real trees and mountains",
+      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing."
     }
   ]
 }
