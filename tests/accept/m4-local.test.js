@@ -125,7 +125,6 @@ for (const seed of SEEDS) {
   test(`M4-5 seed ${seed}: a blackout reaches only through the commute links`, () => {
     // M4.T1's red check (a blackout reaches no other district today); M4.T18,
     // locality, makes it pass: drop this then.
-    test.fail(true, 'M4-5 red: a blackout reaches no other district through the commute links yet');
     const r = row(seed);
     expect(r.reach.length, `seed ${seed}: districts a commute reaches from ${r.x}: ${r.reach}`).toBeGreaterThan(1);
     expect(r.fullBad, `seed ${seed}: districts outside reach ${r.reach} changed: ${r.fullBad}`).toEqual([]);
