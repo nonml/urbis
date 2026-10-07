@@ -13,29 +13,37 @@
 // depth reads from the bank, the railings and the deck fascia. When terrain
 // learns to carve (M10's water), WATER_DROP is the one number that moves.
 //
-// Known limit: sim/terrain.js does not yet treat map.water as flat ground, so
-// the relief the hills put over the corridor (0.1-6 m on today's seeds) still
-// rises through the water sheet away from the roads, and the water only reads
-// in the flat hold around each crossing. Adding map.water to createTerrain's
-// flats in src/sim/terrain.js is the one-line fix (M4.T7's file, outside this
-// task's two render files); the water below is drawn correctly for the flat
-// corridor that fix leaves behind.
+// M4.T8b: the drawn ground frame used to follow the relief straight through
+// the sheet, so from the city view the river read as the same dark grey as the
+// ground and the pick named ground, not water. landscape.js now drops the
+// frame's vertices inside a water rect to WATER_BED and keeps grass off the
+// rects, so the sheet is the surface a camera and a pick see. sim/terrain.js
+// still does not flatten map.water (M4.T7's file, outside this task), so a
+// mover asking the world for the bed's height still gets the old relief.
 //
-// The material is the one main had before 354d937, unchanged: metalness 0 (the
-// environment is near-black on the horizon, so a mirror returned a void),
-// roughness 0.18 (the one cue left is the sun and moon glinting off the
-// ripple), envMapIntensity 0.06 (a constant term outlives the lights it should
-// sit beside and turns the river into a glowing stripe at midnight), and an
-// asphalt normal scrolled along the flow. 0x0d2030 sits at 0.0133 albedo,
-// between the ground plane (0.0085) and the grass banks (0.0247) — the spec's
-// window (world-scale-design.md, "What carries forward").
+// The material (M4.T8b): metalness 0 (the environment is a lit studio, not a
+// horizon, so a mirror on it is a void), roughness 0.14 (the sun and moon glint
+// off the ripple, and a low roughness lets the sky term land as sheen),
+// envMapIntensity 0.45 (up from 0.06, which left the sheet with no reflection
+// at all; the puddles' full mirror is 3.0), and an asphalt normal scrolled
+// along the flow. 0x2f6b78 is a mid blue-green, brighter than the ground plane
+// and the tarmac, so the river reads by day (M4.T8b; world-scale-design.md's
+// "do not re-tune it before the river is somewhere with light" is now spent).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH } from '../sim/world.js';
 import { buildInstancePools } from './buildings.js';
 
 export const WATER_DROP = 0.02;
-export const WATER_COLOR = 0x0d2030;
+// M4.T8b: the old 0x0d2030 sheet read as the same dark grey as the ground from
+// the city view. 0x2f6b78 is a mid blue-green, lighter than the ground and the
+// tarmac, with the env term below high enough that sky and sun land on it as
+// sheen instead of a void.
+export const WATER_COLOR = 0x2f6b78;
+// The bed the ground frame drops to under the water sheet (M4.T8b): below the
+// bank foot (-0.5), so the quay wall's inner face is the only edge a low camera
+// sees and the slope the frame makes entering the rect is under the water.
+export const WATER_BED = -0.9;
 const WATER_TILE = 3.1;   // metres of ripple per repeat along the flow
 const WATER_ACROSS = 2;   // ... and across it
 const SCROLL = 0.03;      // repeats a second the normal map drifts
@@ -43,9 +51,11 @@ const NORMAL_SCALE = 0.35;
 
 // The bank: a low quay wall in ordinary concrete. Wide enough to read as an
 // edge from the street, short enough that it never hides the water behind it.
+// Light enough (M4.T8b) to read against the blue-green sheet, not the old dark.
 const BANK_W = 1.6;
 const BANK_TOP = 0.28;
 const BANK_BOTTOM = -0.5;
+const BANK_COLOR = 0x8a8f98;
 const BANK_MIN_RUN = 0.5;
 // The width a crossing's deck needs, shared by the deck (render/roads.js) and
 // the bank gap cut for it here: the carriageway plus the footways the way
@@ -75,9 +85,9 @@ function waterMaterial(texLoader, maxAniso) {
   normal.wrapS = normal.wrapT = THREE.RepeatWrapping;
   normal.anisotropy = maxAniso;
   return new THREE.MeshStandardMaterial({
-    color: WATER_COLOR, metalness: 0, roughness: 0.18,
+    color: WATER_COLOR, metalness: 0, roughness: 0.14,
     normalMap: normal, normalScale: new THREE.Vector2(NORMAL_SCALE, NORMAL_SCALE),
-    envMapIntensity: 0.06,
+    envMapIntensity: 0.45,
   });
 }
 
@@ -137,6 +147,7 @@ export function buildRiver(texLoader, maxAniso, map) {
   if (water.length) {
     const mat = waterMaterial(texLoader, maxAniso);
     waterMesh = new THREE.Mesh(waterGeometry(water), mat);
+    waterMesh.name = 'river';
     waterMesh.receiveShadow = true;
     let last = 0;
     waterMesh.onBeforeRender = () => {
@@ -147,7 +158,7 @@ export function buildRiver(texLoader, maxAniso, map) {
     };
     group.add(waterMesh);
   }
-  const bankMat = new THREE.MeshStandardMaterial({ color: 0x707680, roughness: 0.9, metalness: 0.05 });
+  const bankMat = new THREE.MeshStandardMaterial({ color: BANK_COLOR, roughness: 0.85, metalness: 0.05 });
   const banks = buildInstancePools([bankMat], bankSlots(map), {
     shape: 'box', castShadow: false, receiveShadow: true, slack: 32,
   });
