@@ -2,6 +2,7 @@
 // palette, and the readout for the lot under the cursor. DOM and input only —
 // the state is sim/cityview.js, the camera and outlines render/cityview.js.
 import { isDark } from '../sim/street.js';
+import { PROBLEM, describe } from '../sim/decline.js';
 import { STAGE } from '../sim/zoning.js';
 import {
   TOOLS, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
@@ -9,6 +10,7 @@ import {
   toolOf, zoomCityView,
 } from '../sim/cityview.js';
 import { paintOf } from '../render/cityview.js';
+import { buildProblems } from '../render/problems.js';
 
 // Radians of orbit and tilt per pixel of drag, and zoom per wheel unit.
 const ORBIT_PER_PX = 0.005;
@@ -219,6 +221,14 @@ function groundAt({ rig, camera }, x, y) {
   return rig.ground(camera, ndcX, ndcY);
 }
 
+// The held-back lot whose problem icon stands under a canvas pixel (M5.T34),
+// or -1: the render layer's own pick, the same ray the pointer draws with.
+function problemAt({ problems, camera }, x, y) {
+  const ndcX = (x / window.innerWidth) * 2 - 1;
+  const ndcY = -(y / window.innerHeight) * 2 + 1;
+  return problems.pick(camera, ndcX, ndcY);
+}
+
 // A press is a click if it barely moves and a drag — orbit or tilt — once it
 // travels. With the road tool held a press on a road node starts a road drag
 // (M5.T3); the right button or Esc sets the tool down (M5.T1).
@@ -238,13 +248,18 @@ function bindPointer(ui) {
     }
     if (e.button !== 0) return;
     dismissRoad(view);   // a new click answers any ask still standing
-    const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false };
-    const at = groundAt(ui, e.clientX, e.clientY);
+    // A click on a problem icon opens its reason card; anywhere else closes
+    // one and paints as before (M5.T34).
+    const problem = problemAt(ui, e.clientX, e.clientY);
+    view.problem = problem >= 0 ? problem : null;
+    view.problemAt = problem >= 0 ? { x: e.clientX, y: e.clientY } : null;
+    const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false, problem };
+    const at = problem < 0 ? groundAt(ui, e.clientX, e.clientY) : null;
     if (toolOf(view)?.drag && at && pressRoad(view, at.x, at.z)) press.road = true;
     ui.press = press;
   });
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && view.mode === 'city') layDownTool(view);
+    if (e.key === 'Escape' && view.mode === 'city') { view.problem = null; layDownTool(view); }
   });
   window.addEventListener('pointermove', (e) => {
     ui.pointer = { x: e.clientX, y: e.clientY };
@@ -264,7 +279,8 @@ function bindPointer(ui) {
   });
   window.addEventListener('pointerup', () => {
     const { press } = ui;
-    if (press?.road) releaseRoad(view);
+    if (press?.problem >= 0) { /* the reason card is already open */ }
+    else if (press?.road) releaseRoad(view);
     else if (press && press.travel <= CLICK_SLOP) paintLot(view, city);
     ui.press = null;
   });
@@ -319,7 +335,31 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
   }
 }
 
-function showCard({ view, city, street, pointer, card }) {
+// Today's reason for the lot whose problem icon was clicked (M5.T34): the
+// cause's own line from decline.js's table, and the decline line the street
+// already speaks when it is that same cause.
+function reasonCard(p, cause) {
+  const label = PROBLEM[cause]?.label ?? 'problem';
+  const line = p.why === cause ? describe(p) : null;
+  return `<b style="color:#fff">PROBLEM · ${label.toUpperCase()}</b>`
+    + (line ? `<br>${line}` : '')
+    + '<br><span style="opacity:0.65">click elsewhere to close</span>';
+}
+
+function showCard({ view, city, street, pointer, card, problems }) {
+  if (view.problem != null && view.mode === 'city') {
+    const cause = problems.causeOf(view.problem);
+    card.dataset.cause = cause ?? '';
+    card.dataset.lot = `${view.problem}`;
+    card.innerHTML = reasonCard(city.parcels[view.problem], cause);
+    card.style.display = 'block';
+    const at = view.problemAt ?? pointer ?? { x: 20, y: 20 };
+    card.style.left = `${at.x + 16}px`;
+    card.style.top = `${at.y + 16}px`;
+    return;
+  }
+  card.dataset.cause = '';
+  card.dataset.lot = '';
   if (!pointer || (view.hover < 0 && !view.drag && !view.pick)) {
     card.style.display = 'none';
     return;
@@ -370,8 +410,12 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   const ui = {
     canvas, cam, camera, city, street, view, rig, card, ask,
     ...buildPalette(view, city),
+    // The problem-icon layer (M5.T34) rides the city view's own group: built
+    // once, framed each update from the sim's cause list.
+    problems: buildProblems(city, { dark: (zone) => isDark(street, zone) }),
     pointer: null, press: null, parked: null, hoverTool: null,
   };
+  rig.mesh.add(ui.problems.mesh);
   for (const { row, tool } of ui.rows) {
     row.addEventListener('pointerenter', () => { ui.hoverTool = tool; });
     row.addEventListener('pointerleave', () => { ui.hoverTool = null; });
@@ -379,9 +423,11 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   bindPointer(ui);
   function update() {
     holdStreetRig(ui);
+    if (view.mode !== 'city') view.problem = null;
     hover(ui);
     showPalette(ui);
     showDemand(ui);
+    ui.problems.frame(camera, view.lift);
     showCard(ui);
     showAsk(ui);
   }

@@ -8,6 +8,8 @@
 // dark and the letting boards go up first; only an empty building comes down.
 import { worldMap } from './patrol.js';
 import { streetName } from './streetnames.js';
+import { STAGE } from './map.js';
+import { SERVICE_TYPES, serviceReach, servicesOf } from './ops.js';
 
 export const TREND = {
   GROWING: 'growing',     // floors going up, or tenants coming back
@@ -24,6 +26,12 @@ export const CAUSE = {
   MARKET_THIN: 'demand-thin',
   MARKET_LOW: 'demand-low',
   NO_POWER: 'no-power',
+  NO_ROAD: 'no-road',
+  NO_SERVICE: 'no-service',
+  // M12's water and garbage join the same table (M5-16): the causes are listed
+  // here so their icons and words land with the systems that set them.
+  NO_WATER: 'no-water',
+  NO_COLLECTION: 'no-collection',
 };
 
 // Seconds for a full building to empty once its market collapses, and to let
@@ -89,6 +97,64 @@ const PLAIN_CAUSE = {
   [TREND.STALLED]: CAUSE.MARKET_THIN,
   [TREND.DECLINING]: CAUSE.MARKET_LOW,
 };
+
+// The problem table (M5-16): every cause a held-back building can show, its
+// one line and its icon mark. It is the join point — a new system adds its
+// cause to CAUSE and its entry here, and the icon layer and the reason card
+// pick them up without changing. MARKET_LOW shares demand's entry: a building
+// losing demand and one waiting on it are the same problem to the player.
+export const PROBLEM = {
+  [CAUSE.NO_ROAD]: { label: 'no road', mark: 'road' },
+  [CAUSE.NO_POWER]: { label: 'no power', mark: 'power' },
+  [CAUSE.NO_SERVICE]: { label: 'no service in reach', mark: 'service' },
+  [CAUSE.MARKET_THIN]: { label: 'no demand', mark: 'demand' },
+  [CAUSE.MARKET_LOW]: { label: 'no demand', mark: 'demand' },
+  [CAUSE.NO_WATER]: { label: 'no water', mark: 'water' },
+  [CAUSE.NO_COLLECTION]: { label: 'no collection', mark: 'collection' },
+};
+
+// A building the world is holding back from growing: one stands or is started,
+// on land the player zoned for it, below the cap and not moving. A finished
+// building is not held back — it is done — and an empty lot is not a building.
+export function heldBack(p) {
+  if (p.kind !== 'lot' || p.zoned === null || p.use !== p.zoned) return false;
+  if (!(p.building || hasFloors(p))) return false;
+  return p.stage < (p.cap ?? STAGE.HIGH) && p.trend !== TREND.GROWING;
+}
+
+// The first cause a held-back building shows: what is missing from the outside
+// in. `dark` is the power zone's truth (street.js isDark), `served` whether a
+// service the city runs reaches this parcel (servedIn below). Ties read the way
+// judge() judges them: power outranks the market, and a stranded parcel
+// outranks both.
+export function problemOf(p, { dark = false, served = true } = {}) {
+  if (p.noRoad || p.why === CAUSE.NO_ROAD) return CAUSE.NO_ROAD;
+  if (dark) return CAUSE.NO_POWER;
+  if (!served) return CAUSE.NO_SERVICE;
+  return PROBLEM[p.why] ? p.why : CAUSE.MARKET_THIN;
+}
+
+// Which parcels every service the city actually runs can reach, capacity
+// included (ops.js serviceReach). A city that has built no clinic cannot
+// complain that a lot lacks one, so types with no services are not tested.
+export function servedIn(city) {
+  const reaches = SERVICE_TYPES
+    .filter((type) => servicesOf(city.parcels, type).length > 0)
+    .map((type) => serviceReach(city.parcels, type));
+  if (reaches.length === 0) return () => true;
+  return (p) => reaches.every((reach) => reach.has(p));
+}
+
+// Every held-back building and the cause its icon shows, in parcel order. The
+// icon layer, the reason card and the acceptance check all read this one list.
+export function problemList(city, { dark = () => false, served = servedIn(city) } = {}) {
+  const out = [];
+  city.parcels.forEach((p, i) => {
+    if (!heldBack(p)) return;
+    out.push({ i, cause: problemOf(p, { dark: dark(p.powerZone), served: served(p) }) });
+  });
+  return out;
+}
 
 function doing(p) {
   const floors = hasFloors(p);
