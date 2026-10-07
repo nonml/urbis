@@ -26,9 +26,6 @@ export const REACH = { start: 200, min: 60, max: 220 };
 const PAN_SPEED = 60;
 const HURRY_PAN = 2.2;
 
-// The palette, keyed R C I X: three uses and the eraser.
-export const BRUSH_KEYS = { r: 'res', c: 'com', i: 'ind', x: null };
-
 // ---------------------------------------------------------------------------
 // The tool frame (M5.T1). A tool is what a brush key selects: the operation it
 // runs, what it costs the city, the mark its cursor would draw, and the first
@@ -50,7 +47,7 @@ function zoneTool(id, key, use, name, blurb) {
     // view (M5.T19, M5.T26): it is the one that refuses non-lots and answers
     // whether the zoning changed.
     op: (map, at) => zoneParcel(map, map.parcels.indexOf(at), use),
-    cost: () => TOOL_PRICE[id],
+    cost: (map, at) => TOOL_PRICE[id],
     preview: (at) => ({
       kind: use === null ? 'unzone' : `zone ${use}`,
       use,
@@ -71,6 +68,12 @@ export const TOOLS = {
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
   unzone: zoneTool('unzone', 'x', null, 'unzone', 'clears a lot back to open land'),
 };
+
+// A tool names its own key (M5.T1), so the key table the panel and `cityKey`
+// read is the frame's, not a second one to keep in step. `BRUSH_KEYS` stays the
+// key -> use view the palette has always exported.
+const TOOL_BY_KEY = new Map(Object.values(TOOLS).map((tool) => [tool.key, tool]));
+export const BRUSH_KEYS = Object.fromEntries(Object.values(TOOLS).map((tool) => [tool.key, tool.use]));
 
 // The tool the brush holds, or null once the player puts it down.
 export function toolOf(view) {
@@ -143,16 +146,22 @@ export function cityKey(view, key, streetYaw) {
     toggleCityView(view, streetYaw);
     return true;
   }
-  if (view.mode !== 'city' || !(key in BRUSH_KEYS)) return false;
-  chooseBrush(view, BRUSH_KEYS[key]);
+  const tool = view.mode === 'city' ? TOOL_BY_KEY.get(key) : null;
+  if (!tool) return false;
+  chooseTool(view, tool);
   return true;
 }
 
+// Picking a tool up is one rule, wherever it comes from — its key (cityKey) or
+// its panel row (ui/cityview.js).
+export function chooseTool(view, tool) {
+  view.brush = tool.use;
+  view.active = true;
+}
+
 export function chooseBrush(view, use) {
-  if (use === null || Object.values(BRUSH_KEYS).includes(use)) {
-    view.brush = use;
-    view.active = true;
-  }
+  const tool = use === null ? TOOLS.unzone : TOOLS[use];
+  if (tool) chooseTool(view, tool);
 }
 
 // A drag in the overview: sideways orbits, up and down tilts inside the band.

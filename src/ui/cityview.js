@@ -4,7 +4,7 @@
 import { isDark } from '../sim/street.js';
 import { STAGE } from '../sim/zoning.js';
 import {
-  TOOLS, chooseBrush, hoverLot, layDownTool, lotStatus, orbitCityView, paintLot, toolOf,
+  TOOLS, chooseTool, hoverLot, layDownTool, lotStatus, orbitCityView, paintLot, toolOf,
   zoomCityView,
 } from '../sim/cityview.js';
 import { paintOf } from '../render/cityview.js';
@@ -16,7 +16,11 @@ const ZOOM_PER_WHEEL = 0.001;
 // A press that travels less than this many pixels is a click, not a drag.
 const CLICK_SLOP = 6;
 
-const USE_NAME = { res: 'residential', com: 'commercial', ind: 'industrial' };
+// Use names come from the tools themselves (M5.T1), so the frame stays the one
+// place a tool is described. The eraser has no use to name here.
+const USE_NAME = Object.fromEntries(
+  Object.values(TOOLS).filter((tool) => tool.use).map((tool) => [tool.use, tool.name]),
+);
 const STAGE_NAME = ['empty lot', 'site', 'low-rise', 'mid-rise', 'tower'];
 // What the lot is doing, and the one word of why when there is one.
 const STATUS_LINE = {
@@ -68,6 +72,7 @@ function buildPalette(view, city) {
     row.id = `tool-${tool.id}`;
     row.dataset.tool = tool.id;
     row.dataset.key = tool.key;
+    row.dataset.cost = `${tool.cost(city, null)}`;
     row.title = toolLine(tool, city);
     row.style.cssText = 'cursor:pointer;padding:0 8px 0 6px;border-left:3px solid transparent;border-radius:2px';
     row.innerHTML = `<b style="color:#fff">${tool.key.toUpperCase()}</b> &nbsp;${swatch(tool.use)}`
@@ -75,7 +80,7 @@ function buildPalette(view, city) {
     row.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.stopPropagation();
-      chooseBrush(view, tool.use);
+      chooseTool(view, tool);
     });
     panel.appendChild(row);
     return { row, tool };
