@@ -259,10 +259,14 @@ async function abort(w) {
 // task change, but `git status` in a lane whose HEAD predates .gitignore's entry lists
 // it, and every judge round flagged it as a stray file (Muse's whole T33/T34 record).
 const OS_NOISE = /(^|\/)\.DS_Store$/;
+// Uncommitted edits, plus what the lane has committed past main: a lane sent back
+// to resolve a merge has its task in a commit already.
 function changedPaths(dir) {
-  return sh('git', ['status', '--porcelain', '-uall'], dir).split('\n').filter(Boolean)
-    .map((line) => line.slice(3).split(' -> ').at(-1))
-    .filter((f) => !OS_NOISE.test(f));
+  const loose = sh('git', ['status', '--porcelain', '-uall'], dir).split('\n').filter(Boolean)
+    .map((line) => line.slice(3).split(' -> ').at(-1));
+  let ahead = [];
+  try { ahead = sh('git', ['diff', '--name-only', 'main...HEAD'], dir).split('\n').filter(Boolean); } catch { /* no main */ }
+  return [...new Set([...loose, ...ahead])].filter((f) => !OS_NOISE.test(f));
 }
 
 const changed = (w) => changedPaths(w.dir).length;
@@ -444,20 +448,24 @@ function commitTask(w) {
   const t = w.task;
   sh('git', ['add', '-A', '--', '.', ':(exclude,glob)**/.DS_Store'], w.dir);
   const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: task checks green, draws ${w.draws ?? 'not printed'}.`;
-  sh('git', ['commit', '-q', '-m', t.commit ?? subjectOf(t), '-m', why], w.dir);
+  // A lane sent back to merge main has already committed its work: nothing new to add.
+  const staged = sh('git', ['diff', '--cached', '--name-only'], w.dir).trim();
+  if (staged) sh('git', ['commit', '-q', '-m', t.commit ?? subjectOf(t), '-m', why], w.dir);
   return sh('git', ['rev-parse', '--short', 'HEAD'], w.dir).trim();
 }
 
 // A task that passed its check lands on main at once, so the tasks that need it can
 // start: main is merged into the lane, the short gate runs on the result, and main
 // fast-forwards to it. The loop waits on it, so main cannot move in between.
-// Returns 'conflict', a fault for the worker, or null once it is on main.
+// Returns { conflict: files } (left mid-merge), a fault for the worker, or null once
+// it is on main.
 async function land(w) {
   try {
     sh('git', ['merge', '--no-edit', '-q', 'main'], w.dir);
   } catch {
-    try { sh('git', ['merge', '--abort'], w.dir); } catch { /* nothing to abort */ }
-    return 'conflict';
+    // Left mid-merge: the worker resolves it (judge sends it back) or it is parked.
+    const files = sh('git', ['diff', '--name-only', '--diff-filter=U'], w.dir).trim().split('\n').filter(Boolean);
+    return { conflict: files };
   }
   try {
     await shAsync('npm', ['run', 'gate'], w.dir, { GATE_PORT: String(w.gate) });
@@ -507,7 +515,15 @@ async function judge(state, w) {
     const commit = commitTask(w);
     state.tasks[t.id] = { ...state.tasks[t.id], commit, model: w.model };
     fault = await land(w);
-    if (fault === 'conflict') {
+    if (fault?.conflict && w.tries < FIX_TRIES) {
+      // Main moved under the lane (M4.T7, M4.T6b, M5.T3d on 2026-10-07): resolving
+      // the clash is the worker's job, not a reason to throw the work away.
+      w.tries += 1;
+      await send(w, `Main moved while you worked. \`git merge main\` is in progress in your worktree and conflicts in: ${fault.conflict.join(', ')}. Resolve each conflict keeping both sides' intent (main's changes are other tasks' finished work), \`git add\` them and \`git commit --no-edit\`, then check again.\n${portsLine(w)}`);
+      return `${w.name}: ${t.id} conflicts with main in ${fault.conflict.join(', ')}, sent back to merge (${w.tries}/${FIX_TRIES})`;
+    }
+    if (fault?.conflict) {
+      try { sh('git', ['merge', '--abort'], w.dir); } catch { /* nothing to abort */ }
       w.live = false;
       state.tasks[t.id].why = 'conflicts with main';
       return `${w.name}: ${t.id} conflicts with main, parked`;
