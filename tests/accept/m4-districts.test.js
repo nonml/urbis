@@ -52,7 +52,6 @@ for (const seed of SEEDS) {
   test(`M4-1 seed ${seed}: 4+ districts of 3+ kinds, 400+ buildings, 40+ free lots`, () => {
     // M4.T1's red check (2 districts, no kind, under 400 buildings today);
     // M4.T3-T5, the town plan and its buildings, make it pass: drop this then.
-    test.fail(true, 'M4-1 red: one generated district, no kind, under 400 buildings');
     const r = row(seed);
     const kinds = [...new Set(r.districts.map((d) => d.kind))];
     expect(r.districts.length, `seed ${seed}: districts`).toBeGreaterThanOrEqual(MIN_DISTRICTS);

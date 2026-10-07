@@ -99,7 +99,6 @@ function row(seed) {
 test.setTimeout(120000);
 for (const seed of SEEDS) {
   test(`M5-3 seed ${seed}: a removed road empties, commuters detour, a building loses its road`, () => {
-    test.fail(true, 'M5-3 red: a lot with noRoad does not decline with "no road"');
     const r = row(seed);
     expect(r.parcel, `seed ${seed}: a building loses its only road`).toBeTruthy();
     expect(r.noRoad, `seed ${seed}: ops marks it noRoad`).toBe(true);

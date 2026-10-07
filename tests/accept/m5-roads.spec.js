@@ -51,7 +51,6 @@ function roadSite(seed) {
 
 for (const seed of SEEDS) {
   test(`M5-1 seed ${seed}: a dragged road into open land is driven end to end`, async ({ page }) => {
-    test.fail(true, 'M5-1 red: no road tool or road drag in the city view');
     const site = roadSite(seed);
     expect(site, `seed ${seed}: the seed has open land for a 120 m drag`).toBeTruthy();
     await page.goto(`/?capture=1&gen=1&seed=${seed}&speed=${SPEED}`);

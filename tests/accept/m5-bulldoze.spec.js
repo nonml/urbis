@@ -44,7 +44,6 @@ const stateOf = (page, ids) => page.evaluate((list) => {
 
 for (const seed of SEEDS) {
   test(`M5-2 seed ${seed}: row, tower and lot are bulldozed, zoned and saved`, async ({ page }) => {
-    test.fail(true, 'M5-2 red: the X brush clears lots only; no bulldoze tool');
     await bootView(page, seed);
     const parcels = await page.evaluate(() => window.__game.city().parcels);
     const targets = [parcels.find((p) => p.kind === 'row'), parcels.find((p) => p.kind === 'tower'),

@@ -98,6 +98,24 @@ function addChain(nodes, edges, district, way, kind, axis, points) {
   }
 }
 
+// Every district's roads cut together into one graph (M4.T4): the plan's own,
+// each cell's, and the arterials that join them, so shared junctions are one
+// node and a car can leave a cell and reach any other. The plan's own ways stay
+// first, so where the town's roads run through them a lookup reads the plan's.
+function districtsGraph(cells, town, district) {
+  const graph = buildGraph({
+    id: 'town',
+    avenues: [...district.avenues, ...cells.flatMap((d) => d.avenues), ...town.arterials.avenues],
+    crossings: [...district.crossings, ...cells.flatMap((d) => d.crossings), ...town.arterials.crossings],
+  });
+  const own = new Set([...district.avenues, ...district.crossings].map((w) => w.id));
+  graph.edges = [
+    ...graph.edges.filter((e) => own.has(e.way)),
+    ...graph.edges.filter((e) => !own.has(e.way)),
+  ];
+  return graph;
+}
+
 // Every avenue cut where a crossing meets it, every crossing cut where an
 // avenue meets it, as nodes and edges.
 function buildGraph(district) {
@@ -152,10 +170,13 @@ function splitDistricts(district) {
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
   const district = generateDistrict(seed);
-  // The coarse town (M4.T3): cells, kinds, arterials and the river. Today the
-  // generated district still fills the map; M4.T4 makes one district per cell
-  // and joins their roads through town.arterials.
+  // The coarse town (M4.T3): cells, kinds, arterials and the river. M4.T4 turns
+  // each cell into a district of its own kind (citygen.KIND_SPECS: avenue gap,
+  // crossing count, height and style range) and cuts every one of their roads
+  // with the arterials into map.graph. The load-time district still fills the
+  // map until M4.T5 moves the buildings onto the cells.
   const town = planTown(seed);
+  const cells = town.cells.map((cell) => generateDistrict(seed, cell, cell.kind));
   const plan = planLayout(district, seed);
   plan.pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings);
   const dressing = planDressing(district, seed);
@@ -169,7 +190,11 @@ export function createMap(seed) {
     dirty: new Set(),
     district,
     districts: splitDistricts(district),
-    graph: buildGraph(district),
+    // One district per town-plan cell, in cell order: its kind, its own roads,
+    // and the height and style range its buildings may take (M4.T4, M4.T5).
+    cells,
+    // All districts' roads, cut into one graph through the arterials (M4.T4).
+    graph: districtsGraph(cells, town, district),
     town,
     // The town's water (M4.T3): terrain.buildable refuses a footprint in it
     // (M4.T5), and M4.T8 draws it. Rects are terrain's [cx, cz, hw, hd].
