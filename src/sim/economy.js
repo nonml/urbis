@@ -4,6 +4,7 @@
 // Pure: zoning ticks it, render and the probe read it (law 5).
 import { isDark } from './street.js';
 import { worldMap } from './patrol.js';
+import { serviceReach } from './ops.js';
 
 // A district is a power area (districtAt in street.js, areas from
 // map.districts): the grid is what a player can cut, so it is the unit a
@@ -112,6 +113,17 @@ const WEALTH_RISE_SECS = 25;
 const WEALTH_FALL_SECS = 15;
 const DARK_DRAIN_SECS = 60;
 
+// A clinic and a school earn the district back faster (M5-5, M5.T15): each
+// building a service's catchment-and-capacity reaches lives longer in work,
+// keeps its trade and spends it at home, so the pay a blackout or a departing
+// firm costs comes back sooner. The boost is per service type, never per
+// service — a second clinic in a catchment the first filled adds capacity, not
+// a second helping (ops.js serviceReach) — and a service that stands where no
+// building answers it earns nothing. Both sit at 25% over the 25 s above, past
+// the 20% the roadmap asks for and inside what the wealth series can show.
+const HEALTH_BOOST = { clinic: 1.25, school: 1.25 };
+const HEALTH_MIN = 0.2;   // the floor the strongest a boost may cut to
+
 // The commute a district's residents drive (M3.T35): traffic lays every
 // resident's trip on the graph's edges for the hour and publishes the
 // per-district summary on street.traffic.flowByDistrict — the residents, the
@@ -155,6 +167,12 @@ const CREDIT_NEED_RISE = 0.02;
 // it added to break ground and the 20 s market lag to arrive; the deadline also
 // keeps an old rezone from claiming a swing that is really the market's own.
 const CREDIT_SECS = 300;
+
+// The market's own live state -> the map's parcel list, weakly: the services the
+// player places are edits on the map (ops.js), and the wealth rate reads them
+// (M5.T15). Keyed by the economy, held once at creation and never in it, so a
+// save or a hash never sees a map in the market.
+const MARKETS = new WeakMap();
 
 // The market constants above, read back by scripts/economy-probe.mjs so its
 // report quotes the shipped numbers instead of hard-coding a second copy.
@@ -314,6 +332,7 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
     )),
   };
   measureFloors(economy, parcels, heightOf);
+  MARKETS.set(economy, map.parcels ?? []);
   for (const d of economy.districts) {
     // The opening city is what the seed rolled, not a rezone: the first measure
     // counts it, and no player did that.
@@ -401,10 +420,16 @@ function scare(economy, d, dt) {
   d.chase = 0;
 }
 
-function earn(d, dt, late = 0) {
+// The price a district earns and spends it: the wealth rises toward the target
+// while the pay is short of it and falls toward it from above, at a rate the
+// services reaching the buildings can cut (riseSecs). A dark district trades
+// nothing at all and falls to no trade over DARK_DRAIN_SECS whatever it
+// reached; a late worker earns less a shift, so the target drops with it.
+function earn(d, dt, late, state) {
   const employment = Math.min(d.jobs, d.homes) / d.homes;
   const target = d.dark ? 0 : employment * (1 - late);
-  const secs = d.dark ? DARK_DRAIN_SECS : target > d.wealth ? WEALTH_RISE_SECS : WEALTH_FALL_SECS;
+  const secs = d.dark ? DARK_DRAIN_SECS
+    : target > d.wealth ? riseSecs(d, state) : WEALTH_FALL_SECS;
   d.wealth += (target - d.wealth) * Math.min(1, dt / secs);
 }
 
@@ -472,10 +497,39 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
     flee(economy, d, dt);
     if (economy.time >= d.nextMove) moveFirm(economy, d);
     price(d, commute.lost);
-    earn(d, dt, commute.late);
+    earn(d, dt, commute.late, economy);
     react(d, dt);
     creditRezone(d, economy.time);
   }
+}
+
+// The buildings a service type reaches in one district, capacity included
+// (ops.js serviceReach): the players' services live on the map, and the map is
+// held here weakly the moment the economy is created — the services the player
+// places land on the map's own parcel list, which a sim that reads only the
+// city's lots would otherwise never see. A district with no clinic of the type
+// reaches nothing and gets no boost; one clinic and a second in the same
+// catchment reach the same buildings, so the pair moves the rates once.
+function servedIn(parcels, d, types) {
+  let served = 0;
+  for (const type of types) {
+    const reach = serviceReach(parcels, type);
+    for (const p of reach.keys()) if (p.powerZone === d.id) served += 1;
+  }
+  return served;
+}
+
+// How fast a district's pay comes back right now: the base rate, cut by every
+// health service that actually reaches its buildings (M5.T15). Measured against
+// the market's own state, never drawn from its stream, so one district's
+// services cannot shift the other's.
+function riseSecs(d, state) {
+  let secs = WEALTH_RISE_SECS;
+  for (const type of Object.keys(HEALTH_BOOST)) {
+    if (servedIn(MARKETS.get(state), d, [type]) === 0) continue;
+    secs = Math.min(secs, WEALTH_RISE_SECS / HEALTH_BOOST[type]);
+  }
+  return Math.max(HEALTH_MIN, Math.min(WEALTH_RISE_SECS, secs));
 }
 
 // What the market says about one parcel's use, in the parcel's own district.
