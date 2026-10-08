@@ -13,8 +13,11 @@
 # up), and the CMU finger joints fan the hand open. The Idle's hips, legs,
 # feet and fingers are the rig's own rest stance instead — straight knees,
 # level pelvis, ankles a stance apart, soles flat, fingers together — with the
-# walk's hanging arms kept from M2.F2d. All parts are merged, decimated under
-# the tri budget, vertex-coloured and exported to PERSON_OUT (default
+# walk's hanging arms kept from M2.F2d. M2.F2f: the whole figure has to land
+# under a 10,000-tri bar (tests/accept/m2-people.spec.js), so the merge no
+# longer decimates to one shared ratio: the faces a garment sits on top of are
+# dropped, and every visible part takes its own budget. All parts are merged,
+# vertex-coloured and exported to PERSON_OUT (default
 # public/assets/models/person.glb): one skinned mesh, one material, `Walk` +
 # `Idle`.
 import math
@@ -27,9 +30,18 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parent
 BVH = ROOT / 'mocap' / 'cmu-08_01-walk.bvh'
 DEFAULT_OUT = 'public/assets/models/person.glb'
-# Whole character — head/hands skin, suit, trousers, shoes, hair, eyes — under
-# the 15k-tri / 1.5 MB budget, with slack for the export.
-TRI_BUDGET = 14500
+# M2.F2f: the GLB the test loads must count under 10,000 triangles. Each part
+# declares its own budget and the whole export is checked against TRI_BUDGET
+# before it is written. MakeHuman's own topology is far denser than a game
+# needs — 8.8k tris for a head, 6.5k for a hand, 3k for a pair of shoes — so
+# the head keeps most of the budget (the one part the player reads closely at
+# play distance) and the hands, the shoes and the hair give up the rest.
+HEAD_BUDGET = 6000
+HAND_BUDGET = 2200
+HAIR_BUDGET = 1500
+SUIT_BUDGET = 2000
+SHOE_BUDGET = 700
+TRI_BUDGET = 9700
 
 # Skin, jacket, trousers, shoes, hair, eyes, in linear RGB (glTF COLOR_0 is
 # linear). A dark worn navy suit, near-black shoes, chestnut hair, warm skin:
@@ -98,6 +110,7 @@ if os.environ.get('PERSON_STAGE') != 'bake':  # host side: python3 make_person.p
 
 import bpy  # noqa: E402  (only reachable inside Blender)
 from mathutils import Matrix, Vector  # noqa: E402
+from mathutils.bvhtree import BVHTree  # noqa: E402
 
 try:  # Blender 4.2+ extensions load under bl_ext.
     from bl_ext.blender_org.mpfb.services.humanservice import HumanService
@@ -443,23 +456,90 @@ def stash(rig, action):
     bpy.context.view_layer.update()
 
 
-def tri_count(body):
-    return sum(len(p.vertices) - 2 for p in body.data.polygons)
+def tri_count(ob):
+    return sum(len(p.vertices) - 2 for p in ob.data.polygons)
 
 
-def decimate(body):
-    bpy.context.view_layer.objects.active = body
-    body.select_set(True)
-    if body.data.shape_keys:
-        bpy.ops.object.shape_key_remove(all=True, apply_mix=True)
-    for mod in list(body.modifiers):
-        if mod.type == 'MASK':
-            bpy.context.view_layer.objects.active = body
-            bpy.ops.object.modifier_apply(modifier=mod.name)
-    mod = body.modifiers.new('Budget', 'DECIMATE')
-    mod.ratio = min(1.0, (TRI_BUDGET - 500) / max(1, tri_count(body)))
-    bpy.ops.object.modifier_apply(modifier=mod.name)
-    return tri_count(body)
+# Bone groups whose weight marks the visible skin. The head and neck are the
+# part the player reads closely, so they keep the larger budget; the hands
+# hang by the thighs and read as hands from the play camera's distance.
+SKIN_REGIONS = ((('Head', 'Neck'), HEAD_BUDGET),
+                (('Hand', 'Finger', 'Thumb'), HAND_BUDGET))
+# How far under a garment a face may sit and still count as covered. The hair
+# rests on the scalp and a shoe shell wraps a toe a few millimetres clear of
+# the skin, so a ray along a face's own normal reaches either well inside this.
+COVER_REACH = 0.03
+
+
+def region_faces(ob, keys):
+    """Faces whose skin weight sits in these bone groups."""
+    ids = {g.index for g in ob.vertex_groups if any(k in g.name for k in keys)}
+    return [p.index for p in ob.data.polygons
+            if all(sum(g.weight for g in ob.data.vertices[i].groups
+                       if g.group in ids) > 0.5 for i in p.vertices)]
+
+
+def face_tris(ob, faces):
+    return sum(len(ob.data.polygons[i].vertices) - 2 for i in faces)
+
+
+def select_faces(ob, faces):
+    for p in ob.data.polygons:
+        p.select = p.index in faces
+
+
+def remove_faces(ob, faces):
+    """Delete polygons in place. The edit-mode delete is the operator that
+    keeps vertex groups, colour layers and the armature modifier; a bmesh
+    round-trip would silently drop the colours."""
+    select_faces(ob, faces)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.delete(type='FACE')
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.update()
+
+
+def drop_covered(body, garments):
+    """M2.F2f: drop the faces a garment sits on top of. MPFB already masks the
+    covered skin in bulk with a Delete mask per asset; this takes the seams
+    that mask stops short of — the toes inside the shoe shells, the scalp
+    under the hair — by firing each face along its own normal into the worn
+    garments."""
+    deps = bpy.context.evaluated_depsgraph_get()
+    trees = [BVHTree.FromObject(g.evaluated_get(deps), deps)
+             for g in garments if g is not None]
+    covered = [p.index for p in body.data.polygons
+               if any(tree.ray_cast(body.matrix_world @ p.center,
+                                    (body.matrix_world.to_3x3() @ p.normal).normalized(),
+                                    COVER_REACH)[0] is not None for tree in trees)]
+    remove_faces(body, covered)
+    return len(covered)
+
+
+def collapse(ob, faces, budget):
+    """Collapse the selected faces to `budget` triangles; `faces=None` is the
+    whole part. Returns the count the part held before."""
+    if faces is None:
+        faces = range(len(ob.data.polygons))
+    before = face_tris(ob, faces)
+    select_faces(ob, faces)
+    bpy.context.view_layer.objects.active = ob
+    bpy.ops.object.mode_set(mode='EDIT')
+    bpy.ops.mesh.decimate(ratio=min(1.0, budget / max(1, before)))
+    bpy.ops.object.mode_set(mode='OBJECT')
+    bpy.context.view_layer.update()
+    return before
+
+
+def decimate_regions(body):
+    """M2.F2f: one budget per region of the visible skin. The edit-mode
+    Decimate touches only the selection, so the head keeps its triangles while
+    the hands give theirs up, instead of every region sharing one ratio."""
+    for keys, budget in SKIN_REGIONS:
+        before = collapse(body, region_faces(body, keys), budget)
+        after = face_tris(body, region_faces(body, keys))
+        print(f'  [decimate] {keys[0]}: {before} -> {after} tris')
 
 
 def paint(body, parts):
@@ -530,14 +610,12 @@ def single_material():
 def merge(body, parts):
     """Join the dressed parts into one skinned mesh. Vertex groups survive the
     join by name; every part was weight-copied to the body's own rig."""
-    apply_masks(body)
     bpy.context.view_layer.objects.active = body
     body.select_set(True)
     for key in ('hair', 'eyes', 'suit', 'shoes'):
         ob = parts.get(key)
         if ob is None:
             continue
-        apply_masks(ob)
         ob.select_set(True)
         print(f'  [merge] {key}: {len(ob.data.color_attributes)} color attrs, '
               f'{tri_count(ob)} tris')
@@ -613,13 +691,28 @@ def main():
 
     parts = {'eyes': ObjectService.find_object_of_type_amongst_nearest_relatives(body, 'Eyes'),
              'hair': hair, 'suit': suit, 'shoes': shoes}
+    apply_masks(body)
+    covered = drop_covered(body, (hair, suit, shoes))
+    print(f'  [drop] {covered} faces covered by the garments, '
+          f'{tri_count(body)} body tris left')
     paint(body, parts)
+    for ob, budget in ((hair, HAIR_BUDGET), (suit, SUIT_BUDGET), (shoes, SHOE_BUDGET)):
+        if ob is None:
+            continue
+        apply_masks(ob)
+        before = tri_count(ob)
+        collapse(ob, None, budget)
+        print(f'  [decimate] {ob.name.split(".")[-1]}: {before} -> {tri_count(ob)} tris')
+    decimate_regions(body)
     merge(body, parts)
-    tris = decimate(body)
     body.data.materials.clear()
     body.data.materials.append(single_material())
+    tris = tri_count(body)
+    if tris > TRI_BUDGET:
+        sys.exit(f'M2.F2f person: {tris} tris is over the {TRI_BUDGET} budget. '
+                 'Raise a part\'s budget only against a shot that shows it.')
     export(body, rig, out)
-    print(f'M2.F2c person: {len(body.data.vertices)} verts, {tris} tris, '
+    print(f'M2.F2f person: {len(body.data.vertices)} verts, {tris} tris, '
           f'{len(rig.data.bones)} joints, walk frames {start}..{start + cycle}, '
           f'clips Walk+Idle, {out.stat().st_size / 1024:.1f} KB')
 
