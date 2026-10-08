@@ -35,3 +35,7 @@ docs/shots/gate/
 
 # The scorecard re-shoots its frames every run; the table in latest.md is the record.
 docs/scorecard/*.png
+
+# Python bytecode from tools/ scripts
+__pycache__/
+*.pyc
