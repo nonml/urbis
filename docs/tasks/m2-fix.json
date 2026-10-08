@@ -153,12 +153,13 @@
         "src/render/landscape.js",
         "src/render/trees.js",
         "src/render/models.js",
-        "docs/shots/"
+        "docs/shots/",
+        "src/render/props.js"
       ],
       "needs": [],
       "test": "tests/accept/m2-landscape.spec.js",
       "commit": "M2.F5 (M2-4): real trees and mountains",
-      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing. Retry 2026-10-09: the first try was parked after a scratch script hung for 10 min. Its edits (make_landscape.py, models.js GLB reader) are in ../urbis-parked/M2.F5.patch: start with git apply ../urbis-parked/M2.F5-retry.patch (text only; rebake the GLBs with the script), then finish. Every shell command must exit by itself within 2 minutes: no servers, watchers or scripts that wait on stdin in the foreground."
+      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing. Retry 2 (2026-10-09): the street trees live in src/render/props.js, now in your files. The last try is in ../urbis-parked/M2.F5-retry2.patch (git apply it first; it applies on main): its make_landscape.py, models.js GLB reader and props.js wiring are good. One thing to change: it pasted every GLB as base64 into trees.js and landscape.js (3,000+ lines). Do NOT embed model bytes in JS. Load the GLBs from public/assets/models/ the same way person.glb is loaded in the game; in Node specs, read the file from disk with fs and parse it with the models.js GLB reader. Delete the base64 blocks and the --check mode that keeps them. Every shell command must exit by itself within 2 minutes."
     }
   ]
 }
