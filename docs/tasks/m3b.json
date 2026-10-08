@@ -258,6 +258,18 @@
       "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-9: **Sim cost:** on a test map of 2,000 buildings, 60 visible cars, 150 visible walkers and the commute flow of every resident, one 50 ms sim step takes at most 4 ms on this Mac (checked by `scripts/simbench.mjs`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M3.R4",
+      "lane": "traffic",
+      "goal": "tests/traffic.test.js is green again. On main two of its tests fail before any change: \"lanePoint settles both directions on the right of travel, 2.4 m out\" gets NaN, and \"a follower keeps its gap\" ends 13.5 m behind the stopped leader (bar < 0.5). Run: GATE_FULL=1 npx playwright test tests/traffic.test.js (4 s). Likely cause: a later change to src/sim/traffic.js (git log -- src/sim/traffic.js: M4.T10 movers on hills, M3.T35 commute) changed lanePoint or the follow logic. Read the diff of those commits, find the line that makes NaN and the stop gap, and fix traffic.js so all 5 tests pass. Never edit the test bars.",
+      "files": [
+        "src/sim/traffic.js"
+      ],
+      "needs": [],
+      "test": "tests/traffic.test.js",
+      "commit": "M3.R4 (M3-6): traffic unit tests green again",
+      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes."
+    },
+    {
       "id": "M3.T40",
       "lane": "traffic",
       "goal": "A new road carries traffic within 60 game seconds: when addRoad adds edges, cars near them take trips over them, and the addRoad check's marker is dropped",
@@ -268,11 +280,12 @@
       ],
       "needs": [
         "M3.T30",
-        "M3.T35"
+        "M3.T35",
+        "M3.R4"
       ],
       "test": "tests/accept/m3-traffic.test.js",
       "commit": "M3.T40 (M3-6): a new road carries traffic",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing. Re-queued 2026-10-07: the removeRoad test in the same file (passed at M3.T28) also fails now on seeds 7, 33, 73 (cars still on the removed road 10 s later). Make both tests in m3-traffic.test.js pass."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing. Re-queued 2026-10-07: the removeRoad test in the same file (passed at M3.T28) also fails now on seeds 7, 33, 73 (cars still on the removed road 10 s later). Make both tests in m3-traffic.test.js pass. Retry 2026-10-09: the first try stalled re-running tests/traffic.test.js, which was already red on main (fixed first by M3.R4). Its edits are in ../urbis-parked/M3.T40.patch; read it and reuse what works. Every shell command must exit by itself within 2 minutes."
     },
     {
       "id": "M3.R1",
