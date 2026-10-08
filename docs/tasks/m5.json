@@ -4,7 +4,7 @@
     {
       "id": "M5.T1",
       "lane": "build-ui",
-      "goal": "The tool frame. A tool is `{ op, cost(map, at), preview(at), refuse(map, at) \u2192 reason }`; the R C I X brushes become tools; the city-view panel lists tools with their keys and costs; hovering a tool names what it does and its cost; a right click or Esc puts it down",
+      "goal": "The tool frame. A tool is `{ op, cost(map, at), preview(at), refuse(map, at) → reason }`; the R C I X brushes become tools; the city-view panel lists tools with their keys and costs; hovering a tool names what it does and its cost; a right click or Esc puts it down",
       "files": [
         "src/sim/cityview.js",
         "src/ui/cityview.js"
@@ -360,7 +360,7 @@
     {
       "id": "M5.T17",
       "lane": "build-sim",
-      "goal": "Budget, sim. City money; income each game minute = tax \u00d7 floor area per use; upkeep per road metre and per service; a higher tax lowers that use's demand; in debt, services shut, farthest police station first, and the news says so; formula in `ECONOMY.md`",
+      "goal": "Budget, sim. City money; income each game minute = tax × floor area per use; upkeep per road metre and per service; a higher tax lowers that use's demand; in debt, services shut, farthest police station first, and the news says so; formula in `ECONOMY.md`",
       "files": [
         "src/sim/budget.js",
         "src/sim/economy.js",
@@ -437,6 +437,25 @@
       "commit": "M5.T21 (M5-8): five overlays",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
       "test": "tests/accept/m5-overlays.spec.js"
+    },
+    {
+      "id": "M5.T21b",
+      "lane": "build-ui",
+      "goal": "The overlays show on screen. Today src/render/overlays.js (M5.T20/M5.T21) is imported by nothing: buildOverlays() is never called, so in the city view (Z) every overlay looks exactly like no overlay, and the O key (sim/cityview.js cycleOverlay) only cycles the sim's 3 entries, never the 5 new ones (demand, power, police cover, land value, traffic) or the coverage ones. Do: (1) in src/game/scene.js, next to buildCityView, call buildOverlays(city, cityView, { dark, map, street }) with the street's power truth and add its mesh to the scene; return it as overlayRig; (2) in src/main.js call overlayRig.frame(e) right after cityRig.frame each frame (e = the city view's eased lift, see how render/cityview.js reads it); (3) make O walk the whole ring: cycleOverlay must wrap at the full count (OVERLAY_RING.length), e.g. pass the count in from the caller, since sim/ must not import render/; (4) expose overlayRig.pool() and overlayRig.draws() on window.__game.cityview in src/game/probe.js; (5) in tests/accept/m5-overlays.spec.js add a test on seed 73: press z, wait for lift >= 1, then for every overlay index n > 0 in OVERLAY_RING: aim({overlay:n}), wait 2 frames, expect __game.cityview.overlayDraws() === 1 and pool().count > 0, and expect the canvas pixels to differ from the no-overlay frame (read both with the same readPixels helper other specs use). Also press O OVERLAY_RING.length times and expect it back at 0, having visited every index.",
+      "files": [
+        "src/game/scene.js",
+        "src/main.js",
+        "src/sim/cityview.js",
+        "src/game/probe.js",
+        "src/render/overlays.js",
+        "tests/accept/m5-overlays.spec.js"
+      ],
+      "needs": [
+        "M5.T21"
+      ],
+      "test": "tests/accept/m5-overlays.spec.js",
+      "commit": "M5.T21b (M5-8): the overlays show on screen",
+      "notes": "Size S. Found 2026-10-09 by the director: city-view shots with each overlay were identical to the plain view. The old spec only checked the draw budget, so it passed with nothing drawn. Draws must stay <= 175. Every shell command must exit by itself within 2 minutes. If you must touch a file not listed, stop and say so."
     },
     {
       "id": "M5.T22",
