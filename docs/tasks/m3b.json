@@ -292,7 +292,7 @@
     {
       "id": "M3.R2",
       "lane": "build-sim",
-      "goal": "Ops are fast again. tests/accept/m3-ops.test.js passed when M3.T21 landed and now fails on its own, with the Mac idle: on seed 22 the slowest of 200 ops takes 2.17 ms, over the 2 ms bar. Find the op that got slow and make it fast without loosening the bar. Find the commit that broke it (git bisect between the task's landing and main). If a later milestone's criterion changed what the check assumes, ask the director with the evidence; never edit the check to pass.",
+      "goal": "Ops are fast again. tests/accept/m3-ops.test.js fails: on seed 22 the slowest of 200 ops takes about 2.5 ms, over the 2 ms bar (run it with GATE_FULL=1 npx playwright test tests/accept/m3-ops.test.js; under 1 s). Do NOT git bisect: the first try stalled on it. Instead: (1) add a temporary timer in the test copy or a scratch script that runs seed 22 and prints the time per op kind and the 5 slowest single ops with their kind and size; (2) read that op path in src/sim and find the work that grows with the city (a full-map scan, a rebuild of an index, an array copy); (3) make that op touch only the lots it changes. Never edit the check or its 2 ms bar. If the slow op is slow because a later milestone requires it, stop and ask the director with the numbers.",
       "files": [
         "src/sim/ops.js",
         "src/sim/map.js",
@@ -304,7 +304,7 @@
       ],
       "test": "tests/accept/m3-ops.test.js",
       "commit": "M3.R2 (M3-4): ops are fast again",
-      "notes": "Size S. Regression found 2026-10-07."
+      "notes": "Size S. Regression found 2026-10-07. Retried 2026-10-09 with a measure-first brief."
     },
     {
       "id": "M3.R3",
