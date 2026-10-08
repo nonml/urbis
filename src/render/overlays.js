@@ -1,17 +1,39 @@
 // City-view overlays (M5.T20): the planner's lot tint. One pooled
 // InstancedMesh, one instance per lot, a per-instance colour from the overlay
-// the O key cycles (sim/cityview.js OVERLAYS) — one draw at any lot count,
-// zero while the overlay is off or the camera is on the street (law 4).
+// the O key cycles — one draw at any lot count, zero while the overlay is off
+// or the camera is on the street (law 4). Planning chrome, not world: unlit,
+// outside the fog and unpickable, so a raw pick under it still names the lot it
+// covers (M5.T3d).
 //
-// Every colour is the sim's own value: a lot's zoning, or what it is doing
-// (lotStatus). The later overlay tasks append their id to OVERLAYS and their
-// mapping to `lotTint` here; the pool, the key and the one-draw cost do not
-// change. The layer is planning chrome, not world: unlit, outside the fog and
-// unpickable, so a raw pick under it still names the lot it covers (M5.T3d).
+// M5.T21 fills the ring: the sim's own three stay the sim's (sim/cityview.js
+// OVERLAYS), and this module appends the five — demand, power, police cover,
+// land value, traffic — and a coverage overlay per service, each mapped to the
+// value behind its colour. Every value is read off the sim the frame loop
+// already ticks: `overlayValue` is that number, and
+// tests/accept/m5-overlays.spec.js checks it against the sim on five lots.
+//
+// The land-value formula, written down:
+//   base     0.30  every lot is worth something
+//   wealth  +0.25  its district's wealth (economy.js d.wealth)
+//   demand  +0.25  the market for its own use (economy.js demandFor)
+//   service +0.20  the clinic, school and park reach covering it (ops.js)
+//   police  +0.20  a station inside its 100 m catchment (SERVICES.police)
+//   traffic -0.15  this hour's load on its frontage edge, over the busiest
+//                  edge's (traffic.js edgeLoad). M5.T28's pollution lands
+//                  here, as a term of its own.
+// Each term is the sim's own number for this parcel, so the overlay cannot
+// drift from the economy. Two one-line wirings this module's files do not own
+// are open: the sim's OVERLAYS list stops at 'status' (so the O key, which
+// wraps on its length, does not reach the ids below) and game/scene.js does not
+// call buildOverlays (so the layer is not in the frame yet).
 import * as THREE from 'three';
-import { lotStatus, overlayOf } from '../sim/cityview.js';
+import { OVERLAYS, lotStatus } from '../sim/cityview.js';
 import { builtHeight } from '../sim/zoning.js';
+import { demandFor } from '../sim/economy.js';
 import { paintOf } from './cityview.js';
+import { SERVICES, inCatchment, serviceReach, servicesOf } from '../sim/ops.js';
+import { frontageRoad } from '../sim/map.js';
+import { edgeLoad } from '../sim/traffic.js';
 
 // The tint volume stands from the lot floor to its roofline, so the overlay
 // reads over a building from the oblique view; an empty lot keeps a slab.
@@ -21,26 +43,156 @@ const TINT_FLOOR = 1.2;
 const TINT_OPACITY = 0.42;
 // The lot under the cursor lightens: the same cue the kerbs give.
 const HOVER_LIGHTEN = 0.35;
-
-// Grounded planner colours for what a lot is doing (lotStatus): the zone
-// swatches' colours where a status has one, so growth reads green, decline
-// rust, a clearing site ochre and a finished building slate.
+// Grounded planner colours for what a lot is doing (lotStatus), the zone
+// swatches' colours where a status has one: growth green, decline rust, a
+// clearing site ochre, a finished building slate.
 const STATUS_PAINT = {
-  growing: '#6b9651', declining: '#b0553b', clearing: '#c19436',
-  complete: '#4d7aa6', stalled: '#6d4a42', waiting: '#8e8b84', unzoned: '#5a5852',
+  growing: '#6b9651', declining: '#b0553b', clearing: '#c19436', complete: '#4d7aa6',
+  stalled: '#6d4a42', waiting: '#8e8b84', unzoned: '#5a5852',
+};
+// The land-value weights above, exported so the check reads the same numbers.
+export const LAND_VALUE = {
+  base: 0.3, wealth: 0.25, demand: 0.25, service: 0.2, police: 0.2, traffic: -0.15,
+};
+// The services whose reach is an amenity a lot's value reads.
+const AMENITY = ['clinic', 'school', 'park'];
+
+// The ramps a 0-1 value walks: rust for the wrong end, ochre in the middle,
+// leaf green for the right one. No neon.
+const RAMPS = {
+  demand: ['#b0553b', '#c19436', '#6b9651'], cover: ['#6b9651', '#c19436', '#b0553b'],
+  power: ['#8c3f2e', '#7d94a8'], value: ['#8e8b84', '#cbb168'],
+  police: ['#b0553b', '#4d7aa6'], traffic: ['#9a978d', '#c19436', '#8c3f2e'],
+};
+const STOPS = Object.fromEntries(Object.entries(RAMPS)
+  .map(([name, hexes]) => [name, hexes.map((hex) => new THREE.Color(hex))]));
+
+// Where each overlay's value sits on its ramp: `at` turns the sim's own number
+// into 0-1 (police cover is metres, traffic is travellers over the busiest
+// edge's).
+const SHADE = {
+  demand: { ramp: 'demand', at: (v) => v }, power: { ramp: 'power', at: (v) => v },
+  value: { ramp: 'value', at: (v) => v }, cover: { ramp: 'cover', at: (v) => v },
+  police: { ramp: 'police', at: (v) => 1 - Math.min(1, v / SERVICES.police.radius) },
+  traffic: { ramp: 'traffic', at: (v, t) => (t.busiest > 0 ? v / t.busiest : 0) },
 };
 
-// What overlay `id` paints lot `i`, as a colour string, or null when that
-// overlay has no lot value. `dark` answers whether the lot's power zone is out
-// (sim/street.js isDark), so the status overlay can say 'stalled'.
-export function lotTint(id, city, view, i, dark = () => false) {
+// The ring the view's `overlay` index walks: the sim's three, this task's five,
+// then one coverage overlay per service. Indexed here, not in the sim, so the
+// ids past the sim's list still resolve to a tint.
+const MINE = [
+  { id: 'demand', name: 'demand' }, { id: 'power', name: 'power' },
+  { id: 'police', name: 'police cover' }, { id: 'value', name: 'land value' },
+  { id: 'traffic', name: 'traffic' },
+  ...Object.keys(SERVICES).map((type) => ({ id: `cover:${type}`, name: `${SERVICES[type].name} cover` })),
+];
+export const OVERLAY_RING = [...OVERLAYS, ...MINE];
+
+// The overlay the view is on, never undefined.
+export const overlayAt = (view) => OVERLAY_RING[view.overlay] ?? OVERLAY_RING[0];
+
+const clamp01 = (v) => Math.max(0, Math.min(1, v));
+
+// What one overlay's per-lot question needs, built once a frame: a type's
+// stations and the lots they reach, and this hour's load on every edge.
+function tablesOf(id, ctx) {
+  const map = ctx.map ?? null;
+  const street = ctx.street ?? null;
+  const parcels = map?.parcels ?? [];
+  const type = id.startsWith('cover:') ? id.slice(6) : null;
+  const t = {
+    type, def: type ? SERVICES[type] ?? null : null, stations: [], busiest: 0, served: new Map(),
+  };
+  if (t.def) {
+    t.stations = servicesOf(parcels, type);
+    for (const [p, s] of serviceReach(parcels, type)) t.served.set(s, (t.served.get(s) ?? 0) + 1);
+  }
+  if (id === 'police') t.stations = servicesOf(parcels, 'police');
+  if (id === 'value') {
+    t.stations = servicesOf(parcels, 'police');
+    t.amenity = AMENITY.map((a) => serviceReach(parcels, a));
+  }
+  if (id === 'traffic' || id === 'value') {
+    const edges = map?.graph?.edges ?? [];
+    t.byId = new Map((map?.graph?.nodes ?? []).map((n) => [n.id, n]));
+    t.load = new Map(edges.map((e) => [e.id, edgeLoad(street?.traffic, e.id)]));
+    t.busiest = edges.reduce((busiest, e) => Math.max(busiest, t.load.get(e.id)), 0);
+  }
+  return t;
+}
+
+// A station's fill: the buildings it serves, over its capacity.
+const fillOf = (t, station) => (t.served.get(station) ?? 0) / t.def.capacity;
+
+// A coverage overlay's value for one lot: a station's own parcel reads its fill,
+// a lot inside a catchment reads the fill of the nearest station covering it,
+// and a lot outside every catchment reads nothing. A station is not another
+// station's customer, so it reads nothing under another type.
+function coverFill(p, t) {
+  if (!t.def) return null;
+  if (p.kind === 'service') return p.type === t.type ? fillOf(t, p) : null;
+  const near = t.stations.find((s) => inCatchment(s, p));
+  return near ? fillOf(t, near) : null;
+}
+
+// Metres to the nearest of `t`'s stations, or null where none stands.
+const nearest = (t, p) => (t.stations.length
+  ? Math.min(...t.stations.map((s) => Math.hypot(p.x - s.x, p.z - s.z))) : null);
+
+// The load this hour on the edge the lot fronts, or null where it fronts none.
+const roadLoad = (p, ctx, t) => {
+  const road = ctx.map ? frontageRoad(ctx.map, p, t.byId) : null;
+  return road ? t.load.get(road.edge.id) ?? 0 : null;
+};
+
+// The land-value formula above, on this lot's own numbers.
+function landValue(p, city, ctx, t) {
+  const d = city.economy?.districts?.[p.powerZone];
+  const amenity = t.amenity.reduce((sum, reach) => sum + (reach.has(p) ? 1 : 0), 0) / AMENITY.length;
+  const near = nearest(t, p) ?? Infinity;
+  const load = roadLoad(p, ctx, t) ?? 0;
+  return clamp01(LAND_VALUE.base
+    + LAND_VALUE.wealth * clamp01(d?.wealth ?? 0.5)
+    + LAND_VALUE.demand * clamp01(p.use ? demandFor(city, p) : 0)
+    + LAND_VALUE.service * amenity
+    + LAND_VALUE.police * clamp01(1 - near / SERVICES.police.radius)
+    + LAND_VALUE.traffic * (t.busiest > 0 ? load / t.busiest : 0));
+}
+
+// The sim's own number for lot `i` under overlay `id`, or null where that
+// overlay has no value for it. `ctx` is what the frame hands the layer: `dark`
+// is the street's power truth, `map` and `street` the graph and the flow.
+export function overlayValue(id, city, view, i, ctx = {}, t = tablesOf(id, ctx)) {
   const p = city.parcels[i];
+  if (!p) return null;
+  if (id === 'demand') return p.use ? demandFor(city, p) : null;
+  if (id === 'power') return (ctx.dark ?? (() => false))(p.powerZone) ? 0 : 1;
+  if (id === 'police') return nearest(t, p);
+  if (id === 'traffic') return t.load ? roadLoad(p, ctx, t) : null;
+  if (id === 'value') return landValue(p, city, ctx, t);
+  if (t.def) return coverFill(p, t);
+  return null;
+}
+
+// The colour an overlay paints lot `i`: a zone swatch or a status colour for
+// the sim's two categorical overlays, otherwise the shade its value sits at on
+// its ramp. Null means the overlay has nothing to say about this lot.
+export function lotTint(id, city, view, i, ctx = {}, t = tablesOf(id, ctx)) {
+  const p = city.parcels[i];
+  if (!p) return null;
   if (id === 'zone') return paintOf(p.zoned);
   if (id === 'status') {
-    const status = lotStatus(view, city, i, dark(p.powerZone));
+    const status = lotStatus(view, city, i, (ctx.dark ?? (() => false))(p.powerZone));
     return STATUS_PAINT[status] ?? STATUS_PAINT.waiting;
   }
-  return null;
+  const v = overlayValue(id, city, view, i, ctx, t);
+  if (v === null || !Number.isFinite(v)) return null;
+  const spec = SHADE[id.startsWith('cover:') ? 'cover' : id];
+  if (!spec) return null;
+  const x = clamp01(spec.at(v, t)) * (STOPS[spec.ramp].length - 1);
+  const at = Math.min(STOPS[spec.ramp].length - 2, Math.floor(x));
+  const c = paint.copy(STOPS[spec.ramp][at]).lerp(STOPS[spec.ramp][at + 1], x - at);
+  return `#${c.getHexString()}`;
 }
 
 const pos = new THREE.Vector3();
@@ -67,22 +219,27 @@ function growTint(rig, needed) {
 // in with the rise and draws nothing at all on the street or with the overlay
 // off.
 function update(rig, e) {
-  const { city, view, dark } = rig;
-  const overlay = overlayOf(view);
+  const overlay = overlayAt(rig.view);
   if (!(e > 0) || overlay.id === 'off') {
     rig.tint.visible = false;
     return;
   }
+  const { city, view, ctx } = rig;
   const needed = city.parcels.length;
   if (needed > rig.tint.instanceMatrix.count) growTint(rig, needed);
   const tint = rig.tint;
   tint.count = needed;
   tint.material.opacity = TINT_OPACITY * Math.min(1, e);
+  // One frame's tables for every lot: the stations, the reach and the loads
+  // are the same question asked `needed` times.
+  const t = tablesOf(overlay.id, ctx);
   for (let i = 0; i < needed; i++) {
     const p = city.parcels[i];
-    paint.set(lotTint(overlay.id, city, view, i, dark) ?? '#000000');
-    if (i === view.hover) paint.lerp(white, HOVER_LIGHTEN);
-    const height = Math.max(builtHeight(p), TINT_FLOOR);
+    const colour = lotTint(overlay.id, city, view, i, ctx, t);
+    paint.set(colour ?? '#000000');
+    if (colour && i === view.hover) paint.lerp(white, HOVER_LIGHTEN);
+    // A lot this overlay has no value for is not painted at all, not black.
+    const height = colour ? Math.max(builtHeight(p), TINT_FLOOR) : 0;
     tint.setMatrixAt(i, matrix.compose(pos.set(p.x, 0, p.z), quat, scale.set(p.w, height, p.d)));
     tint.setColorAt(i, paint);
   }
@@ -92,8 +249,9 @@ function update(rig, e) {
 }
 
 // The overlay rig, ready for the city view to own. `dark(zone)` is the
-// street's power truth; it may be left out until the street is handed in.
-export function buildOverlays(city, view, { dark = () => false } = {}) {
+// street's power truth; `map` and `street` are what the police, traffic and
+// coverage overlays read, and may be left out until they are handed in.
+export function buildOverlays(city, view, { dark = () => false, map = null, street = null } = {}) {
   const geo = new THREE.BoxGeometry(1, 1, 1);
   geo.translate(0, 0.5, 0);
   // Unlit and outside the fog: the planner's overlay, not the weather. The
@@ -108,11 +266,14 @@ export function buildOverlays(city, view, { dark = () => false } = {}) {
   tint.raycast = () => {};
   const group = new THREE.Group();
   group.add(tint);
-  const rig = { city, view, dark, tint, group };
+  const rig = { city, view, ctx: { dark, map, street }, tint, group };
   return {
     mesh: group,
     // After the city view has placed its camera; `e` is its eased lift.
     frame: (e) => update(rig, e),
+    // The pool's own numbers: how many lots it is drawing, and the instances
+    // it has room for. One mesh, so the whole layer's cost is `draws()`.
+    pool: () => ({ count: rig.tint.count, capacity: rig.tint.instanceMatrix.count }),
     // The layer's whole draw cost while it is showing: the one pooled mesh.
     draws: () => (rig.tint.visible ? 1 : 0),
   };
