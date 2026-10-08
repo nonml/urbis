@@ -64,9 +64,33 @@ export const MAX_ROAD_GRADIENT = 0.4;
 // is a slope and not one number.
 const GRADIENT_STEP = 2;
 
-// Flat footprints from a road table's own spans: the fallback for a caller with
-// no graph (world.js's own district). Every road makes its own, so a new avenue
-// flattens the ground under it without anyone editing this file.
+// The flat rect a road object makes: an edge covers its own carriageway and
+// both walkways along the span it runs, measured through the nodes at its ends;
+// a node is the square through its own junction. Null when an edge's ends are
+// not in the index — the caller has not laid them in yet.
+function flatRectOf(source, nodes) {
+  if (typeof source.x === 'number') return nodeFlatRect(source);
+  const a = nodes.get(source.a);
+  const b = nodes.get(source.b);
+  if (!a || !b) return null;
+  return a.x === b.x
+    ? [a.x, (a.z + b.z) / 2, ROAD_FLAT_HALF, Math.abs(b.z - a.z) / 2]
+    : [(a.x + b.x) / 2, a.z, Math.abs(b.x - a.x) / 2, ROAD_FLAT_HALF];
+}
+
+// A node's own square through its junction.
+function nodeFlatRect(node) {
+  return [node.x, node.z, ROAD_FLAT_HALF, ROAD_FLAT_HALF];
+}
+
+// A parcel's footprint, as the pad the hills stay out from under.
+function padRectOf(p) {
+  return [p.x, p.z, p.w / 2, p.d / 2];
+}
+
+// The flat footprints from a road table's own spans: the fallback for a caller
+// with no graph (world.js's own district). Every road makes its own, so a new
+// avenue flattens the ground under it without anyone editing this file.
 export function roadFlatRects(district) {
   const rects = [];
   for (const av of district.avenues) {
@@ -76,37 +100,6 @@ export function roadFlatRects(district) {
     rects.push([(cr.x0 + cr.x1) / 2, cr.z, (cr.x1 - cr.x0) / 2, ROAD_FLAT_HALF]);
   }
   return rects;
-}
-
-// One flat rect per road edge and one per junction, read from the graph the sim
-// actually drives (M4.T6). Edges are cut at every junction (M3.T8) and each runs
-// along one axis (D2), so an edge rect is exactly its tarmac plus walks; the
-// junction square covers the four corner quadrants no edge reaches, so the
-// ground through a junction is as level as the tarmac through it. Deriving from
-// the graph means a road op (M5.T3) grades its own road without touching this
-// file.
-function graphFlatRects(graph) {
-  const byId = new Map(graph.nodes.map((n) => [n.id, n]));
-  const rects = [];
-  for (const e of graph.edges) {
-    const a = byId.get(e.a);
-    const b = byId.get(e.b);
-    if (!a || !b) continue;
-    rects.push(a.x === b.x
-      ? [a.x, (a.z + b.z) / 2, ROAD_FLAT_HALF, Math.abs(b.z - a.z) / 2]
-      : [(a.x + b.x) / 2, a.z, Math.abs(b.x - a.x) / 2, ROAD_FLAT_HALF]);
-  }
-  for (const n of graph.nodes) rects.push([n.x, n.z, ROAD_FLAT_HALF, ROAD_FLAT_HALF]);
-  return rects;
-}
-
-// Every parcel's footprint, as the pad the hills stay out from under. Hills
-// ramp off these over FLAT_BLEND, so the ground between them rolls across the
-// town while no base is ever buried by more than VERGE_RISE — which SHOP_SILL
-// already clears. The map's record of what stands there (buildings, lots, later
-// services) is the only list needed.
-function padRects(map) {
-  return (map.parcels ?? []).map((p) => [p.x, p.z, p.w / 2, p.d / 2]);
 }
 
 // The shelf the hills crest off: the district's own road spans. Derived, so a
@@ -200,44 +193,79 @@ function holdFlat(rects, blend, x, z) {
 // well under the bucket, so the 3x3 neighbourhood around a point is exhaustive.
 const FLAT_CELL = 64;
 const FLAT_KEY = 0x8000; // shifts negative buckets into one integer key
+// A set this small keeps the plain scan: the world's own hand terrain has a
+// dozen rects and no lookup beats a dozen compares.
+const SMALL_FLAT_SET = 16;
 
-function flatBuckets(rects) {
-  const index = new Map();
-  for (const r of rects) {
-    const x0 = Math.floor((r[0] - r[2]) / FLAT_CELL);
-    const x1 = Math.floor((r[0] + r[2]) / FLAT_CELL);
-    const z0 = Math.floor((r[1] - r[3]) / FLAT_CELL);
-    const z1 = Math.floor((r[1] + r[3]) / FLAT_CELL);
-    for (let ix = x0; ix <= x1; ix++) {
-      for (let iz = z0; iz <= z1; iz++) {
-        const key = (ix + FLAT_KEY) * 0x10000 + (iz + FLAT_KEY);
-        const bucket = index.get(key);
-        if (bucket) bucket.push(r);
-        else index.set(key, [r]);
-      }
-    }
-  }
-  return index;
-}
+const flatKey = (ix, iz) => (ix + FLAT_KEY) * 0x10000 + (iz + FLAT_KEY);
 
-// holdFlat over a bucketed set. A small set keeps the plain scan: the world's
-// own hand terrain has a dozen rects and no lookup beats a dozen compares.
-function holdFlatIndexed(index, rects, blend, x, z) {
-  if (rects.length <= 16) return holdFlat(rects, blend, x, z);
-  const ix = Math.floor(x / FLAT_CELL);
-  const iz = Math.floor(z / FLAT_CELL);
-  let held = 0;
-  for (let dx = -1; dx <= 1; dx++) {
-    for (let dz = -1; dz <= 1; dz++) {
-      const bucket = index.get((ix + dx + FLAT_KEY) * 0x10000 + (iz + dz + FLAT_KEY));
-      if (!bucket) continue;
-      for (const r of bucket) {
-        held = Math.max(held, 1 - smoothstep01(rectDistance(x, z, r[0], r[1], r[2], r[3]) / blend));
-        if (held >= 1) return 1;
-      }
+// The rects one terrain stands on, as the table a look-up reads. Each source
+// (a road edge, a node, a parcel, or a rect itself for a fixed table) is held by
+// its own identity, so taking it out again is exact: the buckets are a plain
+// lookup over the set, and dropping a rect leaves only the cells it reached.
+// That is what lets a road op re-grade the ground under its own road and the
+// pads of the lots it replans, instead of re-measuring the whole city's
+// (M5.T3c).
+function flatTable(build, fixed = false) {
+  const rects = new Map();
+  const buckets = new Map();
+  const eachCell = (rect, visit) => {
+    for (let ix = Math.floor((rect[0] - rect[2]) / FLAT_CELL), ex = Math.floor((rect[0] + rect[2]) / FLAT_CELL);
+      ix <= ex; ix++) {
+      for (let iz = Math.floor((rect[1] - rect[3]) / FLAT_CELL), ez = Math.floor((rect[1] + rect[3]) / FLAT_CELL);
+        iz <= ez; iz++) visit(flatKey(ix, iz));
     }
-  }
-  return held;
+  };
+  const put = (sources) => {
+    for (const source of sources) {
+      if (rects.has(source)) continue;
+      const rect = build(source);
+      if (!rect) continue;
+      rects.set(source, rect);
+      eachCell(rect, (key) => {
+        const bucket = buckets.get(key);
+        if (bucket) bucket.push(rect);
+        else buckets.set(key, [rect]);
+      });
+    }
+  };
+  const take = (sources) => {
+    for (const source of sources) {
+      const rect = rects.get(source);
+      if (!rect) continue;
+      rects.delete(source);
+      eachCell(rect, (key) => {
+        const bucket = buckets.get(key);
+        if (!bucket) return;
+        const at = bucket.indexOf(rect);
+        if (at >= 0) bucket.splice(at, 1);
+      });
+    }
+  };
+  return {
+    fixed,
+    count: () => rects.size,
+    put,
+    take,
+    // 1 inside any of the rects, 0 once the blend has run out.
+    hold(blend, x, z) {
+      if (rects.size <= SMALL_FLAT_SET) return holdFlat([...rects.values()], blend, x, z);
+      const ix = Math.floor(x / FLAT_CELL);
+      const iz = Math.floor(z / FLAT_CELL);
+      let held = 0;
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          const bucket = buckets.get(flatKey(ix + dx, iz + dz));
+          if (!bucket) continue;
+          for (const r of bucket) {
+            held = Math.max(held, 1 - smoothstep01(rectDistance(x, z, r[0], r[1], r[2], r[3]) / blend));
+            if (held >= 1) return 1;
+          }
+        }
+      }
+      return held;
+    },
+  };
 }
 
 function wildness(relief, x, z) {
@@ -270,27 +298,55 @@ function footprintGradient(heightAt, x, z, w, d) {
   return steepest;
 }
 
+// The flats table of a graph: one rect per edge and one per node (M4.T6). It
+// keeps its own node index, so an edge a road op laid in is measured without the
+// caller re-indexing the graph for it, and a node the op laid in indexes itself
+// as it is put.
+function flatsTable(byId) {
+  const nodes = new Map(byId);
+  const table = flatTable((source) => flatRectOf(source, nodes));
+  return {
+    fixed: false,
+    count: table.count,
+    hold: table.hold,
+    take: table.take,
+    put(sources) {
+      for (const source of sources) {
+        // A node indexes itself before anything is measured through it, so an
+        // edge laid in by the same op is read through the joints it stands on.
+        if (typeof source.x === 'number') nodes.set(source.id, source);
+        table.put([source]);
+      }
+    },
+  };
+}
+
 // The ground a map stands on. `map.flatRects` is the whole flat table when a
 // caller owns one, otherwise the roads make it — from the map's graph when it
 // has one, from its district's spans when it does not; `map.water` is the water
 // a footprint may never touch. Exactly zero on every road and never negative
-// anywhere.
+// anywhere. The two tables travel with the ground, so an op (regrade below)
+// changes only the ground its own road touches.
 export function createTerrain(map) {
-  const flats = map.flatRects
-    ?? (map.graph ? graphFlatRects(map.graph) : roadFlatRects(map.district));
-  const pads = padRects(map);
+  const byId = map.graph ? new Map(map.graph.nodes.map((n) => [n.id, n])) : null;
   const water = map.water ?? [];
   const relief = reliefRect(map.district);
-  const flatIndex = flatBuckets(flats);
-  const padIndex = flatBuckets(pads);
+  const fixed = map.flatRects ?? (map.graph ? null : roadFlatRects(map.district));
+  const flats = fixed
+    ? flatTable((rect) => rect, true)
+    : flatsTable(byId);
+  if (fixed) flats.put(fixed);
+  else flats.put([...map.graph.edges, ...map.graph.nodes]);
+  const pads = flatTable(padRectOf);
+  pads.put(map.parcels ?? []);
 
   const heightAt = (x, z) => {
-    const open = 1 - holdFlatIndexed(flatIndex, flats, FLAT_BLEND, x, z);
+    const open = 1 - flats.hold(FLAT_BLEND, x, z);
     // On the tarmac the answer is exactly zero, and a mover asks here often.
     if (open === 0) return 0;
     const swell = VERGE_RISE * band01(SWELL_WAVES, x, z);
     const hills = HILL_RISE * band01(HILL_WAVES, x, z);
-    const tuck = pads.length ? holdFlatIndexed(padIndex, pads, FLAT_BLEND, x, z) : 0;
+    const tuck = pads.count() ? pads.hold(FLAT_BLEND, x, z) : 0;
     return open * (swell + hills * wildness(relief, x, z) * (1 - tuck));
   };
 
@@ -304,5 +360,32 @@ export function createTerrain(map) {
     return { ok: !wet && gradient <= MAX_BUILD_GRADIENT, water: wet, gradient };
   };
 
-  return { heightAt, buildable };
+  return { heightAt, buildable, flats, pads };
+}
+
+// The ground an edit changed, applied to the ground it stands on (M5.T3c): the
+// flats of the road edges and nodes it laid in or took out of the graph, and
+// the pads of the parcels it planned or removed. A road op grades its own
+// corridor and its lots' pads and reads nothing else of the city's ground, so a
+// road laid, torn up and laid back leaves the same heights behind. A fixed
+// table (the hand preset's own) holds no graph sources, and is left alone.
+export function regrade(terrain, { flatsIn = [], flatsOut = [], padsIn = [], padsOut = [] }) {
+  if (!terrain?.flats) return terrain;
+  if (!terrain.flats.fixed) {
+    terrain.flats.put(flatsIn);
+    terrain.flats.take(flatsOut);
+  }
+  terrain.pads.put(padsIn);
+  terrain.pads.take(padsOut);
+  return terrain;
+}
+
+// The same ground read the other way, which is what the op's undo does.
+export function reverseGround(ground) {
+  return {
+    flatsIn: ground.flatsOut,
+    flatsOut: ground.flatsIn,
+    padsIn: ground.padsOut,
+    padsOut: ground.padsIn,
+  };
 }

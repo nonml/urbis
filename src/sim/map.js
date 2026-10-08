@@ -371,9 +371,16 @@ function boxEdgeGap(box, a, b) {
 // The nearest road a parcel fronts, as { edge, gap }, or null. `byId` lets an
 // editor sweep many parcels without re-indexing the graph for each.
 export function frontageRoad(map, p, byId = indexNodes(map)) {
+  return frontageRoadOn(map.graph.edges, p, byId);
+}
+
+// frontageRoad over a candidate list of edges. An op (sim/ops.js) narrows the
+// graph to the edges its own box can reach once, and reads this list for every
+// lot in the box, instead of sweeping the whole graph once per lot (M3.T20).
+export function frontageRoadOn(edges, p, byId) {
   const box = { minX: p.x - p.w / 2, maxX: p.x + p.w / 2, minZ: p.z - p.d / 2, maxZ: p.z + p.d / 2 };
   let best = null;
-  for (const edge of map.graph.edges) {
+  for (const edge of edges) {
     const a = byId.get(edge.a);
     const b = byId.get(edge.b);
     if (!a || !b) continue;
@@ -381,6 +388,33 @@ export function frontageRoad(map, p, byId = indexNodes(map)) {
     if (gap <= FRONTAGE_MAX + 1e-6 && (!best || gap < best.gap)) best = { edge, gap };
   }
   return best;
+}
+
+// The edges whose own box comes within `reach` of `box`, the graph's own order
+// kept. Every road runs along one axis (D2), so the gap between a footprint
+// and an edge centre-line is one axis gap per direction (boxEdgeGap): an edge
+// whose span stays farther out than the reach on either axis cannot meet
+// anything inside the box. `reach` is FRONTAGE_MAX for a frontage sweep, and
+// wider still for a replan, which measures one span against its neighbours.
+export function edgesIn(edges, byId, box, reach = FRONTAGE_MAX) {
+  const near = [];
+  for (const edge of edges) {
+    const a = byId.get(edge.a);
+    const b = byId.get(edge.b);
+    if (!a || !b) continue;
+    if (Math.max(a.x, b.x) < box.minX - reach || Math.min(a.x, b.x) > box.maxX + reach
+      || Math.max(a.z, b.z) < box.minZ - reach || Math.min(a.z, b.z) > box.maxZ + reach) continue;
+    near.push(edge);
+  }
+  return near;
+}
+
+// Every parcel whose footprint meets the box { minX, maxX, minZ, maxZ }, in the
+// map's own order: the only parcels an edit on that box reads, so a replan or a
+// frontage sweep never touches a lot it cannot change (M3.T20).
+export function parcelsIn(map, box) {
+  return (map.parcels ?? []).filter((p) => p.x - p.w / 2 <= box.maxX && p.x + p.w / 2 >= box.minX
+    && p.z - p.d / 2 <= box.maxZ && p.z + p.d / 2 >= box.minZ);
 }
 
 // Every building whose footprint meets the box { minX, maxX, minZ, maxZ }.
