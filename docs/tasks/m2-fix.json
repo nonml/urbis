@@ -158,7 +158,7 @@
       "needs": [],
       "test": "tests/accept/m2-landscape.spec.js",
       "commit": "M2.F5 (M2-4): real trees and mountains",
-      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing. Retry 2026-10-09: the first try was parked after a scratch script hung for 10 min. Its edits (make_landscape.py, models.js GLB reader) are in ../urbis-parked/M2.F5.patch: start with git apply ../urbis-parked/M2.F5.patch, then finish. Every shell command must exit by itself within 2 minutes: no servers, watchers or scripts that wait on stdin in the foreground."
+      "notes": "Size M. Draws stay at or under 175. Look at a city-view shot and a street shot before finishing. Retry 2026-10-09: the first try was parked after a scratch script hung for 10 min. Its edits (make_landscape.py, models.js GLB reader) are in ../urbis-parked/M2.F5.patch: start with git apply ../urbis-parked/M2.F5-retry.patch (text only; rebake the GLBs with the script), then finish. Every shell command must exit by itself within 2 minutes: no servers, watchers or scripts that wait on stdin in the foreground."
     }
   ]
 }
