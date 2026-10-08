@@ -124,6 +124,17 @@ const DARK_DRAIN_SECS = 60;
 const HEALTH_BOOST = { clinic: 1.25, school: 1.25 };
 const HEALTH_MIN = 0.2;   // the floor the strongest a boost may cut to
 
+// A park raises the want for homes where its catchment reaches (M5-5, M5.T16):
+// greenery is what residents answer, so a district a park serves wants homes
+// worth PARK_SHARE of itself more than its jobs alone. A share of the district,
+// not a count of visitors: the want lands the same on a small district as on a
+// large one, and at GAP_GAIN 1.5 the share is the 0.05 rise in home demand the
+// roadmap asks for, once the market's lag has carried it. Per service type,
+// never per service — a second park in a catchment the first filled adds
+// capacity, not a second lift (ops.js serviceReach) — and a park that reaches no
+// standing building lifts nothing.
+const PARK_SHARE = 0.06;
+
 // The commute a district's residents drive (M3.T35): traffic lays every
 // resident's trip on the graph's edges for the hour and publishes the
 // per-district summary on street.traffic.flowByDistrict — the residents, the
@@ -300,12 +311,12 @@ function measureFloors(economy, parcels, heightOf) {
 // sell, plus works wanting floor. A measured district's jobs are every
 // non-residential floor it has (M3.T16); the hand preset shipped with its
 // balanced base standing in for them through base.res.
-function price(d, lost = 0) {
+function price(d, lost = 0, state) {
   for (const use of USES) d.have[use] = d.base[use] + d.floor[use];
   d.homes = d.have.res;
   d.jobs = d.calm ? d.have.com + d.have.ind : d.base.res + d.floor.com + d.floor.ind;
   const commerce = d.calm ? COMMERCE_PER_HOME : COMMERCE_PER_HOME_HAND;
-  d.need.res = d.jobs;
+  d.need.res = d.jobs + parkPull(d, state);
   d.need.com = d.homes * d.wealth * commerce * (1 - lost) + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
   const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
@@ -496,7 +507,7 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
     const commute = readCommute(economy, d, street);
     flee(economy, d, dt);
     if (economy.time >= d.nextMove) moveFirm(economy, d);
-    price(d, commute.lost);
+    price(d, commute.lost, economy);
     earn(d, dt, commute.late, economy);
     react(d, dt);
     creditRezone(d, economy.time);
@@ -507,9 +518,11 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
 // (ops.js serviceReach): the players' services live on the map, and the map is
 // held here weakly the moment the economy is created — the services the player
 // places land on the map's own parcel list, which a sim that reads only the
-// city's lots would otherwise never see. A district with no clinic of the type
-// reaches nothing and gets no boost; one clinic and a second in the same
-// catchment reach the same buildings, so the pair moves the rates once.
+// city's lots would otherwise never see. A district with no service of the type
+// reaches nothing and earns no effect; one service and a second in the same
+// catchment reach the same buildings, so the pair counts once. Both readers
+// below — the wealth rates (M5.T15) and the want for homes (M5.T16) — go
+// through here, so every service lands on the economy the same way.
 function servedIn(parcels, d, types) {
   let served = 0;
   for (const type of types) {
@@ -517,6 +530,17 @@ function servedIn(parcels, d, types) {
     for (const p of reach.keys()) if (p.powerZone === d.id) served += 1;
   }
   return served;
+}
+
+// The extra want for homes a park raises in a district right now (M5.T16):
+// nothing unless one of its parks reaches the district's buildings, which is
+// the same catchment-and-capacity read the health boost uses, so the second
+// park in a full catchment adds capacity and not another helping. Measured
+// against the map's own state, never drawn from the market's stream, so one
+// district's parks cannot shift the other's.
+function parkPull(d, state) {
+  if (servedIn(MARKETS.get(state), d, ['park']) === 0) return 0;
+  return PARK_SHARE * d.size;
 }
 
 // How fast a district's pay comes back right now: the base rate, cut by every
