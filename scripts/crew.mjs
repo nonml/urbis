@@ -161,12 +161,17 @@ function ports(state, name) {
 }
 
 const portsLine = (w) => `You are in a parallel git worktree. Always use GATE_PORT=${w.gate}, SHOT_PORT=${w.shot}, SCORE_PORT=${w.score}; other workers use other ports.`;
+// A path outside the worktree (/tmp, ~) makes OpenCode stop and ask permission,
+// and no one answers: the tool waits forever and the worker reads as stalled
+// (every stall of 2026-10-09 was a bash call writing under /tmp).
+const scratchLine = 'Never read or write outside this worktree (no /tmp, no ~, no copies of the repo elsewhere): OpenCode blocks on a permission prompt no one answers. Put scratch files in .scratch/ here; git ignores it.';
 
 function briefPrompt(w) {
   return [
     'You have full read/write access. Make the necessary code changes.',
     `Read AGENTS.md, then own ${w.brief} end to end. Iterate until every finish line holds.`,
     portsLine(w),
+    scratchLine,
     'Make your first edit within 5 minutes: read only what the next edit needs, then measure, fix, repeat.',
     'Do not commit, push, stash or checkout. Do not open or judge PNGs.',
     'End with a report: files changed, each finish line with its measured number, anything you could not do.',
@@ -188,6 +193,7 @@ function taskPrompt(w) {
     t.test ? `Check with: npm run build && GATE_FULL=1 GATE_PORT=${w.gate} npx playwright test ${t.test}` : 'Check with: npm run build',
     'Do not run npm run gate: the crew runs the checks when you finish.',
     portsLine(w),
+    scratchLine,
     'Do not commit, push, stash or checkout. Do not open or judge PNGs.',
     'End with: the files you changed and the test result.',
   ].filter(Boolean).join('\n');
