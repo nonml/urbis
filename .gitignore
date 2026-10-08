@@ -39,3 +39,6 @@ docs/scorecard/*.png
 # Python bytecode from tools/ scripts
 __pycache__/
 *.pyc
+
+# Workers' scratch files (scripts/crew.mjs)
+.scratch/
