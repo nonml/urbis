@@ -131,6 +131,19 @@ const input = bindInput({
 applySpawn(player, cam, restored ? null : query.get('spawn'));
 const DARK = hudCtx.dark;
 
+// The help line's look token (M4.R1): a bare mouse under the pointer lock names
+// what looks on the street, the drag names what looks in the overview. The rest
+// of the line stays in index.html; only this token follows the view.
+const HINT_LOOK = { street: 'mouse · look', city: 'drag · look' };
+const hintLine = document.getElementById('hint');
+let hintView = null;
+function syncHintLine() {
+  const view = cityView.mode === 'city' ? 'city' : 'street';
+  if (!hintLine || hintView === view) return;
+  hintView = view;
+  hintLine.textContent = hintLine.textContent.replace(/(?:mouse|drag) · look/, HINT_LOOK[view]);
+}
+
 // O cycles the planner's overlays (M5.T20/M5.T21). The action table in
 // game/input.js is the key bindings' own list and no binding names the overlay
 // ring, so the key sim/cityview.js's cityKey answers to is installed here at the
@@ -356,6 +369,7 @@ function render() {
   // on the same eased lift the camera blends by.
   overlayRig.frame(easeLift(cityView.lift));
   input.cityUi.update();
+  syncHintLine();
   // The city's history panel (M5.T32b): the overview's own, painted from the
   // live economy every frame it is open, and put away the moment it closes.
   if (historyPanel.open) {
