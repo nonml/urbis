@@ -5,7 +5,7 @@
 import { test, expect } from '@playwright/test';
 import { generateDistrict } from '../src/sim/citygen.js';
 import { planLayout } from '../src/sim/layout.js';
-import { HAND_PINNED, placePinned } from '../src/sim/landmarks.js';
+import { HAND_PINNED, placePinned, riverWater } from '../src/sim/landmarks.js';
 import { spawnFor } from '../src/sim/spawn.js';
 import { mulberry32 } from '../src/sim/rng.js';
 import { ROAD_HALF_WIDTH, WALKWAY_WIDTH } from '../src/sim/world.js';
@@ -32,7 +32,7 @@ function clearZ(d, k, z) {
 // The rule, written out a second way.
 function expected(d, seed) {
   const a0 = d.avenues[0];
-  const ramen = placePinned(HAND_PINNED, a0, d.crossings).find((t) => t.id === 'ramen');
+  const ramen = placePinned(HAND_PINNED, a0, d.crossings, riverWater(seed)).find((t) => t.id === 'ramen');
   const face = (side) => (side < 0 ? Math.PI / 2 : -Math.PI / 2);
   const shops = [{ x: a0.x + ramen.side * SHOP_OUT, z: ramen.z + RAMEN_SIGN_DZ, ry: face(ramen.side), kind: 0 }];
   const cands = [];
@@ -97,7 +97,7 @@ test('the RAMEN board hangs on the noodle bar and every other sign on a wall wid
   for (const seed of SEEDS) {
     const d = generateDistrict(seed);
     const { shops } = planDressing(d, seed);
-    const ramen = placePinned(HAND_PINNED, d.avenues[0], d.crossings).find((t) => t.id === 'ramen');
+    const ramen = placePinned(HAND_PINNED, d.avenues[0], d.crossings, riverWater(seed)).find((t) => t.id === 'ramen');
     expect(shops[0].kind, `seed ${seed}`).toBe(0);
     expect(shops.slice(1).some((s) => s.kind === 0), `seed ${seed}: a second RAMEN`).toBe(false);
     expect(Math.abs(shops[0].z - ramen.z) + 3, `seed ${seed}: RAMEN off its tower`).toBeLessThanOrEqual(ramen.d / 2);
