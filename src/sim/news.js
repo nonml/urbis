@@ -10,6 +10,7 @@ import { address } from './decline.js';
 import { NO_ROAD, STAGE } from './zoning.js';
 import { isDark } from './street.js';
 import { SERVICES } from './ops.js';
+import { homesInReach, POLLUTION_REACH } from './pollution.js';
 
 // Lines kept, oldest first.
 export const NEWS_MAX = 4;
@@ -38,6 +39,14 @@ function serviceName(type) {
   const name = SERVICES[type]?.name ?? 'Service';
   return `${name[0].toUpperCase()}${name.slice(1)}`;
 }
+
+// What a works lot topping out costs the homes standing in its smoke (M5-11,
+// pollution.js): the same field the economy prices those homes' demand with,
+// named on the lot that put it there. Offices top out beside homes and say
+// nothing — it is the works a home wants less of.
+const smokeClause = (p, all) => (p.use === 'ind' && homesInReach(p, all).length > 0
+  ? ` — homes within ${POLLUTION_REACH} m want less`
+  : '');
 
 export function createNews() {
   return { items: [], last: null, residents: null };
@@ -81,8 +90,9 @@ export function snapshot(city, people, street) {
 // 2. Each watched parcel i, in order, whose stage changed, with p = watched[i],
 //    noun = NOUN[p.use] and at = address(p.x, p.z): EMPTY before and SITE after
 //    gives `${noun} breaking ground at ${at}`; HIGH after gives `${noun} topped
-//    out at ${at}`; EMPTY after gives `${noun} at ${at} came down`. Any other
-//    change says nothing.
+//    out at ${at}`, ending smokeClause(p, all) when a works lot tops out with
+//    homes inside POLLUTION_REACH of it; EMPTY after gives `${noun} at ${at}
+//    came down`. Any other change says nothing.
 // 3. Each watched parcel i, in order, whose cause changed to the no-road cut
 //    (NO_ROAD, zoning.js): `${NOUN[p.use]} at ${at} declining — no road`.
 // 4. Each district i, in order, whose move after is not null and is not the same
@@ -115,7 +125,7 @@ export function newsBetween(before, after, city) {
     const noun = NOUN[p.use];
     const at = address(p.x, p.z);
     if (was === STAGE.EMPTY && now === STAGE.SITE) lines.push(`${noun} breaking ground at ${at}`);
-    else if (now === STAGE.HIGH) lines.push(`${noun} topped out at ${at}`);
+    else if (now === STAGE.HIGH) lines.push(`${noun} topped out at ${at}${smokeClause(p, all)}`);
     else if (now === STAGE.EMPTY) lines.push(`${noun} at ${at} came down`);
   });
   all.forEach((p, i) => {

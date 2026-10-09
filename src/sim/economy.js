@@ -6,6 +6,7 @@ import { isDark } from './street.js';
 import { worldMap } from './patrol.js';
 import { serviceReach } from './ops.js';
 import { TAX_DEMAND, createBudget, tickBudget } from './budget.js';
+import { pollutionOf } from './pollution.js';
 
 // A district is a power area (districtAt in street.js, areas from
 // map.districts): the grid is what a player can cut, so it is the unit a
@@ -135,6 +136,23 @@ const HEALTH_MIN = 0.2;   // the floor the strongest a boost may cut to
 // capacity, not a second lift (ops.js serviceReach) — and a park that reaches no
 // standing building lifts nothing.
 const PARK_SHARE = 0.06;
+
+// Pollution puts a price on the homes inside its reach (M5-11, pollution.js): a
+// home lot the smoke or the noise reaches is worth HOME_DEMAND_HIT less demand
+// than its district says, so it breaks ground later, works slower and can be
+// shed. It is a price on the read, never on the market: the district's own
+// demand — its price, its firms, its wealth — is untouched, so a works lot
+// holding one block back costs that block and nothing else (consequence fits the
+// act). Works and offices themselves are not priced by it; the jobs a works lot
+// brings still pull homes.
+export const HOME_DEMAND_HIT = 0.5;
+
+// The street the economy was last ticked with, held weakly beside the districts
+// and never on them (law 5: a save or a hash never sees one). demandFor reads
+// the commute flow's load table through pollution.js to price the noise and has
+// no street of its own.
+const STREETS = new WeakMap();
+const streetOf = (economy) => STREETS.get(economy);
 
 // The commute a district's residents drive (M3.T35): traffic lays every
 // resident's trip on the graph's edges for the hour and publishes the
@@ -517,6 +535,7 @@ function commuteOf(economy, id) {
 // so the economy never imports zoning and the two stay one-way.
 export function tickEconomy(economy, parcels, heightOf, street, dt) {
   economy.time += dt;
+  STREETS.set(economy, street);
   measureFloors(economy, parcels, heightOf);
   // The city's books tick with the market they are charged on: the whole parcel
   // list the market holds, so a building that stands is taxed (M5-6, budget.js).
@@ -578,9 +597,16 @@ function riseSecs(d, state) {
   return Math.max(HEALTH_MIN, Math.min(WEALTH_RISE_SECS, secs));
 }
 
-// What the market says about one parcel's use, in the parcel's own district.
+// What the market says about one parcel's use, in the parcel's own district,
+// less what the city's pollution and noise price the homes inside their reach at
+// (M5-11, pollution.js). Zoning reads this, so a home lot beside a works lot
+// grows slower; the overlay reads the same number, so its land value falls with
+// it (M5.T21's formula, whose demand term is this read).
 export function demandFor(city, parcel) {
-  return city.economy.districts[parcel.powerZone]?.demand[parcel.use] ?? 0;
+  const d = city.economy.districts[parcel.powerZone];
+  const market = d?.demand[parcel.use] ?? 0;
+  if (parcel.use !== 'res') return market;
+  return Math.max(0, market - HOME_DEMAND_HIT * pollutionOf(parcel, city, streetOf(city.economy)));
 }
 
 // The whole city's demand per use: the mean of its districts, for a glance.
