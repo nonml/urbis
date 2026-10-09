@@ -10,19 +10,24 @@
 // and the ops test will use, so they are pinned by behaviour here.
 import { test, expect } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const FILE = fileURLToPath(import.meta.url);
 const SEEDS = [7, 11, 22, 33, 73];
+const SCRATCH = new URL('../.scratch/', import.meta.url);
 
-// The child's whole stdout is the map; warnings belong on stderr.
+// A map is far more JSON than a pipe holds (~64 KB), so the worker writes it to
+// a file: stdout would be truncated at the buffer and JSON.parse would fail.
 if (process.argv[2] === '--worker') {
   const seed = Number(process.argv[3]);
+  const out = process.argv[4] || fileURLToPath(new URL(`map-${seed}-${process.pid}.json`, SCRATCH));
   const { setWorldSeed } = await import('../src/sim/seedstore.js');
   setWorldSeed(seed, true);
   const { createMap } = await import('../src/sim/map.js');
-  process.stdout.write(`${JSON.stringify(createMap(seed))}\n`);
+  mkdirSync(dirname(out), { recursive: true });
+  writeFileSync(out, JSON.stringify(createMap(seed)));
   process.exit(0);
 }
 
@@ -31,10 +36,9 @@ const { mapHash, nodeAt, edgesNear, buildingsIn, districtAt } = await import('..
 const readGolden = (seed) => JSON.parse(readFileSync(`tests/golden/map-${seed}.json`, 'utf8'));
 
 function liveMap(seed) {
-  const out = execFileSync(process.execPath, [FILE, '--worker', String(seed)], {
-    encoding: 'utf8', maxBuffer: 64 * 1024 * 1024,
-  });
-  return JSON.parse(out.trim().split('\n').pop());
+  const path = fileURLToPath(new URL(`map-${seed}.json`, SCRATCH));
+  execFileSync(process.execPath, [FILE, '--worker', String(seed), path]);
+  return JSON.parse(readFileSync(path, 'utf8'));
 }
 
 // The golden's flat shape, rebuilt from the map's grouped one. `pinned` is the
