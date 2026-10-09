@@ -66,9 +66,18 @@ function asGolden(map) {
   };
 }
 
+// The golden freezes the load-time district (M0.T8). createMap has since grown
+// past it on purpose: the graph joins every cell (M4.T4) and the drive box spans
+// the buildable land (M5.T3b). Those two keys are pinned elsewhere
+// (golden.test.js reads the world modules; m4/m5 accept tests the growth); the
+// rest of the play district must still read the golden exactly.
+const GROWN = ['graph', 'district'];
 for (const seed of SEEDS) {
   test(`seed ${seed}: createMap reads the golden map`, () => {
-    expect(asGolden(liveMap(seed))).toEqual(readGolden(seed));
+    const live = asGolden(liveMap(seed));
+    const gold = readGolden(seed);
+    for (const k of GROWN) { delete live[k]; delete gold[k]; }
+    expect(live).toEqual(gold);
   });
 }
 
@@ -106,7 +115,9 @@ test('buildingsIn finds the footprint a box covers and nothing far away', () => 
 
 test('districtAt names the district a point stands in, null outside', () => {
   const map = liveMap(22);
-  expect(districtAt(map, map.spawn.player.x, map.spawn.player.z)).toEqual(map.district);
+  // The areas the map names (M3.T36), not the one load-time district.
+  const at = districtAt(map, map.spawn.player.x, map.spawn.player.z);
+  expect(map.districts ?? [map.district]).toContain(at);
   expect(districtAt(map, 1e6, 1e6)).toBeNull();
 });
 
