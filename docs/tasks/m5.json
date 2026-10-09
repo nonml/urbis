@@ -391,7 +391,7 @@
       ],
       "test": "tests/accept/m5-budget-live.spec.js",
       "commit": "M5.T17b (M5-6): the budget runs in the game",
-      "notes": "Size S. Found 2026-10-09 by the director: M5.T17 landed as a sim module nothing calls. Saves must stay exact (M3.R1). Draws unchanged. Never read or write outside this worktree. If you must touch a file not listed, stop and say so. Retry 2026-10-09: the first try lost its model mid-task (free endpoint unavailable). Its save.js, probe.js and spec edits are in ../urbis-parked/M5.T17b-retry.patch: git apply it first. Still missing: the src/main.js hookup (create on city.economy.budget, tick in the fixed step)."
+      "notes": "Size S. Found 2026-10-09 by the director: M5.T17 landed as a sim module nothing calls. Saves must stay exact (M3.R1). Draws unchanged. Never read or write outside this worktree. If you must touch a file not listed, stop and say so. Retry 2026-10-09: the first try lost its model mid-task (free endpoint unavailable). Its save.js, probe.js and spec edits are in .scratch/M5.T17b-retry.patch: git apply it first. Still missing: the src/main.js hookup (create on city.economy.budget, tick in the fixed step)."
     },
     {
       "id": "M5.T18",
