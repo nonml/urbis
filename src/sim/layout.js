@@ -119,7 +119,18 @@ function subtractRuns(runs, holes) {
 // MIN_RUN between them, plus each lot's own clear strip.
 const LOT_GAP = MIN_RUN + 2 * LOT_CLEAR;
 
-// The z bands the lots aim for: one equal slice of the drive per lot, so they
+// The box the plan is laid across in z: the box a person may go, never the box a
+// car may go. A road op settles the drive box on the graph it leaves (map.js
+// M5.T3b, ops.js roadEdit), so a plan read off it would move the moment the
+// player builds — the wall the map carries has to stay the one
+// planBuildings(map.district, seed) derives from that district, whatever the
+// drivable box has grown to since. A generated district and the hand preset
+// both give the walk box the drive's own z, so nothing moves today.
+function planBox(district) {
+  return district.walk ?? district.drive;
+}
+
+// The z bands the lots aim for: one equal slice of the plan per lot, so they
 // reach across the whole district instead of packing into the south end.
 function lotBands(lo, hi, count) {
   const span = hi - lo;
@@ -173,11 +184,11 @@ function placeLot(sides, [w0, w1], rand) {
 
 // One pass over every avenue side: the side's free z runs, then one lot per
 // band so the lots spread across the district. A band with no room on any side
-// falls back to anywhere in the drive. Tagged with avenue and side for planLayout.
+// falls back to anywhere in the plan box. Tagged with avenue and side for planLayout.
 function districtLots(district, seed, pinned) {
   const rand = mulberry32(seed);
-  const lo = district.drive.minZ;
-  const hi = district.drive.maxZ;
+  const lo = planBox(district).minZ;
+  const hi = planBox(district).maxZ;
   const count = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
   const sides = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const depth = rowDepth(district, a.x, side);
@@ -197,7 +208,7 @@ function districtLots(district, seed, pinned) {
 // The district's lots, as [x, z, w, d] like zoning's LOTS: LOTS_MIN..LOTS_MAX of
 // them from the seed, each on one avenue side's building line, rowDepth deep,
 // a LOT_FRONT long inside one of that side's rowRuns, wholly inside the
-// district's drive bounds in z, clear of the pinned towers, and never
+// district's walk bounds in z, clear of the pinned towers, and never
 // overlapping another lot. The same seed always gives the same lots. `pinned`
 // is the map's own tower table; omitted, the hand map's PINNED_TOWERS.
 export function deriveLots(district, seed, pinned = PINNED_TOWERS) {
