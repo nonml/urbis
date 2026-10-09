@@ -269,7 +269,21 @@
       "needs": [],
       "test": "tests/traffic.test.js",
       "commit": "M3.R4 (M3-6): traffic unit tests green again",
-      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes. Director 2026-10-09 (after the worker proved traffic.js is unchanged and the map moved under the test): (a) fix src/sim/map.js so cutPoints never emits a zero-length edge (a=b), a real graph bug; (b) in tests/traffic.test.js pick an edge its tick budget fits (<= 240 m, the test's own intent) and keep every numeric bar exactly as it is."
+      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes. Director 2026-10-09 (after the worker proved traffic.js is unchanged and the map moved under the test): (a) fix src/sim/map.js so cutPoints never emits a zero-length edge (a=b), a real graph bug; (b) in tests/traffic.test.js pick an edge its tick budget fits (<= 240 m, the test's own intent) and keep every numeric bar exactly as it is. Retry 2 (2026-10-09): the last try solved it (5 passed) but was rejected on a stale file list. Redo exactly that: (1) src/sim/map.js cutPoints: drop consecutive duplicate cut values so no edge runs from a node to itself (seed 22 town.cr0.2 ran 0,-9 to 0,-9); (2) tests/traffic.test.js: longestEdge(map, min, max = Infinity) takes an upper bound and the two car tests pass BUDGET_M = 190 so the edge fits the 300-tick budget; the lanePoint sweep skips zero-length edges; no numeric bar changes. Do not touch citygen.js or townplan.js. Do not ask the director again."
+    },
+    {
+      "id": "M3.R5",
+      "lane": "traffic",
+      "goal": "tests/map.test.js is green. 10 of its tests fail on main because its liveMap helper reads a child process stdout that is cut off at 65,536 bytes, so the JSON it parses is truncated. Make liveMap read the whole output (e.g. write the JSON to a file under .scratch/ in the child and read the file, or use execFileSync with a large maxBuffer and no pipe truncation). Do not change what the tests check. Run: GATE_FULL=1 npx playwright test tests/map.test.js.",
+      "files": [
+        "tests/map.test.js"
+      ],
+      "needs": [
+        "M3.R4"
+      ],
+      "test": "tests/map.test.js",
+      "commit": "M3.R5 (M3-6): map tests read the whole map",
+      "notes": "Size S. Found 2026-10-09 by the M3.R4 worker. Never read or write outside this worktree."
     },
     {
       "id": "M3.T40",
