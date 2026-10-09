@@ -45,7 +45,19 @@ const TIERS = (process.env.CREW_TIERS
   ?? 'opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
 // Muse Spark's thinking levels top out at xhigh, Step 5's at high.
-const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
+// ../.urbis-effort.json overrides one lane for an A/B, read on every send so it needs
+// no restart: { "lane": "medium" } sets the effort, { "lane": { "model": "...",
+// "variant": "..." } } the model too.
+const EFFORT = path.join(ROOT, '..', '.urbis-effort.json');
+const laneCfg = (lane) => {
+  try {
+    const v = JSON.parse(fs.readFileSync(EFFORT, 'utf8'))[lane];
+    return typeof v === 'string' ? { variant: v } : v ?? {};
+  } catch { return {}; }
+};
+const laneEffort = (lane) => laneCfg(lane).variant;
+const variantOf = (model, lane) => (laneEffort(lane) ? { variant: laneEffort(lane) }
+  : model.includes('deepseek') ? { variant: 'max' }
   : model.includes('muse') ? { variant: 'xhigh' }
   : model.includes('step-5') ? { variant: 'high' } : {});
 // Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
@@ -206,11 +218,12 @@ const prompt = (w) => (w.task && !w.task.brief ? taskPrompt(w)
 
 async function send(w, text) {
   const { c } = await client(w.dir);
+  w.model = laneCfg(w.name).model ?? w.model;
   if (w.session) {
     // A session carried over from the lane's last task (assign) may be gone with
     // its server; then the task starts a new one.
     try {
-      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
+      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model, w.name) });
       w.lastSent = Date.now();
       return;
     } catch {
@@ -218,7 +231,7 @@ async function send(w, text) {
     }
   }
   w.session = (await c.createSession({ title: `crew ${w.name}` })).id;
-  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
+  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model, w.name) });
   w.lastSent = Date.now();
 }
 

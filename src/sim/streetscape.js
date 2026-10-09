@@ -76,15 +76,30 @@ export function zebrasFor(district, carZ) {
 // - A def with face 'south' is dropped: it hangs on the hand map's south row.
 // - The def whose sub is 'RAMEN' hangs over the RAMEN board: ax =
 //   district.avenues[0].x, side = ramen.side, z = ramen.z.
-// - Any other def: ax = counterpartX(def.ax ?? 0, district) and side = def.side.
-//   Its row is the rows entry with that ax and side; each of the row's runs
-//   [r0, r1] gives the span max(r0, walk.minZ) + SIGN_IN .. min(r1, walk.maxZ) -
-//   SIGN_IN (spans with lo > hi are skipped). z is def.z clamped into the span
-//   that leaves it nearest def.z (a tie goes to the earlier span); a def with no
-//   row or no span is dropped.
+// - Any other def: ax = counterpartX(def.ax ?? 0, district). Its row is the
+//   rows entry with that ax and def.side, and its spans are that row's runs cut
+//   to the walk box and inset by SIGN_IN at each end (frontageSpans below). z is
+//   def.z clamped into the span that leaves it nearest def.z (a tie goes to the
+//   earlier span). The river, a crossing or the plan may leave that face with no
+//   span at all, and then the sign hangs on the frontage that remains — the
+//   other face of the same avenue, both faces of one short row — with side
+//   flipped to the face that carries it. A def with no row, or with no span on
+//   either face, is dropped.
 // - A sign is then dropped when a sign kept before it has the same ax and side
 //   and a z closer than SIGN_GAP.
 // `rows` is planLayout's rows, `ramen` the RAMEN board as { side, z }.
+
+// The frontage one avenue side can hang a sign from, as [z0, z1] spans in the
+// order the side's runs are written: each run cut to the walk box and inset by
+// SIGN_IN at both ends, so the sign's arm meets a wall rather than a gap or the
+// end of the walk. A side the river, a crossing or the plan has emptied of
+// frontage offers no span at all.
+function frontageSpans(row, walk) {
+  return (row?.runs ?? [])
+    .map(([r0, r1]) => [Math.max(r0, walk.minZ) + SIGN_IN, Math.min(r1, walk.maxZ) - SIGN_IN])
+    .filter(([lo, hi]) => lo <= hi);
+}
+
 export function placeSigns(defs, district, rows, ramen) {
   const { walk } = district;
   const out = [];
@@ -100,13 +115,20 @@ export function placeSigns(defs, district, rows, ramen) {
     } else {
       ax = counterpartX(def.ax ?? 0, district);
       side = def.side;
-      const row = rows.find((r) => r.ax === ax && r.side === side);
-      if (!row) continue;
+      let spans = frontageSpans(rows.find((r) => r.ax === ax && r.side === side), walk);
+      if (!spans.length) {
+        // That face has no frontage left to hang on, so the sign goes on the
+        // frontage that remains: the other face of the avenue it was written
+        // for. Both faces of one avenue are one street; a sign that crossed to
+        // another avenue would no longer mark the shop it was written against.
+        const far = frontageSpans(rows.find((r) => r.ax === ax && r.side === -side), walk);
+        if (far.length) {
+          spans = far;
+          side = -side;
+        }
+      }
       z = null;
-      for (const [r0, r1] of row.runs) {
-        const lo = Math.max(r0, walk.minZ) + SIGN_IN;
-        const hi = Math.min(r1, walk.maxZ) - SIGN_IN;
-        if (lo > hi) continue;
+      for (const [lo, hi] of spans) {
         const c = Math.min(hi, Math.max(lo, def.z));
         if (z === null || Math.abs(c - def.z) < Math.abs(z - def.z)) z = c;
       }

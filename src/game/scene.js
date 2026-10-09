@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { DISTRICTS } from '../sim/world.js';
 import { ARC, arcTarget, arcSigns } from '../sim/arc.js';
-import { zoneGlow, blink } from '../sim/street.js';
+import { zoneGlow, blink, isDark } from '../sim/street.js';
 import { isIndoors, STREET } from '../sim/interior.js';
 import { ROOF_RAIN_BELOW } from './camera.js';
 import { buildGround, buildTowers, buildSkyline } from '../render/block.js';
@@ -34,6 +34,7 @@ import { buildZoning } from '../render/zoning.js';
 import { buildVacant } from '../render/vacant.js';
 import { buildDecline } from '../render/decline.js';
 import { buildCityView } from '../render/cityview.js';
+import { buildOverlays } from '../render/overlays.js';
 import { buildInteriors, updateInteriors } from '../render/interior.js';
 import { buildArcMarker, updateArcMarker } from '../render/arc.js';
 import { hideFaded } from '../render/faded.js';
@@ -207,6 +208,13 @@ export function buildScene(ctx) {
   // City view (Z): the same world from above, where the player zones the lots.
   const cityRig = buildCityView(city, cityView);
   scene.add(cityRig.mesh);
+  // The planner's lot tint over it (M5.T20/M5.T21): one pooled mesh, one
+  // instance per lot, the colour the overlay the O key is on reads off the sim.
+  // It draws nothing on the street and nothing at all with the overlay off.
+  const overlayRig = buildOverlays(city, cityView, {
+    dark: (zone) => isDark(street, zone), map, street,
+  });
+  scene.add(overlayRig.mesh);
 
   return {
     env, spots, groundMats: ground.mats, markingMats: ground.markings,
@@ -214,7 +222,7 @@ export function buildScene(ctx) {
     lamps, streakMeshes, carStreaks, lampPoolMeshes, fadedDraws, growth, vacant,
     decline, arcMarker, npcRig, traffic, heroRig, police, avatar, shops,
     interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig, audio,
-    roads: ground.roads, map, mapState,
+    roads: ground.roads, map, mapState, overlayRig,
   };
 }
 

@@ -6,6 +6,7 @@ import {
   BUILD_LINE, LOT_CLEAR, LOT_FRONT, LOTS_MAX, LOTS_MIN, MIN_RUN, PIN_CLEAR, PINNED_TOWERS,
   deriveLots, planLayout, rowDepth, rowRuns,
 } from '../src/sim/layout.js';
+import { riverWater } from '../src/sim/landmarks.js';
 import { sweep } from './sweep.js';
 
 const SEEDS = sweep(300);
@@ -84,7 +85,7 @@ test('the plan cuts every lot and pinned tower out of its row', () => {
     for (const row of plan.rows) {
       const at = `seed ${seed} row x=${row.ax} side ${row.side}`;
       expect(row.depth, `${at}: depth`).toBeCloseTo(rowDepth(d, row.ax, row.side), 9);
-      const full = rowRuns(d, row.ax, row.side);
+      const full = rowRuns(d, row.ax, row.side, riverWater(seed));
       const mine = plan.lots.filter((lot) => {
         const h = homeOf(d, lot);
         return h && h.ax === row.ax && h.side === row.side;
