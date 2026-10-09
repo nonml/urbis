@@ -708,6 +708,24 @@
       "notes": "Size S: at most 80 changed lines outside the spec. Look at how the O overlay key is wired in src/main.js and copy that path."
     },
     {
+      "id": "M5.R1",
+      "lane": "build-ui",
+      "needs": [
+        "M5.T32b"
+      ],
+      "goal": "The city view HUD reads cleanly. In .scratch/hud-overlap.png (seed 7, city view, 20 s in) the economy panel (src/render/economy.js: SOUTH/NORTH, jobs, homes, wealth, demand, firms) is drawn over the status lines (town name, seed, time, weather) at the top left, so both are unreadable; and the news feed at the top right shows `5 people moved out of the city` four times in a row. Make no two HUD panels overlap at 1280x720 and 1920x1080 in the street view and the city view, and have the news feed fold a line repeated back to back into one line with a count (`5 people moved out of the city ×4`). Write tests/accept/m5-hud-clean.spec.js first: boot the built game (&gen=1&seed=7), and in both views and both sizes read every visible HUD panel's getBoundingClientRect and check no two intersect; push the same news line 4 times through the feed and check it shows once with ×4.",
+      "files": [
+        "src/render/economy.js",
+        "src/sim/news.js",
+        "src/main.js",
+        "src/ui/",
+        "tests/accept/m5-hud-clean.spec.js"
+      ],
+      "test": "tests/accept/m5-hud-clean.spec.js",
+      "commit": "M5.R1 (M5-8): HUD panels never overlap; repeated news folds",
+      "notes": "Size M. Find where the status lines and the news feed are built (grep the strings) before moving anything. Keep the look: same fonts and colours, only positions and stacking change."
+    },
+    {
       "id": "M5.T33",
       "lane": "build-ui",
       "goal": "Drag zoning. Hold the mouse with a brush and drag: every empty lot the stroke crosses is zoned, its total cost shown before release; one undo takes the stroke back; checked in `m5-newland.spec.js`",

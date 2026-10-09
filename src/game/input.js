@@ -21,6 +21,7 @@ import { STREET } from '../sim/interior.js';
 import { cityKey } from '../sim/cityview.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
+import { PANEL_KEY } from '../ui/history.js';
 import { toggleJournal } from '../render/arcui.js';
 import { cycleRadio } from '../audio/music.js';
 import { loadBindings, onBindingsChange } from '../ui/settings.js';
@@ -55,12 +56,12 @@ const isTyping = (e) => {
 
 // parts: canvas, cam, camera, city, cityRig, cityView, street, clock, interior,
 // arc, arcUI, look(dx, dy), dolly(deltaY), fireHack, toggleVehicle, enterDoor,
-// newGame. Installs every listener once, in play's order, and returns the
-// readings the frame loop makes.
+// newGame, toggleHistory. Installs every listener once, in play's order, and
+// returns the readings the frame loop makes.
 export function bindInput(parts) {
   const {
     canvas, cam, camera, city, cityRig, cityView, street, clock, interior,
-    arc, arcUI, look, dolly, fireHack, toggleVehicle, enterDoor, newGame,
+    arc, arcUI, look, dolly, fireHack, toggleVehicle, enterDoor, newGame, toggleHistory,
   } = parts;
 
   // `held` is every physical key down, lower-case; the bindings say which
@@ -118,6 +119,7 @@ export function bindInput(parts) {
     else if (action === 'newGame' && !titleShowing()) askNewGame(newGame);
     else if (action === 'radio' && driving) radio = cycleRadio(radio);
     else if (action === 'journal') toggleJournal(arcUI);
+    else if (action === 'history') toggleHistory();
     else if (action === 'choice1') arcChoose(arc, 1, street.time);
     else if (action === 'choice2') arcChoose(arc, 2, street.time);
     // The overview lifts off the street, never out of a shop or off a roof, and a
@@ -128,7 +130,14 @@ export function bindInput(parts) {
 
   window.addEventListener('keydown', (e) => {
     if (e.repeat || isTyping(e)) return;
-    fire(byKey.get(e.key.toLowerCase()));
+    const k = e.key.toLowerCase();
+    const action = byKey.get(k);
+    // The city's history panel (M5.T32b) answers to a letter no binding names,
+    // so the key sits beside the action it fires, the way O cycles the planner's
+    // overlays from main.js. Only in the overview, like every city key. A
+    // binding that ever claims the letter wins: the press is theirs then.
+    if (!action && k === PANEL_KEY && cityView.mode === 'city') fire('history');
+    fire(action);
   });
 
   // The gamepad, read once a step. Buttons fire on the press edge through the

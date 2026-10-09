@@ -318,6 +318,35 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M3-6: after addRoad a car drives it within 60 game seconds. Today within 60 s cars are routed over a new road but the first arrival is ~120 s (seed 73): make nearby cars take trips over a new road so one drives it within 60 s. Keep the sim deterministic (state.rng only, no Math.random) and the draws unchanged. Drop the test.fail marker on the addRoad test in tests/accept/m3-traffic.test.js only when the check is green; the marker reason is measured, do not drop it without the check passing. Re-queued 2026-10-07: the removeRoad test in the same file (passed at M3.T28) also fails now on seeds 7, 33, 73 (cars still on the removed road 10 s later). Make both tests in m3-traffic.test.js pass. Retry 2026-10-09: the first try stalled re-running tests/traffic.test.js, which was already red on main (fixed first by M3.R4). Its edits are in .scratch/M3.T40.patch; read it and reuse what works. Every shell command must exit by itself within 2 minutes."
     },
     {
+      "id": "M3.T40b",
+      "lane": "traffic",
+      "needs": [
+        "M3.T40"
+      ],
+      "goal": "A new road is driven within 60 game seconds. M3.T40 (f47cc44) reworked src/sim/traffic.js but landed only because the check was marked test.fail; the marker is now gone and `after addRoad a car drives it within 60 game seconds` fails: 22 new roads no car drove in 60 s (first arrival ~120 s, seed 73). First measure, in .scratch/m3-t40b.md: for one new edge on seed 73, when is it routable, which car first gets a trip over it and when, and why the trip takes ~120 s (trip assignment cadence, re-route only at trip end, or the car is far). Then fix the cause in traffic.js so cars already near the new road re-plan onto it.",
+      "files": [
+        "src/sim/traffic.js"
+      ],
+      "test": "tests/accept/m3-traffic.test.js",
+      "commit": "M3.T40b (M3-6): cars near a new road re-plan onto it",
+      "notes": "Size M. Never edit tests/, never split or shorten roads, never change map.js. Run only: GATE_FULL=1 npx playwright test tests/accept/m3-traffic.test.js tests/golden.test.js."
+    },
+    {
+      "id": "M3.R7",
+      "lane": "traffic",
+      "needs": [
+        "M3.T40b"
+      ],
+      "goal": "tests/accept/m3-traffic.spec.js `at 8:00 most visible walkers are residents heading to their job parcel` times out (page.waitForFunction, 120 s) on main, and did before M3.T40. Find what it waits for that never comes (write it in .scratch/m3-r7.md), then fix the game code so it comes. If the wait is for something the game never had, stop and say so.",
+      "files": [
+        "src/sim/",
+        "src/render/npcs.js"
+      ],
+      "test": "tests/accept/m3-traffic.spec.js",
+      "commit": "M3.R7 (M3-6): residents walk to work at 8:00 again",
+      "notes": "Size M. Never edit tests/. Run only: GATE_FULL=1 npx playwright test tests/accept/m3-traffic.spec.js."
+    },
+    {
       "id": "M3.R1",
       "lane": "build-sim",
       "goal": "Saves are exact again. tests/accept/m3-save.spec.js passed when M3.T38 landed and now fails: on seed 33 a game after 200 ops loads to a different map, and on seed 7 the save no longer folds a run of zone flips to its net effect (0 folded, 56+ expected). Later ops (M5 services, new land, roads, bulldoze) must save, load and compact like every other op. Find the commit that broke it (git bisect between the task's landing and main). If a later milestone's criterion changed what the check assumes, ask the director with the evidence; never edit the check to pass.",
