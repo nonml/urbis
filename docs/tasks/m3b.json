@@ -262,12 +262,14 @@
       "lane": "traffic",
       "goal": "tests/traffic.test.js is green again. On main two of its tests fail before any change: \"lanePoint settles both directions on the right of travel, 2.4 m out\" gets NaN, and \"a follower keeps its gap\" ends 13.5 m behind the stopped leader (bar < 0.5). Run: GATE_FULL=1 npx playwright test tests/traffic.test.js (4 s). Likely cause: a later change to src/sim/traffic.js (git log -- src/sim/traffic.js: M4.T10 movers on hills, M3.T35 commute) changed lanePoint or the follow logic. Read the diff of those commits, find the line that makes NaN and the stop gap, and fix traffic.js so all 5 tests pass. Never edit the test bars.",
       "files": [
-        "src/sim/traffic.js"
+        "src/sim/traffic.js",
+        "src/sim/map.js",
+        "tests/traffic.test.js"
       ],
       "needs": [],
       "test": "tests/traffic.test.js",
       "commit": "M3.R4 (M3-6): traffic unit tests green again",
-      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes."
+      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes. Director 2026-10-09 (after the worker proved traffic.js is unchanged and the map moved under the test): (a) fix src/sim/map.js so cutPoints never emits a zero-length edge (a=b), a real graph bug; (b) in tests/traffic.test.js pick an edge its tick budget fits (<= 240 m, the test's own intent) and keep every numeric bar exactly as it is."
     },
     {
       "id": "M3.T40",
