@@ -35,6 +35,7 @@ import { createRenderer, createComposer, fitRenderer } from './render/atmosphere
 import { buildNews, showNews } from './render/news.js';
 import { createCityView, tickCityView, cityKey, easeLift } from './sim/cityview.js';
 import { createArc, tickArc } from './sim/arc.js';
+import { buildHistoryPanel } from './ui/history.js';
 
 const DRAW_BUDGET = 175;
 // Fields a keypress typed into is text, never a command (game/input.js isTyping).
@@ -95,6 +96,10 @@ const lampPlan = { furniture: map.furniture };
 const newsLine = buildNews();
 const hud = buildHud(newsLine);
 const { lotNote } = hud;
+// The city's history panel (M5.T32b): DOM and a 2D canvas, so it costs no
+// WebGL draw. The city view's key opens it; the frame loop paints it while it
+// is open (render(), beside the other panels' updates).
+const historyPanel = buildHistoryPanel(document.body);
 
 const { composer, bloom, grade } = createComposer(renderer, scene, camera);
 window.addEventListener('resize', () => fitRenderer(renderer, composer, camera, grade));
@@ -121,6 +126,7 @@ if (CAPTURE) clock.rate = 0;
 const input = bindInput({
   canvas, cam, camera, city, cityRig, cityView, street, clock, interior, arc, arcUI: hud.arcUI,
   look: camRig.look, dolly: camRig.dolly, fireHack, toggleVehicle, enterDoor, newGame,
+  toggleHistory: () => historyPanel.toggle(),
 });
 applySpawn(player, cam, restored ? null : query.get('spawn'));
 const DARK = hudCtx.dark;
@@ -233,6 +239,10 @@ bindProbe({
   getReplayError: () => replayErr, setPoliceHold: (on) => { policeHold = on; },
   setStreamOrigin: (x, z) => { streamOrigin = x === null ? null : { x, z }; },
 });
+// The economy's own series (M5-15), which the history panel draws: read back
+// here so a check compares the painted pixels with the live rows. The base
+// probe's economy() is the district report, which does not hold them.
+window.__game.history = () => city.economy.history;
 const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
 const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
 
@@ -346,6 +356,12 @@ function render() {
   // on the same eased lift the camera blends by.
   overlayRig.frame(easeLift(cityView.lift));
   input.cityUi.update();
+  // The city's history panel (M5.T32b): the overview's own, painted from the
+  // live economy every frame it is open, and put away the moment it closes.
+  if (historyPanel.open) {
+    if (cityView.mode === 'city') historyPanel.frame(city.economy);
+    else historyPanel.toggle();
+  }
 
   renderer.info.reset();
   // The city mirror re-shoots one cube face per frame, and only when stale — five
