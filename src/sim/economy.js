@@ -5,6 +5,7 @@
 import { isDark } from './street.js';
 import { worldMap } from './patrol.js';
 import { serviceReach } from './ops.js';
+import { TAX_DEMAND, createBudget, tickBudget } from './budget.js';
 
 // A district is a power area (districtAt in street.js, areas from
 // map.districts): the grid is what a player can cut, so it is the unit a
@@ -311,6 +312,15 @@ function measureFloors(economy, parcels, heightOf) {
 // sell, plus works wanting floor. A measured district's jobs are every
 // non-residential floor it has (M3.T16); the hand preset shipped with its
 // balanced base standing in for them through base.res.
+// The tax the city charges a use is a price on it (M5-6, budget.js): each point
+// costs that use TAX_DEMAND of demand, because a developer asked to pay more for
+// the floor he is about to build wants less of it. It moves the price alone —
+// the need and the have are what the city has, not what it is charged — and it
+// reads no market state, so one district's taxes never reach the other's.
+function taxCost(state, use) {
+  return state?.budget ? TAX_DEMAND * state.budget.tax[use] : 0;
+}
+
 function price(d, lost = 0, state) {
   for (const use of USES) d.have[use] = d.base[use] + d.floor[use];
   d.homes = d.have.res;
@@ -320,12 +330,17 @@ function price(d, lost = 0, state) {
   d.need.com = d.homes * d.wealth * commerce * (1 - lost) + d.firms.com;
   d.need.ind = d.have.com * d.wealth * INDUSTRY_PER_COMMERCE + d.firms.ind;
   const gain = d.calm ? GAP_GAIN : GAP_GAIN_HAND;
-  for (const use of USES) d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size);
+  for (const use of USES) {
+    d.price[use] = clamp01(BALANCED + (gain * (d.need[use] - d.have[use])) / d.size - taxCost(state, use));
+  }
 }
 
 // `map` is the city being played: a map carrying its own lots is a generated
 // plan, and a generated new game gets the calm market (docs/ECONOMY.md, M1.T3).
 // The hand preset's map has no lots and keeps the market it shipped with.
+// The city's books (M5-6, budget.js) live beside the districts, never on them:
+// a district is a market and the money is the city's, so the economy holds the
+// one plain object the taxes and the balance sit in and ticks it with itself.
 export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
   const calm = Boolean(map.lots);
   // The map's parcel list holds every building and lot (M3.T15); the economy
@@ -338,6 +353,7 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
     time: 0,
     rand,
     calm,
+    budget: createBudget(map),
     districts: defs.map((def) => makeDistrict(
       def.id, def.name, all.filter((p) => p.powerZone === def.id), rand, calm, heightOf, def.kind,
     )),
@@ -348,7 +364,7 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
     // The opening city is what the seed rolled, not a rezone: the first measure
     // counts it, and no player did that.
     d.rezone = null;
-    price(d);
+    price(d, 0, economy);
     Object.assign(d.demand, d.price);
   }
   return economy;
@@ -502,6 +518,9 @@ function commuteOf(economy, id) {
 export function tickEconomy(economy, parcels, heightOf, street, dt) {
   economy.time += dt;
   measureFloors(economy, parcels, heightOf);
+  // The city's books tick with the market they are charged on: the whole parcel
+  // list the market holds, so a building that stands is taxed (M5-6, budget.js).
+  tickBudget(economy.budget, MARKETS.get(economy), dt);
   for (const d of economy.districts) {
     d.dark = isDark(street, d.id);
     const commute = readCommute(economy, d, street);
@@ -520,14 +539,17 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
 // places land on the map's own parcel list, which a sim that reads only the
 // city's lots would otherwise never see. A district with no service of the type
 // reaches nothing and earns no effect; one service and a second in the same
-// catchment reach the same buildings, so the pair counts once. Both readers
-// below — the wealth rates (M5.T15) and the want for homes (M5.T16) — go
-// through here, so every service lands on the economy the same way.
+// catchment reach the same buildings, so the pair counts once. A service the
+// books have shut is not running and reaches nobody (M5-6, budget.js). Both
+// readers below — the wealth rates (M5.T15) and the want for homes (M5.T16) —
+// go through here, so every service lands on the economy the same way.
 function servedIn(parcels, d, types) {
   let served = 0;
   for (const type of types) {
     const reach = serviceReach(parcels, type);
-    for (const p of reach.keys()) if (p.powerZone === d.id) served += 1;
+    for (const [p, service] of reach) {
+      if (!service.shut && p.powerZone === d.id) served += 1;
+    }
   }
   return served;
 }

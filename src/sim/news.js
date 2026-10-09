@@ -1,6 +1,7 @@
 // The city tells the player what just changed (milestone 3): a lot breaking
 // ground, topping out or coming down, firms moving jobs in or out of a district,
-// the power going and coming back, people moving in or out. A city that changes
+// the power going and coming back, people moving in or out, and the city's books
+// shutting a service they cannot pay for (M5-6, budget.js). A city that changes
 // where nobody is looking might as well not change; this is the line that says
 // so, top right, for a few seconds (render/news.js).
 // Pure (law 5): main ticks it after the city and the people, render reads
@@ -8,6 +9,7 @@
 import { address } from './decline.js';
 import { NO_ROAD, STAGE } from './zoning.js';
 import { isDark } from './street.js';
+import { SERVICES } from './ops.js';
 
 // Lines kept, oldest first.
 export const NEWS_MAX = 4;
@@ -26,6 +28,16 @@ export const WHY = { dark: ' after the power cut', chase: ' after the police cha
 // What the use a rezone added is called in the credit line (economy.js d.credit):
 // the demand it set off is wanted "for the new workshops".
 export const CREDIT_NOUN = { res: 'homes', com: 'offices', ind: 'workshops' };
+// What the books say about a service they shut and one they bring back
+// (budget.js lastShut / lastBack): the reason, in the player's words.
+const SHUT_WHY = 'shut down — the city is in debt';
+const BACK_WHY = 'open again — the books can pay for it';
+
+// A service type's name as a line starts it.
+function serviceName(type) {
+  const name = SERVICES[type]?.name ?? 'Service';
+  return `${name[0].toUpperCase()}${name.slice(1)}`;
+}
 
 export function createNews() {
   return { items: [], last: null, residents: null };
@@ -43,15 +55,20 @@ function watched(city) {
 // district's last firm move (economy.js replaces d.last with a new object on
 // every move, so a move is a change of identity), whether each district is dark,
 // the demand change a rezone was credited with (economy.js d.credit, a new
-// object when it lands), and how many people live on the lots.
+// object when it lands), the service the city's books last shut and the one they
+// last brought back (budget.js lastShut / lastBack, a new object each time), and
+// how many people live on the lots.
 export function snapshot(city, people, street) {
   const all = watched(city);
+  const budget = city.economy?.budget;
   return {
     stages: all.map((p) => p.stage),
     whys: all.map((p) => p.why),
     moves: city.economy.districts.map((d) => d.last),
     credits: city.economy.districts.map((d) => d.credit),
     dark: city.economy.districts.map((d) => isDark(street, d.id)),
+    shut: budget?.lastShut ?? null,
+    back: budget?.lastBack ?? null,
     residents: people.list.length,
   };
 }
@@ -75,9 +92,14 @@ export function snapshot(city, people, street) {
 //    ${name} district`, and when m.cause is set (economy.js flee: the firm a
 //    power cut or a chase drove out) that line ends WHY[m.cause].
 // 5. Each district i, in order, whose credit after is set and is not the same
-//    object as its credit before, with c = that credit (economy.js creditRezone:
-//    a rezone that moved the district over the build bar): `More ${NOUN[c.use],
-//    lower case} wanted in the ${name} district for the new ${CREDIT_NOUN[c.source]}`.
+// object as its credit before, with c = that credit (economy.js creditRezone:
+// a rezone that moved the district over the build bar): `More ${NOUN[c.use],
+// lower case} wanted in the ${name} district for the new ${CREDIT_NOUN[c.source]}`.
+// 6. When the service the books shut after is set and is not the same object as
+// the one before, with s = that service (budget.js lastShut): `${the service's
+// name} at ${address(s.x, s.z)} ${SHUT_WHY}`; and the same for the one they
+// brought back, with b = after.back, `${the service's name} at ${address(b.x,
+// b.z)} ${BACK_WHY}`.
 export function newsBetween(before, after, city) {
   const lines = [];
   const { districts } = city.economy;
@@ -115,6 +137,14 @@ export function newsBetween(before, after, city) {
     const noun = NOUN[c.use].toLowerCase();
     lines.push(`More ${noun} wanted in the ${d.name} district for the new ${CREDIT_NOUN[c.source]}`);
   });
+  const s = after.shut;
+  if (s != null && s !== before.shut) {
+    lines.push(`${serviceName(s.type)} at ${address(s.x, s.z)} ${SHUT_WHY}`);
+  }
+  const b = after.back;
+  if (b != null && b !== before.back) {
+    lines.push(`${serviceName(b.type)} at ${address(b.x, b.z)} ${BACK_WHY}`);
+  }
   return lines;
 }
 
