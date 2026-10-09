@@ -143,6 +143,14 @@ const GROUND_SINK = 0.08;     // the base plane's own drop (block.js)
 const GROUND_LATTICE = 2;     // the 700 m plane's vertices sit on 2 (mod 4)
 const GROUND_HEX = 0x14171c;  // the base plane's colour, so the two read as one
 
+// How far the frame reaches past the map's build box. The farmland wraps the
+// town's outline (render/outskirts.js: BAND_GAP past the town's outermost road,
+// then EAST_WIDTH of field, snapped out onto the lattice above), and the build
+// box stops BUILD_MARGIN in — so the band's outer lip had ground under it only
+// up to the frame's edge and the fields ended in air. The band's own reach,
+// less the build margin, rounded up by one lattice step.
+const FIELD_REACH = 16;
+
 // The nearest lattice line at or under `v`, and at or over it.
 const latticeLo = (v) => Math.floor((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
 const latticeHi = (v) => Math.ceil((v - GROUND_LATTICE) / GROUND_STEP) * GROUND_STEP + GROUND_LATTICE;
@@ -165,8 +173,8 @@ function sinkWater(geo, map) {
 
 // The frame as up to four strips around the square the base plane covers.
 function frameRects(bounds) {
-  const x0 = latticeLo(bounds.minX), x1 = latticeHi(bounds.maxX);
-  const z0 = latticeLo(bounds.minZ), z1 = latticeHi(bounds.maxZ);
+  const x0 = latticeLo(bounds.minX - FIELD_REACH), x1 = latticeHi(bounds.maxX + FIELD_REACH);
+  const z0 = latticeLo(bounds.minZ - FIELD_REACH), z1 = latticeHi(bounds.maxZ + FIELD_REACH);
   const hx0 = Math.max(x0, -BASE_PLANE_HALF), hx1 = Math.min(x1, BASE_PLANE_HALF);
   const hz0 = Math.max(z0, -BASE_PLANE_HALF), hz1 = Math.min(z1, BASE_PLANE_HALF);
   if (hx1 <= hx0 || hz1 <= hz0) return [[x0, x1, z0, z1]];
