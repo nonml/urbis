@@ -391,7 +391,7 @@
       ],
       "test": "tests/accept/m5-budget-live.spec.js",
       "commit": "M5.T17b (M5-6): the budget runs in the game",
-      "notes": "Size S. Found 2026-10-09 by the director: M5.T17 landed as a sim module nothing calls. Saves must stay exact (M3.R1). Draws unchanged. Never read or write outside this worktree. If you must touch a file not listed, stop and say so. Retry 2026-10-09: the first try lost its model mid-task (free endpoint unavailable). Its save.js, probe.js and spec edits are in ../urbis-parked/M5.T17b-retry.patch: git apply it first. Still missing: the src/main.js hookup (create on city.economy.budget, tick in the fixed step)."
+      "notes": "Size S. Found 2026-10-09 by the director: M5.T17 landed as a sim module nothing calls. Saves must stay exact (M3.R1). Draws unchanged. Never read or write outside this worktree. If you must touch a file not listed, stop and say so. Retry 2026-10-09: the first try lost its model mid-task (free endpoint unavailable). Its save.js, probe.js and spec edits are in .scratch/M5.T17b-retry.patch: git apply it first. Still missing: the src/main.js hookup (create on city.economy.budget, tick in the fixed step)."
     },
     {
       "id": "M5.T18",
@@ -590,7 +590,7 @@
         "M4.T11"
       ],
       "commit": "M5.T28 (M5-11): pollution",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-11: **Pollution:** A/B, a works lot grown to HIGH: a home lot 40 m from it grows slower and has a lower land value than in B; a home lot 200 m away is within 1% of B *(provisional)*; the news names the cause; a busy road (its edge load in M3's commute flow) makes noise that does the same (checked by `tests/accept/m5-pollution.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-11: **Pollution:** A/B, a works lot grown to HIGH: a home lot 40 m from it grows slower and has a lower land value than in B; a home lot 200 m away is within 1% of B *(provisional)*; the news names the cause; a busy road (its edge load in M3's commute flow) makes noise that does the same (checked by `tests/accept/m5-pollution.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Retry 2026-10-09: the first try stalled running a long grid search and retuning economy constants (MARKET_LAG_SECS) to make the A/B pass. Never change existing economy constants and never run a sweep longer than 2 minutes. Its pollution.js and test are in .scratch/M5.T28-retry.patch (git apply it, if present). If the pollution effect is lost in the economy's own noise on the A/B, stop and ask the director with the numbers.",
       "test": "tests/accept/m5-pollution.test.js"
     },
     {
