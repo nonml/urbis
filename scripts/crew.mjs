@@ -45,7 +45,14 @@ const TIERS = (process.env.CREW_TIERS
   ?? 'opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
 // Muse Spark's thinking levels top out at xhigh, Step 5's at high.
-const variantOf = (model) => (model.includes('deepseek') ? { variant: 'max' }
+// ../.urbis-effort.json ({ "lane": "medium" }) overrides one lane's effort, read on
+// every send, so an A/B between lanes needs no restart.
+const EFFORT = path.join(ROOT, '..', '.urbis-effort.json');
+const laneEffort = (lane) => {
+  try { return JSON.parse(fs.readFileSync(EFFORT, 'utf8'))[lane]; } catch { return undefined; }
+};
+const variantOf = (model, lane) => (laneEffort(lane) ? { variant: laneEffort(lane) }
+  : model.includes('deepseek') ? { variant: 'max' }
   : model.includes('muse') ? { variant: 'xhigh' }
   : model.includes('step-5') ? { variant: 'high' } : {});
 // Asset bakes (trellis) idle far longer than a code turn: CREW_STALL_MIN raises the cap.
@@ -210,7 +217,7 @@ async function send(w, text) {
     // A session carried over from the lane's last task (assign) may be gone with
     // its server; then the task starts a new one.
     try {
-      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
+      await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model, w.name) });
       w.lastSent = Date.now();
       return;
     } catch {
@@ -218,7 +225,7 @@ async function send(w, text) {
     }
   }
   w.session = (await c.createSession({ title: `crew ${w.name}` })).id;
-  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model) });
+  await c.sendPromptAsync(w.session, text, { agent: 'build', model: w.model, ...variantOf(w.model, w.name) });
   w.lastSent = Date.now();
 }
 
