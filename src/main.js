@@ -21,6 +21,9 @@ import { createHackables, syncHackables, aimTarget } from './sim/hackables.js';
 import { createPeople, tickPeople } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
+// On its own line, not folded into the one above: news-wire.spec.js greps that
+// import verbatim.
+import { pushNews } from './sim/news.js';
 import { chaseIn } from './sim/economy.js';
 import { STREET, createInterior, tickInterior, useDoor, occupiedParcel } from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
@@ -36,6 +39,7 @@ import { buildNews, showNews } from './render/news.js';
 import { createCityView, tickCityView, cityKey, easeLift } from './sim/cityview.js';
 import { createArc, tickArc } from './sim/arc.js';
 import { buildHistoryPanel } from './ui/history.js';
+import { placeHudPanels } from './ui/hudlayout.js';
 
 const DRAW_BUDGET = 175;
 // Fields a keypress typed into is text, never a command (game/input.js isTyping).
@@ -130,6 +134,19 @@ const input = bindInput({
 });
 applySpawn(player, cam, restored ? null : query.get('spawn'));
 const DARK = hudCtx.dark;
+
+// The help line's look token (M4.R1): a bare mouse under the pointer lock names
+// what looks on the street, the drag names what looks in the overview. The rest
+// of the line stays in index.html; only this token follows the view.
+const HINT_LOOK = { street: 'mouse · look', city: 'drag · look' };
+const hintLine = document.getElementById('hint');
+let hintView = null;
+function syncHintLine() {
+  const view = cityView.mode === 'city' ? 'city' : 'street';
+  if (!hintLine || hintView === view) return;
+  hintView = view;
+  hintLine.textContent = hintLine.textContent.replace(/(?:mouse|drag) · look/, HINT_LOOK[view]);
+}
 
 // O cycles the planner's overlays (M5.T20/M5.T21). The action table in
 // game/input.js is the key bindings' own list and no binding names the overlay
@@ -243,6 +260,10 @@ bindProbe({
 // here so a check compares the painted pixels with the live rows. The base
 // probe's economy() is the district report, which does not hold them.
 window.__game.history = () => city.economy.history;
+// The news feed's own push (M5.R1), capture-only like the rest of the probes
+// that move the world: a check makes the city repeat a line and reads the feed
+// fold it into one line with a count.
+if (CAPTURE) window.__game.pushNews = (text) => pushNews(news, text, street.time);
 const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
 const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
 
@@ -356,6 +377,7 @@ function render() {
   // on the same eased lift the camera blends by.
   overlayRig.frame(easeLift(cityView.lift));
   input.cityUi.update();
+  syncHintLine();
   // The city's history panel (M5.T32b): the overview's own, painted from the
   // live economy every frame it is open, and put away the moment it closes.
   if (historyPanel.open) {
@@ -377,5 +399,8 @@ function render() {
   tickHud(hud, hudCtx, {
     draws: lastDraws, tris: (renderer.info.render.triangles / 1e6).toFixed(2), dt, driving,
   });
+  // The HUD's corners (M5.R1): which column each panel stands in, laid out
+  // after tickHud has stacked the bottom-left ones upward.
+  placeHudPanels(hud, historyPanel);
 }
 render();

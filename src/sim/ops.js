@@ -12,8 +12,8 @@
 // An op is pure logic on the map (law 5) and deterministic given its state, so
 // the save's op log (M3.T38) replays.
 import {
-  STAGE, STAGES, USES, USE_BY_KIND, buildingParcel, buildBounds, edgesIn, frontageRoadOn,
-  landBounds, markBridges, markDirty, parcelsIn, projectOnSegment,
+  STAGE, STAGES, USES, USE_BY_KIND, BUILD_MARGIN, buildingParcel, edgesIn, frontageRoadOn,
+  graphBounds, markBridges, markDirty, parcelsIn, projectOnSegment,
 } from './map.js';
 import { regrade, reverseGround, waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
@@ -653,8 +653,12 @@ function roadEdit(map, box, change, flats = null) {
   // is clamped to the exact box of the roads, so a road that leaves the old box
   // hands the car its whole length, and the city view pans the build margin.
   if (driveBefore) {
-    Object.assign(map.district.drive, landBounds(map));
-    Object.assign(map.bounds, buildBounds(map));
+    const land = graphBounds(map.graph);
+    Object.assign(map.district.drive, land);
+    Object.assign(map.bounds, {
+      minX: land.minX - BUILD_MARGIN, maxX: land.maxX + BUILD_MARGIN,
+      minZ: land.minZ - BUILD_MARGIN, maxZ: land.maxZ + BUILD_MARGIN,
+    });
   }
   map.version = version + 1;
   markDirty(map, box);

@@ -365,6 +365,20 @@
       "commit": "M4.T18 (M4-5, M4-8): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
       "test": "tests/accept/m4-local.test.js"
+    },
+    {
+      "id": "M4.R1",
+      "lane": "input",
+      "goal": "Mouse look like GTA and Watch Dogs on PC. Today the camera turns only while the mouse is dragged (src/game/input.js pointerdown/pointermove). In the street view, on foot and in a car: a click on the canvas takes pointer lock (canvas.requestPointerLock()), and while the canvas holds it every mousemove turns the camera by movementX/movementY through the same look(dx, dy) the drag uses, with no button held. Esc releases the lock (the browser does this) and the pause menu opens as Esc already does. The mouse never steers the car: A/D steer, the mouse only moves the camera. The city view keeps click-and-drag exactly as now and never takes the lock; switching to it releases the lock. Update the HUD help line from `drag · look` to `mouse · look` in the street view. Write tests/accept/m4-mouselook.spec.js first: boot the built game (&gen=1&seed=7); fake the lock with Object.defineProperty(document, 'pointerLockElement', { get: () => canvas, configurable: true }) and fire document pointerlockchange; dispatch mousemove events with movementX 200 and no button and check the camera yaw (via __game) changed, on foot and after F into a car; check the car's heading did not change from the mouse alone; in the city view check a buttonless mousemove does not move its camera.",
+      "files": [
+        "src/game/input.js",
+        "src/main.js",
+        "src/game/probe.js",
+        "tests/accept/m4-mouselook.spec.js"
+      ],
+      "test": "tests/accept/m4-mouselook.spec.js",
+      "commit": "M4.R1 (M4): mouse look with pointer lock in the street view",
+      "notes": "Size S: at most 80 changed lines outside the spec. Gamepad look (PAD_LOOK_PX) stays as it is. If __game has no reading of the camera yaw, add one line to the probe beside the others and list it in your final message."
     }
   ]
 }
