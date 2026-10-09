@@ -1,9 +1,14 @@
 // Save and continue: a running game as plain data (law 5). The state schema is
 // version 2 (the people and the hour); M3.T38 adds the op log, and with it the
-// version-3 save format, marked by `format`. deserialize() rebuilds the map
-// from the seed, replays the log and lays the snapshot over it, so a save holds
-// the edits and not just the lots. A save this thin cannot resurrect a stale
-// derived value: heights, floors and demand are recomputed on the first tick.
+// format-3 save file, marked by `format`. M5.T22 is format 4: the city's books
+// (money and the tax rates) and what the player builds that the log does not
+// replay — the caps they paint and the services they place. A format-3 save is
+// this same schema and continues, on the default treasury, the opening rates,
+// and the seed's own caps with none placed.
+// deserialize() rebuilds the map from the seed, replays the log and lays the
+// snapshot over it, so a save holds the edits and not just the lots. A save this
+// thin cannot resurrect a stale derived value: heights, floors and demand are
+// recomputed on the first tick.
 //
 // The log is compacted at save time — a run of zone edits on one parcel is one
 // decision, not fifty — and the shorter log is kept only when a replay on the
@@ -28,7 +33,10 @@ import { heightAt } from './world.js';
 import { createCity, STAGE, USES } from './zoning.js';
 
 export const SAVE_VERSION = 2;
-export const SAVE_FORMAT = 3;
+export const SAVE_FORMAT = 4;
+// The format one release back: an op log with no books in it. Same state
+// schema, so it continues rather than starts over (M5.T22).
+const COMPAT_FORMAT = 3;
 
 // ---------------------------------------------------------------------------
 // The op log. Every edit the player makes is one plain descriptor, applied
@@ -229,6 +237,7 @@ function snapshotStreet(street) {
 
 function snapshotParcel(p) {
   const s = {
+    kind: p.kind,
     use: p.use, zoned: p.zoned, painted: p.painted, stage: p.stage, progress: p.progress,
     building: p.building, why: p.why, vacancy: p.vacancy,
   };
@@ -236,6 +245,18 @@ function snapshotParcel(p) {
   // (map.js buildingParcel). Only a trend the sim set travels; a parcel that
   // has none keeps the replay's own, so the loaded map stays exact.
   if (typeof p.trend === 'string') s.trend = p.trend;
+  // A service is a building the player placed on an empty lot (M5.T11), not an
+  // op the log replays: its kind, its type and the storeys it stands are its
+  // own, and the books can shut it without taking it down (budget.js).
+  if (p.kind === 'service') {
+    s.type = p.type;
+    s.heights = [...p.heights];
+    if (p.shut) s.shut = true;
+  }
+  // A cap the player painted (M5.T8). The seed's lots and the map's buildings
+  // open uncapped, so only a painted one travels: a format-3 save, which has
+  // none, keeps the heights the replay gave it.
+  if (p.cap !== undefined && p.cap !== STAGE.HIGH) s.cap = p.cap;
   return s;
 }
 
@@ -243,6 +264,18 @@ function snapshotDistrict(d) {
   return {
     firms: { ...d.firms }, wealth: d.wealth, nextMove: d.nextMove,
     demand: { ...d.demand }, last: d.last && { ...d.last },
+  };
+}
+
+// The books as plain data. What is not plain is the map they measure, held
+// weakly in budget.js: the save carries the arithmetic, never the world.
+function snapshotBudget(b) {
+  if (!b) return null;
+  return {
+    time: b.time, due: b.due, money: b.money, tax: { ...b.tax },
+    income: b.income, upkeep: b.upkeep,
+    debt: b.debt, wasDebt: b.wasDebt, closed: b.closed, since: b.since,
+    lastShut: b.lastShut && { ...b.lastShut }, lastBack: b.lastBack && { ...b.lastBack },
   };
 }
 
@@ -260,6 +293,9 @@ function snapshotCity(city) {
       // different rolls than the run it interrupted, and the districts drift.
       rand: city.economy.rand.dump(),
       districts: city.economy.districts.map(snapshotDistrict),
+      // The city's books (M5.T17): the money, the tax rates and what the last
+      // game minute cost, so a continued city is not handed a fresh treasury.
+      budget: snapshotBudget(city.economy.budget),
     },
   };
 }
@@ -319,7 +355,7 @@ const isPlain = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
 function isSnapshot(s) {
   return isPlain(s)
     && s.version === SAVE_VERSION
-    && s.format === SAVE_FORMAT
+    && (s.format === SAVE_FORMAT || s.format === COMPAT_FORMAT)
     && Number.isInteger(s.seed) && s.seed > 0 && s.seed < 2 ** 31
     && typeof s.generate === 'boolean'
     && Number.isInteger(s.mapVersion) && s.mapVersion >= 0
@@ -400,6 +436,7 @@ function applyStreet(street, s) {
 }
 
 function applyParcel(p, s) {
+  if (s.kind !== undefined) p.kind = str(s.kind);
   const use = s.use === null ? null : str(s.use);
   const zoned = s.zoned === null ? null : str(s.zoned);
   if ((use !== null && !USES.includes(use)) || (zoned !== null && !USES.includes(zoned))) {
@@ -415,6 +452,36 @@ function applyParcel(p, s) {
   if (s.trend !== undefined) p.trend = str(s.trend);
   p.why = s.why === null ? null : str(s.why);
   p.vacancy = num(s.vacancy);
+  // A service keeps what the replay's lot never had: its type, the storeys it
+  // stands at (zoning.js makes a service every stage the same height) and
+  // whether the red has closed its doors.
+  if (s.kind === 'service') {
+    p.type = str(s.type);
+    if (Array.isArray(s.heights) && s.heights.length === p.heights.length) p.heights = s.heights.map(num);
+    if (s.shut === true) p.shut = true;
+  }
+  // A painted cap, and only that: no field is the seed's own HIGH, so a
+  // format-3 save leaves every parcel at the height the replay gave it.
+  if (s.cap !== undefined) {
+    if (!Number.isInteger(s.cap) || s.cap < 0 || s.cap > STAGE.HIGH) throw new Error('save: bad cap');
+    p.cap = s.cap;
+  }
+}
+
+function applyBudget(budget, s) {
+  budget.time = num(s.time);
+  budget.due = num(s.due);
+  budget.money = num(s.money);
+  budget.tax = { res: num(s.tax?.res), com: num(s.tax?.com), ind: num(s.tax?.ind) };
+  budget.income = num(s.income);
+  budget.upkeep = num(s.upkeep);
+  budget.debt = bool(s.debt);
+  budget.wasDebt = bool(s.wasDebt);
+  budget.closed = num(s.closed);
+  budget.since = num(s.since);
+  budget.lastShut = s.lastShut === null ? null : { ...s.lastShut };
+  budget.lastBack = s.lastBack === null ? null : { ...s.lastBack };
+  return budget;
 }
 
 function applyDistrict(d, s) {
@@ -440,6 +507,13 @@ function applyCity(city, s) {
   city.economy.time = num(s.economy.time);
   city.economy.rand.load(num(s.economy.rand));
   city.economy.districts.forEach((d, i) => applyDistrict(d, s.economy.districts[i]));
+  // The books come back on the live budget object — the economy and the panel
+  // hold that reference, not this one. A format-3 save has none, and the city
+  // opens on the treasury and the rates a new one gets.
+  if (s.economy.budget !== undefined) {
+    if (!isPlain(s.economy.budget)) throw new Error('save: budget');
+    applyBudget(city.economy.budget, s.economy.budget);
+  }
   return city;
 }
 
@@ -533,11 +607,13 @@ export function takeNotice() {
 export function deserialize(data) {
   try {
     const saved = typeof data === 'string' ? JSON.parse(data) : data;
-    // A save from before this format: its version is lower, or it is the same
-    // state schema without the op log the format-3 save carries.
+    // A save from before this format: its version is lower, or it predates the
+    // op log — the state schema without the `format` the file carries since
+    // version 3. A format-3 save is this schema with an older file and keeps
+    // playing, on defaults for what it never wrote (M5.T22).
     if (isPlain(saved) && Number.isInteger(saved.version) && saved.version > 0
       && (saved.version < SAVE_VERSION
-        || (saved.version === SAVE_VERSION && saved.format !== SAVE_FORMAT))) {
+        || (saved.version === SAVE_VERSION && saved.format === undefined))) {
       notice = `Save version ${saved.version} is from an older release — a new city has started.`;
       return null;
     }
