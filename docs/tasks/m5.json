@@ -616,12 +616,13 @@
       "needs": [
         "M5.T29"
       ],
-      "goal": "Make the pollution overlay reachable. M5.T29 (0064454) taught src/render/overlays.js to shade pollution, but `pollution` is not in OVERLAYS in src/sim/cityview.js, so the O key never reaches it and the code is dead. Add { id: 'pollution', name: 'pollution' } to OVERLAYS right after traffic. In tests/accept/m5-overlays.spec.js: add 'pollution' to the ring the first test expects, and add a test that on 5 sampled lots overlayValue('pollution', ...) equals pollutionOf(parcel, city, street) from src/sim/pollution.js, and that at least one of seed 7's lots reads above 0 (a works lot smokes).",
+      "goal": "Make the pollution overlay reachable. M5.T29 (0064454) taught src/render/overlays.js to shade pollution, but `pollution` is not in OVERLAYS in src/sim/cityview.js, so the O key never reaches it. Add { id: 'pollution', name: 'pollution' } to OVERLAYS right after traffic, and add 'pollution' after 'traffic' in the ring the first test of tests/accept/m5-overlays.spec.js expects (that one line only). Write tests/accept/m5-pollution-overlay.spec.js: pressing O from off reaches pollution in the ring, on 5 sampled lots overlayValue('pollution', ...) equals pollutionOf(parcel, city, street) from src/sim/pollution.js, and at least one of seed 7's lots reads above 0.",
       "files": [
         "src/sim/cityview.js",
-        "tests/accept/m5-overlays.spec.js"
+        "tests/accept/m5-overlays.spec.js",
+        "tests/accept/m5-pollution-overlay.spec.js"
       ],
-      "test": "tests/accept/m5-overlays.spec.js",
+      "test": "tests/accept/m5-pollution-overlay.spec.js",
       "commit": "M5.T29b (M5-8): pollution overlay in the O ring, with its check",
       "notes": "Size S: at most 60 changed lines. Do not touch src/render/overlays.js; it is done. If any other test lists the ring (grep for 'traffic' next to 'value' in tests/), stop and say which, do not edit it."
     },
