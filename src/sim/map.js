@@ -67,35 +67,10 @@ function spans(lo, hi, v) {
   return v >= lo && v <= hi;
 }
 
-// The longest stretch of road one edge may carry. An edge is the stretch a
-// car's lane, its stop line and its route are measured over, and the town's
-// grid leaves stretches of 580 m with a junction only at each end, where none
-// of that resolves. MAX_SPAN is 160 m, about the scale the plan's own grid is
-// laid at — its avenues cut at 91 m and 109 m — and VMAX (sim/traffic.js,
-// 13.5 m/s) covers it in just under 12 s, so a car is never more than a few
-// seconds from the junction its follow law and its signals drive to.
-const MAX_SPAN = 160;
-
-// A span plus every crossing value strictly inside it, in order, plus a cut
-// every MAX_SPAN metres inside any stretch left longer than that. Two ways
-// sharing a value — a district avenue on an arterial, or a span closed to a
-// point — cuts the same node twice, and a duplicate node would give an edge
-// from it to itself: zero length, no lane, NaN wherever it is measured. `keep`
-// refuses a cut, so a road is never cut over the water: a bridge is one piece
-// bank to bank (M4.T7) and a node in the river has no road to stand on.
-function cutPoints(from, to, crossings, keep = () => true) {
+// A span plus every crossing value strictly inside it, in order.
+function cutPoints(from, to, crossings) {
   const inside = crossings.filter((v) => v > from && v < to).sort((p, q) => p - q);
-  const points = [from, ...inside, to].filter((v, i, all) => i === 0 || v !== all[i - 1]);
-  const cuts = [];
-  for (let i = 1; i < points.length; i++) {
-    const step = points[i] >= points[i - 1] ? 1 : -1;
-    for (let d = MAX_SPAN; d < Math.abs(points[i] - points[i - 1]); d += MAX_SPAN) {
-      const v = points[i - 1] + step * d;
-      if (keep(v)) cuts.push(v);
-    }
-  }
-  return [...points, ...cuts].sort((p, q) => p - q)
-    .filter((v, i, all) => i === 0 || v !== all[i - 1]);
+  return [from, ...inside, to];
 }
 
 function ensureNode(nodes, x, z) {
@@ -132,7 +107,7 @@ function districtsGraph(cells, town, district) {
     id: 'town',
     avenues: [...district.avenues, ...cells.flatMap((d) => d.avenues), ...town.arterials.avenues],
     crossings: [...district.crossings, ...cells.flatMap((d) => d.crossings), ...town.arterials.crossings],
-  }, town.river?.rects ?? []);
+  });
   const own = new Set([...district.avenues, ...district.crossings].map((w) => w.id));
   graph.edges = [
     ...graph.edges.filter((e) => own.has(e.way)),
@@ -176,23 +151,19 @@ export function markBridges(graph, water) {
 }
 
 // Every avenue cut where a crossing meets it, every crossing cut where an
-// avenue meets it, and both cut again every MAX_SPAN metres inside a stretch
-// left longer than that. `water` is the town's own [cx, cz, hw, hd] rects: no
-// cut is made over one, so a bridge keeps one piece bank to bank.
-function buildGraph(district, water = []) {
-  const wet = (x, z) => water.some(([cx, cz, hw, hd]) =>
-    x > cx - hw && x < cx + hw && z > cz - hd && z < cz + hd);
+// avenue meets it, as nodes and edges.
+function buildGraph(district) {
   const byId = new Map();
   const edges = [];
   for (const av of district.avenues) {
     const met = district.crossings.filter((c) => spans(c.x0, c.x1, av.x)).map((c) => c.z);
     addChain(byId, edges, district, av, 'avenue', 'z',
-      cutPoints(av.z0, av.z1, met, (z) => !wet(av.x, z)).map((z) => [av.x, z]));
+      cutPoints(av.z0, av.z1, met).map((z) => [av.x, z]));
   }
   for (const cr of district.crossings) {
     const met = district.avenues.filter((a) => spans(a.z0, a.z1, cr.z)).map((a) => a.x);
     addChain(byId, edges, district, cr, 'connector', 'x',
-      cutPoints(cr.x0, cr.x1, met, (x) => !wet(x, cr.z)).map((x) => [x, cr.z]));
+      cutPoints(cr.x0, cr.x1, met).map((x) => [x, cr.z]));
   }
   return { nodes: [...byId.values()], edges };
 }
