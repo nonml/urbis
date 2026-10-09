@@ -274,14 +274,14 @@
     {
       "id": "M3.R5",
       "lane": "traffic",
-      "goal": "tests/map.test.js is green. 10 of its tests fail on main because its liveMap helper reads a child process stdout that is cut off at 65,536 bytes, so the JSON it parses is truncated. Make liveMap read the whole output (e.g. write the JSON to a file under .scratch/ in the child and read the file, or use execFileSync with a large maxBuffer and no pipe truncation). Do not change what the tests check. Run: GATE_FULL=1 npx playwright test tests/map.test.js.",
+      "goal": "tests/map.test.js is green. 10 of its tests fail on main because its liveMap helper reads a child process stdout that is cut off at 65,536 bytes, so the JSON it parses is truncated. Make liveMap read the whole output (e.g. write the JSON to a file under .scratch/ in the child and read the file, or use execFileSync with a large maxBuffer and no pipe truncation). You may change only the liveMap helper and the --worker branch of tests/map.test.js, never an expect or a seed list. Done when GATE_FULL=1 npx playwright test tests/map.test.js is all green; the crew checks golden.test.js, the director runs map.test.js on landing. Run: GATE_FULL=1 npx playwright test tests/map.test.js.",
       "files": [
         "tests/map.test.js"
       ],
       "needs": [
         "M3.R4"
       ],
-      "test": "tests/map.test.js",
+      "test": "tests/golden.test.js",
       "commit": "M3.R5 (M3-6): map tests read the whole map",
       "notes": "Size S. Found 2026-10-09 by the M3.R4 worker. Never read or write outside this worktree."
     },
