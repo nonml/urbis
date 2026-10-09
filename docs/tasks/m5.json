@@ -532,7 +532,8 @@
       "files": [
         "src/sim/cityview.js",
         "src/ui/cityview.js",
-        "src/render/roads.js"
+        "src/render/roads.js",
+        "tests/accept/m5-t25.spec.js"
       ],
       "needs": [
         "M5.T24",
@@ -541,7 +542,8 @@
         "M5.T11"
       ],
       "commit": "M5.T25 (M5-10): road types in the tool, and drawn",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-10: **Road types:** the player lays a 2-lane street, a 4-lane avenue and a one-way, and upgrades a street to an avenue in place for the difference in cost; A/B in M3's traffic: at the same lights, an avenue carries at least 1.8 times *(provisional: twice the lanes, less what the junction's turns take)* the cars of a street through one junction in the evening rush hour (checked by `tests/accept/m5-roadtypes.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-10: **Road types:** the player lays a 2-lane street, a 4-lane avenue and a one-way, and upgrades a street to an avenue in place for the difference in cost; A/B in M3's traffic: at the same lights, an avenue carries at least 1.8 times *(provisional: twice the lanes, less what the junction's turns take)* the cars of a street through one junction in the evening rush hour (checked by `tests/accept/m5-roadtypes.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Your check: write tests/accept/m5-t25.spec.js first, with @playwright/test. It must fail on main before your change (run it once and see it fail) and pass after; it must reach the feature the way a player does (the key, the sim call the frame loop makes), not only call your new function, so code nothing calls cannot pass it.",
+      "test": "tests/accept/m5-t25.spec.js"
     },
     {
       "id": "M5.T26",
@@ -549,7 +551,8 @@
       "goal": "Undo. Ctrl+Z in the city view undoes the last act within 10 game seconds through M3's undo, and refunds its cost",
       "files": [
         "src/sim/cityview.js",
-        "src/game/input.js"
+        "src/game/input.js",
+        "tests/accept/m5-t26.spec.js"
       ],
       "needs": [
         "M5.T19",
@@ -560,7 +563,8 @@
         "M5.T25"
       ],
       "commit": "M5.T26 (M5-7): undo",
-      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-7: Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down (checked by `tests/accept/m5-cost.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-7: Before anything is placed or bulldozed, the city view shows its cost, and it refuses what the budget cannot pay, saying why; Ctrl+Z within 10 game seconds of an act undoes it and refunds its cost in full; hovering a tool names what it does and its cost, and a right click or Esc puts the tool down (checked by `tests/accept/m5-cost.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Your check: write tests/accept/m5-t26.spec.js first, with @playwright/test. It must fail on main before your change (run it once and see it fail) and pass after; it must reach the feature the way a player does (the key, the sim call the frame loop makes), not only call your new function, so code nothing calls cannot pass it.",
+      "test": "tests/accept/m5-t26.spec.js"
     },
     {
       "id": "M5.T27",
@@ -746,7 +750,8 @@
       "lane": "build-ui",
       "goal": "Close. The sweep of the city view and the street at every new road, gap and service; one commit per defect; the M5 keys' hints (M7.T12)",
       "files": [
-        "content/hints.json"
+        "content/hints.json",
+        "tests/accept/m5-t36.spec.js"
       ],
       "needs": [
         "M5.T1",
@@ -790,7 +795,8 @@
         "M5.T9"
       ],
       "commit": "M5.T36 (M5-13): close",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-13: The sweep of the city view and the street at every new road, bulldozed gap and service has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-13: The sweep of the city view and the street at every new road, bulldozed gap and service has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Your check: write tests/accept/m5-t36.spec.js first, with @playwright/test. It must fail on main before your change (run it once and see it fail) and pass after; it must reach the feature the way a player does (the key, the sim call the frame loop makes), not only call your new function, so code nothing calls cannot pass it.",
+      "test": "tests/accept/m5-t36.spec.js"
     }
   ]
 }
