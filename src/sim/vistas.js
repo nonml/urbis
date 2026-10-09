@@ -8,6 +8,7 @@
 // is the hand map's fallback until M3.T14 deletes it (M3-2).
 import { DISTRICTS } from './world.js';
 import { worldSeed } from './seedstore.js';
+import { waterBlocked } from './terrain.js';
 import { mulberry32 } from './rng.js';
 
 // Its own random stream, so a vista never moves a lot or a row building.
@@ -125,11 +126,16 @@ export function planVistas(district, seed) {
 // buildings, and its ring derives from the map's own district and seed; a map
 // without buildings is the hand preset, whose renderer keeps its own tables.
 // With no map the booted world's WORLD_VISTAS stands, so today's callers are
-// unchanged until M3.T13's renderer passes the map (M3-2).
+// unchanged until M3.T13's renderer passes the map (M3-2). A ring tower the
+// map's water reaches is left out: only bridges cross the river (M4-2).
 export function vistasOf(map) {
   if (!map) return WORLD_VISTAS;
   if (!map.buildings) return null;
-  return { caps: map.buildings.filter((b) => b.kind === 'cap'), ring: ringFor(map.district, map.seed) };
+  const water = map.water ?? [];
+  return {
+    caps: map.buildings.filter((b) => b.kind === 'cap'),
+    ring: ringFor(map.district, map.seed).filter((t) => !waterBlocked(water, t.x, t.z, t.w, t.d)),
+  };
 }
 
 export const WORLD_VISTAS = worldSeed().generate ? planVistas(DISTRICTS[0], worldSeed().seed) : null;

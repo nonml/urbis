@@ -13,7 +13,8 @@
 // Pure sim (law 5): no three.js, no DOM.
 import { DISTRICTS, ROAD_HALF_WIDTH, WALKWAY_WIDTH, buildable } from './world.js';
 import { worldSeed } from './seedstore.js';
-import { BUILD_LINE, PINNED_TOWERS, pinnedBuildings } from './landmarks.js';
+import { BUILD_LINE, PINNED_TOWERS, pinnedBuildings, riverWater } from './landmarks.js';
+import { waterBlocked } from './terrain.js';
 import { capsFor } from './vistas.js';
 import { mulberry32 } from './rng.js';
 
@@ -59,12 +60,23 @@ export function rowDepth(district, ax, side) {
   return Math.min(max, fair);
 }
 
+// The z bands the river takes from a row whose x band is [x0, x1] (M4-2): each
+// water rect the band reaches. Only bridges cross water, so a row, a lot and a
+// building cut from one never stand in it. The 8 m setback terrain.buildable
+// adds is the world rule for the map's lots (map.js); a row runs to the bank,
+// or the river would leave too little frontage for the lots a district offers.
+function waterHoles(water, x0, x1) {
+  return water
+    .filter(([cx, , hw]) => x0 < cx + hw && x1 > cx - hw)
+    .map(([, cz, , hd]) => [cz - hd, cz + hd]);
+}
+
 // Where a row may stand on one avenue side, as sorted [z0, z1] runs: the
 // avenue's length less ROW_END_GAP at each end, less every crossing that comes
 // within ROW_END_GAP of the row's band (x from the building line back by
-// rowDepth), cut ROW_END_GAP wider than its CROSSING_BAND. Runs shorter than
-// MIN_RUN are dropped.
-export function rowRuns(district, ax, side) {
+// rowDepth), cut ROW_END_GAP wider than its CROSSING_BAND, less the `water`
+// (map.water). Runs shorter than MIN_RUN are dropped.
+export function rowRuns(district, ax, side, water = []) {
   const depth = rowDepth(district, ax, side);
   const near = ax + side * BUILD_LINE;
   const far = ax + side * (BUILD_LINE + depth);
@@ -85,7 +97,7 @@ export function rowRuns(district, ax, side) {
     cursor = Math.max(cursor, cz1);
   }
   if (end - cursor >= MIN_RUN) runs.push([cursor, end]);
-  return runs;
+  return subtractRuns(runs, waterHoles(water, bx0, bx1)).filter(([z0, z1]) => z1 - z0 >= MIN_RUN);
 }
 
 const EPS = 1e-6;
@@ -171,17 +183,35 @@ function placeLot(sides, [w0, w1], rand) {
   return { lot, ax, side, depth };
 }
 
+// The fewest-gaps fill: every side's shortest lots laid end to end from its low
+// end, until `count` stand. A random pass wastes frontage; where the river has
+// taken half of it, the district would fall under LOTS_MIN lots without this.
+function packLots(sides, lo, hi, count) {
+  const picked = [];
+  for (const side of sides) {
+    side.placed = [];
+    for (let ranges = lotRanges(side, LOT_FRONT[0], lo, hi); ranges.length && picked.length < count;
+      ranges = lotRanges(side, LOT_FRONT[0], lo, hi)) {
+      const z = ranges[0][0];
+      side.placed.push({ z, d: LOT_FRONT[0] });
+      picked.push({ lot: [side.ax + side.side * (BUILD_LINE + side.depth / 2), z, side.depth, LOT_FRONT[0]],
+        ax: side.ax, side: side.side, depth: side.depth });
+    }
+  }
+  return picked;
+}
+
 // One pass over every avenue side: the side's free z runs, then one lot per
 // band so the lots spread across the district. A band with no room on any side
 // falls back to anywhere in the drive. Tagged with avenue and side for planLayout.
-function districtLots(district, seed, pinned) {
+function districtLots(district, seed, pinned, water) {
   const rand = mulberry32(seed);
   const lo = district.drive.minZ;
   const hi = district.drive.maxZ;
   const count = LOTS_MIN + Math.floor(rand() * (LOTS_MAX - LOTS_MIN + 1));
   const sides = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const depth = rowDepth(district, a.x, side);
-    const runs = subtractRuns(rowRuns(district, a.x, side), pinsOn(district, a.x, side, pinned))
+    const runs = subtractRuns(rowRuns(district, a.x, side, water), pinsOn(district, a.x, side, pinned))
       .map(([f0, f1]) => [Math.max(f0, lo), Math.min(f1, hi)])
       .filter(([f0, f1]) => f1 - f0 > EPS);
     return { ax: a.x, side, depth, runs, placed: [] };
@@ -191,7 +221,7 @@ function districtLots(district, seed, pinned) {
     const spot = placeLot(sides, band, rand) || placeLot(sides, [lo, hi], rand);
     if (spot) picked.push(spot);
   }
-  return picked;
+  return picked.length >= LOTS_MIN ? picked : packLots(sides, lo, hi, count);
 }
 
 // The district's lots, as [x, z, w, d] like zoning's LOTS: LOTS_MIN..LOTS_MAX of
@@ -199,9 +229,10 @@ function districtLots(district, seed, pinned) {
 // a LOT_FRONT long inside one of that side's rowRuns, wholly inside the
 // district's drive bounds in z, clear of the pinned towers, and never
 // overlapping another lot. The same seed always gives the same lots. `pinned`
-// is the map's own tower table; omitted, the hand map's PINNED_TOWERS.
-export function deriveLots(district, seed, pinned = PINNED_TOWERS) {
-  return districtLots(district, seed, pinned).map((p) => p.lot);
+// is the map's own tower table; omitted, the hand map's PINNED_TOWERS. `water`
+// is the map's water; omitted, the seed's river.
+export function deriveLots(district, seed, pinned = PINNED_TOWERS, water = riverWater(seed)) {
+  return districtLots(district, seed, pinned, water).map((p) => p.lot);
 }
 
 // Everything the street wall and zoning need: { district, seed, lots, rows },
@@ -210,13 +241,15 @@ export function deriveLots(district, seed, pinned = PINNED_TOWERS) {
 // avenue side: rowRuns less each lot widened by LOT_CLEAR and the pinned towers
 // (on the first avenue) widened by PIN_CLEAR, with runs under MIN_RUN dropped.
 // `pinned` is the map's own tower table; omitted, the hand map's PINNED_TOWERS.
-export function planLayout(district, seed, pinned = PINNED_TOWERS) {
-  const picked = districtLots(district, seed, pinned);
+// `water` is the map's water; omitted, the seed's river: no lot or row stands in
+// it (M4-2).
+export function planLayout(district, seed, pinned = PINNED_TOWERS, water = riverWater(seed)) {
+  const picked = districtLots(district, seed, pinned, water);
   const rows = district.avenues.flatMap((a) => [-1, 1].map((side) => {
     const holes = picked.filter((p) => p.ax === a.x && p.side === side)
       .map((p) => [p.lot[1] - p.lot[3] / 2 - LOT_CLEAR, p.lot[1] + p.lot[3] / 2 + LOT_CLEAR])
       .concat(pinsOn(district, a.x, side, pinned));
-    const runs = subtractRuns(rowRuns(district, a.x, side), holes)
+    const runs = subtractRuns(rowRuns(district, a.x, side, water), holes)
       .filter(([z0, z1]) => z1 - z0 >= MIN_RUN - EPS);
     return { ax: a.x, side, depth: rowDepth(district, a.x, side), runs };
   }));
@@ -536,9 +569,12 @@ function rowBuilding(b) {
 // style the district style a use comes from (rows), facade the architecture
 // render/block.js pools, x/z/w/d the footprint, h the height, face the front.
 // `plan` is planLayout's; plan.pinned and plan.caps override the world's own,
-// so a map built for another seed uses that seed's towers and caps.
+// so a map built for another seed uses that seed's towers and caps. A cap the
+// river reaches is left out: an avenue's end may open on the stream.
 export function buildingsOf(plan) {
-  const caps = plan.caps ?? capsFor(plan.district, plan.seed);
+  const water = riverWater(plan.seed);
+  const caps = (plan.caps ?? capsFor(plan.district, plan.seed))
+    .filter((c) => !waterBlocked(water, c.x, c.z, c.w, c.d));
   return [
     ...pinnedBuildings(plan.district, plan.pinned),
     ...planBuildings(plan.district, plan.seed, plan).map(rowBuilding),
