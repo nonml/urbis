@@ -274,16 +274,30 @@
     {
       "id": "M3.R5",
       "lane": "traffic",
-      "goal": "tests/map.test.js is green. 10 of its tests fail on main because its liveMap helper reads a child process stdout that is cut off at 65,536 bytes, so the JSON it parses is truncated. Make liveMap read the whole output (e.g. write the JSON to a file under .scratch/ in the child and read the file, or use execFileSync with a large maxBuffer and no pipe truncation). Do not change what the tests check. Run: GATE_FULL=1 npx playwright test tests/map.test.js.",
+      "goal": "tests/map.test.js is green. 10 of its tests fail on main because its liveMap helper reads a child process stdout that is cut off at 65,536 bytes, so the JSON it parses is truncated. Make liveMap read the whole output (e.g. write the JSON to a file under .scratch/ in the child and read the file, or use execFileSync with a large maxBuffer and no pipe truncation). You may change only the liveMap helper and the --worker branch of tests/map.test.js, never an expect or a seed list. Done when GATE_FULL=1 npx playwright test tests/map.test.js is all green; the crew checks golden.test.js, the director runs map.test.js on landing. Run: GATE_FULL=1 npx playwright test tests/map.test.js.",
       "files": [
         "tests/map.test.js"
       ],
       "needs": [
         "M3.R4"
       ],
-      "test": "tests/map.test.js",
+      "test": "tests/golden.test.js",
       "commit": "M3.R5 (M3-6): map tests read the whole map",
       "notes": "Size S. Found 2026-10-09 by the M3.R4 worker. Never read or write outside this worktree."
+    },
+    {
+      "id": "M3.R6",
+      "lane": "traffic",
+      "needs": [
+        "M3.R5"
+      ],
+      "goal": "createMap(seed) matches the golden again. Since M3.R5 (7587f79) tests/map.test.js reads the whole map, and 6 tests fail for real: the 5 `seed N: createMap reads the golden map` tests and `districtAt names the district`. The golden files are what scripts/map-golden.mjs buildMap(seed) prints (built from the world modules), and tests/golden.test.js passes, so the world modules are right; createMap in src/sim/map.js, or a module only it reads, has drifted from them. First write down, in .scratch/m3-r6.md, which keys differ and why (one line each), then fix the code so createMap(seed) gives the same map. Never regenerate tests/golden/, never edit tests/.",
+      "files": [
+        "src/sim/"
+      ],
+      "test": "tests/map.test.js",
+      "commit": "M3.R6 (M3-6): createMap matches the golden again",
+      "notes": "Size M. If the cause is that a later task deliberately changed what createMap returns (look at git log -p src/sim/map.js), stop and say which commit and why, do not undo it. Run only: GATE_FULL=1 npx playwright test tests/map.test.js tests/golden.test.js."
     },
     {
       "id": "M3.T40",
