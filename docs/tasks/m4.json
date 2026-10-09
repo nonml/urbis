@@ -373,6 +373,7 @@
       "files": [
         "src/game/input.js",
         "src/main.js",
+        "src/game/probe.js",
         "tests/accept/m4-mouselook.spec.js"
       ],
       "test": "tests/accept/m4-mouselook.spec.js",
