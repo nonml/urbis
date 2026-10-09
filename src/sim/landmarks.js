@@ -7,6 +7,15 @@
 // Pure sim (law 5): no three.js, no DOM.
 import { AVENUES, AVENUE_X, CROSSINGS, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 import { worldSeed } from './seedstore.js';
+import { planTown } from './townplan.js';
+import { waterBlocked } from './terrain.js';
+
+// The town's water for a seed, as terrain's [cx, cz, hw, hd] rects: map.water,
+// derived without building the map, so a plan that runs before it (layout,
+// dressing, the pinned towers) keeps off the same river the map carries (M4-2).
+export function riverWater(seed) {
+  return planTown(seed).river.rects;
+}
 
 // Shaft face of every avenue row, metres from the avenue centre-line. The
 // podium stands 0.6 m proud of it, so the shopfronts meet the walkway edge.
@@ -31,14 +40,16 @@ export const PIN_BAND = ROAD_HALF_WIDTH + WALKWAY_WIDTH;
 // footprint (z - d / 2 to z + d / 2) stays PIN_GAP clear of every crossing band
 // (c.z +- PIN_BAND), of the avenue's z0 and z1, and of every tower already
 // placed; otherwise it takes the nearest z on the half-metre grid that does,
-// trying hand z - 0.5, hand z + 0.5, hand z - 1, ... in that order.
+// trying hand z - 0.5, hand z + 0.5, hand z - 1, ... in that order. A tower
+// never stands on water or in its setback (M4.T8c): a z the river reaches is
+// not free.
 // A tower at z clears the span z0..z1 (already widened by whatever gap the
 // caller owes) when its footprint sits entirely outside it.
 function clearOf(t, z, z0, z1) {
   return z + t.d / 2 <= z0 || z - t.d / 2 >= z1;
 }
 
-function isFree(t, z, placed, avenue, crossings) {
+function isFree(t, z, placed, avenue, crossings, water) {
   if (z - t.d / 2 < avenue.z0 + PIN_GAP) return false;
   if (z + t.d / 2 > avenue.z1 - PIN_GAP) return false;
   for (const c of crossings) {
@@ -47,30 +58,32 @@ function isFree(t, z, placed, avenue, crossings) {
   for (const u of placed) {
     if (!clearOf(t, z, u.z - u.d / 2 - PIN_GAP, u.z + u.d / 2 + PIN_GAP)) return false;
   }
-  return true;
+  return !waterBlocked(water, towerCentreX(t, avenue.x), z, t.w, t.d);
 }
 
 // hand z first, then hand z - 0.5, hand z + 0.5, hand z - 1, ... — nearest first.
-function nearestFreeZ(t, placed, avenue, crossings) {
-  if (isFree(t, t.z, placed, avenue, crossings)) return t.z;
+function nearestFreeZ(t, placed, avenue, crossings, water) {
+  if (isFree(t, t.z, placed, avenue, crossings, water)) return t.z;
   const span = avenue.z1 - avenue.z0;
   for (let n = 1; n <= span * 2; n++) {
     const step = Math.ceil(n / 2) * 0.5;
     const z = t.z + (n % 2 === 1 ? -step : step);
-    if (isFree(t, z, placed, avenue, crossings)) return z;
+    if (isFree(t, z, placed, avenue, crossings, water)) return z;
   }
   throw new Error(`landmarks: no free z for ${t.id}`);
 }
 
-export function placePinned(hand, avenue, crossings) {
+export function placePinned(hand, avenue, crossings, water = []) {
   const placed = [];
   for (const t of hand) {
-    placed.push({ ...t, z: nearestFreeZ(t, placed, avenue, crossings) });
+    placed.push({ ...t, z: nearestFreeZ(t, placed, avenue, crossings, water) });
   }
   return placed;
 }
 
-export const PINNED_TOWERS = worldSeed().generate ? placePinned(HAND_PINNED, AVENUES[0], CROSSINGS) : HAND_PINNED;
+export const PINNED_TOWERS = worldSeed().generate
+  ? placePinned(HAND_PINNED, AVENUES[0], CROSSINGS, riverWater(worldSeed().seed))
+  : HAND_PINNED;
 
 // Where a tower's shaft centre stands: out from its avenue centre-line by the
 // building line plus half the shaft width. `ax` lets a generated map use its own.

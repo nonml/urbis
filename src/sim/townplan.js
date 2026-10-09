@@ -39,6 +39,22 @@ const RIVER_OVERHANG = 300;
 const ARTERIAL_MARGIN = 100;
 const ARTERIAL_LANES = 4;
 
+// The town is laid out around the downtown district's own street, whose avenues
+// run z ±DOWNTOWN_SPAN about the town's centre (citygen AVENUE_Z0 / AVENUE_Z1).
+// The river reads across the town past that street, never along it: a corridor
+// on the centre line cuts the street in half — the water and its setback take
+// the middle of it, its rows and lots have nowhere dry to stand and the bank
+// beside the water has no ground a player can zone — so the river's boundary
+// falls clear of the street's own end. A three-row town's boundaries sit a cell
+// away from the centre line and already do; a two-row town's only boundary is
+// the centre line, so its river's row band is grown by the clearance below.
+const DOWNTOWN_SPAN = 100;
+// The corridor's bank clears the street end and the vista towers that close it
+// (CAP_GAP + CAP_D[1] = 15 m past the avenue's own end, vistas.js), plus the
+// arterial that runs along the bank with its carriageway and walkways.
+const BANK_ROOM = 24;
+const RIVER_CLEAR = DOWNTOWN_SPAN + RIVER_CORRIDOR / 2 + BANK_ROOM;
+
 // The row bands, south (front) row first: full rows, then the remainder, so a
 // five-cell town is 2 + 2 + 1 and never a hole in the middle.
 function rowCounts(rand) {
@@ -121,7 +137,10 @@ export function planTown(seed) {
   // The river sits on a boundary between two row bands, so it always has cells
   // on both sides. Where the short final row leaves open land, water crosses it.
   const riverRow = rngInt(rand, 0, counts.length - 2);
-  const depth = counts.length * cellD + RIVER_CORRIDOR;
+  // A two-row town's river's row band is grown by the clearance, so the
+  // corridor lands clear of the downtown street's own end instead of across it.
+  const riverRoom = counts.length > 2 ? 0 : RIVER_CLEAR;
+  const depth = counts.length * cellD + RIVER_CORRIDOR + 2 * riverRoom;
   const zShift = -depth / 2;
   // Rows north of the river start above the corridor; the town centres on z = 0.
   const rowBase = (r) => r * cellD + (r > riverRow ? RIVER_CORRIDOR : 0) + zShift;

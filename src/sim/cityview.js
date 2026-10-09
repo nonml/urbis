@@ -21,6 +21,10 @@ const LIFT_SECS = 1.6;
 // The overview is oblique — a Cities: Skylines distance, never a flat map and
 // never the horizon. Radians above the ground; the drag moves inside the band.
 export const TILT = { start: 1, min: 0.9, max: 1.25 };
+// The lift as the camera blends it (render/cityview.js holds the camera's own
+// curve and sim/ never imports render/): 0 on the street, 1 at the overview,
+// eased in between. The planner's lot tint fades in on the same number.
+export const easeLift = (lift) => lift * lift * (3 - 2 * lift);
 // Metres from the camera to the point it looks at. It starts where all ten lots
 // fit on screen from most headings; the wheel moves inside the band, whose far
 // end keeps the top of the frame inside the camera's 400 m reach.
@@ -178,14 +182,28 @@ export const TOOLS = {
 };
 
 // The city view's overlays (M5.T20), in the order the O key cycles them. The
-// list is the frame's one place an overlay is named; render/overlays.js maps
+// list is the frame's one place an overlay is named: render/overlays.js maps
 // each id to the pooled lot tint it draws, and the later overlay tasks
-// (M5.T21's five, M5.T29's pollution, M12/M14's views) append here. `off` is
-// first so the view opens unpainted, exactly as the world looks today.
+// (M5.T29's pollution, M12/M14's views) append here. `off` is first so the view
+// opens unpainted, exactly as the world looks today.
+//
+// The ring is the whole of it, not just this sim's own three: an overlay the O
+// key cannot reach is an overlay the player never sees, so the data overlays
+// (M5.T21) are named here too, where the wrap is counted.
 export const OVERLAYS = [
   { id: 'off', name: 'no overlay' },
   { id: 'zone', name: 'zoning' },
   { id: 'status', name: 'growth' },
+  // The five data overlays (M5.T21): the market, the power, the police, the
+  // land's own worth and this hour's traffic. Each is the sim's number for the
+  // lot; render/overlays.js shades it on the ramp its id names.
+  { id: 'demand', name: 'demand' },
+  { id: 'power', name: 'power' },
+  { id: 'police', name: 'police cover' },
+  { id: 'value', name: 'land value' },
+  { id: 'traffic', name: 'traffic' },
+  // One coverage overlay per service: how full the station covering the lot is.
+  ...Object.keys(SERVICES).map((type) => ({ id: `cover:${type}`, name: `${SERVICES[type].name} cover` })),
 ];
 
 // The overlay the view is on, never undefined: a save or a hand-written view
@@ -194,7 +212,9 @@ export function overlayOf(view) {
   return OVERLAYS[view.overlay] ?? OVERLAYS[0];
 }
 
-// O: the next overlay in the ring, wrapped, and the one now showing.
+// O: the next overlay in the ring, wrapped, and the one now showing. The wrap
+// is the whole ring (OVERLAYS.length), so a keypress past the last one comes
+// home through every overlay on the way.
 export function cycleOverlay(view) {
   view.overlay = ((view.overlay ?? 0) + 1) % OVERLAYS.length;
   return overlayOf(view);

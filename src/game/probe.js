@@ -155,12 +155,17 @@ export function bindProbe(parts) {
 }
 
 function cityViewProbe(parts) {
-  const { city, cityView, cityRig, camera } = parts;
+  const { city, cityView, cityRig, overlayRig, camera } = parts;
   return {
     state: () => ({ ...cityView, level: undefined, trend: [...cityView.trend] }),
     lots: () => city.parcels.map((p) => ({ use: p.use, zoned: p.zoned, stage: STAGES[p.stage], building: p.building })),
     screen: (i) => cityRig.screenOf(camera, i),
     pick: (x, y) => cityRig.pick(camera, x, y),
+    // The planner's lot tint (M5.T21): how many lots it is drawing this frame
+    // and the whole layer's draw cost. One pooled mesh, so the cost is 1 while
+    // an overlay shows and 0 on the street or with the overlay off.
+    pool: () => overlayRig.pool(),
+    overlayDraws: () => overlayRig.draws(),
   };
 }
 
