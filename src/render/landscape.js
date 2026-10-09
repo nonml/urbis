@@ -12,6 +12,13 @@ import { planLayout, CROSSING_BAND, BUILD_LINE } from '../sim/layout.js';
 import { vistasOf } from '../sim/vistas.js';
 import { worldMap } from '../sim/patrol.js';
 import { WATER_BED } from './river.js';
+import { IN_NODE, fetchModel, glbMeshes, readModel } from './models.js';
+
+// The massifs are baked models (tools/models/make_landscape.py): two forms in
+// one GLB in public/assets/models/, and the peaks a range draws are copies of
+// them. The file is loaded the way the props are — over HTTP in the browser,
+// off the disk in Node, where the specs and the sweeps call the builder
+// synchronously and there is no fetch.
 
 // The ground of a map, live: the map's own terrain when it has one (a generated
 // map's, rebuilt from its graph after every road op), the load-time world's
@@ -302,126 +309,104 @@ export function buildGrassTufts(map = worldMap()) {
   return inst;
 }
 
-// Smooth terrain, not cones. One displaced grid per range, merged, so the
-// ranges read as rounded massifs instead of the pale spikes they replaced.
-const MOUNTAIN_CELL = 3;
+// Smooth terrain, not cones — and not built by hand either. The massifs are
+// baked models (tools/models/make_landscape.py): a range is copies of one of
+// the file's two forms dropped onto the peak table the ranges have always had.
+// One merged mesh, one draw, whatever the count.
+//
 // A range stands this far outside the district's walk box, which also clears the
 // vista ring, so a peak can never rise over a street.
 export const MOUNTAIN_CLEAR = 60;
 // The farthest a peak reaches from its centre: largest r plus half the jitter.
 const PEAK_REACH = 140 + 12;
 const MOUNTAIN_FLOOR = -4; // the cones sat 4 m sunk; keep their bases hidden
-const NOISE_SEED = 0x9e37;
-const ROCK_HEX = 0x232c3a;
-const SNOW_HEX = 0xdfe8f2;
-const ROCK_VARY = 0.08; // ±8% brightness, by the same noise as the detail
-
-function hash2(ix, iz) {
-  let h = Math.imul(ix, 374761393) ^ Math.imul(iz, 668265263) ^ NOISE_SEED;
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  h ^= h >>> 16;
-  return (h >>> 0) / 4294967296;
-}
-
-// Value noise, [-1, 1]: the only texture the mountains need, and it must be
-// hash-based so it stays deterministic frame to frame and run to run.
-function valueNoise(x, z) {
-  const ix = Math.floor(x);
-  const iz = Math.floor(z);
-  const fx = x - ix;
-  const fz = z - iz;
-  const ux = fx * fx * (3 - 2 * fx);
-  const uz = fz * fz * (3 - 2 * fz);
-  const a = hash2(ix, iz);
-  const b = hash2(ix + 1, iz);
-  const c = hash2(ix, iz + 1);
-  const d = hash2(ix + 1, iz + 1);
-  const top = a + (b - a) * ux;
-  const bot = c + (d - c) * ux;
-  return (top + (bot - top) * uz) * 2 - 1;
-}
-
-// Ridged detail: coarse relief plus half of it again at finer frequency, so a
-// massif has broad shoulders and a broken crest rather than a smooth dome.
-function mountainNoise(x, z) {
-  return valueNoise(x / 18, z / 18) + 0.5 * valueNoise(x / 7, z / 7);
-}
-
-// The max over peaks, never the sum: overlapping cones used to bury each other,
-// and a sum would stand a wall wherever two ranges meet. Each peak falls off as
-// (1 - t^2)^2, so every face is a rounded massif rather than a spike.
-function makeMountainHeight(peaks) {
-  return (x, z) => {
-    let base = 0;
-    for (const p of peaks) {
-      const t = Math.hypot(x - p.px, z - p.pz) / p.r;
-      if (t < 1) base = Math.max(base, p.h * (1 - t * t) ** 2);
-    }
-    return base + 7 * mountainNoise(x, z) * (base / 110) - 4;
-  };
-}
-
-function mountainGrid(rangePeaks, height, clamp) {
-  let minX = Infinity;
-  let maxX = -Infinity;
-  let minZ = Infinity;
-  let maxZ = -Infinity;
-  for (const p of rangePeaks) {
-    minX = Math.min(minX, p.px - p.r);
-    maxX = Math.max(maxX, p.px + p.r);
-    minZ = Math.min(minZ, p.pz - p.r);
-    maxZ = Math.max(maxZ, p.pz + p.r);
-  }
-  if (clamp.maxX !== undefined) maxX = Math.min(maxX, clamp.maxX);
-  if (clamp.minZ !== undefined) minZ = Math.max(minZ, clamp.minZ);
-  const w = maxX - minX;
-  const d = maxZ - minZ;
-  const geo = new THREE.PlaneGeometry(
-    w, d, Math.round(w / MOUNTAIN_CELL), Math.round(d / MOUNTAIN_CELL)
-  );
-  geo.rotateX(-Math.PI / 2);
-  geo.translate((minX + maxX) / 2, 0, (minZ + maxZ) / 2);
-  const pos = geo.attributes.position;
-  for (let i = 0; i < pos.count; i++) {
-    pos.setY(i, Math.max(MOUNTAIN_FLOOR, height(pos.getX(i), pos.getZ(i))));
-  }
-  pos.needsUpdate = true;
-  return geo;
-}
-
-function smoothstep(edge0, edge1, x) {
-  const t = Math.min(1, Math.max(0, (x - edge0) / (edge1 - edge0)));
-  return t * t * (3 - 2 * t);
-}
-
-// Rock everywhere, snow only where it is both high and flat enough to settle.
-function paintMountains(geo) {
-  const pos = geo.attributes.position;
-  const nor = geo.attributes.normal;
-  const colors = new Float32Array(pos.count * 3);
-  const rock = new THREE.Color(ROCK_HEX);
-  const snow = new THREE.Color(SNOW_HEX);
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i++) {
-    const x = pos.getX(i);
-    const y = pos.getY(i);
-    c.copy(rock).multiplyScalar(1 + ROCK_VARY * mountainNoise(x, pos.getZ(i)));
-    c.lerp(snow, smoothstep(52, 64, y) * smoothstep(0.45, 0.7, nor.getY(i)));
-    colors.set([c.r, c.g, c.b], i * 3);
-  }
-  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-}
-
 // How far the two ridges run past the walk box's south and west ends: the same
 // leads the hand map used, so their ridges start where they always did.
 const RIDGE_SOUTH_LEAD = 82;
 const RIDGE_WEST_LEAD = 18;
+// The massif file and where it lives: the tag the merged mesh wears.
+const MOUNTAIN_MODEL = 'assets/models/mountain_massif.glb';
+
+// A form's own footprint and height, read off the mesh: a copy is scaled by
+// these against the peak it stands for, so a peak of radius r reaches r and a
+// peak of height h peaks at h however tall the model was baked.
+function formExtent(geo) {
+  geo.computeBoundingBox();
+  const bb = geo.boundingBox;
+  return { xz: Math.max(-bb.min.x, bb.max.x, -bb.min.z, bb.max.z), y: bb.max.y };
+}
+
+function massifForms(bytes) {
+  return glbMeshes(bytes).map((part) => ({ geo: part.geometry, extent: formExtent(part.geometry) }));
+}
+
+// The two forms, read once: every peak of every range is a copy of one of them.
+// Node has them on the first call. The browser has not — the GLB is in flight,
+// and the range lands the frame it arrives, into the group the builder handed
+// out. buildMountains() is called from a synchronous builder, so it cannot
+// await; it registers, and the load fills what it registered.
+let forms = null;
+let loading = null;
+const waiting = [];
+
+function massifFormsReady() {
+  if (forms) return forms;
+  if (IN_NODE) {
+    forms = massifForms(readModel(MOUNTAIN_MODEL));
+    return forms;
+  }
+  loading ??= fetchModel(MOUNTAIN_MODEL)
+    .then((bytes) => {
+      forms = massifForms(bytes);
+      for (const [district, group] of waiting.splice(0)) group.add(rangeMesh(district, forms));
+    })
+    .catch(() => null);
+  return null;
+}
+
+function rangeMesh(district, massifs) {
+  const rand = mulberry32(133);
+  const peaks = ridgePeaks(district, rand);
+  const copies = [];
+  const dummy = new THREE.Object3D();
+  peaks.forEach((p, i) => {
+    // The two forms dealt round the table, each turned to face its own way, so
+    // no two peaks of a range read as the same mountain.
+    const { geo, extent } = massifs[i % massifs.length];
+    dummy.position.set(p.px, MOUNTAIN_FLOOR, p.pz);
+    dummy.rotation.set(0, rand() * Math.PI * 2, 0);
+    dummy.scale.set(p.r / extent.xz, p.h / extent.y, p.r / extent.xz);
+    dummy.updateMatrix();
+    copies.push(geo.clone().applyMatrix4(dummy.matrix));
+  });
+  const mesh = new THREE.Mesh(
+    mergeGeometries(copies),
+    // Rock and snow are baked into the model's vertex colours, so the material
+    // is nothing but a surface.
+    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 }),
+  );
+  mesh.name = 'mountain-massif';
+  mesh.userData.model = MOUNTAIN_MODEL;
+  return mesh;
+}
 
 export function buildMountains(district) {
-  const rand = mulberry32(133);
+  const group = new THREE.Group();
+  const massifs = massifFormsReady();
+  if (massifs) {
+    group.add(rangeMesh(district, massifs));
+    return group;
+  }
+  waiting.push([district, group]);
+  return group;
+}
+
+// The peak table of the two ranges: the same leads, spacing and jitter the
+// hand map has always used, so a range starts and ends where it did. Heights
+// stay 45–80 m and radii 90–140 m, so every copy stands clear of the streets.
+function ridgePeaks(district, rand) {
   const peaks = [];
   const ridge = (cx, cz, n, alongX) => {
-    const from = peaks.length;
     for (let i = 0; i < n; i++) {
       const r = 90 + rand() * 50;
       const h = 45 + rand() * 35;
@@ -429,24 +414,10 @@ export function buildMountains(district) {
       const pz = alongX ? cz + (rand() - 0.5) * 24 : cz + i * 26 + rand() * 10;
       peaks.push({ px, pz, r, h });
     }
-    return peaks.slice(from);
   };
-  const westEdge = district.walk.minX - MOUNTAIN_CLEAR;
-  const northEdge = district.walk.maxZ + MOUNTAIN_CLEAR;
-  const west = ridge(westEdge - PEAK_REACH, district.walk.minZ - RIDGE_SOUTH_LEAD, 12, false);
-  const north = ridge(district.walk.minX - RIDGE_WEST_LEAD, northEdge + PEAK_REACH, 9, true);
-  const height = makeMountainHeight(peaks);
-  const geo = mergeGeometries([
-    mountainGrid(west, height, { maxX: westEdge }),
-    mountainGrid(north, height, { minZ: northEdge }),
-  ]);
-  geo.computeVertexNormals();
-  paintMountains(geo);
-  const mesh = new THREE.Mesh(
-    geo,
-    new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1.0 })
-  );
-  const g = new THREE.Group();
-  g.add(mesh);
-  return g;
+  ridge(district.walk.minX - MOUNTAIN_CLEAR - PEAK_REACH,
+    district.walk.minZ - RIDGE_SOUTH_LEAD, 12, false);
+  ridge(district.walk.minX - RIDGE_WEST_LEAD,
+    district.walk.maxZ + MOUNTAIN_CLEAR + PEAK_REACH, 9, true);
+  return peaks;
 }

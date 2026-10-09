@@ -164,6 +164,20 @@
       "notes": "Size S. Derive from map.water, never hard-code seed 7. Then run tests/accept/m4-river-look.spec.js and look at docs/shots/m4-river-7.png: water with bridges, no towers in it. Commit as you go."
     },
     {
+      "id": "M4.T8d",
+      "lane": "city",
+      "goal": "Signs on river seeds. Since M4.T8c the river cuts wall frontage, and tests/streetscape-place.spec.js \"every sign hangs on a building front\" fails on seeds 29, 46, 65, 101, 115, 117: they get 5-6 signs where the test wants at least 7. Make src/sim/streetscape.js place signs on the frontage that remains (e.g. use both faces of short rows, or the bridgehead buildings) so every seed gets at least 7, each still hanging on a real building front. Do not lower the floor in the test. Run: GATE_FULL=1 npx playwright test tests/streetscape-place.spec.js.",
+      "files": [
+        "src/sim/streetscape.js"
+      ],
+      "needs": [
+        "M4.T8c"
+      ],
+      "test": "tests/streetscape-place.spec.js",
+      "commit": "M4.T8d (M4-2): signs on river seeds",
+      "notes": "Size S. Found 2026-10-09 by the M4.T8c review. Never read or write outside this worktree."
+    },
+    {
       "id": "M4.T9",
       "lane": "assets",
       "goal": "Suburb and works buildings (lane: assets). House, low-rise flat and shed models through the M2 pipeline, added to the building pools",

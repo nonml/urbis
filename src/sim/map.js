@@ -233,8 +233,11 @@ export function createMap(seed) {
   const town = planTown(seed);
   const water = town.river.rects;
   const cells = town.cells.map((cell) => generateDistrict(seed, cell, cell.kind));
-  const plan = planLayout(district, seed);
-  plan.pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings);
+  // The towers first: the plan's lots and rows keep clear of where they stand
+  // on this map, which the river can move off the hand preset's place (M4-2).
+  const pinned = placePinned(HAND_PINNED, district.avenues[0], district.crossings, water);
+  const plan = planLayout(district, seed, pinned, water);
+  plan.pinned = pinned;
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
   const graph = markBridges(districtsGraph(cells, town, district), water);

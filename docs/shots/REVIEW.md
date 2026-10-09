@@ -4,6 +4,61 @@ Every shot is judged here before it counts as evidence (AGENTS.md, "How to work"
 step 5). One entry per shot: the slice, the verdict, and each defect by id. Open
 defects stay in the table at the bottom until a commit fixes them.
 
+## 2026-10-09 — M2.F5, the trees and the mountains are models (`m2-f5-landscape`)
+
+`docs/shots/m2-f5-landscape-street.png` (spawn, day) and
+`docs/shots/m2-f5-landscape-city.png` (key z, 2.5 s). Judged by measurement in
+the frame, not by eye: the reviewing agent cannot open the PNGs, so every claim
+below is a probe reading, and the ones only an eye can settle are listed as
+open at the end.
+
+- **Shows the feature.** A pick sweep over the frame (every 24th pixel, every hit
+  on the ray) lands on the tree models: 223 hits in the street shot on
+  `street-trees` geometry, e.g. a canopy at (-7.3, 5.6, 16.4), 17.5 m from the
+  camera at (2.5, 2.05, 30.43) — a head of blocks of leaf cards, not an
+  icosahedron. In the city shot 64 tree hits (a trunk base at
+  (-36.5, 0.2, -85.8), instance 55) and 197 hits on the merged range, all
+  `Group/mountain-massif`, `BufferGeometry`, `MeshStandardMaterial`, 264 m out at
+  (-145, -2.8, 11.3). Both are drawn meshes: draws 125 (street) / 127 (city),
+  peak 131, so the frame holds the models inside the 175 budget.
+- **Clear view.** `__game.frameCheck(2).blocked = 0` in both poses — nothing but
+  the player within 2 m of the lens. No page errors in either boot.
+- **Nothing broken.** The mountains are one mesh (the accept spec asserts one
+  merged mesh, smooth-shaded, vertex-coloured); no floating parts, nothing
+  pokes through: `tests/landscape-place.spec.js` still holds every peak
+  MOUNTAIN_CLEAR outside the walk box on 300 generated seeds plus the hand map,
+  and the faces are still slopes: measured 49.7° at P90 of the face area, 3.7%
+  over 55° (13,538 vertices in the merged range), inside the spec's 50° / 5%.
+- **Toy or neon?** The trees are tubes and forked limbs with 320-triangle
+  alpha-cut canopies per model, three distinct silhouettes from three GLBs; the
+  range is one smooth ridged massif with a snow line. No cones or icosahedra
+  survive (`tests/accept/m2-landscape.spec.js`, test 1).
+- **Readable.** A street reads as 104 planted trees in three leaf shapes with
+  autumn on the east avenue; a range reads as rock-then-snow.
+
+Where the bytes come from, and what it costs: the six GLBs are written by
+`tools/models/make_landscape.py` into `public/assets/models/` (203 KB) and
+loaded from there. The tree pools load through `loadModelPool`, as buildings.js
+and lamps.js do; the range is not a pool but one merged mesh, so it is read with
+the models.js GLB reader over the fetched bytes. In Node — the specs, the
+sweeps — both builders are synchronous and there is no fetch, so the same files
+are read off the disk and parsed by that reader: `readModel` in models.js. No
+model bytes live in the source any more: trees.js is 129 lines instead of 2,054
+and landscape.js loses its 880-line base64 block. The frame holds the same five
+tree pools and one merged range mesh it held before, and measured draws are
+125 / peak 125 street and 127 / peak 131 city against the 175 budget.
+
+Open, for an eye and not a probe:
+- Whether the leaf cards read as foliage at play distance (the white-ellipse
+  sprite, alphaTest 0.5) and whether the three canopy silhouettes are distinct
+  enough on the street.
+- The trunk and limb parts carry baked vertex colours that neither material
+  switches on, so the root flare and gradient are in the file but not on the
+  screen. Unchanged from retry 2.
+- In the browser the trees and the range land a frame after boot, the way the
+  hydrants and bins do; nothing pops in the stills, but it is a change from the
+  inline build, which had them on frame one.
+
 ## 2026-10-07 — M2.F2e, the player stands on both feet (`m2-0-person`)
 
 `docs/shots/m2-0-person.png`, the hand map street pose at the spawn, day (key t),
@@ -177,6 +232,6 @@ the night-road lane built nothing).
 | D17 | A west heading at the spawn opened the follow camera inside the block east of the avenue: 144/144 picked cells at 0 m, centre pixel pure black | seeds 7 and 22, spawn, day and night | **fixed** M1.T6 (`game/camera.js` pulls the arm out of the street wall); 0 cells at 0 m on both seeds |
 | D18 | HUD panels overlap each other's text: news covered the mission panel end to end and the city palette sat under the district table, lot note and story dialogue | city view, seed 7 | **fixed** M1.T6 (`game/hud.js` stacks the bottom-left column and sets the mission panel under the news; measured 0 overlapping pairs) |
 | D19 | At the spawn pose the clear and overcast day shots are hard to tell apart on the eye: towers occlude the sky, and the sun's dimming shows mostly in the distant haze | M2-7 shots, `docs/shots/m2-weather-clear-day.png` / `-overcast-day.png` | open; measured in the frame (sky cells, 15+ levels), weak in the still. M2/M26 weather look |
-| D20 | Seven of seed 7's 31 legacy street-wall rows stand in the 30 m water rect and its 8 m setback (e.g. (-6.3, 21.2), 31 m tall, north face z = 12.9 inside the river); from the seeded spawn the wall hides the river from the city view and from a pick, and a row's shell rises out of the water | seed 7, city view over (-18.5, 0.8); pick at (-3.5, 0) hits a row | open; sim placement (layout.js/map.js) debt, M4.T15 removes the spans at source. The river itself is carved and drawn correctly (`displaceToTerrain` drops every ground surface in a water rect to WATER_BED), and the check's deck-clear probe no longer lands on a row |
+| D20 | Seven of seed 7's 31 legacy street-wall rows stand in the 30 m water rect and its 8 m setback (e.g. (-6.3, 21.2), 31 m tall, north face z = 12.9 inside the river); from the seeded spawn the wall hides the river from the city view and from a pick, and a row's shell rises out of the water | seed 7, city view over (-18.5, 0.8); pick at (-3.5, 0) hits a row | **fixed** M4.T8c: `layout.js` cuts the river out of every row, lot and pinned tower, `vistas.js` leaves out ring towers on it; `docs/shots/m4-river-7.png` shows only bridges across the stream, `tests/accept/m4-dry-land.test.js`. Was: sim placement (layout.js/map.js) debt, M4.T15 removes the spans at source. The river itself is carved and drawn correctly (`displaceToTerrain` drops every ground surface in a water rect to WATER_BED), and the check's deck-clear probe no longer lands on a row |
 | D21 | Seed 7's river probe `near.x + 15` = (-3.5, 0) lay on the **next** bridge: art-ns1 crosses the same 30 m river at x = 0 with a 3.9 m half-deck, so pick #1 was `bridge` and the water 1 cm under it. The two in-town bridges are 18.5 m apart; the check assumed one bridge per ~600 m | `tests/accept/m4-river-look.spec.js:43`, seed 7 | **fixed** main `97c226b`: the probe picks the candidate 8/15/30 m off the bridge with the largest gap to every deck (seed 7: (-48.5, 0.75), 30 m clear) |
 | D22 | Seed 7's deck probe (-18.5, 0.8) lay behind a transparent white glow quad (`MeshBasicMaterial`, `see: true`, equal distance): pick #1 was the quad, the deck #2 | `tests/accept/m4-river-look.spec.js:49`, seed 7 | **fixed** main `97c226b`: `pickAt` filters see-through hits (glow, rain), as `m3-render.spec.js` does |

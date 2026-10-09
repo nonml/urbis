@@ -5,12 +5,12 @@
 // outside the fog and unpickable, so a raw pick under it still names the lot it
 // covers (M5.T3d).
 //
-// M5.T21 fills the ring: the sim's own three stay the sim's (sim/cityview.js
-// OVERLAYS), and this module appends the five — demand, power, police cover,
-// land value, traffic — and a coverage overlay per service, each mapped to the
-// value behind its colour. Every value is read off the sim the frame loop
-// already ticks: `overlayValue` is that number, and
-// tests/accept/m5-overlays.spec.js checks it against the sim on five lots.
+// M5.T21 fills the ring (sim/cityview.js OVERLAYS): the sim's own three, plus
+// demand, power, police cover, land value and traffic, plus a coverage overlay
+// per service. Each is mapped here to the value behind its colour, and every
+// value is read off the sim the frame loop already ticks: `overlayValue` is that
+// number, and tests/accept/m5-overlays.spec.js checks it against the sim on
+// five lots.
 //
 // The land-value formula, written down:
 //   base     0.30  every lot is worth something
@@ -22,12 +22,10 @@
 //                  edge's (traffic.js edgeLoad). M5.T28's pollution lands
 //                  here, as a term of its own.
 // Each term is the sim's own number for this parcel, so the overlay cannot
-// drift from the economy. Two one-line wirings this module's files do not own
-// are open: the sim's OVERLAYS list stops at 'status' (so the O key, which
-// wraps on its length, does not reach the ids below) and game/scene.js does not
-// call buildOverlays (so the layer is not in the frame yet).
+// drift from the economy. The wiring this module's files do not own is
+// game/scene.js, which builds the layer into the frame.
 import * as THREE from 'three';
-import { OVERLAYS, lotStatus } from '../sim/cityview.js';
+import { OVERLAYS, lotStatus, overlayOf } from '../sim/cityview.js';
 import { builtHeight } from '../sim/zoning.js';
 import { demandFor } from '../sim/economy.js';
 import { paintOf } from './cityview.js';
@@ -72,24 +70,24 @@ const STOPS = Object.fromEntries(Object.entries(RAMPS)
 // edge's).
 const SHADE = {
   demand: { ramp: 'demand', at: (v) => v }, power: { ramp: 'power', at: (v) => v },
-  value: { ramp: 'value', at: (v) => v }, cover: { ramp: 'cover', at: (v) => v },
-  police: { ramp: 'police', at: (v) => 1 - Math.min(1, v / SERVICES.police.radius) },
+  value: { ramp: 'value', at: (v) => v },
+  cover: { ramp: 'cover', at: (v) => v, bare: true },
+  police: { ramp: 'police', at: (v) => 1 - Math.min(1, v / SERVICES.police.radius), bare: true },
   traffic: { ramp: 'traffic', at: (v, t) => (t.busiest > 0 ? v / t.busiest : 0) },
 };
+// `bare` overlays shade a lot no station covers at the far end of its ramp,
+// rather than leaving it blank: a district with no police station reads rust all
+// over, so the player sees what is missing instead of an empty map. Both ramps
+// end in rust, which is what "not covered" should read as.
 
-// The ring the view's `overlay` index walks: the sim's three, this task's five,
-// then one coverage overlay per service. Indexed here, not in the sim, so the
-// ids past the sim's list still resolve to a tint.
-const MINE = [
-  { id: 'demand', name: 'demand' }, { id: 'power', name: 'power' },
-  { id: 'police', name: 'police cover' }, { id: 'value', name: 'land value' },
-  { id: 'traffic', name: 'traffic' },
-  ...Object.keys(SERVICES).map((type) => ({ id: `cover:${type}`, name: `${SERVICES[type].name} cover` })),
-];
-export const OVERLAY_RING = [...OVERLAYS, ...MINE];
+// The ring the view's `overlay` index walks: every overlay the sim names, in its
+// order (sim/cityview.js OVERLAYS), so the O key's wrap and this module's tint
+// agree by construction. Indexed in the sim, not here, because the key that
+// walks the ring is the sim's and sim/ never imports render/ (law 5).
+export const OVERLAY_RING = OVERLAYS;
 
 // The overlay the view is on, never undefined.
-export const overlayAt = (view) => OVERLAY_RING[view.overlay] ?? OVERLAY_RING[0];
+export const overlayAt = overlayOf;
 
 const clamp01 = (v) => Math.max(0, Math.min(1, v));
 
@@ -176,7 +174,8 @@ export function overlayValue(id, city, view, i, ctx = {}, t = tablesOf(id, ctx))
 
 // The colour an overlay paints lot `i`: a zone swatch or a status colour for
 // the sim's two categorical overlays, otherwise the shade its value sits at on
-// its ramp. Null means the overlay has nothing to say about this lot.
+// its ramp. Null means the overlay has nothing to say about this lot — a bare
+// overlay says it anyway, at its ramp's far end.
 export function lotTint(id, city, view, i, ctx = {}, t = tablesOf(id, ctx)) {
   const p = city.parcels[i];
   if (!p) return null;
@@ -185,13 +184,16 @@ export function lotTint(id, city, view, i, ctx = {}, t = tablesOf(id, ctx)) {
     const status = lotStatus(view, city, i, (ctx.dark ?? (() => false))(p.powerZone));
     return STATUS_PAINT[status] ?? STATUS_PAINT.waiting;
   }
-  const v = overlayValue(id, city, view, i, ctx, t);
-  if (v === null || !Number.isFinite(v)) return null;
   const spec = SHADE[id.startsWith('cover:') ? 'cover' : id];
   if (!spec) return null;
-  const x = clamp01(spec.at(v, t)) * (STOPS[spec.ramp].length - 1);
-  const at = Math.min(STOPS[spec.ramp].length - 2, Math.floor(x));
-  const c = paint.copy(STOPS[spec.ramp][at]).lerp(STOPS[spec.ramp][at + 1], x - at);
+  const stops = STOPS[spec.ramp];
+  const v = overlayValue(id, city, view, i, ctx, t);
+  if (v === null || !Number.isFinite(v)) {
+    return spec.bare ? `#${stops[stops.length - 1].getHexString()}` : null;
+  }
+  const x = clamp01(spec.at(v, t)) * (stops.length - 1);
+  const at = Math.min(stops.length - 2, Math.floor(x));
+  const c = paint.copy(stops[at]).lerp(stops[at + 1], x - at);
   return `#${c.getHexString()}`;
 }
 
