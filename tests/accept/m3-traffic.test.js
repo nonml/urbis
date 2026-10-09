@@ -149,7 +149,6 @@ test('M3-6: after addRoad a car drives it within 60 game seconds', async () => {
   // (900/1200 frames, seed 73) but the first arrival is ~120 s; the old pass
   // was cars crossing the junction geometry, no route held the new edge.
   // M3.T40 makes nearby cars take trips over a new road and drops this marker.
-  test.fail(true, 'M3-6 red: a new road is routed but not driven within 60 s (first arrival ~120 s, seed 73)');
   const { createTraffic, tick } = await api();
   const rows = [];
   for (const seed of SEEDS) {
