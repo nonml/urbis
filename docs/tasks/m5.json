@@ -607,6 +607,21 @@
       "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-8: **Overlays:** demand, power, land value, traffic, pollution and the coverage of each service each cost at most 2 draws and match the sim's own value on 5 sampled lots; the city view shows demand per use as three bars for the district under the cursor, equal to the economy's values (checked by `tests/accept/m5-overlays.spec.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M5.T29b",
+      "lane": "build-ui",
+      "needs": [
+        "M5.T29"
+      ],
+      "goal": "Make the pollution overlay reachable. M5.T29 (0064454) taught src/render/overlays.js to shade pollution, but `pollution` is not in OVERLAYS in src/sim/cityview.js, so the O key never reaches it and the code is dead. Add { id: 'pollution', name: 'pollution' } to OVERLAYS right after traffic. In tests/accept/m5-overlays.spec.js: add 'pollution' to the ring the first test expects, and add a test that on 5 sampled lots overlayValue('pollution', ...) equals pollutionOf(parcel, city, street) from src/sim/pollution.js, and that at least one of seed 7's lots reads above 0 (a works lot smokes).",
+      "files": [
+        "src/sim/cityview.js",
+        "tests/accept/m5-overlays.spec.js"
+      ],
+      "test": "tests/accept/m5-overlays.spec.js",
+      "commit": "M5.T29b (M5-8): pollution overlay in the O ring, with its check",
+      "notes": "Size S: at most 60 changed lines. Do not touch src/render/overlays.js; it is done. If any other test lists the ring (grep for 'traffic' next to 'value' in tests/), stop and say which, do not edit it."
+    },
+    {
       "id": "M5.T30",
       "lane": "build-ui",
       "goal": "Milestones. Population tiers written in `ZONING.md`; a locked tool refuses with \"unlocks at N people\"; the city view always shows the population and the next tier, and reaching a tier says on screen what it unlocked; the scripted-player test",
