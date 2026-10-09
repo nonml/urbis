@@ -376,6 +376,23 @@
       "test": "tests/accept/m5-budget.test.js"
     },
     {
+      "id": "M5.T17b",
+      "lane": "build-sim",
+      "goal": "The budget runs in the game and survives a save. M5.T17 built src/sim/budget.js (createBudget, tickBudget, setTax, budgetReport) but nothing calls it: main.js never creates or ticks a budget, and save.js does not store it. Do: (1) in src/main.js create the budget next to the economy (createBudget(map)) and call tickBudget(budget, city.parcels, STEP) in the same fixed step that ticks the economy; (2) store and restore the budget in src/sim/save.js (money, tax, debt state, timers, closed services) so a save then load gives the same money to the cent; (3) expose window.__game.budget() returning budgetReport(budget) in src/game/probe.js; (4) add tests/accept/m5-budget-live.spec.js: boot ?gen=1&seed=7, read __game.budget().money, let 2 game minutes pass (use the existing time-skip helper other specs use), and expect money to have changed by the formula's income minus upkeep within 1%; then save, load, and expect identical money and tax.",
+      "files": [
+        "src/main.js",
+        "src/sim/save.js",
+        "src/game/probe.js",
+        "tests/accept/m5-budget-live.spec.js"
+      ],
+      "needs": [
+        "M5.T17"
+      ],
+      "test": "tests/accept/m5-budget-live.spec.js",
+      "commit": "M5.T17b (M5-6): the budget runs in the game",
+      "notes": "Size S. Found 2026-10-09 by the director: M5.T17 landed as a sim module nothing calls. Saves must stay exact (M3.R1). Draws unchanged. Never read or write outside this worktree. If you must touch a file not listed, stop and say so."
+    },
+    {
       "id": "M5.T18",
       "lane": "build-ui",
       "goal": "Budget, panel. Tax per use and the money line in the city view",
