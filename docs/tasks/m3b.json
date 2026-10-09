@@ -286,6 +286,20 @@
       "notes": "Size S. Found 2026-10-09 by the M3.R4 worker. Never read or write outside this worktree."
     },
     {
+      "id": "M3.R6",
+      "lane": "traffic",
+      "needs": [
+        "M3.R5"
+      ],
+      "goal": "createMap(seed) matches the golden again. Since M3.R5 (7587f79) tests/map.test.js reads the whole map, and 6 tests fail for real: the 5 `seed N: createMap reads the golden map` tests and `districtAt names the district`. The golden files are what scripts/map-golden.mjs buildMap(seed) prints (built from the world modules), and tests/golden.test.js passes, so the world modules are right; createMap in src/sim/map.js, or a module only it reads, has drifted from them. First write down, in .scratch/m3-r6.md, which keys differ and why (one line each), then fix the code so createMap(seed) gives the same map. Never regenerate tests/golden/, never edit tests/.",
+      "files": [
+        "src/sim/"
+      ],
+      "test": "tests/map.test.js",
+      "commit": "M3.R6 (M3-6): createMap matches the golden again",
+      "notes": "Size M. If the cause is that a later task deliberately changed what createMap returns (look at git log -p src/sim/map.js), stop and say which commit and why, do not undo it. Run only: GATE_FULL=1 npx playwright test tests/map.test.js tests/golden.test.js."
+    },
+    {
       "id": "M3.T40",
       "lane": "traffic",
       "goal": "A new road carries traffic within 60 game seconds: when addRoad adds edges, cars near them take trips over them, and the addRoad check's marker is dropped",

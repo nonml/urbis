@@ -3,6 +3,7 @@
 // what grows next. The loop and every number here are argued in docs/ECONOMY.md.
 // Pure: zoning ticks it, render and the probe read it (law 5).
 import { isDark } from './street.js';
+import { DAY_SECS } from './clock.js';
 import { worldMap } from './patrol.js';
 import { serviceReach } from './ops.js';
 import { TAX_DEMAND, createBudget, tickBudget } from './budget.js';
@@ -385,6 +386,8 @@ export function createEconomy(parcels, heightOf, rand, map = worldMap()) {
     price(d, 0, economy);
     Object.assign(d.demand, d.price);
   }
+  // The opening city is day zero of the series, before any day has closed.
+  economy.history = { day: 0, rows: [historyRow(economy)] };
   return economy;
 }
 
@@ -550,6 +553,7 @@ export function tickEconomy(economy, parcels, heightOf, street, dt) {
     react(d, dt);
     creditRezone(d, economy.time);
   }
+  recordHistory(economy);
 }
 
 // The buildings a service type reaches in one district, capacity included
@@ -612,6 +616,41 @@ export function demandFor(city, parcel) {
 // The whole city's demand per use: the mean of its districts, for a glance.
 export function cityDemand(economy) {
   return perUse((use) => economy.districts.reduce((sum, d) => sum + d.demand[use], 0) / economy.districts.length);
+}
+
+// History (M5-15, M5.T32): one sample a game day, the last HISTORY_DAYS of them,
+// kept beside the districts. The panel (ui/history.js) reads this series and
+// nothing else, so what it draws is the sim's own numbers at the moment the day
+// closed — the people the homes hold, the work that stands, the residents the
+// work does not cover, the city's money and the market per use. The jobless are
+// the residents of each district beyond the work it has, which is the employment
+// its wealth is earned on (earn above), not a second count of them.
+export const HISTORY_DAYS = 5;
+
+function historyRow(economy) {
+  let population = 0, jobs = 0, busy = 0;
+  for (const d of economy.districts) {
+    population += d.homes;
+    jobs += d.jobs;
+    busy += Math.min(d.jobs, d.homes);
+  }
+  return {
+    day: Math.floor(economy.time / DAY_SECS),
+    population,
+    jobs,
+    jobless: population - busy,
+    money: economy.budget.money,
+    demand: cityDemand(economy),
+  };
+}
+
+// A game day closes: its sample joins the series and the oldest falls off it.
+function recordHistory(economy) {
+  const day = Math.floor(economy.time / DAY_SECS);
+  if (day <= economy.history.day) return;
+  economy.history.day = day;
+  economy.history.rows.push(historyRow(economy));
+  while (economy.history.rows.length > HISTORY_DAYS) economy.history.rows.shift();
 }
 
 // Plain numbers for the readout and the probe — nothing in it is live state.

@@ -57,7 +57,7 @@ const ctxOf = ({ map, street }) => ({ map, street, dark: (zone) => isDark(street
 
 test('M5-8: the ring, and demand, power, police cover and traffic are the sim\'s own on 5 lots', () => {
   expect(OVERLAY_RING.map((o) => o.id)).toEqual([
-    'off', 'zone', 'status', 'demand', 'power', 'police', 'value', 'traffic',
+    'off', 'zone', 'status', 'demand', 'power', 'police', 'value', 'traffic', 'pollution',
     ...SERVICE_TYPES.map((t) => `cover:${t}`),
   ]);
   expect(overlayAt({ overlay: 3 }).id).toBe('demand');
