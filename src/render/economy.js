@@ -2,6 +2,12 @@
 // market wants of each use, as short bars — the cause beside the effect the lots
 // show. Every number is districtReport() (sim/economy.js); DOM only, reads the
 // sim and never writes it.
+//
+// Bottom right (M5.R1), beside the news feed and the mission panel: the city's
+// own numbers on one side and the street's own readouts on the other. It used
+// to stand in the bottom-left column, where the city view's palette pushed the
+// whole stack up over the status lines; ui/hudlayout.js places it in this
+// column, above the history panel when that is open.
 import { districtReport } from '../sim/economy.js';
 
 // A person reads this, so it refreshes on their clock, not the sim's: when frames
@@ -24,7 +30,7 @@ export function buildEconomyPanel() {
   const panel = document.createElement('div');
   panel.id = 'districts';
   panel.style.cssText = [
-    'position:fixed', 'left:12px', 'bottom:36px', 'pointer-events:none', 'z-index:5',
+    'position:fixed', 'left:auto', 'right:12px', 'bottom:12px', 'pointer-events:none', 'z-index:5',
     'font:11px/1.55 ui-monospace,SFMono-Regular,Menlo,monospace', 'letter-spacing:0.04em',
     'color:#e4e1da', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
     'background:rgba(4,8,16,0.6)', 'border:1px solid rgba(255,255,255,0.16)',

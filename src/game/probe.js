@@ -37,7 +37,7 @@ let fcTarget = null;
 
 export function bindProbe(parts) {
   const {
-    seed, generate, save, camera, renderer, street, city, map, lamps, people, player, car: heroCar,
+    seed, generate, save, cam, camera, renderer, street, city, map, lamps, people, player, car: heroCar,
     mission, wanted, dispatch, interior, clock, news, arc, fixed, composer,
     getProfile, getWantedStatus, getInputLog, isReplayDone, getReplayError,
   } = parts;
@@ -47,6 +47,9 @@ export function bindProbe(parts) {
     generated: generate,
     saveNow: save,
     cam: () => camera.position.toArray().map((v) => +v.toFixed(2)),
+    // The rig's yaw (M4.R1): the follow camera's heading, so a test measures the
+    // look without reading the world pose the rig derives from it.
+    camYaw: () => cam.yaw,
     // Canvas pixels for a world point (M0.T4): a test clicks what the game drew
     // instead of hand-tuned coordinates. The raw projection, so a point behind
     // the camera comes back outside the canvas rather than clamped onto it.
@@ -84,7 +87,10 @@ export function bindProbe(parts) {
         onScreen: centre.z <= 1 && Math.abs(centre.x) <= 1 && Math.abs(centre.y) <= 1,
       };
     },
-    car: () => ({ x: +heroCar.x.toFixed(2), y: +heroCar.y.toFixed(2), z: +heroCar.z.toFixed(2), speed: +heroCar.speed.toFixed(1) }),
+    car: () => ({
+      x: +heroCar.x.toFixed(2), y: +heroCar.y.toFixed(2), z: +heroCar.z.toFixed(2),
+      speed: +heroCar.speed.toFixed(1), yaw: heroCar.yaw,
+    }),
     enter: () => parts.toggleVehicle(),
     profile: () => getProfile(),
     heat: () => wanted.heat,

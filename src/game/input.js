@@ -4,9 +4,9 @@
 // src/sim/): the listeners read game state and call the action callbacks main
 // passes; only main steps the sim.
 //
-// The camera stays the caller's: drag and wheel deltas are handed to `look` and
-// `dolly`, so the follow rig can move to game/camera.js (M3.T3) without this
-// file changing.
+// The camera stays the caller's: drag, lock and wheel deltas are handed to
+// `look` and `dolly`, so the follow rig can move to game/camera.js (M3.T3)
+// without this file changing.
 //
 // M7.T11: every action answers to its binding (ui/settings.js), not a literal
 // key. A rebind in the settings screen lands here at once through
@@ -85,6 +85,25 @@ export function bindInput(parts) {
   onBindingsChange((next) => { bindings = next; sync(); });
   const down = (action) => held.has(bindings[action]);
 
+  // The pointer lock (M4.R1) the street view takes on a click: while the canvas
+  // holds it a bare mousemove looks, GTA and Watch Dogs on PC, and Esc releases
+  // it as the browser already does. The overview never takes one — its own drag
+  // orbits its own camera — and going up hands the mouse back to it.
+  const onStreet = () => cityView.mode === 'street';
+  const lockHeld = () => document.pointerLockElement === canvas;
+  const locked = () => onStreet() && lockHeld();
+  function takeLock() {
+    // Chrome hands back a promise and may refuse the lock; an older browser
+    // throws. Either way the drag look stands, so play never notices.
+    try {
+      const ask = canvas.requestPointerLock();
+      if (ask && ask.catch) ask.catch(() => {});
+    } catch { /* a browser without the API keeps the drag look */ }
+  }
+  function releaseLock() {
+    if (lockHeld()) document.exitPointerLock();
+  }
+
   window.addEventListener('keydown', (e) => {
     if (isTyping(e)) return;
     const k = e.key.toLowerCase();
@@ -125,7 +144,10 @@ export function bindInput(parts) {
     // The overview lifts off the street, never out of a shop or off a roof, and a
     // door is used at street scale, never from the overview.
     else if (action === 'door' && cityView.mode === 'street') enterDoor();
-    else if (CITY_CANON[action] && interior.space === STREET) cityKey(cityView, CITY_CANON[action], cam.yaw);
+    else if (CITY_CANON[action] && interior.space === STREET) {
+      cityKey(cityView, CITY_CANON[action], cam.yaw);
+      if (!onStreet()) releaseLock();
+    }
   };
 
   window.addEventListener('keydown', (e) => {
@@ -191,11 +213,28 @@ export function bindInput(parts) {
     lastPX = e.clientX;
     lastPY = e.clientY;
   });
+  // A click on the canvas takes the lock: from then on the mouse looks with no
+  // button held, and the drag it came from hands over without a break. Only a
+  // real press counts — a replayed or scripted event must never grab the cursor
+  // (M0-1's log feeds this listener back through the game).
+  canvas.addEventListener('pointerup', (e) => {
+    if (e.isTrusted && onStreet()) takeLock();
+  });
   window.addEventListener('pointermove', (e) => {
-    if (!dragging) return;
+    // A locked mouse reaches the page as a mousemove too; the listener below
+    // owns the look there, so one movement is never counted twice.
+    if (lockHeld() || !dragging) return;
     look(e.clientX - lastPX, e.clientY - lastPY);
     lastPX = e.clientX;
     lastPY = e.clientY;
+    lastDragT = clock.elapsed;
+  });
+  // Under the lock the cursor does not move, so there are no client deltas: the
+  // raw movement is the look, and it marks the drag clock the same way, so the
+  // driving camera does not swing back to the car's heading behind it.
+  window.addEventListener('mousemove', (e) => {
+    if (!locked()) return;
+    look(e.movementX, e.movementY);
     lastDragT = clock.elapsed;
   });
   window.addEventListener('pointerup', () => { dragging = false; });
