@@ -6,7 +6,7 @@ import { PROBLEM, describe } from '../sim/decline.js';
 import { STAGE } from '../sim/zoning.js';
 import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
-  TOOLS, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
+  TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
   lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview,
   toolOf, zoomCityView,
 } from '../sim/cityview.js';
@@ -208,11 +208,16 @@ function showBooks(city, books) {
 }
 
 // A tool row names what the tool does and what it costs before it is used;
-// hovering one says the same in the help line (M5-7's half that lives here).
+// hovering one says the same in the help line (M5-7's half that lives here). A
+// price per metre names its unit (ROAD_TOOL), and a tool the treasury cannot
+// pay for says that instead of the number.
 const PUT_DOWN = 'right click or Esc puts the tool down';
 
 function toolLine(tool, city) {
-  return `${tool.name} — ${tool.blurb} · $${tool.cost(city, null)}`;
+  const cost = tool.cost(city, null);
+  const poor = affordTool(city, tool);
+  return `${tool.name} — ${tool.blurb} · `
+    + (poor ?? `$${cost}${tool.unit ?? ''}`);
 }
 
 function buildPalette(view, city) {
@@ -234,12 +239,11 @@ function buildPalette(view, city) {
     row.dataset.tool = tool.id;
     row.dataset.key = tool.key ?? '';
     row.dataset.cost = `${tool.cost(city, null)}`;
-    row.title = toolLine(tool, city);
     row.style.cssText = 'cursor:pointer;padding:0 8px 0 6px;border-left:3px solid transparent;border-radius:2px';
     // The road tool has no key yet (the palette picks it up): no key badge.
     const key = tool.key ? `<b style="color:#fff">${tool.key.toUpperCase()}</b> &nbsp;` : '';
     row.innerHTML = `${key}${swatch(tool.use)}`
-      + `${tool.name} <span style="opacity:0.65">$${tool.cost(city, null)}</span>`;
+      + `${tool.name} <span style="opacity:0.65">$${row.dataset.cost}${tool.unit ?? ''}</span>`;
     row.addEventListener('pointerdown', (e) => {
       if (e.button !== 0) return;
       e.stopPropagation();
@@ -415,6 +419,12 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
     const on = entry === tool;
     row.style.borderLeftColor = on ? paintOf(entry.use) : 'transparent';
     row.style.background = on ? 'rgba(255,255,255,0.08)' : 'transparent';
+    // A tool the treasury cannot pay for stands dimmed and says why, the same
+    // words the card gives the cursor (M5-7): the money is never a surprise.
+    const poor = affordTool(city, entry);
+    row.dataset.afford = poor ? 'no' : 'yes';
+    row.title = toolLine(entry, city);
+    row.style.opacity = poor ? 0.45 : 1;
   }
   const shown = hoverTool ?? tool;
   help.textContent = shown ? toolLine(shown, city) : PUT_DOWN;
