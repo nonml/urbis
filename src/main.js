@@ -33,10 +33,12 @@ import { firePulse, fireSparks, tickHackFx } from './render/hackfx.js';
 import { SUBSTATIONS } from './sim/anchors.js';
 import { createRenderer, createComposer, fitRenderer } from './render/atmosphere.js';
 import { buildNews, showNews } from './render/news.js';
-import { createCityView, tickCityView } from './sim/cityview.js';
+import { createCityView, tickCityView, cityKey, easeLift } from './sim/cityview.js';
 import { createArc, tickArc } from './sim/arc.js';
 
 const DRAW_BUDGET = 175;
+// Fields a keypress typed into is text, never a command (game/input.js isTyping).
+const TYPING_TAGS = new Set(['INPUT', 'TEXTAREA', 'SELECT']);
 // One cube face of the reflection world, measured; the margin is the room a
 // spawn needs to land in the same frame without the probe pushing it over.
 const MIRROR_FACE_DRAWS = 4, MIRROR_MARGIN = 10;
@@ -80,6 +82,7 @@ const {
   beacons, signs, signPoolMeshes, lamps, streakMeshes, carStreaks, lampPoolMeshes,
   fadedDraws, growth, vacant, decline, arcMarker, npcRig, traffic, heroRig, police,
   avatar, shops, interiors, puddles, mirror, blobs, steam, fx, rain, heroKey, cityRig,
+  overlayRig,
 } = renderParts;
 // The lamp light pools are additive glow, not world: a pick under one names the
 // asphalt it lies on, never the quad (M5.T4b; the city view's kerbs take the
@@ -121,6 +124,21 @@ const input = bindInput({
 });
 applySpawn(player, cam, restored ? null : query.get('spawn'));
 const DARK = hudCtx.dark;
+
+// O cycles the planner's overlays (M5.T20/M5.T21). The action table in
+// game/input.js is the key bindings' own list and no binding names the overlay
+// ring, so the key sim/cityview.js's cityKey answers to is installed here at the
+// bootstrap, beside the others. It is gated the way every city key is: the
+// overview lifts off the street, never out of a shop, and text typed into a
+// field is never a command.
+window.addEventListener('keydown', (e) => {
+  if (e.repeat || e.ctrlKey || e.altKey || e.metaKey) return;
+  const on = e.target;
+  const typing = on && (on.isContentEditable || TYPING_TAGS.has(on.tagName));
+  if (typing) return;
+  if (e.key.toLowerCase() !== 'o' || interior.space !== STREET) return;
+  cityKey(cityView, 'o', cam.yaw);
+});
 
 function fireHack() {
   const driving = player.mode === 'drive';
@@ -208,6 +226,7 @@ bindProbe({
   dark: DARK, camPivot: CAM_PIVOT, street, city, map, lamps, people, player, car: heroCar,
   mission, wanted, dispatch, interior, clock, news, arc, cityView, cityRig, fixed,
   composer, avatar, towers, skyline, growth, decline, lotNote, police, chunks, outskirts,
+  overlayRig,
   getProfile: () => lastProfile, getWantedStatus: () => lastWantedStatus,
   getInputLog: () => (recorder ? recorder.log(SEED) : null),
   isReplayDone: () => !!replay && fixed.total >= replay.end,
@@ -323,6 +342,9 @@ function render() {
   showNews(newsLine, liveNews(news, street.time));
   if (lastProfile && lastProfile.name) missionOnProfile(mission, lastProfile.name);
   cityRig.frame(camera, lookAt, scene);
+  // The planner's lot tint (M5.T21), after the overview has placed its camera,
+  // on the same eased lift the camera blends by.
+  overlayRig.frame(easeLift(cityView.lift));
   input.cityUi.update();
 
   renderer.info.reset();
