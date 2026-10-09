@@ -176,6 +176,10 @@ const portsLine = (w) => `You are in a parallel git worktree. Always use GATE_PO
 // A path outside the worktree (/tmp, ~) makes OpenCode stop and ask permission,
 // and no one answers: the tool waits forever and the worker reads as stalled
 // (every stall of 2026-10-09 was a bash call writing under /tmp).
+// Said plainly because models have passed checks without doing the work: Muse
+// tagged boxes as models (2026-10-07), Space Bunny deleted shipped features to
+// pass a stale test (M3.R6, 2026-10-10).
+const honestLine = 'Pass the check only by making the game really do what the task says, in the running game a player sees. Never fake it: no labels or flags that claim work not done, no code only a test reaches, no special case for a test seed, no deleting or undoing other shipped work. If the check cannot pass honestly, stop and say why instead.';
 const scratchLine = 'Never read or write outside this worktree (no /tmp, no ~, no copies of the repo elsewhere): OpenCode blocks on a permission prompt no one answers. Put scratch files in .scratch/ here; git ignores it.';
 
 function briefPrompt(w) {
@@ -184,6 +188,7 @@ function briefPrompt(w) {
     `Read AGENTS.md, then own ${w.brief} end to end. Iterate until every finish line holds.`,
     portsLine(w),
     scratchLine,
+    honestLine,
     'Make your first edit within 5 minutes: read only what the next edit needs, then measure, fix, repeat.',
     'Do not commit, push, stash or checkout. Do not open or judge PNGs.',
     'End with a report: files changed, each finish line with its measured number, anything you could not do.',
@@ -201,6 +206,7 @@ function taskPrompt(w) {
       ? `Do not edit ${t.test}: it is the definition of done.`
       : t.test ? `Write ${t.test} first, as the check the task names, and see it fail; then make it pass. Do not weaken it to pass.` : '',
     t.notes ?? '',
+    honestLine,
     'Read AGENTS.md, then the files above, and little else. Make your first edit within 5 minutes.',
     t.test ? `Check with: npm run build && GATE_FULL=1 GATE_PORT=${w.gate} npx playwright test ${t.test}` : 'Check with: npm run build',
     'Do not run npm run gate: the crew runs the checks when you finish.',
@@ -494,8 +500,14 @@ async function land(w) {
   }
   try {
     await shAsync('npm', ['run', 'gate'], w.dir, { GATE_PORT: String(w.gate) });
+    // The task's own check again, on the merged tree: main may have moved under
+    // the lane (M3.T40b passed on a lane that still held a reverted change).
+    if (w.task?.test) {
+      await shAsync('npx', ['playwright', 'test', '--workers', String(GATE_WORKERS), w.task.test], w.dir,
+        { GATE_PORT: String(w.gate), GATE_FULL: '1' });
+    }
   } catch (e) {
-    return `Main was merged into your worktree, and then npm run gate failed:\n${`${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n')}`;
+    return `Main was merged into your worktree, and then the gate or your task's check failed:\n${`${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n')}`;
   }
   sh('git', ['merge', '--ff-only', '-q', `wt/${w.name}`], ROOT);
   return null;

@@ -22,6 +22,10 @@ const power = (p) => STAGE_POWER[Math.min(p.stage, STAGE.HIGH)];
 // A road is busy at this share of the city's busiest edge's load — the denominator
 // the traffic overlay reads too (M5.T21), so one hour reads the same in both.
 const BUSY_SHARE = 0.25;
+// What a road's noise is worth at the kerb, as a share of the traffic it carries:
+// a street is loud, but the loudest corridor in the city is not as loud at a
+// front door as a works lot's smoke is at its wall.
+const ROAD_LOUD = 0.45;
 
 // The works lots putting smoke out: the lots the city grows, in works, that have
 // broken ground. A standing works row is a fixed parcel the market never moves
@@ -77,19 +81,36 @@ const falloff = (d) => (d >= POLLUTION_REACH ? 0 : 1 - d / POLLUTION_REACH);
 const aside = (z, sourceZ) => zoneAt(z) === zoneAt(sourceZ);
 
 // How bad the air and the street are at a point, 0 to 1: what the works lots put
-// out plus what the busy roads carry, each fading to nothing at the reach.
+// out plus what the loudest busy road carries, each fading to nothing at the
+// reach.
 export function pollutionAt(x, z, city, street) {
-  let total = 0;
+  let air = 0;
   for (const p of smoke(city)) {
     if (!aside(z, p.z)) continue;
-    total += power(p) * falloff(Math.hypot(x - p.x, z - p.z));
+    air += power(p) * falloff(Math.hypot(x - p.x, z - p.z));
   }
-  for (const road of noise(street)) {
+  return Math.min(1, air + roadNoise(x, z, noise(street)));
+}
+
+// What the busy roads carry at a point: the loudest one that reaches it, not all
+// of them added. On a generated map the avenues are the busy edges and every lot
+// stands within the reach of three or four of them, and a sum put 1.2-1.6 of
+// noise on lots in the middle of a block — a field clamped at 1.0 all but
+// everywhere. Half of that is a price on the homes (HOME_DEMAND_HIT) no home
+// market pays, and a home lot only holds while that read is above the point the
+// district sheds it at, so every home lot came down and the city kept no
+// resident. One loud road is what a street corner hears; a second a block along
+// is not a second road's worth of noise. The smoke above still adds, because a
+// works lot and a road are two different nuisances and the field is their sum.
+function roadNoise(x, z, roads) {
+  let loudest = 0;
+  for (const road of roads) {
     const near = projectOnSegment(x, z, road.a, road.b);
     if (!aside(z, near.z)) continue;
-    total += road.share * falloff(near.dist);
+    const heard = road.share * ROAD_LOUD * falloff(near.dist);
+    if (heard > loudest) loudest = heard;
   }
-  return Math.min(1, total);
+  return loudest;
 }
 
 // The same field at the parcel's own centre, and the homes a works lot's smoke
