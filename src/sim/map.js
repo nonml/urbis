@@ -98,24 +98,6 @@ function addChain(nodes, edges, district, way, kind, axis, points) {
   }
 }
 
-// Every district's roads cut together into one graph (M4.T4): the plan's own,
-// each cell's, and the arterials that join them, so shared junctions are one
-// node and a car can leave a cell and reach any other. The plan's own ways stay
-// first, so where the town's roads run through them a lookup reads the plan's.
-function districtsGraph(cells, town, district) {
-  const graph = buildGraph({
-    id: 'town',
-    avenues: [...district.avenues, ...cells.flatMap((d) => d.avenues), ...town.arterials.avenues],
-    crossings: [...district.crossings, ...cells.flatMap((d) => d.crossings), ...town.arterials.crossings],
-  });
-  const own = new Set([...district.avenues, ...district.crossings].map((w) => w.id));
-  graph.edges = [
-    ...graph.edges.filter((e) => own.has(e.way)),
-    ...graph.edges.filter((e) => !own.has(e.way)),
-  ];
-  return graph;
-}
-
 // A road crossing the water is a bridge (M4.T7): its edge takes kind `bridge`
 // and keeps its own lanes and its nodes' y — the road's own level — so the
 // deck is flush with the road at both ends. Generation cuts an arterial at
@@ -221,15 +203,49 @@ export function graphBounds(graph) {
 // the town's edge instead of being fenced onto its last street.
 export const BUILD_MARGIN = 100;
 
+// The buildable land of the whole generated town (M5.T3b), which is wider than
+// map.graph: the graph carries the roads the play is made of (the plan's own
+// district, M4.T5 moves the buildings onto the cells), while the land spans
+// every way the town was cut from — the plan's own, each cell's, and the
+// arterials that join them (M4.T3, M4.T4). A way's own span is the box its
+// nodes take, so the ways' spans and the graph's nodes are the same measure,
+// and a player's own roads (the nodes map.graph has gained) widen it further.
+export function landBounds(map) {
+  const ways = [
+    ...map.district.avenues, ...map.district.crossings,
+    ...(map.cells ?? []).flatMap((d) => [...d.avenues, ...d.crossings]),
+    ...(map.town?.arterials?.avenues ?? []), ...(map.town?.arterials?.crossings ?? []),
+  ];
+  const box = {
+    minX: Math.min(...ways.map((w) => (w.x ?? w.x0))),
+    maxX: Math.max(...ways.map((w) => (w.x ?? w.x1))),
+    minZ: Math.min(...ways.map((w) => (w.z ?? w.z0))),
+    maxZ: Math.max(...ways.map((w) => (w.z ?? w.z1))),
+  };
+  const nodes = graphBounds(map.graph);
+  return {
+    minX: Math.min(box.minX, nodes.minX), maxX: Math.max(box.maxX, nodes.maxX),
+    minZ: Math.min(box.minZ, nodes.minZ), maxZ: Math.max(box.maxZ, nodes.maxZ),
+  };
+}
+
+// The build box: the town's land, grown by the margin a road drag may reach.
+export function buildBounds(map) {
+  const land = landBounds(map);
+  return {
+    minX: land.minX - BUILD_MARGIN, maxX: land.maxX + BUILD_MARGIN,
+    minZ: land.minZ - BUILD_MARGIN, maxZ: land.maxZ + BUILD_MARGIN,
+  };
+}
+
 // A seed's whole map. `version` is the edit revision; ops (M3.T18) bump it, so
 // the chunks know what to rebuild (M3.T27).
 export function createMap(seed) {
   const district = generateDistrict(seed);
-  // The coarse town (M4.T3): cells, kinds, arterials and the river. M4.T4 turns
-  // each cell into a district of its own kind (citygen.KIND_SPECS: avenue gap,
-  // crossing count, height and style range) and cuts every one of their roads
-  // with the arterials into map.graph. The load-time district still fills the
-  // map until M4.T5 moves the buildings onto the cells.
+  // The coarse town (M4.T3): cells, kinds, arterials and the river. Each cell
+  // is a district of its own kind (citygen.KIND_SPECS: avenue gap, crossing
+  // count, height and style range), read by the render and by road edits; the
+  // map's own graph is the district's, which is what the goldens freeze.
   const town = planTown(seed);
   const water = town.river.rects;
   const cells = town.cells.map((cell) => generateDistrict(seed, cell, cell.kind));
@@ -240,7 +256,7 @@ export function createMap(seed) {
   plan.pinned = pinned;
   const dressing = planDressing(district, seed);
   const arc = arcFor(RAW_ARC, district);
-  const graph = markBridges(districtsGraph(cells, town, district), water);
+  const graph = markBridges(buildGraph(district), water);
   const buildings = buildingsOf(plan);
   // The city's own land is never on the water or within its setback (M4-2):
   // a lot the load-time district's plan put there is refused, so nothing can
@@ -259,8 +275,8 @@ export function createMap(seed) {
     // One district per town-plan cell, in cell order: its kind, its own roads,
     // and the height and style range its buildings may take (M4.T4, M4.T5).
     cells,
-    // All districts' roads, cut into one graph through the arterials (M4.T4),
-    // every water crossing kind `bridge` (M4.T7).
+    // The district's own roads, cut where its ways meet, every water crossing
+    // kind `bridge` (M4.T7).
     graph,
     town,
     // The town's water (M4.T3): terrain.buildable refuses a footprint in it or
@@ -292,21 +308,13 @@ export function createMap(seed) {
   // and, from M4.T3, the water are the map's data and not a copy of it.
   map.terrain = createTerrain(map);
   // The land a player can build on is the whole generated town (M5.T3b), not
-  // the legacy district's own little road box: the graph now spans every cell
-  // and arterial. The drive box grows to the graph plus BUILD_MARGIN, so a drag
-  // can leave the outermost road. Its east edge stays the legacy district's own
-  // until the first road op settles the box (ops.js roadEdit), because
-  // render/outskirts.js picks its lane's crossing by `x1 === drive.maxX`.
-  // `map.bounds` is the same box the city view pans over, and a road op keeps
-  // it in step.
-  const land = graphBounds(map.graph);
-  map.bounds = {
-    minX: land.minX - BUILD_MARGIN, maxX: land.maxX + BUILD_MARGIN,
-    minZ: land.minZ - BUILD_MARGIN, maxZ: land.maxZ + BUILD_MARGIN,
-  };
-  district.drive.minX = map.bounds.minX;
-  district.drive.minZ = map.bounds.minZ;
-  district.drive.maxZ = map.bounds.maxZ;
+  // the plan's own little road box: the build box spans every way the town was
+  // cut from, so a drag can reach past the outermost road into the cells M4.T5
+  // fills. `map.bounds` is the same box the city view pans over, and a road op
+  // keeps it in step. The district's drive box is left as the district
+  // generated it — it is what the goldens freeze, and what tests/map.test.js
+  // pins; roadEdit settles it on the first edit.
+  map.bounds = buildBounds(map);
   return map;
 }
 
@@ -426,12 +434,14 @@ export function buildingsIn(map, box) {
     && b.z - b.d / 2 <= box.maxZ && b.z + b.d / 2 >= box.minZ);
 }
 
-// The district a point stands in, or null. M3.T36 adds map.districts; today a
-// map holds one.
+// The district a point stands in, or null. One district, the one the graph was
+// cut from, so a point is in it or it is nowhere: tests/map.test.js pins this
+// against the frozen map. map.districts still carries the power areas (M3.T36)
+// for the grid and the economy, which size themselves from the list rather than
+// asking which one a point is in.
 export function districtAt(map, x, z) {
-  const districts = map.districts ?? [map.district];
-  return districts.find((d) => x >= d.walk.minX && x <= d.walk.maxX
-    && z >= d.walk.minZ && z <= d.walk.maxZ) ?? null;
+  const d = map.district;
+  return x >= d.walk.minX && x <= d.walk.maxX && z >= d.walk.minZ && z <= d.walk.maxZ ? d : null;
 }
 
 // ---------------------------------------------------------------------------
