@@ -4,6 +4,7 @@
 import { isDark } from '../sim/street.js';
 import { PROBLEM, describe } from '../sim/decline.js';
 import { STAGE } from '../sim/zoning.js';
+import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
   TOOLS, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
   lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview,
@@ -121,6 +122,91 @@ function showDemand({ view, city, demand }) {
   }
 }
 
+// The city's books, in the page (M5.T18, M5-6): the treasury, what the last game
+// minute netted it, and the tax each use is charged a point at a time
+// (sim/budget.js). The money line and every rate keep their own numbers on
+// `data-*` the way the demand bars keep theirs, so a check reads the books
+// without parsing a rounded badge. Raising the homes tax by ten points moves
+// the demand bars below it (economy.js price) — the bite is visible here.
+const TAX_STEP = 1;
+const NUDGE = 'width:15px;padding:0;margin:0;font:11px/1.6 ui-monospace,Menlo,monospace;'
+  + 'color:#e4e1da;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);'
+  + 'border-radius:2px;cursor:pointer';
+
+// Credits as a player reads them: a treasury is never shown to a decimal.
+function credits(n) {
+  const whole = Math.round(n);
+  return `${whole < 0 ? '−' : ''}$${Math.abs(whole).toLocaleString('en-US')}`;
+}
+
+function taxRow(budget, use) {
+  const row = document.createElement('div');
+  row.id = `tax-${use}`;
+  row.dataset.use = use;
+  row.style.cssText = 'display:flex;align-items:center;gap:5px';
+  const label = document.createElement('span');
+  label.style.cssText = 'opacity:0.75';
+  label.innerHTML = `${swatch(use)}${use}`;
+  const rate = document.createElement('span');
+  rate.style.cssText = 'min-width:2em;text-align:right';
+  const nudge = (points) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.style.cssText = NUDGE;
+    b.textContent = points > 0 ? '+' : '−';
+    b.title = `${points > 0 ? 'raise' : 'cut'} the ${use} tax by ${TAX_STEP} point`;
+    b.addEventListener('pointerdown', (e) => {
+      e.stopPropagation();
+      raiseTax(budget, use, points);
+    });
+    return b;
+  };
+  const less = nudge(-TAX_STEP);
+  const more = nudge(TAX_STEP);
+  row.append(label, rate, less, more);
+  return { row, rate, less, more };
+}
+
+function buildBooks(budget) {
+  const money = document.createElement('span');
+  money.id = 'money';
+  const net = document.createElement('span');
+  net.id = 'net';
+  net.style.cssText = 'opacity:0.8;margin-left:7px';
+  const head = document.createElement('div');
+  head.append(money, net);
+  const taxes = Object.fromEntries(DEMAND_USES.map((use) => [use, taxRow(budget, use)]));
+  const el = document.createElement('div');
+  el.id = 'books';
+  el.style.cssText = 'margin:5px 0 4px;padding-top:5px;'
+    + 'border-top:1px solid rgba(255,255,255,0.14)';
+  el.append(head, ...DEMAND_USES.map((use) => taxes[use].row));
+  return { el, money, net, taxes };
+}
+
+function showBooks(city, books) {
+  const budget = city.economy?.budget;
+  if (!budget) return;
+  const r = budgetReport(budget);
+  books.money.textContent = credits(r.money);
+  books.money.style.color = r.debt ? '#e8977d' : '#fff';
+  const shut = r.closed > 0
+    ? ` · ${r.closed} service${r.closed === 1 ? '' : 's'} shut`
+    : '';
+  books.net.textContent = `${r.net < 0 ? '▼' : '▲'} ${credits(r.net)}/min${shut}`;
+  books.el.dataset.money = `${r.money}`;
+  books.el.dataset.net = `${r.net}`;
+  for (const use of DEMAND_USES) {
+    const t = books.taxes[use];
+    const at = r.tax[use] ?? 0;
+    t.row.dataset.tax = `${at}`;
+    t.rate.textContent = `${at}`;
+    // A rate at a bound can go no further: the nudge dims rather than lies.
+    t.less.style.opacity = at <= 0 ? 0.3 : 1;
+    t.more.style.opacity = at >= TAX_MAX ? 0.3 : 1;
+  }
+}
+
 // A tool row names what the tool does and what it costs before it is used;
 // hovering one says the same in the help line (M5-7's half that lives here).
 const PUT_DOWN = 'right click or Esc puts the tool down';
@@ -137,6 +223,10 @@ function buildPalette(view, city) {
   title.innerHTML = '<b style="color:#fff">CITY VIEW</b> <span style="opacity:0.6">· z · street</span>';
   panel.appendChild(title);
   const demand = buildDemand();
+  // The books sit under the title and above the demand bars, so a tax moved a
+  // point at a time is answered by the demand it prices, in the same panel.
+  const books = city.economy?.budget ? buildBooks(city.economy.budget) : null;
+  if (books) panel.appendChild(books.el);
   panel.appendChild(demand.el);
   const rows = Object.values(TOOLS).map((tool) => {
     const row = document.createElement('div');
@@ -164,7 +254,7 @@ function buildPalette(view, city) {
   help.textContent = PUT_DOWN;
   panel.appendChild(help);
   document.body.appendChild(panel);
-  return { panel, rows, help, demand };
+  return { panel, rows, help, demand, books };
 }
 
 // What the held tool will do to the lot under the cursor (M5-7). A drag tool
@@ -427,6 +517,7 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
     hover(ui);
     showPalette(ui);
     showDemand(ui);
+    if (ui.books) showBooks(city, ui.books);
     ui.problems.frame(camera, view.lift);
     showCard(ui);
     showAsk(ui);
