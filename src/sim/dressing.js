@@ -15,7 +15,7 @@ import { DISTRICTS } from './world.js';
 import { worldSeed } from './seedstore.js';
 import { mulberry32 } from './rng.js';
 import { planLayout } from './layout.js';
-import { HAND_PINNED, placePinned } from './landmarks.js';
+import { HAND_PINNED, placePinned, riverWater } from './landmarks.js';
 import { spawnFor } from './spawn.js';
 
 // What the hand preset has always drawn. A shop is { x, z, ry, kind }: the sign
@@ -132,7 +132,7 @@ const face = (side) => (side < 0 ? Math.PI / 2 : -Math.PI / 2);
 
 function shopsFor(district, seed) {
   const a0 = district.avenues[0];
-  const ramen = placePinned(HAND_PINNED, a0, district.crossings).find((t) => t.id === 'ramen');
+  const ramen = placePinned(HAND_PINNED, a0, district.crossings, riverWater(seed)).find((t) => t.id === 'ramen');
   const shops = [{ x: a0.x + ramen.side * SHOP_OUT, z: ramen.z + RAMEN_SIGN_DZ, ry: face(ramen.side), kind: 0 }];
   const cands = [];
   for (const r of planLayout(district, seed).rows) {
