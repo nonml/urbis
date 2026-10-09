@@ -12,6 +12,14 @@
 // number, and tests/accept/m5-overlays.spec.js checks it against the sim on
 // five lots.
 //
+// M5.T29 adds the sixth data overlay, pollution: the field sim/pollution.js
+// already puts out — what the works lots smoke and what the busy roads carry —
+// shaded from clean air to soot on one ramp. Its value is that field at the
+// lot's own centre, so the overlay and the economy's price on it are one
+// number. The ring's own entry is the sim's (OVERLAYS, sim/cityview.js): the
+// key that walks it is the sim's, so the tint resolves the id the moment the
+// view is put on it.
+//
 // The land-value formula, written down:
 //   base     0.30  every lot is worth something
 //   wealth  +0.25  its district's wealth (economy.js d.wealth)
@@ -19,8 +27,10 @@
 //   service +0.20  the clinic, school and park reach covering it (ops.js)
 //   police  +0.20  a station inside its 100 m catchment (SERVICES.police)
 //   traffic -0.15  this hour's load on its frontage edge, over the busiest
-//                  edge's (traffic.js edgeLoad). M5.T28's pollution lands
-//                  here, as a term of its own.
+//                  edge's (traffic.js edgeLoad). M5.T28's pollution needs no
+//                  term of its own: it prices the demand above (economy.js
+//                  demandFor), which is already this lot's own number, so the
+//                  smoke beside a home lowers its value through it.
 // Each term is the sim's own number for this parcel, so the overlay cannot
 // drift from the economy. The wiring this module's files do not own is
 // game/scene.js, which builds the layer into the frame.
@@ -30,6 +40,7 @@ import { builtHeight } from '../sim/zoning.js';
 import { demandFor } from '../sim/economy.js';
 import { paintOf } from './cityview.js';
 import { SERVICES, inCatchment, serviceReach, servicesOf } from '../sim/ops.js';
+import { pollutionOf } from '../sim/pollution.js';
 import { frontageRoad } from '../sim/map.js';
 import { edgeLoad } from '../sim/traffic.js';
 
@@ -61,6 +72,8 @@ const RAMPS = {
   demand: ['#b0553b', '#c19436', '#6b9651'], cover: ['#6b9651', '#c19436', '#b0553b'],
   power: ['#8c3f2e', '#7d94a8'], value: ['#8e8b84', '#cbb168'],
   police: ['#b0553b', '#4d7aa6'], traffic: ['#9a978d', '#c19436', '#8c3f2e'],
+  // The sixth (M5.T29): clean air, a haze, soot — the sky over a works block.
+  pollution: ['#9a978d', '#a98b5f', '#3f3a2c'],
 };
 const STOPS = Object.fromEntries(Object.entries(RAMPS)
   .map(([name, hexes]) => [name, hexes.map((hex) => new THREE.Color(hex))]));
@@ -74,6 +87,8 @@ const SHADE = {
   cover: { ramp: 'cover', at: (v) => v, bare: true },
   police: { ramp: 'police', at: (v) => 1 - Math.min(1, v / SERVICES.police.radius), bare: true },
   traffic: { ramp: 'traffic', at: (v, t) => (t.busiest > 0 ? v / t.busiest : 0) },
+  // Pollution is already the field itself, so its ramp is walked straight.
+  pollution: { ramp: 'pollution', at: (v) => v },
 };
 // `bare` overlays shade a lot no station covers at the far end of its ramp,
 // rather than leaving it blank: a district with no police station reads rust all
@@ -167,6 +182,9 @@ export function overlayValue(id, city, view, i, ctx = {}, t = tablesOf(id, ctx))
   if (id === 'power') return (ctx.dark ?? (() => false))(p.powerZone) ? 0 : 1;
   if (id === 'police') return nearest(t, p);
   if (id === 'traffic') return t.load ? roadLoad(p, ctx, t) : null;
+  // Pollution: the field itself at the lot's own centre. Where no street is
+  // handed in the roads are silent, and the works lots still smoke.
+  if (id === 'pollution') return pollutionOf(p, city, ctx.street);
   if (id === 'value') return landValue(p, city, ctx, t);
   if (t.def) return coverFill(p, t);
   return null;
