@@ -202,6 +202,8 @@ export const OVERLAYS = [
   { id: 'police', name: 'police cover' },
   { id: 'value', name: 'land value' },
   { id: 'traffic', name: 'traffic' },
+  // The sixth data overlay (M5.T29): the pollution field, clean air to soot.
+  { id: 'pollution', name: 'pollution' },
   // One coverage overlay per service: how full the station covering the lot is.
   ...Object.keys(SERVICES).map((type) => ({ id: `cover:${type}`, name: `${SERVICES[type].name} cover` })),
 ];
