@@ -260,16 +260,16 @@
     {
       "id": "M3.R4",
       "lane": "traffic",
-      "goal": "tests/traffic.test.js is green again. On main two of its tests fail before any change: \"lanePoint settles both directions on the right of travel, 2.4 m out\" gets NaN, and \"a follower keeps its gap\" ends 13.5 m behind the stopped leader (bar < 0.5). Run: GATE_FULL=1 npx playwright test tests/traffic.test.js (4 s). Likely cause: a later change to src/sim/traffic.js (git log -- src/sim/traffic.js: M4.T10 movers on hills, M3.T35 commute) changed lanePoint or the follow logic. Read the diff of those commits, find the line that makes NaN and the stop gap, and fix traffic.js so all 5 tests pass. Never edit the test bars.",
+      "goal": "tests/traffic.test.js is green again by fixing the stale TEST, not the map. Two of its tests fail on main: \"lanePoint settles both directions\" gets NaN from a zero-length edge, and \"a follower keeps its gap\" uses the longest edge (579 m on seed 22), which no car can cover in the test's 300-tick budget. Do exactly this: (1) src/sim/map.js cutPoints: drop consecutive duplicate cut values so no edge runs from a node to itself — nothing else in map.js, never split or shorten roads; (2) tests/traffic.test.js: longestEdge(map, min, max = Infinity) takes an upper bound and the two car tests pass BUDGET_M = 190; the lanePoint sweep skips zero-length edges; no numeric bar changes. You ARE allowed and required to edit tests/traffic.test.js. tests/golden.test.js (the generated maps) must stay green; do not edit it or the goldens. Check: GATE_FULL=1 npx playwright test tests/traffic.test.js tests/golden.test.js",
       "files": [
         "src/sim/traffic.js",
         "src/sim/map.js",
         "tests/traffic.test.js"
       ],
       "needs": [],
-      "test": "tests/traffic.test.js",
+      "test": "tests/golden.test.js",
       "commit": "M3.R4 (M3-6): traffic unit tests green again",
-      "notes": "Size S. Found 2026-10-09 when M3.T40 stalled on these failures. Every shell command must exit by itself within 2 minutes. Director 2026-10-09 (after the worker proved traffic.js is unchanged and the map moved under the test): (a) fix src/sim/map.js so cutPoints never emits a zero-length edge (a=b), a real graph bug; (b) in tests/traffic.test.js pick an edge its tick budget fits (<= 240 m, the test's own intent) and keep every numeric bar exactly as it is. Retry 2 (2026-10-09): the last try solved it (5 passed) but was rejected on a stale file list. Redo exactly that: (1) src/sim/map.js cutPoints: drop consecutive duplicate cut values so no edge runs from a node to itself (seed 22 town.cr0.2 ran 0,-9 to 0,-9); (2) tests/traffic.test.js: longestEdge(map, min, max = Infinity) takes an upper bound and the two car tests pass BUDGET_M = 190 so the edge fits the 300-tick budget; the lanePoint sweep skips zero-length edges; no numeric bar changes. Do not touch citygen.js or townplan.js. Do not ask the director again."
+      "notes": "Size S. Retry 3 (2026-10-09): the last try split every road into 160 m pieces to pass the test; reverted. Do not change the generated city. Never read or write outside this worktree."
     },
     {
       "id": "M3.R5",
