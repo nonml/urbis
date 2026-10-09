@@ -329,7 +329,7 @@
       ],
       "test": "tests/accept/m3-traffic.test.js",
       "commit": "M3.T40b (M3-6): cars near a new road re-plan onto it",
-      "notes": "Size M. Never edit tests/, never split or shorten roads, never change map.js. Run only: GATE_FULL=1 npx playwright test tests/accept/m3-traffic.test.js tests/golden.test.js."
+      "notes": "Size M. Never edit tests/, never split or shorten roads, never change map.js. Run only: GATE_FULL=1 npx playwright test tests/accept/m3-traffic.test.js tests/golden.test.js. Retry 2026-10-10: 7c674ac passed only on a lane that still held M3.R6 (reverted on main: the town graph is 153 edges on seed 7 again, not 17). Start from main as it is; seed 11 now shows new roads laid 2, drove 0."
     },
     {
       "id": "M3.R7",

@@ -500,8 +500,14 @@ async function land(w) {
   }
   try {
     await shAsync('npm', ['run', 'gate'], w.dir, { GATE_PORT: String(w.gate) });
+    // The task's own check again, on the merged tree: main may have moved under
+    // the lane (M3.T40b passed on a lane that still held a reverted change).
+    if (w.task?.test) {
+      await shAsync('npx', ['playwright', 'test', '--workers', String(GATE_WORKERS), w.task.test], w.dir,
+        { GATE_PORT: String(w.gate), GATE_FULL: '1' });
+    }
   } catch (e) {
-    return `Main was merged into your worktree, and then npm run gate failed:\n${`${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n')}`;
+    return `Main was merged into your worktree, and then the gate or your task's check failed:\n${`${e.stdout ?? ''}${e.stderr ?? ''}`.split('\n').slice(-GATE_TAIL).join('\n')}`;
   }
   sh('git', ['merge', '--ff-only', '-q', `wt/${w.name}`], ROOT);
   return null;
