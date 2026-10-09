@@ -147,6 +147,16 @@ const FRESH_CARS = 8;
 // it left standing. Further than any lane's reach of the centre-line, so a car
 // re-tasked from one is off that ground, not in it.
 const GONE_CLEAR = 8;
+// M4.T17: the road in from outside. A quarter of the fleet comes from outside
+// it — the game ticks 16 cars (street.js CAR_COUNT), so four — and only ever
+// runs between the far end and the town, so the road in is driven rather than
+// standing empty. Half of them drive in and half drive out at boot; of the ones
+// standing in town, THROUGH_SHARE run the length of the town and leave by an
+// arterial end the other side — through traffic — and the rest turn round at the
+// far end, which is what a commuter does.
+const OUTSIDE_DIVISOR = 4;
+const OUTSIDE_SPLIT = 0.5;
+const THROUGH_SHARE = 0.5;
 
 // The lane a car drives: `dir` is the sign of travel along the edge's own a->b
 // order, and the lane sits LANE_OFF to the right of that travel. Right of
@@ -197,8 +207,28 @@ function indexes(state) {
   state.links = linksOf(state);
   state.spots = spotsOf(state);
   state.signals = signalNodes(state.map);
+  state.regional = regionalOf(state);
+  state.ends = endsOf(state);
   state.indexVersion = state.map.version;
   return true;
+}
+
+// The road in from outside (M4.T17, map.js's `outside`): the node at its far
+// end, out in the open land past the town, or null when the map has no road in.
+// Rebuilt with the indexes, so a road op that takes the road away takes the
+// traffic off it with it: a car from outside keeps its town trip and stands at
+// its destination, like any car cut off by an op.
+function regionalOf(state) {
+  const gate = state.map.outside?.gate;
+  return gate && state.byId.has(gate) ? gate : null;
+}
+
+// The ends the arterials leave the town by (map.js's `outside.ends`): every one
+// of them out past the town's own roads, where a car crossing the town leaves
+// it. Only the nodes the graph still has count, so a road op that takes one away
+// leaves through traffic the rest.
+function endsOf(state) {
+  return (state.map.outside?.ends ?? []).filter((id) => state.byId.has(id));
 }
 
 function readOps(state, oldBy, oldEdges) {
@@ -494,21 +524,67 @@ export function createTraffic(map, seed, count = 0) {
     links: new Map(), spots: [], signals: new Set(),
     fresh: [], freshUntil: -1, gone: [], closed: new Set(),
     flow: null, flowByDistrict: {},
+    regional: null, ends: [],
   };
   indexes(state);
-  for (let i = 0; i < count; i++) state.cars.push(makeCar(state));
+  // Cars from outside (M4.T17), on a map with a road in from outside: a quarter
+  // of the fleet. A map without one (the hand preset) keeps its whole fleet in
+  // town, so nothing there asks for a far end that does not exist.
+  const outside = state.regional ? Math.floor(count / OUTSIDE_DIVISOR) : 0;
+  for (let i = 0; i < count; i++) state.cars.push(makeCar(state, i >= count - outside));
   return state;
 }
 
 // A car in the shape tick reads and writes, carrying the renderer's interim
 // `axis` and `speed` (M3.T32 moves the renderer onto yaw and v).
-function makeCar(state) {
+function makeCar(state, outside = false) {
   const c = {
     id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null,
     axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
   };
-  if (!assignTrip(state, c, null, false)) assignTrip(state, c, null, true);
+  c.outside = outside;
+  // A car from outside (M4.T17) is placed on its own trip, or it is one more
+  // town car: a map with no road in has none.
+  if (!outside || !assignOutside(state, c)) {
+    if (!assignTrip(state, c, null, false)) assignTrip(state, c, null, true);
+  }
   return c;
+}
+
+// An outside car's first trip (M4.T17): between the far end and either a parcel
+// in town or an arterial end the other side of it, in either direction. So the
+// boot fleet holds cars driving in from the far end, cars driving out to it, and
+// through traffic that has crossed the town and is leaving it. It starts where
+// its trip starts, and only where the camera cannot see it — the rule every boot
+// car obeys (M3-6).
+function assignOutside(state, c) {
+  const gate = state.regional;
+  if (!gate) return false;
+  for (let tries = 0; tries < TRIP_TRIES; tries++) {
+    const to = state.rng() < THROUGH_SHARE ? pick(state.rng, state.ends)
+      : pick(state.rng, state.spots)?.node ?? null;
+    if (!to || to === gate) continue;
+    const inward = state.rng() < OUTSIDE_SPLIT;
+    if (placeOutside(state, c, inward ? gate : to, inward ? to : gate)) return true;
+  }
+  return false;
+}
+
+// Put a car on a trip between two nodes at the node it starts from, on the lane
+// its first edge carries. The lane has to be clear — exactly as a boot car's
+// does, so two cars from outside never stand on one spot — and the start has to
+// be out of the camera's view, so nothing the player can watch appears there.
+function placeOutside(state, c, from, to) {
+  if (!to || to === from) return false;
+  const route = findRoute(state, from, to);
+  if (!route || route.length === 0) return false;
+  const edge = state.edgeById.get(route[0]);
+  const dir = edge.a === from ? 1 : -1;
+  if (!clearAt(state, c, edge.id, dir, 0)) return false;
+  const at = pointOn(state.byId, edge, dir, 0);
+  if (!outOfView(state, at.x, at.z)) return false;
+  takeTrip(state, c, route, dir, 0, to, at);
+  return true;
 }
 
 // A new trip: from a parcel's node (`from`; a random one when null) to another
@@ -610,6 +686,9 @@ function flowTrip(state, c) {
 // runs on the trip stream exactly as before, and each of these draws on its own
 // stream, so neither shifts the random trips (M3-6).
 function rollTrip(state, c) {
+  // A car from outside (M4.T17) keeps its own round: in to town from the far
+  // end, and out again.
+  if (c.outside) return outsideTrip(state, c);
   if (freshTrip(state, c)) return true;
   let fallback = null;
   for (let tries = 0; tries < TRIP_TRIES; tries++) {
@@ -626,6 +705,34 @@ function rollTrip(state, c) {
   if (state.flowRng() < FLOW_PREF && flowTrip(state, c)) return true;
   if (!fallback) return false;
   return chainRoute(state, c, fallback.route, fallback.node);
+}
+
+// The next trip for a car from outside (M4.T17). Every one of them runs between
+// the far end and the town, because the road in is the door the outside world
+// has: standing at the far end it drives in, and standing in town it drives out
+// to it again. In town includes the arterial ends past it, so a through car
+// appears at the far end, runs the length of the town and leaves by an arterial
+// end the other side — and comes back the same way. The trip leaves through the
+// usual turn, like every other trip a car takes where it stands.
+function outsideTrip(state, c) {
+  const gate = state.regional;
+  if (c.goal !== gate) return driveOutside(state, c, gate);
+  // A share of the cars driving in run the length of the town instead of
+  // turning off at a parcel.
+  const through = state.flowRng() < THROUGH_SHARE;
+  const to = through ? pick(state.rng, state.ends)
+    : pick(state.rng, state.spots)?.node ?? null;
+  return driveOutside(state, c, to);
+}
+
+// A trip from where a car stands to another node, planned and chained through
+// the usual turn. False when there is no way there, or the lane it would leave
+// by is not clear: the car holds and tries again next tick, as any car does.
+function driveOutside(state, c, to) {
+  if (!to || to === c.goal) return false;
+  const route = findRoute(state, c.goal, to);
+  if (!route || route.length === 0) return false;
+  return chainRoute(state, c, route, to);
 }
 
 // A trip over a road the player has just laid (M3.T40, M3-6): from a node, along

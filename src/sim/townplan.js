@@ -33,6 +33,23 @@ export const BANK_RUN = 7;
 export const SETBACK = 8;
 export const RIVER_CORRIDOR = WATER_WIDTH + 2 * BANK_RUN + 2 * SETBACK;
 
+// The road in from outside (M4.T17): the town is not an island. It enters
+// at an edge of the map and runs to the northern arterial, so through-traffic
+// and commuters from outside have a way in. It comes down from the hills the
+// west and the north of this map are, and it enters at the edge the spawn camera
+// looks away from, so a car from outside appears and leaves where the camera
+// cannot see it (M3-6). It runs out to the town's own box plus the two margins
+// past it — the arterials' own ARTERIAL_MARGIN and the open land map.js's
+// BUILD_MARGIN keeps for the player's roads — so it is the outermost road the
+// map has and the map's build box stops a build margin past its far end. That
+// far end, out in open land with nothing built near it, is where a car from
+// outside appears and leaves.
+const REGIONAL_REACH = 200;
+// A through road, not a residential street.
+const REGIONAL_LANES = 4;
+// The regional road runs up the middle of a column, never along an arterial.
+const REGIONAL_ID = 'reg-0';
+
 // The river runs past the built cells so it reads across the whole map; an
 // arterial runs this far past them to meet whatever M5 lays outside.
 const RIVER_OVERHANG = 300;
@@ -128,6 +145,24 @@ function makeArterials(avenueXs, zLines, minX, maxX, minZ, maxZ) {
   return { avenues, crossings };
 }
 
+// The road in from outside (M4.T17): a single straight run from the map's own
+// edge south to the northern arterial, up the middle of a column the seed picks,
+// so the two towns' roads in never read the same. It lands on the arterial
+// exactly: its inner end is the crossing's own z, so nothing else cuts it and
+// the join is one node the whole graph shares. `zEdge` is the outermost row
+// boundary — the edge the built town's own roads reach — and nothing stands
+// between it and the plan's own box but its clearance, so the road crosses
+// nothing on the way out. z0 < z1, the avenue's own order, or a crossing does
+// not recognise this way as spanning it and the join is never cut.
+function makeRegional(rand, cellW, zEdge, maxZ) {
+  const x = roundHalf((rngInt(rand, 0, 1) === 1 ? 1 : -1) * cellW / 2);
+  return {
+    id: REGIONAL_ID, kind: 'regional', x,
+    z0: roundHalf(zEdge), z1: roundHalf(maxZ + REGIONAL_REACH),
+    lanes: REGIONAL_LANES,
+  };
+}
+
 export function planTown(seed) {
   const rand = mulberry32(seed);
   const counts = rowCounts(rand);
@@ -171,5 +206,6 @@ export function planTown(seed) {
     cells,
     river: makeRiver(riverZ, minX, maxX),
     arterials: makeArterials([minX, 0, maxX], sortedZ, minX, maxX, minZ, maxZ),
+    regional: makeRegional(rand, cellW, sortedZ[sortedZ.length - 1], maxZ),
   };
 }

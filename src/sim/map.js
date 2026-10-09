@@ -102,10 +102,14 @@ function addChain(nodes, edges, district, way, kind, axis, points) {
 // each cell's, and the arterials that join them, so shared junctions are one
 // node and a car can leave a cell and reach any other. The plan's own ways stay
 // first, so where the town's roads run through them a lookup reads the plan's.
+// The road in from outside (M4.T17) is cut with them, as one more avenue: it is
+// straight along z and nothing crosses it inside its own reach, so it stays one
+// edge, and its own kind is set below.
 function districtsGraph(cells, town, district) {
+  const regional = town.regional ? [town.regional] : [];
   const graph = buildGraph({
     id: 'town',
-    avenues: [...district.avenues, ...cells.flatMap((d) => d.avenues), ...town.arterials.avenues],
+    avenues: [...district.avenues, ...cells.flatMap((d) => d.avenues), ...town.arterials.avenues, ...regional],
     crossings: [...district.crossings, ...cells.flatMap((d) => d.crossings), ...town.arterials.crossings],
   });
   const own = new Set([...district.avenues, ...district.crossings].map((w) => w.id));
@@ -113,7 +117,58 @@ function districtsGraph(cells, town, district) {
     ...graph.edges.filter((e) => own.has(e.way)),
     ...graph.edges.filter((e) => !own.has(e.way)),
   ];
+  for (const e of graph.edges) if (e.way === town.regional?.id) e.kind = town.regional.kind;
   return graph;
+}
+
+// The road in from outside (M4.T17) as the traffic reads it: the way it cuts,
+// the edges that carry it, the far end out in the open land past the town, the
+// node it joins the arterials at, and the ends the arterials themselves leave
+// the town by. The far end is the end of it no arterial touches; null on a map
+// with no town (the hand preset).
+export function outsideOf(graph, town) {
+  const way = town?.regional;
+  if (!way) return null;
+  const edges = graph.edges.filter((e) => e.way === way.id);
+  if (edges.length === 0) return null;
+  const ids = new Set(edges.flatMap((e) => [e.a, e.b]));
+  const arterial = arterialNodes(graph, town);
+  const join = [...ids].find((id) => arterial.has(id));
+  const gate = [...ids].find((id) => id !== join);
+  if (!join || !gate) return null;
+  return {
+    way: way.id,
+    edges: edges.map((e) => e.id),
+    gate,
+    join,
+    // The trees an arterial runs out to, one edge each, all of them past the
+    // town's own roads: where a car crossing the town leaves it again.
+    ends: degreeOne(graph).filter((id) => arterial.has(id) && id !== gate),
+  };
+}
+
+// Every node with exactly one edge, in the graph's own order.
+function degreeOne(graph) {
+  const degree = new Map();
+  for (const e of graph.edges) {
+    degree.set(e.a, (degree.get(e.a) ?? 0) + 1);
+    degree.set(e.b, (degree.get(e.b) ?? 0) + 1);
+  }
+  return [...degree.keys()].filter((id) => degree.get(id) === 1);
+}
+
+// Every node an arterial edge touches. buildGraph cuts every way the same
+// whatever the way's own kind says (a crossing is a connector, an avenue an
+// avenue), so the way a road belongs to is the only thing that names an arterial.
+function arterialNodes(graph, town) {
+  const ways = new Set([...town.arterials.avenues, ...town.arterials.crossings].map((w) => w.id));
+  const nodes = new Set();
+  for (const e of graph.edges) {
+    if (!ways.has(e.way)) continue;
+    nodes.add(e.a);
+    nodes.add(e.b);
+  }
+  return nodes;
 }
 
 // A road crossing the water is a bridge (M4.T7): its edge takes kind `bridge`
@@ -242,6 +297,10 @@ export function createMap(seed) {
   const arc = arcFor(RAW_ARC, district);
   const graph = markBridges(districtsGraph(cells, town, district), water);
   const buildings = buildingsOf(plan);
+  // The road in from outside (M4.T17): its far end is the graph's own outermost
+  // node, so the build margin below keeps the open land a player may build on
+  // past it, and traffic appears and leaves there (sim/traffic.js).
+  const outside = outsideOf(graph, town);
   // The city's own land is never on the water or within its setback (M4-2):
   // a lot the load-time district's plan put there is refused, so nothing can
   // grow on the river. (The legacy street wall stands where planBuildings put
@@ -263,6 +322,8 @@ export function createMap(seed) {
     // every water crossing kind `bridge` (M4.T7).
     graph,
     town,
+    // The road in from outside (M4.T17), as { way, edges, gate, join }.
+    outside,
     // The town's water (M4.T3): terrain.buildable refuses a footprint in it or
     // its setback (M4.T5, M4.T7), and M4.T8 draws it. Rects are terrain's
     // [cx, cz, hw, hd].
