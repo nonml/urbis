@@ -40,6 +40,32 @@ const HURRY_PAN = 2.2;
 // the mark render/cityview.js draws under the cursor from M5.T3 on.
 const TOOL_PRICE = { res: 100, com: 120, ind: 150, unzone: 20 };
 
+// The treasury the city's books hold (M5.T17), or null for a city whose economy
+// has not opened them. The money is what a tool is weighed against here, in the
+// one place a tool's cost is priced (M5-7), so the panel, the card and the act
+// all read the same number.
+const TREASURY = (city) => city?.economy?.budget?.money ?? null;
+
+// The first reason the treasury cannot pay for `cost`, or null when it can. A
+// tool the city cannot pay for says so rather than acting and going without.
+export function moneyRefuse(city, cost) {
+  const money = TREASURY(city);
+  if (money === null || !Number.isFinite(cost)) return null;
+  return money < cost ? `the city cannot pay $${cost}` : null;
+}
+
+// Would the books refuse this tool for want of money, right now (M5-7)? The
+// panel, the help line and the card all read this one answer, so a tool the
+// money cannot pay says so in the same words wherever it is named. The two
+// placeholder-priced tools — a per-metre road, a per-height teardown — are not
+// weighed yet: at those prices the opening treasury cannot pay for a street or
+// for taking a tower down, which would refuse M5-1 outright. They follow when
+// the budget meters them; the zone brushes and the services are priced and
+// refuse today.
+export function affordTool(city, tool) {
+  return tool.money === false ? null : moneyRefuse(city, tool.cost(city, null));
+}
+
 function zoneTool(id, key, use, name, blurb) {
   return {
     id,
@@ -57,11 +83,11 @@ function zoneTool(id, key, use, name, blurb) {
       use,
       box: at && { x: at.x, z: at.z, w: at.w, d: at.d },
     }),
-    refuse: (map, at) => {
+    refuse: (city, at) => {
       if (!at) return 'no lot under the cursor';
       if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not rezoned`;
       if (at.zoned === use) return use === null ? 'already open land' : 'already zoned that';
-      return null;
+      return moneyRefuse(city, TOOL_PRICE[id]);
     },
   };
 }
@@ -69,6 +95,8 @@ function zoneTool(id, key, use, name, blurb) {
 // The road drag (M5.T3) is the one tool that is not a lot brush: a press on a
 // road node, a drag along one axis on the half-metre grid, a release that hands
 // the snapped ends to addRoad. It has no key yet — the palette picks it up.
+// Its price is still M5.T3's per-metre placeholder, so `money: false` keeps the
+// budget off it until the metre is priced (affordTool).
 const ROAD_PRICE = 40;          // dollars per metre, until M5.T17 meters costs
 
 export const ROAD_TOOL = {
@@ -77,12 +105,16 @@ export const ROAD_TOOL = {
   name: 'road',
   blurb: 'drags a new street into open land',
   drag: true,
+  money: false,
+  // Its price is per metre: the palette names the unit (ui/cityview.js) and the
+  // drag card shows what the dragged length comes to.
+  unit: '/m',
   cost: () => ROAD_PRICE,
 };
 
 // The bulldoze tool (M5.T5) is not a lot brush: its cursor holds a whole
 // parcel or a road edge, and a click runs one stage of `bulldoze` or takes the
-// edge out. Costs are provisional like the zone prices (M5.T17 meters them).
+// edge out. Its per-height price is provisional like the road's.
 const BULLDOZE_PRICE = { call: 25, height: 2, road: 6 };
 
 export const BULLDOZE_TOOL = {
@@ -90,6 +122,7 @@ export const BULLDOZE_TOOL = {
   use: 'bulldoze',
   name: 'bulldoze',
   blurb: 'tears down the building or road under the cursor',
+  money: false,
   cost: (map, at) => {
     if (!at) return BULLDOZE_PRICE.call;
     if (at.kind === 'road') return Math.round((at.length ?? 0) * BULLDOZE_PRICE.road);
@@ -125,7 +158,7 @@ function serviceTool(type) {
       }
       if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not built over`;
       if (at.stage !== STAGE.EMPTY) return 'bulldoze the building first';
-      return null;
+      return moneyRefuse(city, def.cost);
     },
     preview: (at) => ({
       kind: `service ${type}`,
