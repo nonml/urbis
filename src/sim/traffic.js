@@ -504,7 +504,7 @@ export function createTraffic(map, seed, count = 0) {
 // `axis` and `speed` (M3.T32 moves the renderer onto yaw and v).
 function makeCar(state) {
   const c = {
-    id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null,
+    id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null, stale: false,
     axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
   };
   if (!assignTrip(state, c, null, false)) assignTrip(state, c, null, true);
@@ -755,15 +755,53 @@ function routeOf(came, to) {
 // A road op changed the graph: a car whose route names an edge the map no
 // longer has is re-tasked from the nearest surviving node clear of the ground
 // the op took away, so a removed road empties of it within the step (M3-6) and
-// an added road can carry it later. A car with no route at all holds until the
-// next tick tries again.
+// an added road can carry it later. A car with no route at all holds at that
+// node until the next tick tries again.
+//
+// A car in a turn is between two lane points, and re-tasking it there would
+// jump it a lane's width in one step. It finishes its 0.6 s turn and is
+// re-tasked after (M3.T40b): left holding a route naming a road that is gone,
+// it reached the end of its leg and found no next edge to turn onto.
 function revalidate(state) {
   for (const c of state.cars) {
-    if (c.turn || c.route.length === 0) continue;
+    if (c.route.length === 0) continue;
     if (c.route.every((id) => state.edgeById.has(id)) && !routeClosed(state, c)) continue;
-    c.turn = null;
-    const node = nearestNode(state, c.x, c.z, state.gone);
-    if (!assignTrip(state, c, node ? node.id : null, true)) { c.route = []; c.v = 0; c.s = 0; }
+    if (c.turn) { c.stale = true; continue; }
+    retask(state, c);
+  }
+}
+
+function retask(state, c) {
+  c.turn = null;
+  const node = nearestNode(state, c.x, c.z, state.gone);
+  if (!assignTrip(state, c, node ? node.id : null, true)) holdAt(state, c, node);
+}
+
+// A car the op left with no trip still may not stand on the ground the op took
+// away: it waits at the node `retask` already picked, no route, until a tick
+// offers it one. Left where it was, it sits in the lane of a centre-line that
+// is no longer in the map — an op that splits the graph into one routable
+// component (a comb with its spine cut) can assign almost no car a trip, and
+// every one of them stays on the removed road for the ten seconds M3-6 counts.
+function holdAt(state, c, node) {
+  c.route = [];
+  c.v = 0;
+  c.s = 0;
+  if (!node) return;
+  c.goal = node.id;
+  c.x = node.x;
+  c.z = node.z;
+  c.y = groundAt(state.map, node.x, node.z);
+  c.prev.x = node.x;
+  c.prev.z = node.z;
+}
+
+// The cars a road op caught mid-turn, once they are standing in a lane again.
+function retaskStale(state) {
+  for (const c of state.cars) {
+    if (!c.stale || c.turn) continue;
+    c.stale = false;
+    retask(state, c);
   }
 }
 
@@ -876,6 +914,7 @@ export function tick(state, dt) {
     }
     beginTurn(state, c, edge, len);
   }
+  retaskStale(state);
   // One pass after the step puts every car on the ground, whichever branch
   // moved it — lane, turn or held at the line (M4.T10).
   for (const c of state.cars) c.y = groundAt(state.map, c.x, c.z);
