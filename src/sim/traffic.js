@@ -128,6 +128,26 @@ const TRIP_TRIES = 40;
 const TRIP_SEED = 0x51ed2701;
 const FLOW_SEED = 0x51ed3501;
 
+// M3.T40: a road the player lays is driven within the minute (M3-6). For
+// FRESH_SECS after an addRoad, cars take trips over it: the ones nearest the new
+// road are re-tasked for it, and a car that finishes a trip drives it next
+// rather than waiting on a random trip to happen to choose it. FRESH_RUN is the
+// longest drive, in metres, a car is sent over a new road for. It is set by the
+// grid, which is coarse: its blocks run to 250 m, so even the closest car in
+// the fleet stands several blocks — 700-800 m of driving, near a minute at VMAX
+// once the lights are counted — from a street laid across the far side of the
+// district. A cap under that sends nobody, and a new road carries no traffic at
+// all. FRESH_CARS keeps it to a handful, so the streets keep their own traffic
+// and only the nearest few turn.
+export const FRESH_SECS = 90;
+export const FRESH_RUN = 1200;
+const FRESH_CARS = 8;
+// A road op that takes ground away: cars standing on it re-task from a node
+// clear of it, so a removed road empties instead of keeping cars at the dead end
+// it left standing. Further than any lane's reach of the centre-line, so a car
+// re-tasked from one is off that ground, not in it.
+const GONE_CLEAR = 8;
+
 // The lane a car drives: `dir` is the sign of travel along the edge's own a->b
 // order, and the lane sits LANE_OFF to the right of that travel. Right of
 // (ux, uz) is (uz, -ux), so the two directions sit 2 * LANE_OFF apart.
@@ -161,15 +181,69 @@ function lengthOf(byId, edge) {
 // map.version, so a removed edge cannot keep a route alive behind the sim's
 // back (M3.T19). The trip spots — one per parcel, on the road it fronts — are
 // rebuilt with them, so a road op's new lots join the traffic.
+//
+// A rebuild is also where a road op is read as traffic: `fresh` is the edges the
+// op added and `gone` the ground it took away (M3.T40). A cut edge is not gone
+// ground — the op leaves its pieces standing on the same tarmac — so an old edge
+// counts as gone only when nothing of its centre-line survives.
 function indexes(state) {
   if (state.indexVersion === state.map.version) return false;
+  const had = state.indexVersion !== null;
+  const oldBy = state.byId;
+  const oldEdges = state.edgeById;
   state.byId = new Map(state.map.graph.nodes.map((n) => [n.id, n]));
   state.edgeById = new Map(state.map.graph.edges.map((e) => [e.id, e]));
+  if (had) readOps(state, oldBy, oldEdges);
   state.links = linksOf(state);
   state.spots = spotsOf(state);
   state.signals = signalNodes(state.map);
   state.indexVersion = state.map.version;
   return true;
+}
+
+function readOps(state, oldBy, oldEdges) {
+  state.fresh = [...state.edgeById.values()].filter((e) => !oldEdges.has(e.id));
+  if (state.fresh.length > 0) state.freshUntil = state.time + FRESH_SECS;
+  state.gone = [];
+  for (const edge of oldEdges.values()) {
+    if (state.edgeById.has(edge.id)) continue;
+    const a = oldBy.get(edge.a);
+    const b = oldBy.get(edge.b);
+    if (!a || !b || survivesOn(state, a, b)) continue;
+    state.gone.push({ a, b });
+  }
+  // The nodes on ground that went: a removed road leaves its ends standing, and
+  // a car that reaches one has nowhere to be but back where it came from.
+  state.closed = state.gone.length === 0 ? new Set()
+    : new Set(state.map.graph.nodes
+      .filter((n) => state.gone.some((g) => offSegment(n, g) <= GONE_CLEAR))
+      .map((n) => n.id));
+}
+
+// Whether any edge of the new graph still runs along the stretch between two
+// points: an op that cuts an edge leaves its pieces on that centre-line, and
+// only the road that is genuinely gone takes its ground with it.
+function survivesOn(state, a, b) {
+  const axis = Math.abs(a.x - b.x) < 1e-9 ? 'x' : 'z';
+  const lo = axis === 'x' ? Math.min(a.x, b.x) : Math.min(a.z, b.z);
+  const hi = axis === 'x' ? Math.max(a.x, b.x) : Math.max(a.z, b.z);
+  const cross = axis === 'x' ? a.z : a.x;
+  for (const e of state.edgeById.values()) {
+    if (e.axis !== axis) continue;
+    const p = state.byId.get(e.a);
+    const q = state.byId.get(e.b);
+    if (!p || !q) continue;
+    const pr = axis === 'x' ? p.x : p.z;
+    const qr = axis === 'x' ? q.x : q.z;
+    const at = axis === 'x' ? p.z : p.x;
+    const bt = axis === 'x' ? q.z : q.x;
+    if (Math.abs(at - cross) > 1e-9 || Math.abs(bt - cross) > 1e-9) continue;
+    // Overlap, not touch: a neighbour that butts up to this stretch shares no
+    // tarmac with it, and the road is gone.
+    if (Math.max(pr, qr) <= lo + 1e-9 || Math.min(pr, qr) >= hi - 1e-9) continue;
+    return true;
+  }
+  return false;
 }
 
 function linksOf(state) {
@@ -207,14 +281,30 @@ function nearerEnd(state, edge, p) {
   return Math.hypot(a.x - p.x, a.z - p.z) <= Math.hypot(b.x - p.x, b.z - p.z) ? a : b;
 }
 
-function nearestNode(state, x, z) {
+// The node nearest a point, skipping any that stands on one of `avoid`'s
+// stretches: a car re-tasked by a road op (M3.T40) goes from a node off the
+// ground the op took away. Every node refused answers with the plain nearest
+// one, so a map with no clear node still re-tasks.
+function nearestNode(state, x, z, avoid = null) {
   let best = null;
   let bestD = Infinity;
   for (const n of state.map.graph.nodes) {
     const d = Math.hypot(n.x - x, n.z - z);
-    if (d < bestD) { bestD = d; best = n; }
+    if (d >= bestD) continue;
+    if (avoid && avoid.some((g) => offSegment(n, g) < GONE_CLEAR)) continue;
+    bestD = d;
+    best = n;
   }
   return best;
+}
+
+// How far a point stands off a stretch of centre-line, 0 on it.
+function offSegment(p, g) {
+  const dx = g.b.x - g.a.x;
+  const dz = g.b.z - g.a.z;
+  const len2 = dx * dx + dz * dz;
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - g.a.x) * dx + (p.z - g.a.z) * dz) / len2));
+  return Math.hypot(p.x - (g.a.x + dx * t), p.z - (g.a.z + dz * t));
 }
 
 // --- The commute flow (M3.T35): every resident's trip on edges by hour ---
@@ -402,6 +492,7 @@ export function createTraffic(map, seed, count = 0) {
     want: count, nextId: 1, rng: mulberry32(seed ^ TRIP_SEED), cam: null,
     flowRng: mulberry32(seed ^ FLOW_SEED),
     links: new Map(), spots: [], signals: new Set(),
+    fresh: [], freshUntil: -1, gone: [], closed: new Set(),
     flow: null, flowByDistrict: {},
   };
   indexes(state);
@@ -439,17 +530,24 @@ function assignTrip(state, c, from, allowInView) {
     if (s0 === null) continue;
     const p = pointOn(state.byId, edge, dir, s0);
     if (!allowInView && !outOfView(state, p.x, p.z)) continue;
-    c.id = state.nextId;
-    state.nextId += 1;
-    c.route = route; c.leg = 0; c.dir = dir; c.s = s0; c.v = 0; c.turn = null;
-    c.goal = to.node; c.axis = edge.axis; c.speed = 0;
-    Object.assign(c, p);
-    c.y = groundAt(state.map, p.x, p.z);
-    c.prev.x = p.x;
-    c.prev.z = p.z;
+    takeTrip(state, c, route, dir, s0, to.node, p);
     return true;
   }
   return false;
+}
+
+// Put a car on a route at `s0` metres along its first edge, in the lane for the
+// direction it drives. Shared by the boot fleet, a re-tasked car and the spread
+// onto a new road, so all three place a car the one way.
+function takeTrip(state, c, route, dir, s0, goal, p) {
+  c.id = state.nextId;
+  state.nextId += 1;
+  c.route = route; c.leg = 0; c.dir = dir; c.s = s0; c.v = 0; c.turn = null;
+  c.goal = goal; c.axis = state.edgeById.get(route[0]).axis; c.speed = 0;
+  Object.assign(c, p);
+  c.y = groundAt(state.map, p.x, p.z);
+  c.prev.x = p.x;
+  c.prev.z = p.z;
 }
 
 // No other car within a car length and a gap of `s` on one lane: two cars at
@@ -506,11 +604,13 @@ function flowTrip(state, c) {
 
 // The next trip for a car standing at its destination: a new far parcel, driven
 // from here. The car turns out of its arrival lane into the new one over the
-// usual 0.6 s, so it never stops dead at the node and never jumps. Two trips
-// in five head where the commuters go instead (M3.T35). The random pick runs
-// first on the trip stream exactly as before, so sampling the flow never
-// shifts the random trips (M3-6); the flow choice draws on its own stream.
+// usual 0.6 s, so it never stops dead at the node and never jumps. A road the
+// player has just laid is taken first when one stands near (M3.T40), then two
+// trips in five head where the commuters go instead (M3.T35). The random pick
+// runs on the trip stream exactly as before, and each of these draws on its own
+// stream, so neither shifts the random trips (M3-6).
 function rollTrip(state, c) {
+  if (freshTrip(state, c)) return true;
   let fallback = null;
   for (let tries = 0; tries < TRIP_TRIES; tries++) {
     const to = pick(state.rng, state.spots);
@@ -526,6 +626,61 @@ function rollTrip(state, c) {
   if (state.flowRng() < FLOW_PREF && flowTrip(state, c)) return true;
   if (!fallback) return false;
   return chainRoute(state, c, fallback.route, fallback.node);
+}
+
+// A trip over a road the player has just laid (M3.T40, M3-6): from a node, along
+// the shortest way to one end of a new edge, then down that edge to the other
+// end. Left to chance a new street waits for a random trip to happen to choose it
+// — the first car can be two minutes out — so the road the player has just laid
+// carries traffic inside the minute. Returns { route, far }: `route` starts at
+// `from`, `far` is the node the trip ends at. `arriveOn` is the edge the car
+// reaches `from` over, so it is never sent straight back down it.
+function freshRoute(state, from, arriveOn = null) {
+  let best = null;
+  for (const edge of state.fresh) {
+    for (const near of [edge.a, edge.b]) {
+      const far = near === edge.a ? edge.b : edge.a;
+      if (far === from || !state.byId.has(near)) continue;
+      const approach = findRoute(state, from, near);
+      // No way to that end, so no trip: an approach that failed to plan is not
+      // an empty one. Treating it as empty builds a trip that claims to start at
+      // `from` and names only the new edge, which starts somewhere else entirely
+      // — the car is then chained onto an edge it is nowhere near and is driven
+      // across the map to reach it. An empty approach is only true when the car
+      // is already standing at the end it drives in at.
+      if (approach === null || (approach.length === 0 && from !== near)) continue;
+      // A car that reaches this end *from* the far one has to turn back down the
+      // edge it came along, and the lane swap cannot carry that; the trip goes in
+      // the other end instead. On a dead-end spur that leaves the junction end.
+      if (cameFrom(state, approach, near) === far) continue;
+      if (approach[approach.length - 1] === arriveOn) continue;
+      const route = [...approach, edge.id];
+      // Both ends of a street are weighed and the nearer one taken. Taking the
+      // first that works sends a car the long way round a spur to reach the far
+      // tip it could have entered at the junction, which costs it the minute
+      // M3-6 measures in.
+      const len = routeLen(state, route);
+      if (!best || len < best.len) best = { route, far, len };
+    }
+  }
+  return best;
+}
+
+// The node a route reached `node` from — the far end of its last edge.
+function cameFrom(state, route, node) {
+  if (route.length === 0) return null;
+  const edge = state.edgeById.get(route[route.length - 1]);
+  if (!edge) return null;
+  return edge.a === node ? edge.b : edge.a;
+}
+
+// A trip over a road the player has just laid, for a car standing at its
+// destination and free to take it now.
+function freshTrip(state, c) {
+  if (state.time > state.freshUntil) return false;
+  const over = freshRoute(state, c.goal);
+  if (!over || routeLen(state, over.route) > FRESH_RUN) return false;
+  return chainRoute(state, c, over.route, over.far);
 }
 
 function pick(rng, arr) {
@@ -545,8 +700,23 @@ function outOfView(state, x, z) {
   return (dx * Math.sin(cam.yaw) + dz * Math.cos(cam.yaw)) / d <= VIEW_DOT;
 }
 
+// Whether a car's remaining route stands on ground a road op has taken away: it
+// names an edge the map no longer has, or it reaches a node on that ground.
+function routeClosed(state, c) {
+  if (state.closed.size === 0) return false;
+  for (let i = c.leg; i < c.route.length; i++) {
+    const edge = state.edgeById.get(c.route[i]);
+    if (!edge) return true;
+    if (state.closed.has(edge.a) || state.closed.has(edge.b)) return true;
+  }
+  return false;
+}
+
 // A* over the graph, cost the edge length, heuristic the grid's Manhattan gap.
+// Ground a road op has taken away is not on the way anywhere: the route stops at
+// its border, so a trip is never planned back over a road that is not there.
 function findRoute(state, from, to) {
+  if (state.closed.has(from) || state.closed.has(to)) return null;
   const goal = state.byId.get(to);
   const g = new Map([[from, 0]]);
   const came = new Map();
@@ -560,6 +730,7 @@ function findRoute(state, from, to) {
     if (cur.id === to) return routeOf(came, to);
     closed.add(cur.id);
     for (const link of state.links.get(cur.id)) {
+      if (state.closed.has(link.to)) continue;
       const ng = g.get(cur.id) + link.len;
       if (ng >= (g.get(link.to) ?? Infinity)) continue;
       g.set(link.to, ng);
@@ -582,21 +753,62 @@ function routeOf(came, to) {
 }
 
 // A road op changed the graph: a car whose route names an edge the map no
-// longer has is re-tasked from the nearest surviving node, so a removed road
-// empties of it within the step and an added road can carry it later. A car
-// with no route at all holds until the next tick tries again.
+// longer has is re-tasked from the nearest surviving node clear of the ground
+// the op took away, so a removed road empties of it within the step (M3-6) and
+// an added road can carry it later. A car with no route at all holds until the
+// next tick tries again.
 function revalidate(state) {
   for (const c of state.cars) {
-    if (c.route.length === 0 || c.route.every((id) => state.edgeById.has(id))) continue;
+    if (c.turn || c.route.length === 0) continue;
+    if (c.route.every((id) => state.edgeById.has(id)) && !routeClosed(state, c)) continue;
     c.turn = null;
-    const node = nearestNode(state, c.x, c.z);
+    const node = nearestNode(state, c.x, c.z, state.gone);
     if (!assignTrip(state, c, node ? node.id : null, true)) { c.route = []; c.v = 0; c.s = 0; }
   }
 }
 
+// The cars a new road can claim (M3.T40, M3-6): every car that can reach it
+// inside FRESH_RUN has its trip run on over it, cheapest first, so the street
+// the player just laid carries traffic inside the minute instead of waiting on a
+// random trip to happen to choose it. Each car keeps the leg it is on — it is
+// mid-lane, and stopping it there would jump it — and plans from that leg's far
+// node, which is where it is going anyway. Cars reach a street they are not
+// standing near the same way, over a fresh trip taken at their destination.
+function replanNear(state) {
+  if (state.fresh.length === 0) return;
+  const plans = [];
+  for (const c of state.cars) {
+    if (c.turn || c.route.length === 0) continue;
+    if (!state.edgeById.has(c.route[c.leg])) continue;
+    // The cost is what decides: the metres left on this leg plus the drive over
+    // the new road is how long before the car is on the street the player laid.
+    const over = freshRoute(state, edgeEnd(state, c), c.route[c.leg]);
+    if (!over) continue;
+    // The trip runs on from the end of this leg, so its first edge has to leave
+    // that node. One that is this leg again is a U-turn the lane swap cannot
+    // carry, and splicing it in would put the car back where it came from.
+    if (over.route[0] === c.route[c.leg]) continue;
+    const left = lengthOf(state.byId, state.edgeById.get(c.route[c.leg])) - c.s;
+    const cost = left + routeLen(state, over.route);
+    if (cost <= FRESH_RUN) plans.push({ c, over, cost });
+  }
+  if (plans.length === 0) return;
+  plans.sort((p, q) => p.cost - q.cost);
+  for (const { c, over } of plans.slice(0, FRESH_CARS)) {
+    c.route = [...c.route.slice(0, c.leg + 1), ...over.route];
+    c.goal = over.far;
+  }
+}
+
+// The node at the far end of the edge a car is driving, in its own direction.
+function edgeEnd(state, c) {
+  const edge = state.edgeById.get(c.route[c.leg]);
+  return edge ? (c.dir > 0 ? edge.b : edge.a) : c.goal;
+}
+
 export function tick(state, dt) {
   state.time += dt;
-  if (indexes(state)) revalidate(state);
+  if (indexes(state)) { revalidate(state); replanNear(state); }
   tickFlow(state);
   const lanes = new Map();
   for (const c of state.cars) {

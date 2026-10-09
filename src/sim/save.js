@@ -257,6 +257,10 @@ function snapshotParcel(p) {
   // open uncapped, so only a painted one travels: a format-3 save, which has
   // none, keeps the heights the replay gave it.
   if (p.cap !== undefined && p.cap !== STAGE.HIGH) s.cap = p.cap;
+  // A ringing fire alarm (M5.T14): a deadline on the parcel, so it either
+  // travels or it stops ringing the moment the city is saved. Only a building
+  // with one carries the field, and a save that has none keeps it that way.
+  if (p.alarmUntil) s.alarmUntil = p.alarmUntil;
   return s;
 }
 
@@ -466,6 +470,10 @@ function applyParcel(p, s) {
     if (!Number.isInteger(s.cap) || s.cap < 0 || s.cap > STAGE.HIGH) throw new Error('save: bad cap');
     p.cap = s.cap;
   }
+  // The alarm's deadline, in the same plain seconds the sim keeps, and only
+  // when it is ringing: a parcel the replay never gave a field keeps none, so
+  // the loaded map is the map the seed laid.
+  if (s.alarmUntil !== undefined) p.alarmUntil = num(s.alarmUntil);
 }
 
 function applyBudget(budget, s) {

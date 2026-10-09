@@ -23,12 +23,13 @@ import { displaceToTerrain } from './landscape.js';
 import { heightAt, ROAD_HALF_WIDTH, WALKWAY_WIDTH } from '../sim/world.js';
 import { vistasOf } from '../sim/vistas.js';
 import { worldMap } from '../sim/patrol.js';
+import { graphBounds } from '../sim/map.js';
 import { tileSeed } from './chunks.js';
 import { mulberry32 } from '../sim/rng.js';
 
 // Where the outskirts are allowed to be: two bands south and east of the city.
-// The hand map keeps HAND_BANDS; a generated city lays them past its skyline
-// with bandsFor.
+// The hand map keeps HAND_BANDS; a generated city lays them past its town's own
+// outline with bandsFor.
 //
 // They wrap the south and the east only. West and north are the mountain
 // ranges: they stand MOUNTAIN_CLEAR outside the walk box to the west and north
@@ -51,18 +52,37 @@ const EAST_WIDTH = 104;  // the hand bands' own width
 // The nearest bound on the 2 (mod 4) ground lattice, outward.
 const onLattice = (v, up) => (up ? Math.ceil((v - 2) / 4) : Math.floor((v - 2) / 4)) * 4 + 2;
 
+// The town's outline: the box the town's own roads span. The downtown district
+// the map keeps and every cell of the town plan are cut inside it, and the
+// arterials that join the cells run out to its edge, so a band laid just past it
+// stands past every road the town has — a district's own walk box is a third of
+// that, and laying the bands off it put hedgerows, sheds and scrub inside the
+// town's outer districts.
+export function outlineFor(map) {
+  return map?.graph ? graphBounds(map.graph) : null;
+}
+
+// A district's own outline, for a caller holding no town: the box its roads and
+// its park span. bandsFor's default, so the hand map and the district tests lay
+// their bands exactly where they always did.
+const districtOutline = (district) => ({
+  minX: district.drive.minX, maxX: district.walk.maxX,
+  minZ: district.walk.minZ, maxZ: district.walk.maxZ,
+});
+
 // Returns the two farmland bands — south and east of the skyline, never under
-// it — for the given district and its planned vistas.
-export function bandsFor(district, vistas) {
+// it — for the given district and its planned vistas. `outline` is the town's
+// own (outlineFor); a district's stands in for it when there is no town.
+export function bandsFor(district, vistas, outline = districtOutline(district)) {
   const towers = [...vistas.caps, ...vistas.ring];
-  const eastFace = Math.max(district.walk.maxX, ...towers.map((t) => t.x + t.w / 2));
-  const southFace = Math.min(district.walk.minZ, ...towers.map((t) => t.z - t.d / 2));
+  const eastFace = Math.max(outline.maxX, ...towers.map((t) => t.x + t.w / 2));
+  const southFace = Math.min(outline.minZ, ...towers.map((t) => t.z - t.d / 2));
   const x0 = onLattice(eastFace + BAND_GAP, true);
   const z1 = onLattice(southFace - BAND_GAP, false);
   const z0 = z1 - SOUTH_DEPTH;
   return [
-    { x0: onLattice(district.drive.minX, true), x1: x0, z0, z1, inner: 'z' },
-    { x0, x1: x0 + EAST_WIDTH, z0, z1: onLattice(district.walk.maxZ, false), inner: 'x' },
+    { x0: onLattice(outline.minX, true), x1: x0, z0, z1, inner: 'z' },
+    { x0, x1: x0 + EAST_WIDTH, z0, z1: onLattice(outline.maxZ, false), inner: 'x' },
   ];
 }
 
@@ -71,20 +91,38 @@ const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
 const into = (b, x, z) => [clamp(x, b.x0, b.x1), clamp(z, b.z0, b.z1)];
 const nearest = (list, key, v) => list.reduce((best, o) => (Math.abs(o[key] - v) < Math.abs(best[key] - v) ? o : best));
 
+// Every way the town's roads run along — the downtown district's own, each
+// cell's, and the arterials that join them, which is the set map.js cuts into
+// one graph. A farm track leaves town on one of these, so it starts on a road a
+// player can drive out of town on.
+function waysOf(map) {
+  const cells = map.cells ?? [];
+  const arterials = map.town?.arterials ?? { avenues: [], crossings: [] };
+  return {
+    avenues: [map.district.avenues, ...cells.map((c) => c.avenues), arterials.avenues].flat(),
+    crossings: [map.district.crossings, ...cells.map((c) => c.crossings), arterials.crossings].flat(),
+  };
+}
+
 // The four tracks: an east-reaching crossing carried out east, a spine down
-// the east band, a spine across the south band, an avenue carried out south;
-// the bends and wanders are the hand map's own.
-export function lanesFor(district, [south, east]) {
-  const crossing = nearest(district.crossings.filter((c) => c.x1 === district.drive.maxX), 'z', (east.z0 + east.z1) / 2);
-  const avenue = nearest(district.avenues, 'x', (south.x0 + south.x1) / 2);
+// the east band, a spine across the south band, an avenue carried out south.
+// Every bend is a fraction of its band, so a band a kilometre long down a whole
+// town gets a spine that runs its length and not one that wanders in a corner.
+// `ways` is the town's own; a district's stands in for it (lanesFor's default).
+export function lanesFor(district, [south, east], ways = district) {
+  const far = Math.max(...ways.crossings.map((c) => c.x1));
+  const crossing = nearest(ways.crossings.filter((c) => c.x1 === far), 'z', (east.z0 + east.z1) / 2);
+  const avenue = nearest(ways.avenues, 'x', (south.x0 + south.x1) / 2);
   const ew = east.x1 - east.x0;
   const sw = south.x1 - south.x0;
+  const ed = east.z1 - east.z0;
+  const sd = south.z1 - south.z0;
   const cz = crossing.z;
   return [
     [[east.x0, cz], into(east, east.x0 + ew * 0.31, cz + 5), into(east, east.x0 + ew * 0.63, cz - 3), [east.x1, clamp(cz + 1, east.z0, east.z1)]],
-    [into(east, east.x0 + 18, east.z1 - 136), into(east, east.x0 + 24, east.z1 - 78), into(east, east.x0 + 20, east.z1 - 30), into(east, east.x0 + 15, east.z1)],
-    [into(south, south.x0, south.z1 - 28), into(south, south.x0 + sw * 0.39, south.z1 - 37), into(south, south.x0 + sw * 0.76, south.z1 - 28), into(south, south.x1, south.z1 - 35)],
-    [[avenue.x, south.z1], into(south, avenue.x + 5, south.z1 - 29), [avenue.x - 1, south.z0]],
+    [into(east, east.x0 + ew * 0.09, east.z1 - ed * 0.69), into(east, east.x0 + ew * 0.12, east.z1 - ed * 0.40), into(east, east.x0 + ew * 0.10, east.z1 - ed * 0.15), into(east, east.x0 + ew * 0.08, east.z1 - ed * 0.02)],
+    [into(south, south.x0, south.z1 - sd * 0.33), into(south, south.x0 + sw * 0.39, south.z1 - sd * 0.44), into(south, south.x0 + sw * 0.76, south.z1 - sd * 0.33), into(south, south.x1, south.z1 - sd * 0.42)],
+    [[avenue.x, south.z1], into(south, avenue.x + 5, south.z1 - sd * 0.35), [avenue.x - 1, south.z0]],
   ];
 }
 
@@ -121,10 +159,12 @@ const LANE_PAD = 12;           // lane steps this far outside a tile still matte
 const SCRUB_PER_M2 = 1 / 60;
 const YARD_SEED_SALT = 0x51a7;
 
-// Pool capacities. Sized against the ~18 tiles that can hold outskirts and be
-// resident at once from inside the district; claim() degrades to "place less"
-// rather than corrupting anything if a future world overruns them, and stats()
-// reports the starvation so it cannot pass silently.
+// Pool capacities. The bands wrap a whole town now, not one district's edge, so
+// a resident ring at the town's edge holds about 2,300 props against these —
+// measured, with every kind's peak inside its capacity (tests/accept/
+// m4-t13.spec.js fails the slice if any pool starves there). claim() degrades to
+// "place less" rather than corrupting anything if a future world overruns them,
+// and stats() reports the starvation so it cannot pass silently.
 const CAPACITY = {
   track: 400, hedge: 4000, fence: 3500, scrub: 2400,
   shed: 140, pole: 120, wire: 120, drum: 260, tree: 400,
@@ -473,7 +513,45 @@ function nearbyRoadSteps(bounds, buckets) {
 // the thing standing on it.
 const inRect = (r, x, z) => x >= r.x0 && x < r.x1 && z >= r.z0 && z < r.z1;
 
-function eligibleRects(bounds, bands) {
+// The town's water, grown by its own bank run (map.town.river, townplan's
+// BANK_RUN): the map says how wide its bank is, so no number lives here. Same
+// [centre x, centre z, half width, half depth] shape as the map's own rects.
+function waterKeep(map) {
+  const keep = map.town?.river?.bankRun ?? 0;
+  return (map.water ?? []).map(([cx, cz, hw, hd]) => [cx, cz, hw + keep, hd + keep]);
+}
+
+// A band cut into the rects that avoid the water. The river runs out past the
+// town on both sides (townplan's RIVER_OVERHANG), so a band down the east face
+// crosses it wherever the town's outline reaches the stream: without this the
+// east band grows sheds in the water. Each piece is at most four rects, and the
+// bank stop is the one a real field makes. `water` holds [cx, cz, hw, hd].
+function cutWater(rects, water) {
+  let parts = rects;
+  for (const [cx, cz, hw, hd] of water) {
+    const x0 = cx - hw, x1 = cx + hw;
+    const z0 = cz - hd, z1 = cz + hd;
+    const next = [];
+    for (const r of parts) {
+      const lo = Math.max(r.x0, x0);
+      const hi = Math.min(r.x1, x1);
+      const zo = Math.max(r.z0, z0);
+      const zi = Math.min(r.z1, z1);
+      if (lo >= hi || zo >= zi) {
+        next.push(r);
+        continue;
+      }
+      if (x0 > r.x0) next.push({ ...r, x1: x0 });
+      if (x1 < r.x1) next.push({ ...r, x0: x1 });
+      if (z0 > r.z0) next.push({ x0: lo, x1: hi, z0: r.z0, z1: z0 });
+      if (z1 < r.z1) next.push({ x0: lo, x1: hi, z0: z1, z1: r.z1 });
+    }
+    parts = next;
+  }
+  return parts;
+}
+
+function eligibleRects(bounds, bands, water) {
   const rects = [];
   for (const b of bands) {
     const r = {
@@ -482,7 +560,7 @@ function eligibleRects(bounds, bands) {
     };
     if (r.x1 - r.x0 > 1 && r.z1 - r.z0 > 1) rects.push(r);
   }
-  return rects;
+  return cutWater(rects, water).filter((r) => r.x1 - r.x0 > 1 && r.z1 - r.z0 > 1);
 }
 
 function nearbyLaneSteps(rect, laneSteps) {
@@ -523,7 +601,10 @@ function emitLanes(claim, pools, near, roads) {
     if (nearLane(roads, px, pz, ROAD_CLEAR)) continue;
     claim.place(pools.pole, upright(px, pz, r01(s.i, 3, FIELD_SEED) * Math.PI, 1),
       _tint.setScalar(0.85 + r01(s.i, 4, FIELD_SEED) * 0.3));
-    const next = s.steps[s.i + POLE_EVERY];
+    // The wire wants a pole at its far end. A span reaching across the water's
+    // cut — where the bank stops the track — would hang from one end with
+    // nothing holding the other up.
+    const next = near.find((n) => n.own && n.i === s.i + POLE_EVERY && n.steps === s.steps);
     if (!next) continue;
     const nx = next.x + next.dz * POLE_OFFSET;
     const nz = next.z - next.dx * POLE_OFFSET;
@@ -745,12 +826,14 @@ function buildPools() {
 // a release(), no Object3D — which is what tells chunks.js to hand slots back
 // instead of disposing geometry.
 export function buildOutskirts(map = worldMap()) {
-  // A generated map lays its bands past its own skyline; the hand preset keeps
-  // its tables.
+  // A generated map lays its bands and its tracks around its own town; the hand
+  // preset keeps its tables.
   const vistas = vistasOf(map);
-  const bands = vistas ? bandsFor(map.district, vistas) : HAND_BANDS;
-  const lanes = vistas ? lanesFor(map.district, bands) : HAND_LANES;
+  const outline = vistas ? outlineFor(map) ?? districtOutline(map.district) : null;
+  const bands = vistas ? bandsFor(map.district, vistas, outline) : HAND_BANDS;
+  const lanes = vistas ? lanesFor(map.district, bands, waysOf(map)) : HAND_LANES;
   const laneSteps = laneStepsOf(lanes);
+  const water = waterKeep(map);
   const pools = buildPools();
   const ground = buildOutskirtGround(bands);
   const meshes = [ground, ...Object.values(pools).map((p) => p.mesh)];
@@ -768,7 +851,7 @@ export function buildOutskirts(map = worldMap()) {
   }
 
   function build(bounds) {
-    const rects = eligibleRects(bounds, bands);
+    const rects = eligibleRects(bounds, bands, water);
     if (!rects.length) return null;
     const roadSteps = nearbyRoadSteps(bounds, roadsNow());
     const claim = createClaim();

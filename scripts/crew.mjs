@@ -466,6 +466,11 @@ function subjectOf(t) {
 
 function commitTask(w) {
   const t = w.task;
+  // Specs re-render docs/shots on every run; a task that does not own a shot must
+  // not commit the re-render (it only makes merge conflicts for the next lane).
+  if (!t.files.some((f) => f.startsWith('docs/shots'))) {
+    try { sh('git', ['checkout', 'HEAD', '--', 'docs/shots'], w.dir); } catch { /* none tracked */ }
+  }
   sh('git', ['add', '-A', '--', '.', ':(exclude,glob)**/.DS_Store'], w.dir);
   const why = `Task ${t.id}, filled by ${w.model} and checked by scripts/crew.mjs: task checks green, draws ${w.draws ?? 'not printed'}.`;
   // A lane sent back to merge main has already committed its work: nothing new to add.
