@@ -61,6 +61,37 @@ the 10,000-triangle budget and vertex-colours the body, then exports
 tools/models/make_person.py` writes elsewhere; it stops and names the missing
 tool if Blender or MPFB is not installed.
 
+## Landscape models (M2.F5)
+
+`make_landscape.py` needs nothing installed — no Blender, no trellis, standard
+library only, because these meshes are parametric and small:
+
+```bash
+python3 tools/models/make_landscape.py     # writes the six GLBs
+```
+
+| Model | Bytes | Tris | Verts |
+|---|---|---|---|
+| `tree_trunk.glb` | 10,100 | 288 | 200 |
+| `tree_branch.glb` | 36,340 | 700 | 860 |
+| `tree_canopy_oak.glb` | 31,440 | 320 | 640 |
+| `tree_canopy_lime.glb` | 31,440 | 320 | 640 |
+| `tree_canopy_plane.glb` | 31,440 | 320 | 640 |
+| `mountain_massif.glb` | 62,524 | 2,356 | 1,290 |
+
+Whole set 203 KB, wall time 0.07 s. One stem (a tapered tube with a root flare
+and noise on its radius), one set of five forking limbs, and a canopy per tree
+model — 16 alpha-cut leaf cards in each of ten leaf masses, 320 triangles, sky
+occlusion baked into the vertex colours. The massif file holds two forms: a
+rounded shoulder with a ridged crest, two lesser tops, rock under a snow line,
+meeting y = 0 so a copy lifted onto the terrain never floats.
+
+The script writes only the GLBs, into `public/assets/models/`. The renderers
+(`src/render/trees.js`, `src/render/landscape.js`) load them from there —
+`loadModelPool` in the browser, `readModel` and the models.js GLB reader in
+Node, where the builders are synchronous and there is no fetch — so no model
+bytes live in the source.
+
 ## M2.E1 — trellis.cpp (GGML/Metal) evaluation
 
 Run on the operator's Mac (Apple M3, 16 GB, macOS 26.6.2), 2026-10-06, by
