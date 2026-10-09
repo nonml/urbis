@@ -21,6 +21,7 @@ import { tickInterior, STREET, syncInterior, frameCamera, isIndoors } from '../s
 import { census, describe } from '../sim/people.js';
 import { liveNews } from '../sim/news.js';
 import { districtReport } from '../sim/economy.js';
+import { budgetReport } from '../sim/budget.js';
 import { pinDemand } from '../sim/decline.js';
 import { arcSnapshot, arcChoose, arcSkipStep } from '../sim/arc.js';
 import { forceTier, forceSearch, createWanted } from '../sim/wanted.js';
@@ -134,6 +135,10 @@ export function bindProbe(parts) {
       })),
     }),
     economy: () => districtReport(city),
+    // The city's books (M5.T17b): the money, the tax rates and the last game
+    // minute's figures, as budget.js's plain report — the same numbers the
+    // panel draws, so a test can watch the books close on the running game.
+    budget: () => budgetReport(city.economy.budget),
     // M0-1: the fixed-step count, a pause, the ?record=1 log and the state hash a
     // record/replay comparison reads — player, car, street, city (with its
     // economy), people and wanted.
