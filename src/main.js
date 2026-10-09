@@ -21,6 +21,9 @@ import { createHackables, syncHackables, aimTarget } from './sim/hackables.js';
 import { createPeople, tickPeople } from './sim/people.js';
 import { tickCommute, commuteLabel } from './sim/commute.js';
 import { createNews, tickNews, liveNews } from './sim/news.js';
+// On its own line, not folded into the one above: news-wire.spec.js greps that
+// import verbatim.
+import { pushNews } from './sim/news.js';
 import { chaseIn } from './sim/economy.js';
 import { STREET, createInterior, tickInterior, useDoor, occupiedParcel } from './sim/interior.js';
 import { serialize, deserialize } from './sim/save.js';
@@ -36,6 +39,7 @@ import { buildNews, showNews } from './render/news.js';
 import { createCityView, tickCityView, cityKey, easeLift } from './sim/cityview.js';
 import { createArc, tickArc } from './sim/arc.js';
 import { buildHistoryPanel } from './ui/history.js';
+import { placeHudPanels } from './ui/hudlayout.js';
 
 const DRAW_BUDGET = 175;
 // Fields a keypress typed into is text, never a command (game/input.js isTyping).
@@ -256,6 +260,10 @@ bindProbe({
 // here so a check compares the painted pixels with the live rows. The base
 // probe's economy() is the district report, which does not hold them.
 window.__game.history = () => city.economy.history;
+// The news feed's own push (M5.R1), capture-only like the rest of the probes
+// that move the world: a check makes the city repeat a line and reads the feed
+// fold it into one line with a count.
+if (CAPTURE) window.__game.pushNews = (text) => pushNews(news, text, street.time);
 const playerDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0, walkPhase: 0, mode: 'foot' };
 const carDraw = { x: 0, y: 0, z: 0, yaw: 0, speed: 0 };
 
@@ -391,5 +399,8 @@ function render() {
   tickHud(hud, hudCtx, {
     draws: lastDraws, tris: (renderer.info.render.triangles / 1e6).toFixed(2), dt, driving,
   });
+  // The HUD's corners (M5.R1): which column each panel stands in, laid out
+  // after tickHud has stacked the bottom-left ones upward.
+  placeHudPanels(hud, historyPanel);
 }
 render();

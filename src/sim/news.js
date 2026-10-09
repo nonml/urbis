@@ -158,17 +158,25 @@ export function newsBetween(before, after, city) {
   return lines;
 }
 
+// One line into the feed, the newest last, and the oldest dropped once the
+// feed holds more than NEWS_MAX. The city's own push (tickNews) and a check
+// that makes it repeat itself (main.js, behind ?capture=1) both come through
+// here, so a line is said one way however it arrived.
+export function pushNews(news, text, at) {
+  news.items.push({ at, text });
+  if (news.items.length > NEWS_MAX) news.items.splice(0, news.items.length - NEWS_MAX);
+}
+
 // One frame: now = snapshot(city, people, street). When news.last is not null,
 // every line of newsBetween(news.last, now, city) is pushed to news.items as {
 // at: street.time, text }. Then residents: when news.residents is null it
 // becomes now.residents; otherwise moved = now.residents - news.residents, and
 // when Math.abs(moved) >= CROWD the line `${moved} people moved into the city`
 // (moved > 0) or `${-moved} people moved out of the city` is pushed the same way
-// and news.residents becomes now.residents. Then news.last = now, and the oldest
-// items are dropped until there are at most NEWS_MAX.
+// and news.residents becomes now.residents. Then news.last = now.
 export function tickNews(news, city, people, street) {
   const now = snapshot(city, people, street);
-  const push = (text) => news.items.push({ at: street.time, text });
+  const push = (text) => pushNews(news, text, street.time);
   if (news.last !== null) newsBetween(news.last, now, city).forEach(push);
   if (news.residents === null) news.residents = now.residents;
   else {
@@ -179,11 +187,21 @@ export function tickNews(news, city, people, street) {
     }
   }
   news.last = now;
-  if (news.items.length > NEWS_MAX) news.items.splice(0, news.items.length - NEWS_MAX);
 }
 
 // The texts of the items younger than NEWS_SECS at street time `now` (now - at <
-// NEWS_SECS), oldest first.
+// NEWS_SECS), oldest first. A line the city says again straight away is one line
+// with a count — `5 people moved out of the city ×4` — because the feed holds
+// NEWS_MAX lines and a repeated line would otherwise spend all of them saying
+// one thing. Only back-to-back repeats fold: the same words later are a new
+// line, and its count starts again.
 export function liveNews(news, now) {
-  return news.items.filter((i) => now - i.at < NEWS_SECS).map((i) => i.text);
+  const folded = [];
+  for (const item of news.items) {
+    if (now - item.at >= NEWS_SECS) continue;
+    const last = folded[folded.length - 1];
+    if (last && last.text === item.text) last.n += 1;
+    else folded.push({ text: item.text, n: 1 });
+  }
+  return folded.map((f) => (f.n > 1 ? `${f.text} ×${f.n}` : f.text));
 }
