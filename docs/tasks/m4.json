@@ -242,20 +242,36 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M4.T12a",
+      "lane": "story",
+      "needs": [
+        "M4.T5"
+      ],
+      "goal": "The town's districts are the generated cells. map.districts today is splitDistricts(district) in src/sim/map.js: two power halves, south and north, of the load-time district, so tests/accept/m4-districts.test.js reads 2 districts on every seed. The town already has its cells (map.cells, M4.T3/M4.T4/M4.T5: towers, housing, works, suburb). Make map.districts the cells: each with its id, name and kind, each its own power zone (every parcel's powerZone is the id of the district it stands in, so districtAt(map, p.x, p.z).id === p.powerZone), its own street zone and its own economy district (city.economy.districts one per district). Every module that names 'south' or 'north' as a zone (grep powerZone and the two names in src/sim) reads the map's districts instead. First write in .scratch/m4-t12a.md every place that assumes two zones, one line each; then change them.",
+      "files": [
+        "src/sim/"
+      ],
+      "test": "tests/accept/m4-districts.test.js",
+      "commit": "M4.T12a (M4-1): the districts are the town's cells, each its own power and economy",
+      "notes": "Size L, at most 400 changed lines. Never edit tests/ or tests/golden/. These must stay green, run them before you finish: GATE_FULL=1 npx playwright test tests/accept/m4-districts.test.js tests/golden.test.js tests/map.test.js tests/accept/m3-districts.test.js tests/accept/m5-pollution.test.js tests/accept/m5-overlays.spec.js. If one of them asserts exactly two zones, stop and name it; do not work around it."
+    },
+    {
       "id": "M4.T12",
-      "lane": "city",
+      "lane": "story",
       "goal": "Story places across the town. A substation per district, pursuit homes, arc places, interiors' frames and the spawn (in the towers district) placed by the map, not by the first district",
       "files": [
         "src/sim/anchors.js",
         "src/sim/spawn.js",
-        "src/sim/landmarks.js"
+        "src/sim/landmarks.js",
+        "tests/accept/m4-story-places.spec.js"
       ],
       "needs": [
-        "M4.T5"
+        "M4.T5",
+        "M4.T12a"
       ],
       "commit": "M4.T12 (M4-1): story places across the town",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
-      "test": "tests/accept/m4-districts.test.js"
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. Write tests/accept/m4-story-places.spec.js first with @playwright/test (Node only is fine): on five seeds (7, 11, 22, 33, 73) every district has a substation inside it, pursuit homes and arc places stand inside the town and on a lot or building that exists in the map, and the spawn stands in the towers district; see it fail on main, then make it pass.",
+      "test": "tests/accept/m4-story-places.spec.js"
     },
     {
       "id": "M4.T13",
