@@ -7,8 +7,9 @@
 // `?speed=N` (M0.T3, 1 to 8) is a test flag: above 1 the frame is pinned to
 // exactly N fixed steps and dt is ignored, so a replay fed in by step ends in a
 // frame count a check can predict; 1 is the real-time accumulator M0-1 built,
-// and the value a game sets when it is not testing (M5.T35). Every step still
-// runs — the sim is never skipped forward.
+// and the value a game rests at when nothing else is asking for a pace — the
+// city view's own pause and 1x/2x/4x buttons (M5.T35) ride on it. Every step
+// still runs — the sim is never skipped forward.
 //
 // This module is game-side, not sim: it holds no state of its own beyond an
 // accumulator, the whole-step count (a replay stops on it), and the poses it
@@ -67,6 +68,16 @@ export function isPaused() { return paused; }
 // Wire the menu once there is a DOM; a Node import (tests) gets the state only.
 if (typeof document !== 'undefined') installPause({ setPaused, isPaused });
 
+// The overview's own pace (M5.T35, M5-17), read through the one module that
+// holds the overview (ui/cityview.js installs it once at boot): Space holds the
+// city view at 0 and its 1x/2x/4x buttons run that many fixed steps a frame. It
+// is installed rather than imported, because this module is the sim's doorway
+// for Node — the A/B runner (tests/accept/lib/ab.js) imports it for STEP and
+// boots the sim from a seed afterwards, and the city view's own module graph
+// builds a map at evaluation (law 5 keeps that out of here).
+let speedSource = null;
+export function setSpeedSource(read) { speedSource = read; return read; }
+
 export function createFixedStep(speed = readSpeed()) {
   return { acc: 0, alpha: 0, steps: 0, speed: clampSpeed(speed), total: 0 };
 }
@@ -101,7 +112,13 @@ export function advance(step, dt, end = Infinity) {
     frameAlpha = 0;
     return 0;
   }
-  const speed = step.speed ?? 1;
+  // The overview's own pace (M5.T35, M5-17) is the frame's resting speed: Space
+  // holds the city view at 0 and its 1x/2x/4x buttons run that many fixed steps
+  // a frame. Anything else the step was set to outranks it — M0.T3's ?speed=
+  // pin above, the probe's pause (game/probe.js) at 0 — so a replay's frame
+  // count and a script's hold work exactly as they did before.
+  const held = step.speed ?? 1;
+  const speed = held === 1 ? (speedSource?.() ?? 1) : held;
   if (speed > 1) {
     step.acc = 0;
     step.alpha = 0;
