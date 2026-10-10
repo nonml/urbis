@@ -11,8 +11,8 @@
 // ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
 import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
-import { frontageRoad, nodeAt } from './map.js';
-import { SERVICES, addRoad, bulldoze, placeService, removeRoad } from './ops.js';
+import { frontageRoad, nodeAt, ROAD_TYPES, roadTypeOf } from './map.js';
+import { SERVICES, addRoad, bulldoze, placeService, removeRoad, upgradeCost, upgradeRoad } from './ops.js';
 import { MAX_ROAD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
@@ -98,23 +98,40 @@ function zoneTool(id, key, use, name, blurb) {
 
 // The road drag (M5.T3) is the one tool that is not a lot brush: a press on a
 // road node, a drag along one axis on the half-metre grid, a release that hands
-// the snapped ends to addRoad. It has no key yet — the palette picks it up.
-// Its price is still M5.T3's per-metre placeholder, so `money: false` keeps the
-// budget off it until the metre is priced (affordTool).
-const ROAD_PRICE = 40;          // dollars per metre, until M5.T17 meters costs
-
-export const ROAD_TOOL = {
-  id: 'road',
-  use: 'road',
-  name: 'road',
-  blurb: 'drags a new street into open land',
-  drag: true,
-  money: false,
-  // Its price is per metre: the palette names the unit (ui/cityview.js) and the
-  // drag card shows what the dragged length comes to.
-  unit: '/m',
-  cost: () => ROAD_PRICE,
+// the snapped ends to addRoad. The drag picks a type (M5.T25, M5-10): the
+// palette holds a row per road type, and the row holds the drag, the price per
+// metre and the cross-section the road is drawn at. Prices are ROAD_TYPES' own
+// per metre; `money: false` keeps the budget off the drag until the metre is
+// metered, as it has been since M5.T3 — at these prices the opening treasury
+// cannot pay for a street, which would refuse M5-1 outright.
+const ROAD_TOOL = (id, type) => {
+  const def = ROAD_TYPES[type];
+  return {
+    id,
+    use: id,
+    type,
+    name: def.name,
+    blurb: `drags a new ${def.name} into open land`,
+    drag: true,
+    money: false,
+    unit: '/m',
+    cost: () => def.cost,
+  };
 };
+
+// The street is the palette's own row, so the id the panel has always given the
+// road tool stays with the two-lane street; an avenue and a one-way are the two
+// rows beside it. A held tool's `type` is what it lays.
+const ROAD_TOOL_STREET = ROAD_TOOL('road', 'street');
+const ROAD_TOOL_AVENUE = ROAD_TOOL('avenue', 'avenue');
+const ROAD_TOOL_ONEWAY = ROAD_TOOL('oneway', 'oneway');
+export const ROAD_TOOLS = [ROAD_TOOL_STREET, ROAD_TOOL_AVENUE, ROAD_TOOL_ONEWAY];
+
+// The half-width a road type is drawn and refused at: a lane is
+// ROAD_HALF_WIDTH's metres, so a street's two stand 3.5 m each side of its
+// centre line and an avenue's four twice as far. One number, so the drag
+// refuses at the width the pools then draw.
+const halfWidth = (type) => ((ROAD_TYPES[type]?.lanes ?? 2) / 2) * ROAD_HALF_WIDTH;
 
 // The bulldoze tool (M5.T5) is not a lot brush: its cursor holds a whole
 // parcel or a road edge, and a click runs one stage of `bulldoze` or takes the
@@ -172,7 +189,9 @@ function serviceTool(type) {
 }
 
 export const TOOLS = {
-  road: ROAD_TOOL,
+  road: ROAD_TOOL_STREET,
+  avenue: ROAD_TOOL_AVENUE,
+  oneway: ROAD_TOOL_ONEWAY,
   bulldoze: BULLDOZE_TOOL,
   res: zoneTool('res', 'r', 'res', 'residential', 'zones a lot for homes'),
   com: zoneTool('com', 'c', 'com', 'commercial', 'zones a lot for shops'),
@@ -241,6 +260,7 @@ export function layDownTool(view) {
   view.active = false;
   view.drag = null;
   view.pick = null;
+  view.road = null;
   view.confirm = null;
 }
 
@@ -278,6 +298,7 @@ export function createCityView(city, map = worldMap()) {
     hover: -1,
     drag: null,            // the road drag's snapped ends, while one is held
     pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
+    road: null,            // the road a road tool holds under its cursor (M5.T25)
     confirm: null,         // a road removal waiting on the page's ask (M5.T5)
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
@@ -297,6 +318,7 @@ export function toggleCityView(view, streetYaw) {
     view.hover = -1;
     view.drag = null;
     view.pick = null;
+    view.road = null;
     view.confirm = null;
     return;
   }
@@ -333,6 +355,7 @@ export function chooseTool(view, tool) {
   view.brush = tool.use;
   view.active = true;
   view.pick = null;
+  view.road = null;
   view.confirm = null;
 }
 
@@ -365,16 +388,18 @@ export function hoverPick(view, city, target) {
   }
 }
 
-// A click: the tool goes on the lot under the cursor, or — with the bulldozer —
-// on the whole parcel or road the cursor holds. Returns whether the world
-// changed. A tool the player put down acts nowhere. `shift` is the cap brush
-// (M5.T8): a zone tool paints the lot low-rise, the eraser lifts the cap back
-// off. It lands even where the zone itself is already set, so a lot the player
-// has no reason to rezone can still be capped.
+// A click: the tool goes on the lot under the cursor, on the whole parcel or
+// road the cursor holds with the bulldozer, or — with a road tool held (M5.T25)
+// — on the road under it. Returns whether the world changed. A tool the player
+// put down acts nowhere. `shift` is the cap brush (M5.T8): a zone tool paints
+// the lot low-rise, the eraser lifts the cap back off. It lands even where the
+// zone itself is already set, so a lot the player has no reason to rezone can
+// still be capped.
 export function paintLot(view, city, shift = view.shift) {
   if (view.mode !== 'city' || view.lift < 1) return false;
   const tool = toolOf(view);
-  if (!tool || tool.drag) return false;
+  if (!tool) return false;
+  if (tool.drag) return changeRoad(view, tool);
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
   if (tool.type) return buildService(view, city, tool);
   if (view.hover < 0) return false;
@@ -421,6 +446,7 @@ function adoptLots(view, city, map) {
   view.trend = lots.map(() => 0);
   view.hover = -1;
   view.pick = null;
+  view.road = null;   // the op renames the edges: nothing under the cursor now
 }
 
 // The map a view edits (M5.T5): the op runs on it, the picker reads its parcels.
@@ -483,9 +509,10 @@ export function dismissRoad(view) {
   view.confirm = null;
 }
 
-// The carriageway's footprint: the drag line swept half a road to each side.
-function roadBand(from, to, axis) {
-  const half = ROAD_HALF_WIDTH;
+// The carriageway's footprint: the drag line swept half a road to each side, at
+// the width the laid type is drawn with (M5.T25) — an avenue refuses a building
+// standing where its own lanes would run.
+function roadBand(from, to, axis, half) {
   return axis === 'x'
     ? { minX: Math.min(from.x, to.x), maxX: Math.max(from.x, to.x), minZ: from.z - half, maxZ: from.z + half }
     : { minX: from.x - half, maxX: from.x + half, minZ: Math.min(from.z, to.z), maxZ: Math.max(from.z, to.z) };
@@ -528,8 +555,8 @@ function roadDoubles(map, from, to, axis) {
 }
 
 // The first reason a straight road between the snapped ends cannot stand.
-function roadRefuse(map, from, to, axis) {
-  const band = roadBand(from, to, axis);
+function roadRefuse(map, from, to, axis, type = 'street') {
+  const band = roadBand(from, to, axis, halfWidth(type));
   const wet = (map.water ?? []).some(([cx, cz, hw, hd]) => overlaps(band, cx - hw, cx + hw, cz - hd, cz + hd));
   if (wet) return 'over water';
   const blocked = (map.parcels ?? []).some((p) => (p.kind !== 'lot' || p.stage > 0)
@@ -540,23 +567,27 @@ function roadRefuse(map, from, to, axis) {
   return null;
 }
 
-// The drag's live numbers, or null when no drag is on.
+// The drag's live numbers, or null when no drag is on. The price is the type's
+// own per metre (ROAD_TYPES), so the card names the same road the release lays.
 export function roadPreview(view) {
   const d = view.drag;
   if (!d) return null;
+  const type = d.type ?? 'street';
   const reason = d.length < ROAD_MIN
     ? `drag at least ${ROAD_MIN} m`
-    : roadRefuse(WORLDS.get(view).map, d.from, d.to, d.axis);
-  return { ...d, cost: Math.round(d.length * ROAD_PRICE), reason };
+    : roadRefuse(WORLDS.get(view).map, d.from, d.to, d.axis, type);
+  return { ...d, cost: Math.round(d.length * ROAD_TYPES[type].cost), reason };
 }
 
-// A press with the road tool: grab the road node nearest the ground point.
+// A press with a road tool: grab the road node nearest the ground point, and
+// remember the type the brush holds so the release lays the road it picked.
 export function pressRoad(view, x, z) {
   if (view.mode !== 'city' || view.lift < 1) return false;
   const hit = nodeAt(WORLDS.get(view).map, x, z);
   if (!hit || hit.dist > ROAD_PICK) return false;
   const n = hit.node;
-  view.drag = { from: { x: n.x, z: n.z }, to: { x: n.x, z: n.z }, axis: null, length: 0 };
+  const type = toolOf(view)?.type ?? 'street';
+  view.drag = { from: { x: n.x, z: n.z }, to: { x: n.x, z: n.z }, axis: null, length: 0, type };
   return true;
 }
 
@@ -571,17 +602,51 @@ export function moveRoad(view, x, z) {
 }
 
 // The release: addRoad on the snapped ends, then sign its new lots into the
-// live city. A refused drag is dropped without touching the map.
+// live city. addRoad lays a street (ops.js), so a drag of another type changes
+// the pieces it just laid to the type the drag picked — the fresh `op` edges
+// only, never a piece cut out of a standing road, which keeps its own lanes.
 export function releaseRoad(view) {
   const preview = roadPreview(view);
   view.drag = null;
   if (!preview || preview.reason) return false;
   const { map, city } = WORLDS.get(view);
+  const laid = map.graph.edges.slice();
   const version = map.version;
   addRoad(map, preview.from, preview.to);
   if (map.version === version) return false;
+  if (preview.type !== 'street') {
+    for (const e of map.graph.edges) {
+      if (e.way === 'op' && !laid.includes(e)) upgradeRoad(map, e, preview.type);
+    }
+  }
   adoptLots(view, city, map);
   return true;
+}
+
+// What a click on the road under the cursor offers (M5.T25, M5-10): the change
+// to the held type, and what it costs on top of the road standing there — the
+// difference per metre (ops.js upgradeCost), negative for a cheaper type. Null
+// when no road tool is held or no road is under the cursor.
+export function roadOffer(view) {
+  const tool = toolOf(view);
+  const held = view.road;
+  if (!tool?.type || !held || held.kind !== 'road') return null;
+  const from = roadTypeOf(held.edge);
+  const to = tool.type;
+  if (from === to) return { from, to, cost: 0, same: true };
+  return { from, to, cost: upgradeCost(WORLDS.get(view).map, held.edge, to) };
+}
+
+// A click on a road with a road tool held: the road changes to the held type in
+// place, for the difference in cost (M5-10). A click on open land is not a
+// drag's press, so it does nothing.
+function changeRoad(view, tool) {
+  const held = view.road;
+  if (!held || held.kind !== 'road' || roadTypeOf(held.edge) === tool.type) return false;
+  const { map } = WORLDS.get(view);
+  const version = map.version;
+  upgradeRoad(map, held.edge, tool.type);
+  return map.version !== version;
 }
 // WASD pans the overview, relative to the way it faces, the same axes the
 // player walks on. The pivot stays over the district floor.

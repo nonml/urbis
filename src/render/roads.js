@@ -6,6 +6,7 @@ import * as THREE from 'three';
 import { ROAD_HALF_WIDTH as ROAD_HALF, WALKWAY_WIDTH } from '../sim/world.js';
 import { WORLD_FURNITURE, rhythm } from '../sim/furniture.js';
 import { worldMap } from '../sim/patrol.js';
+import { ROAD_TYPES, roadTypeOf } from '../sim/map.js';
 import { loadPBRMaps, standardFromMaps } from './materials.js';
 import { buildInstancePools } from './buildings.js';
 import { refreshBuildGround } from './landscape.js';
@@ -20,6 +21,27 @@ const MARK_Y = 0.02;
 const MANHOLE_R = 0.55;
 const ROAD_SLACK = 96;  // headroom for a road op that adds a stretch (M3.T27)
 const BRIDGE_SLACK = 96;  // the same headroom for a bridge a road op brings
+const ARROW_SLACK = 96;   // headroom for a road op that turns roads into one-ways
+
+// The half-width a road is drawn at (M5.T25, M5-10): a lane is
+// ROAD_HALF_WIDTH's metres, so a street's two stand 3.5 m each side of its
+// centre line and an avenue's four twice as far out. The drag refuses at the
+// same number (sim/cityview.js halfWidth), so a road is never refused a width
+// the pools then fail to draw.
+const halfWidthOf = (edge) => ROAD_TYPES[roadTypeOf(edge)].lanes / 2 * ROAD_HALF;
+
+// The widest road drawn through a point: a junction's own square and its
+// crossings are sized by the widest way that meets there, not by a street.
+function widestAt(map, nodes, x, z) {
+  let half = ROAD_HALF;
+  for (const e of map.graph.edges) {
+    const a = nodes.get(e.a);
+    const b = nodes.get(e.b);
+    if (!a || !b) continue;
+    if ((a.x === x && a.z === z) || (b.x === x && b.z === z)) half = Math.max(half, halfWidthOf(e));
+  }
+  return half;
+}
 
 // One flat quad as a slot: the pool's unit plane turned to the ground, `across`
 // its x span and `along` its z span. One centred box: `y` is the slot's centre.
@@ -50,10 +72,12 @@ function endTrim(way, node) {
 // holds is drawn, whatever way laid it, so the road a player drags (M5.T3c)
 // appears the same frame its version change reaches the pools; a node with two
 // edges or more is a junction and trims them back, a dangling end keeps its
-// full half-width. A bridge edge is the one exception (M4.T8b): its deck is the
-// carriageway (bridgePieces), so no tarmac quad is laid over the deck and a
-// pick at the deck's middle names the bridge, not the road. The junction
-// squares still close the street at each end of the span.
+// full half-width. An avenue's tarmac is twice a street's (M5.T25), and a
+// junction with an avenue in it covers an avenue's mouth. A bridge edge is the
+// one exception (M4.T8b): its deck is the carriageway (bridgePieces), so no
+// tarmac quad is laid over the deck and a pick at the deck's middle names the
+// bridge, not the road. The junction squares still close the street at each
+// end of the span.
 function carriagewayPieces(map, nodes) {
   const degree = new Map();
   for (const e of map.graph.edges) {
@@ -62,26 +86,30 @@ function carriagewayPieces(map, nodes) {
   }
   const out = [];
   const junctionIds = new Set();
-  const trim = (id) => ((degree.get(id) ?? 0) > 1 ? ROAD_HALF : 0);
+  // An edge trims back at a junction by its own half-width: its tarmac runs
+  // right up to the square laid there, and no further.
+  const trim = (id, half) => ((degree.get(id) ?? 0) > 1 ? half : 0);
   for (const e of map.graph.edges) {
     const a = nodes.get(e.a);
     const b = nodes.get(e.b);
     if (!a || !b) continue;
     const vertical = a.x === b.x;
     const raw = vertical ? b.z - a.z : b.x - a.x;
-    const t0 = trim(e.a);
-    const t1 = trim(e.b);
+    const half = halfWidthOf(e);
+    const t0 = trim(e.a, half);
+    const t1 = trim(e.b, half);
     if (t0 > 0) junctionIds.add(e.a);
     if (t1 > 0) junctionIds.add(e.b);
     if (e.kind === 'bridge') continue;
     const span = Math.abs(raw) - t0 - t1;
     if (span <= 0) continue;
     const mid = (vertical ? a.z + b.z : a.x + b.x) / 2 + (Math.sign(raw) * (t0 - t1)) / 2;
-    out.push(vertical ? flat(a.x, mid, ROAD_HALF * 2, span) : flat(mid, a.z, span, ROAD_HALF * 2));
+    out.push(vertical ? flat(a.x, mid, half * 2, span) : flat(mid, a.z, span, half * 2));
   }
   for (const id of junctionIds) {
     const j = nodes.get(id);
-    out.push(flat(j.x, j.z, ROAD_HALF * 2, ROAD_HALF * 2));
+    const half = widestAt(map, nodes, j.x, j.z);
+    out.push(flat(j.x, j.z, half * 2, half * 2));
   }
   return out;
 }
@@ -144,12 +172,14 @@ function mark(out, x, z, across, along) {
 }
 
 // Center dashes down each avenue (10 cm x 3 m on a 6 m pitch) and along the two
-// crossings that carry them, edge by edge.
+// crossings that carry them, edge by edge. A one-way carries arrows down its
+// centre instead (arrowPieces), the way a real one-way is painted.
 function dashPieces(map, nodes, out) {
   const dash = 3;
   const clear = 0.5 + dash / 2;
   for (const way of map.district.avenues) {
     for (const e of edgesOf(map, way.id)) {
+      if (roadTypeOf(e) === 'oneway') continue;
       const a = nodes.get(e.a);
       const b = nodes.get(e.b);
       const from = Math.min(a.z, b.z) + endTrim(way, a) + clear;
@@ -170,13 +200,15 @@ function dashPieces(map, nodes, out) {
 }
 
 // Junction stripes: 35 cm wide on a 70 cm pitch, across each avenue a crossing
-// meets. A mid-block crossing is block.js's to wire (tests/streetscape-wire).
-function zebraPieces(map, out) {
+// meets, spanning the whole carriageway the widest road there is drawn at. A
+// mid-block crossing is block.js's to wire (tests/streetscape-wire).
+function zebraPieces(map, nodes, out) {
   const furniture = map.furniture ?? WORLD_FURNITURE;
   const junctions = furniture ? furniture.junctions
     : map.district.avenues.map((a) => ({ x: a.x, z: map.district.crossings[0].z }));
   for (const j of junctions) {
-    for (let i = -3; i <= 3; i++) mark(out, j.x + i * 0.7, j.z, 0.35, ROAD_HALF * 2 - 1);
+    const span = widestAt(map, nodes, j.x, j.z) * 2 - 1;
+    for (let i = -3; i <= 3; i++) mark(out, j.x + i * 0.7, j.z, 0.35, span);
   }
 }
 
@@ -204,15 +236,16 @@ function edgeLines(map, nodes, out) {
 
 // The dress a road a player dragged (way 'op') carries (M5.T3d): a walk and a
 // kerb per side, centre dashes and edge lines, so a new street reads between
-// its lots the way a generated avenue does. The district's own ways keep the
-// tables above; only the graph's op edges are walked here. End lines stop a
-// road's half-width short of each end, so paint never runs into a junction.
+// its lots the way a generated avenue does. Every offset stands clear of the
+// road's own half-width (M5.T25), so an avenue's walks flank its four lanes
+// where a street's flank its two. End lines stop a road's half-width short of
+// each end, so paint never runs into a junction. A one-way carries arrows down
+// its centre instead of dashes (arrowPieces).
 function opDress(map, nodes) {
   const walks = [];
   const kerbs = [];
   const markings = [];
   const dash = 3;
-  const clear = ROAD_HALF + 0.6;
   for (const e of map.graph.edges) {
     if (e.way !== 'op') continue;
     const a = nodes.get(e.a);
@@ -220,10 +253,12 @@ function opDress(map, nodes) {
     if (!a || !b) continue;
     const vertical = a.x === b.x;
     const len = Math.abs(vertical ? b.z - a.z : b.x - a.x);
+    const half = halfWidthOf(e);
+    const clear = half + 0.6;
     if (len <= 2 * clear) continue;
     const mid = (vertical ? a.z + b.z : a.x + b.x) / 2;
-    const walkOff = ROAD_HALF + WALKWAY_WIDTH / 2;
-    const kerbOff = ROAD_HALF + KERB_WIDTH / 2;
+    const walkOff = half + WALKWAY_WIDTH / 2;
+    const kerbOff = half + KERB_WIDTH / 2;
     for (const side of [-1, 1]) {
       walks.push(vertical
         ? slab(a.x + side * walkOff, 0, mid, WALKWAY_WIDTH, WALK_RISE, len)
@@ -234,19 +269,122 @@ function opDress(map, nodes) {
     }
     const lo = (vertical ? Math.min(a.z, b.z) : Math.min(a.x, b.x)) + clear;
     const hi = (vertical ? Math.max(a.z, b.z) : Math.max(a.x, b.x)) - clear;
-    for (const v of rhythmIn(3, 6, lo + dash / 2 + 0.5, hi - dash / 2 - 0.5)) {
-      if (vertical) mark(markings, a.x, v, 0.10, dash);
-      else mark(markings, v, a.z, dash, 0.10);
+    if (roadTypeOf(e) !== 'oneway') {
+      for (const v of rhythmIn(3, 6, lo + dash / 2 + 0.5, hi - dash / 2 - 0.5)) {
+        if (vertical) mark(markings, a.x, v, 0.10, dash);
+        else mark(markings, v, a.z, dash, 0.10);
+      }
     }
     for (const side of [-1, 1]) {
       if (vertical) {
-        for (const [zc, span] of zoneSplit(lo, hi)) mark(markings, a.x + side * EDGE_LINE_OUT, zc, 0.10, span);
+        for (const [zc, span] of zoneSplit(lo, hi)) mark(markings, a.x + side * (half + 0.2), zc, 0.10, span);
       } else {
-        mark(markings, (lo + hi) / 2, a.z + side * EDGE_LINE_OUT, hi - lo, 0.10);
+        mark(markings, (lo + hi) / 2, a.z + side * (half + 0.2), hi - lo, 0.10);
       }
     }
   }
   return { walks, kerbs, markings };
+}
+
+// Every painted quad of a one-way (M5.T25, M5-10): an arrow every ARROW_PITCH
+// metres, anchored at the edge's middle so a road reads the same whichever end
+// a player drags it from and pointing the way the road is driven (a one-way
+// runs from its `a` node to its `b`, sim/map.js lanesInDir). An arrow is a
+// painted shaft with a two-arm head: three quads, one marking. It rides the
+// marking materials so a blackout dims it with the rest of the road's paint.
+const ARROW_PITCH = 24;    // metres between arrows along a one-way
+const ARROW_LEN = 0.6;     // metres of arrow per metre of the road's half-width
+const SHAFT_W = 0.16;      // metres wide a painted line is, as the dashes are
+// A painted bar `across` wide and `along` long lying on the ground, turned so
+// its length runs `u` (a flat quad's length runs its own +y, and a rz of
+// atan2 lays that down along any ground direction).
+function bar(x, z, across, along, u) {
+  return { ...markSlot(x, z, across, along), rz: Math.atan2(-u.x, -u.z) };
+}
+
+function arrowAt(p, u, v, len) {
+  const out = [bar(p.x, p.z, SHAFT_W, len * 0.8, u)];
+  const tip = { x: p.x + u.x * len * 0.42, z: p.z + u.z * len * 0.42 };
+  for (const side of [-1, 1]) {
+    const d = { x: u.x * 0.78 + v.x * side * 0.63, z: u.z * 0.78 + v.z * side * 0.63 };
+    const n = Math.hypot(d.x, d.z);
+    d.x /= n;
+    d.z /= n;
+    out.push(bar(tip.x - d.x * len * 0.13, tip.z - d.z * len * 0.13, SHAFT_W, len * 0.42, d));
+  }
+  return out;
+}
+
+function arrowPieces(map, nodes) {
+  const out = [];
+  for (const e of map.graph.edges) {
+    if (roadTypeOf(e) !== 'oneway') continue;
+    const a = nodes.get(e.a);
+    const b = nodes.get(e.b);
+    if (!a || !b) continue;
+    const vertical = a.x === b.x;
+    const span = vertical ? b.z - a.z : b.x - a.x;
+    const half = halfWidthOf(e);
+    const clear = half + 0.6;
+    const lo = (vertical ? Math.min(a.z, b.z) : Math.min(a.x, b.x)) + clear;
+    const hi = (vertical ? Math.max(a.z, b.z) : Math.max(a.x, b.x)) - clear;
+    if (lo >= hi) continue;
+    const mid = (vertical ? a.z + b.z : a.x + b.x) / 2;
+    const line = vertical ? a.x : a.z;
+    const u = vertical ? { x: 0, z: Math.sign(span) } : { x: Math.sign(span), z: 0 };
+    const v = { x: u.z, z: -u.x };
+    const len = half * ARROW_LEN;
+    const at = (k) => (vertical ? { x: line, z: k } : { x: k, z: line });
+    for (let k = mid; k >= lo; k -= ARROW_PITCH) out.push(...arrowAt(at(k), u, v, len));
+    for (let k = mid + ARROW_PITCH; k <= hi; k += ARROW_PITCH) out.push(...arrowAt(at(k), u, v, len));
+  }
+  return out;
+}
+
+// A one-way's arrows, pooled (M5.T25): one InstancedMesh per power zone, so
+// each zone's paint dims with that zone's blackout, and sized at boot like the
+// manholes' own pool — a map with no one-way has no arrow to size from, and a
+// pool built empty could never draw one. `update` rewrites the instances the
+// map now carries.
+const ARROW_GEO = new THREE.PlaneGeometry(1, 1);
+
+function buildArrowPool(materials, slots) {
+  const counts = [0, 0];
+  for (const s of slots) counts[s.kind] += 1;
+  const meshes = [0, 1].map((kind) => {
+    const mesh = new THREE.InstancedMesh(ARROW_GEO, materials[kind], Math.max(1, counts[kind]) + ARROW_SLACK);
+    mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.name = 'arrows';
+    return mesh;
+  });
+  const at = new THREE.Vector3();
+  const quat = new THREE.Quaternion();
+  const euler = new THREE.Euler();
+  const size = new THREE.Vector3();
+  const m = new THREE.Matrix4();
+  const update = (list = slots) => {
+    const used = [0, 0];
+    for (const s of list) {
+      const mesh = meshes[s.kind];
+      const i = used[s.kind]++;
+      if (!mesh || i >= mesh.instanceMatrix.count) continue;
+      at.set(s.x, s.y ?? 0, s.z);
+      size.set(s.w, s.h, s.d ?? 1);
+      quat.setFromEuler(euler.set(s.rx ?? 0, s.ry ?? 0, s.rz ?? 0));
+      mesh.setMatrixAt(i, m.compose(at, quat, size));
+    }
+    for (const [kind, mesh] of meshes.entries()) {
+      mesh.count = used[kind];
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+    }
+  };
+  update();
+  const group = new THREE.Group();
+  for (const mesh of meshes) group.add(mesh);
+  return { group, meshes, update };
 }
 
 // Every road piece of a map, before a pool exists, keyed to the edge or
@@ -259,7 +397,7 @@ export function roadPieces(map = worldMap(), extras = {}) {
   const op = opDress(map, nodes);
   const markings = [];
   dashPieces(map, nodes, markings);
-  zebraPieces(map, markings);
+  zebraPieces(map, nodes, markings);
   edgeLines(map, nodes, markings);
   const manholes = [];
   for (const way of map.district.avenues) {
@@ -272,6 +410,7 @@ export function roadPieces(map = worldMap(), extras = {}) {
     walks: [...paving.walks, ...op.walks, ...(extras.walks ?? [])],
     kerbs: [...paving.kerbs, ...op.kerbs, ...(extras.kerbs ?? [])],
     markings: [...markings, ...op.markings, ...(extras.markings ?? [])],
+    arrows: arrowPieces(map, nodes),
     manholes,
     bridges: bridgePieces(map),
   };
@@ -398,6 +537,12 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
   const markings = buildInstancePools(markingMats, pieces.markings, {
     shape: 'plane', castShadow: false, receiveShadow: false, slack: ROAD_SLACK,
   });
+  // A one-way's arrows (M5.T25): painted on the marking materials, so a
+  // blackout dims them with the rest of the road's paint, but in a pool of
+  // their own — one draw while a one-way is drawn at all, and none while the
+  // map holds no one-way, which every generated map does not.
+  const arrows = buildArrowPool(markingMats, pieces.arrows);
+  group.add(arrows.group);
   const manholes = buildCirclePool(
     new THREE.MeshStandardMaterial({ color: 0x14171c, roughness: 0.7, metalness: 0.4 }),
     pieces.manholes, ROAD_SLACK,
@@ -408,6 +553,9 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     for (const mesh of pool.meshes) mesh.name = 'road';
     group.add(pool.group);
   }
+  // The arrows answer to their own name: a pick at a one-way's middle names
+  // the arrow it is drawn with.
+  group.add(arrows.group);
   manholes.mesh.name = 'road';
   group.add(manholes.mesh);
   // Bridge decks and railings ride their own pools (M4.T8): one draw each
@@ -437,6 +585,7 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     walks.update(p.walks);
     kerbs.update(p.kerbs);
     markings.update(p.markings);
+    arrows.update(p.arrows);
     manholes.update(p.manholes);
     deck.update(p.bridges.decks);
     rails.update(p.bridges.rails);
@@ -447,7 +596,7 @@ export function buildRoads(texLoader, maxAniso, map = worldMap(), extrasOf = () 
     group,
     mats: { road: roadMat, walk: walkMat, curb: curbMat },
     markings: markingMats,
-    pools: { road, walks, kerbs, markings, manholes, deck, rails },
+    pools: { road, walks, kerbs, markings, arrows, manholes, deck, rails },
     river,
     update,
   };

@@ -6,10 +6,11 @@ import { PROBLEM, describe } from '../sim/decline.js';
 import { STAGE } from '../sim/zoning.js';
 import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
-  TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick, layDownTool,
-  lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad, roadPreview,
-  toolOf, zoomCityView,
+  TOOLS, ROAD_TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick,
+  layDownTool, lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad,
+  roadOffer, roadPreview, toolOf, zoomCityView,
 } from '../sim/cityview.js';
+import { ROAD_TYPES } from '../sim/map.js';
 import { paintOf } from '../render/cityview.js';
 import { buildProblems } from '../render/problems.js';
 
@@ -58,9 +59,13 @@ const ASK = [
   'padding:12px 16px', 'border-radius:6px', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
 ].join(';');
 
+// The three road tools are one mark: a street, an avenue and a one-way all
+// paint the road's own swatch (M5.T25).
+const ROAD_USE = new Set(ROAD_TOOLS.map((tool) => tool.use));
+
 function swatch(use) {
   return `<span style="display:inline-block;width:9px;height:9px;margin-right:6px;`
-    + `background:${paintOf(use)};border-radius:2px"></span>`;
+    + `background:${paintOf(ROAD_USE.has(use) ? 'road' : use)};border-radius:2px"></span>`;
 }
 
 // Demand bars (M5.T27): three rows — res, com, ind — for the district under the
@@ -209,7 +214,7 @@ function showBooks(city, books) {
 
 // A tool row names what the tool does and what it costs before it is used;
 // hovering one says the same in the help line (M5-7's half that lives here). A
-// price per metre names its unit (ROAD_TOOL), and a tool the treasury cannot
+// price per metre names its unit (ROAD_TOOLS), and a tool the treasury cannot
 // pay for says that instead of the number.
 const PUT_DOWN = 'right click or Esc puts the tool down';
 
@@ -271,12 +276,32 @@ function toolNote(view, city, at) {
   return `<br>◆ ${tool.preview(at).kind} · $${tool.cost(city, at)}`;
 }
 
-// The held road drag: its snapped length and cost, or why it cannot land.
+// The held road drag (M5.T3): its snapped length and cost, or why it cannot
+// land. The card names the type the drag picked (M5.T25).
 function dragCard(view) {
   const p = roadPreview(view);
+  const name = ROAD_TYPES[p.type ?? 'street'].name.toUpperCase();
   const line = `${p.length.toFixed(1)} m · $${p.cost}`;
   const why = p.reason ? `<br><span style="color:#e8977d">✕ ${p.reason}</span>` : '';
-  return `${swatch('road')}<b style="color:#fff">NEW STREET</b><br>${line}${why}`;
+  return `${swatch('road')}<b style="color:#fff">NEW ${name}</b><br>${line}${why}`;
+}
+
+// The road a road tool holds under its cursor (M5.T25, M5-10): what a click
+// offers — the change to the held type and its cost, the difference per metre
+// — or why there is nothing to change. The offer and its cost ride `data-*`
+// the way the demand bars keep theirs (M5.T27).
+function roadCard(view) {
+  const tool = toolOf(view);
+  const offer = roadOffer(view);
+  const name = ROAD_TYPES[tool.type].name;
+  if (offer.same) {
+    return `${swatch('road')}<b style="color:#fff">${name.toUpperCase()}</b>`
+      + `<br>already a ${name} — nothing to change`;
+  }
+  const cost = offer.cost < 0 ? `−$${Math.abs(Math.round(offer.cost)).toLocaleString('en-US')}`
+    : `$${Math.round(offer.cost).toLocaleString('en-US')}`;
+  return `${swatch('road')}<b style="color:#fff">${name.toUpperCase()}</b>`
+    + `<br>◆ change to ${name} · ${cost}`;
 }
 
 // The bulldozer's cursor (M5.T5): what is under it, what it costs, or why not.
@@ -403,11 +428,22 @@ function hover({ view, city, pointer, rig, camera }) {
   const nothing = () => { hoverLot(view, -1); hoverPick(view, city, null); };
   if (view.mode !== 'city' || view.lift < 1 || !pointer) return nothing();
   // A road drag is not about a lot: no lot under its cursor to read out.
-  if (view.drag || toolOf(view)?.drag) return nothing();
+  if (view.drag) return nothing();
+  const tool = toolOf(view);
   const x = (pointer.x / window.innerWidth) * 2 - 1;
   const y = -(pointer.y / window.innerHeight) * 2 + 1;
   // The bulldozer holds a whole parcel or a road (M5.T5); a brush holds a lot.
-  if (toolOf(view)?.id === 'bulldoze') return hoverPick(view, city, rig.pickTarget(camera, x, y));
+  if (tool?.id === 'bulldoze') return hoverPick(view, city, rig.pickTarget(camera, x, y));
+  // A road tool holds the road under the cursor (M5.T25): the card offers the
+  // change to the held type and its cost, and a click makes it. The hold is the
+  // view's own `road`, not the bulldoze's `pick`: the cursor mark render/
+  // cityview.js draws over a pick belongs to the tool that tears things down.
+  if (tool?.drag) {
+    const target = rig.pickTarget(camera, x, y);
+    view.road = target?.kind === 'road' ? target : null;
+    hoverPick(view, city, null);
+    return;
+  }
   hoverPick(view, city, null);
   return hoverLot(view, rig.pick(camera, x, y));
 }
@@ -460,13 +496,24 @@ function showCard({ view, city, street, pointer, card, problems }) {
   }
   card.dataset.cause = '';
   card.dataset.lot = '';
-  if (!pointer || (view.hover < 0 && !view.drag && !view.pick)) {
+  card.dataset.upgrade = '';
+  card.dataset.cost = '';
+  if (!pointer || (view.hover < 0 && !view.drag && !view.pick && !view.road)) {
     card.style.display = 'none';
     return;
   }
-  card.innerHTML = view.drag ? dragCard(view)
-    : toolOf(view)?.id === 'bulldoze' ? targetCard(view, city)
-      : readout(view, city, street, view.hover);
+  // A road tool holds the road under its cursor, not a lot (M5.T25).
+  const tool = toolOf(view);
+  if (view.road?.kind === 'road' && tool?.drag) {
+    const offer = roadOffer(view);
+    card.dataset.upgrade = offer.same ? '' : tool.type;
+    card.dataset.cost = offer.same ? '' : `${offer.cost}`;
+    card.innerHTML = roadCard(view);
+  } else {
+    card.innerHTML = view.drag ? dragCard(view)
+      : tool?.id === 'bulldoze' ? targetCard(view, city)
+        : readout(view, city, street, view.hover);
+  }
   card.style.display = 'block';
   card.style.left = `${pointer.x + 16}px`;
   card.style.top = `${pointer.y + 16}px`;
