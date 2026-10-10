@@ -18,9 +18,13 @@
 
 import { toggleDay } from '../sim/clock.js';
 import { STREET } from '../sim/interior.js';
+import { worldMap } from '../sim/patrol.js';
+import { createHackables, syncHackables, aimTarget } from '../sim/hackables.js';
 import { cityKey, undoAct } from '../sim/cityview.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
+import { buildHackMenu } from '../ui/hackmenu.js';
+import { setPaused } from './loop.js';
 import { PANEL_KEY } from '../ui/history.js';
 import { toggleJournal } from '../render/arcui.js';
 import { cycleRadio } from '../audio/music.js';
@@ -35,6 +39,10 @@ const HELD_CAR = { throttle: 0, steer: 0 };
 // canonical letter sim/cityview.js's cityKey expects per city action.
 const MOVE_TOKEN = { forward: 'w', back: 's', left: 'a', right: 'd', run: 'shift' };
 const CITY_CANON = { cityView: 'z', brushRes: 'r', brushCom: 'c', brushInd: 'i', brushErase: 'x' };
+
+// The hack key held this long opens the menu of the aimed thing's hacks instead
+// of firing its default one (M6.T3). A press shorter than this is a tap.
+const HACK_HOLD_MS = 260;
 
 // The pad's standard mapping (W3C): left stick moves and steers, right stick
 // looks, RT runs, A enters, X hacks, Y opens the journal. M29 adds layouts.
@@ -85,6 +93,66 @@ export function bindInput(parts) {
   onBindingsChange((next) => { bindings = next; sync(); });
   const down = (action) => held.has(bindings[action]);
 
+  // The registry (M6.T1) and the aim pick (M6.T2) the hack key fires from: a
+  // shelf of input's own, synced on the press from the same map, city and street
+  // the frame loop syncs every step, so the pick is the one the game holds. The
+  // follow rig puts the eye one arm behind the player along the look axis, so the
+  // player is that arm back from the eye — the point and heading the lot note
+  // asks about, never a spot behind the player's own back. A wall that shortens
+  // the arm can leave the recovered point up to one arm ahead of the body, which
+  // only ever aims the pick further down the street. The HUD hides the highlight
+  // in the car; the key and the menu still read the aim from the driving camera.
+  const hacks = createHackables({ map: worldMap(), city, street });
+  const arm = () => cam.dist * Math.cos(cam.pitch);
+  const aim = () => {
+    if (cityView.mode !== 'street' || interior.space !== STREET) return null;
+    syncHackables(hacks, { map: worldMap(), street, city });
+    const fx = Math.sin(cam.yaw), fz = Math.cos(cam.yaw);
+    return aimTarget(hacks, camera.position.x + fx * arm(), camera.position.z + fz * arm(), fx, fz);
+  };
+
+  // One hack, one applier. The blackout is the one the sim fires today, and it
+  // goes through the entry point play has always used: main's fireHack owns its
+  // visible effects — the sparks, the steam, the heat and the mission line — and
+  // kills the district the player stands in, the box's own whenever the box is
+  // in reach on foot. The profiler's effect is the aim panel itself, so its fire
+  // has nothing to spend. A hack M6 has not built yet refuses and says why, so
+  // the menu never pretends to work.
+  const onFire = (hack) => {
+    if (hack.id === 'blackout') { fireHack(); return null; }
+    if (hack.id === 'profiler') return null;
+    return 'not built yet';
+  };
+  const hackMenu = buildHackMenu(onFire);
+
+  // The hack key: a tap fires the aimed thing's default hack, a hold opens the
+  // menu of its hacks — and the release that ends the hold is never a second
+  // press. With nothing in reach there is no menu and nothing to aim at, and the
+  // key is the district's own blackout, which is what it has always been.
+  let hackHold = 0;
+  function openHackMenu() {
+    hackHold = 0;
+    const t = aim();
+    if (!t) { fireHack(); return; }
+    hackMenu.open(t.entry);
+  }
+  function hackDown() {
+    if (hackMenu.isOpen) { hackMenu.close(); return; }
+    if (hackHold) return;
+    hackHold = setTimeout(openHackMenu, HACK_HOLD_MS);
+  }
+  function hackUp() {
+    if (!hackHold) return;
+    clearTimeout(hackHold);
+    hackHold = 0;
+    const t = aim();
+    // The thing's own hack fires, or it does not. When it does not, M6-2's rule
+    // holds: the blackout works in every district, so the key never stops being
+    // the blackout.
+    if (t && !onFire(t.entry.hacks[0])) return;
+    fireHack();
+  }
+
   // The pointer lock (M4.R1) the street view takes on a click: while the canvas
   // holds it a bare mousemove looks, GTA and Watch Dogs on PC, and Esc releases
   // it as the browser already does. The overview never takes one — its own drag
@@ -116,6 +184,8 @@ export function bindInput(parts) {
     held.delete(k);
     const token = MOVE_TOKEN[byKey.get(k)];
     if (token) keys.delete(token);
+    // The tap that ends before the hold: the hack key's own machine (M6.T3).
+    if (k === bindings.hack) hackUp();
   });
 
   // The car radio (M7.T18): B steps off -> station A -> station B -> off while
@@ -128,10 +198,12 @@ export function bindInput(parts) {
   // this table, so a rebind and a button can never drift apart. WASD/Shift are
   // read by footInput/driveInput through `down`, the city view's own keys
   // through CITY_CANON. One key, one action: setBinding swaps on a clash, so
-  // two of these can never match one press.
+  // two of these can never match one press. The hack key is its own machine — a
+  // tap fires, a hold opens the menu — and never passes through here.
   const fire = (action) => {
-    if (action === 'hack') fireHack();
-    else if (action === 'vehicle') toggleVehicle();
+    // The hack menu is modal (M6.T3): while it is open no other action answers.
+    if (hackMenu.isOpen) return;
+    if (action === 'vehicle') toggleVehicle();
     else if (action === 'dayNight') toggleDay(clock);
     // N (M7-7): the ask comes first, in the page, whenever a save exists — but
     // only in play; on the title the front door's own button asks.
@@ -165,6 +237,25 @@ export function bindInput(parts) {
     // from the overview's own Z — so the bound action is skipped for the press.
     const undoKey = e.ctrlKey && k === 'z' && cityView.mode === 'city';
     const action = modified ? null : byKey.get(k);
+    // The hack menu's own keys: the arrows move the selection, Enter fires the
+    // chosen hack, Escape puts the menu away. ui/pause.js answers to Escape in
+    // the capture phase and has already paused the game with this press, so the
+    // pause goes back the way the player left it — running, and its overlay with
+    // it. The menu can never have been opened while the game was paused (pause
+    // eats every other key), so this only ever undoes the pause this press made.
+    if (hackMenu.isOpen) {
+      if (k === 'arrowup') hackMenu.move(-1);
+      else if (k === 'arrowdown') hackMenu.move(1);
+      else if (k === 'enter') hackMenu.choose();
+      else if (k === 'escape') {
+        hackMenu.close();
+        setPaused(false);
+        const pause = document.getElementById('pause');
+        if (pause) pause.style.display = 'none';
+      }
+    }
+    // The hack key starts its own machine: a tap fires, a hold opens the menu.
+    if (k === bindings.hack) hackDown();
     // The city's history panel (M5.T32b) answers to a letter no binding names,
     // so the key sits beside the action it fires, the way O cycles the planner's
     // overlays from main.js. Only in the overview, like every city key. A
@@ -197,7 +288,10 @@ export function bindInput(parts) {
       return;
     }
     if (padDown(p, PAD.enter) && !heldPad[PAD.enter]) { fire('vehicle'); fire('door'); }
-    if (padDown(p, PAD.hack) && !heldPad[PAD.hack]) fire('hack');
+    // X is the hack key (M6.T3): a tap fires the aimed thing's default hack, a
+    // hold opens its menu, exactly as the keyboard's own key does.
+    if (padDown(p, PAD.hack) && !heldPad[PAD.hack]) hackDown();
+    if (!padDown(p, PAD.hack) && heldPad[PAD.hack]) hackUp();
     if (padDown(p, PAD.journal) && !heldPad[PAD.journal]) fire('journal');
     for (let i = 0; i < heldPad.length; i++) heldPad[i] = padDown(p, i);
     pad.x = stick(p.axes?.[0]);
@@ -259,6 +353,8 @@ export function bindInput(parts) {
   function footInput() {
     driving = false;
     if (cityView.mode === 'city') return HELD_FOOT;
+    // The menu is modal (M6.T3): nobody walks with it open.
+    if (hackMenu.isOpen) return HELD_FOOT;
     pollPad();
     const lx = Math.sin(cam.yaw);
     const lz = Math.cos(cam.yaw);
@@ -278,6 +374,7 @@ export function bindInput(parts) {
   function driveInput() {
     driving = true;
     if (cityView.mode === 'city') return HELD_CAR;
+    if (hackMenu.isOpen) return HELD_CAR;
     pollPad();
     return {
       throttle: clamp1((down('forward') ? 1 : 0) + (down('back') ? -1 : 0) - pad.y),
