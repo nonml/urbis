@@ -7,9 +7,10 @@
 //   ambience_street — the crowd: rises with the walkers out near the player
 //   hum_district    — the traffic: rises with the commute flow and nearby cars
 //
-// An M7.T7 blackout kills both beds for the listener's zone: the district's
+// An M7.T7 blackout kills both beds for the listener's district: the district's
 // voice dies with its lamps and comes back when street.js restores them. The
-// other zone keeps humming — one hack, one side of the avenue (`zonePower`).
+// other districts keep humming — one hack, one part of the city
+// (`zonePower`).
 //
 // `ambienceSounds(pose)` is the whole decision as pure data, so a check can
 // list what plays per pose with no browser and no AudioContext (the criterion's
@@ -17,7 +18,7 @@
 // two voices on engine.js and moves only their gain and rate after.
 import { nightOf } from '../sim/clock.js';
 import { shareOut } from '../sim/commute.js';
-import { zoneAt } from '../sim/street.js';
+import { districtAt, zoneAt } from '../sim/street.js';
 
 export const BEDS = { street: 'ambience_street', hum: 'hum_district' };
 export const AMBIENCE_BUS = 'ambience';
@@ -69,15 +70,19 @@ export function kindAt(city, x = 0, z = 0) {
   return best && KIND_MIX[best.use] ? best.use : 'downtown';
 }
 
-// How much of the district's voice survives at the listener's zone (M7.T7).
-// `dark` is the [zone0, zone1] pair `__game.dark()` returns and sites.js reads;
-// `phase` is street.js's zonePhase, so a caller that has the live collapse lets
-// the hum fade through it; `glow` is zoneGlow per zone — the light the lamps
-// actually show — and wins, so sound crosses the threshold with the light. Any
-// of the three may sit in a probe's `lights` object. `zone` picks the zone
-// outright; a pose with none of them is lit.
+// How much of the district's voice survives at the listener's district (M7.T7).
+// `dark` is the per-district out array `__game.dark()` returns and sites.js
+// reads; `phase` is street.js's zonePhase, so a caller that has the live
+// collapse lets the hum fade through it; `glow` is zoneGlow per district — the
+// light the lamps actually show — and wins, so sound crosses the threshold with
+// the light. Any of the three may sit in a probe's `lights` object. `zone`
+// picks the district outright; a listener whose pose carries neither falls back
+// to the street sim's own reading of where they stand (street.js districtAt),
+// so a city of any number of districts is heard, not just the two halves.
 export function zonePower(pose = {}, pz = 0) {
-  const zone = pose.zone ?? zoneAt(pz);
+  const px = pose.px ?? pose.x ?? 0;
+  const state = pose.street ?? pose.lights?.street;
+  const zone = pose.zone ?? (state ? districtAt(state, px, pz) : zoneAt(pz));
   const lights = pose.lights ?? {};
   const at = (v) => (Array.isArray(v) ? v[zone] : v);
   const glow = at(pose.glow ?? lights.glow);
@@ -101,7 +106,8 @@ function countNear(list, x, z, r2, keep) {
 //   hour 0..24; walkers street.npcs; cars street.cars; px/pz the listener;
 //   kind 'res' | 'com' | 'ind' | 'downtown' (or city/px/pz to derive it);
 //   commute the flow 0..1, defaulting to the sim's own shareOut(hour);
-//   dark [zone0, zone1] out, or phase/glow per zone (M7.T7).
+//   dark [zone0, zone1] out, or phase/glow per district (M7.T7), or the street
+//     state itself (pose.street), whose own districtAt names where they stand;
 export function ambienceSounds(pose = {}) {
   const hour = (((pose.hour ?? pose.clock?.hour ?? 12) % 24) + 24) % 24;
   const px = pose.px ?? pose.x ?? 0;

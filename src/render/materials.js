@@ -1,7 +1,12 @@
 // Texture loading discipline (mined from fable-cities, enforced here):
 // albedo + emissive in sRGB, data maps (normal/rough/metal) linear,
 // RepeatWrapping everywhere, renderer-max anisotropy.
+//
+// It is also where the district helpers live next to the per-district uniforms
+// they feed, so every lit thing in the city reads one answer to "which power
+// district is this in".
 import * as THREE from 'three';
+import { districtAt } from '../sim/map.js';
 
 const BASE = 'assets/';
 // Metres of facade one repeat of a window map covers, on every tower in the city.
@@ -186,6 +191,41 @@ export function concreteFacadeMaterial(maps, windowMap, tint) {
 // InstancedBufferAttribute for instances): without it WebGL reads 0, and the
 // whole mesh quietly follows district 0 through every blackout.
 export const MAX_DISTRICTS = 16;
+
+// The power district a fixture stands in: the map's own areas, by the district
+// the point falls in (sim/map.js districtAt). One per map district, so a town
+// cut into any number of them runs that many power zones. A map with no areas
+// still runs the two halves the street sim falls back to, which is what every
+// map before districts had; an id past the uniforms above is held at the last
+// slot rather than indexing off the end of the array.
+export function districtOf(map, x, z) {
+  const hit = districtAt(map, x, z);
+  const id = typeof hit?.id === 'number' ? hit.id : (z < 0 ? 0 : 1);
+  return Math.min(Math.max(id, 0), MAX_DISTRICTS - 1);
+}
+
+// One soft radial dot, every additive light in the city over it: a lantern's
+// glare, a shop's bloom, a steam wisp. Each is its own mesh, so they may as
+// well share one canvas — and one canvas keeps the icon identical wherever it
+// lands. Null where there is no canvas to paint it on (a Node build of a rig):
+// the colour still multiplies out to the same additive wash, flat.
+let GLOW_TEX = null;
+export function getGlowTex() {
+  if (GLOW_TEX) return GLOW_TEX;
+  if (typeof document === 'undefined') return null;
+  const c = document.createElement('canvas');
+  c.width = c.height = 128;
+  const g = c.getContext('2d');
+  const grad = g.createRadialGradient(64, 64, 2, 64, 64, 64);
+  grad.addColorStop(0, 'rgba(255,255,255,1)');
+  grad.addColorStop(0.35, 'rgba(255,255,255,0.35)');
+  grad.addColorStop(1, 'rgba(255,255,255,0)');
+  g.fillStyle = grad;
+  g.fillRect(0, 0, 128, 128);
+  GLOW_TEX = new THREE.CanvasTexture(c);
+  return GLOW_TEX;
+}
+
 export function zoneLit(mat, key) {
   const own = mat.onBeforeCompile;
   mat.userData.zoneDiffuse = {

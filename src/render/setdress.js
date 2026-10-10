@@ -1,12 +1,19 @@
 // Set dressing: lit shopfronts, merged puddle mirrors, animated steam vents.
 // Shops + puddles are static merges (2 draws); steam is 3 live sprites.
+//
+// Every fixture here belongs to the power district it stands in
+// (materials.js districtOf), so a blackout takes out one district's trade
+// names, water and steam with its lamps — however many districts the map cuts
+// the town into, and one merged mesh for each of them rather than one per sign.
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getGlowTex, buildPools } from './signs.js';
+import { buildPools } from './signs.js';
 import { buildStreaks } from './streaks.js';
 import { mulberry32 } from '../sim/rng.js';
-import { zoneAt } from '../sim/street.js';
-import { loadPBRMaps, standardFromMaps, wetness } from './materials.js';
+import { worldMap } from '../sim/patrol.js';
+import {
+  districtOf, getGlowTex, loadPBRMaps, standardFromMaps, wetness, MAX_DISTRICTS,
+} from './materials.js';
 import { loadModelPool } from './models.js';
 import { reportKit } from './lamps.js';
 import { PUDDLES, SHOPS, VENTS } from '../sim/dressing.js';
@@ -79,21 +86,21 @@ function mapSignFaces(geo, kind, lit) {
   return geo;
 }
 
-function shopSignGeos(s, signGeos, brackets) {
-  const zone = s.z < 0 ? 0 : 1;
+function shopSignGeos(s, signGeos, brackets, map) {
+  const zone = districtOf(map, s.x, s.z);
   const dx = Math.sin(s.ry);
   const dz = Math.cos(s.ry);
   const fascia = mapSignFaces(new THREE.BoxGeometry(6.0, 0.92, 0.24), s.kind, [4]);
   fascia.rotateY(s.ry);
   fascia.translate(s.x + dx * 0.2, 3.62, s.z + dz * 0.2);
-  signGeos[zone].push(fascia);
+  (signGeos[zone] ??= []).push(fascia);
   // Both broad faces of the blade carry the name: the whole point of a
   // projecting sign is being read side-on from down the block, where a flat
   // fascia is edge-on and says nothing.
   const blade = mapSignFaces(new THREE.BoxGeometry(1.9, 0.86, 0.1), s.kind, [4, 5]);
   blade.rotateY(s.ry + Math.PI / 2);
   blade.translate(s.x + dx * 1.2, 5.1, s.z + dz * 1.2);
-  signGeos[zone].push(blade);
+  (signGeos[zone] ??= []).push(blade);
   const arm = new THREE.BoxGeometry(0.1, 0.1, 0.62);
   arm.rotateY(s.ry);
   arm.translate(s.x + dx * 0.42, 5.44, s.z + dz * 0.42);
@@ -147,9 +154,11 @@ export function buildStreetKit() {
 // A road op replans the map's lamps (M5.T4b). The light pools and the
 // wet-road smears were merged from the plan the world was born with, so they
 // are refilled in place from the new one: the same meshes, the same draws, and
-// the new street's glow lands on the asphalt the player just laid.
+// the new street's glow lands on the asphalt the player just laid. Every
+// district that has a mesh has it refilled, however many the map runs.
 export function refreshLampDressing(lamps, poolMeshes, streakMeshes, signSources) {
-  for (const zone of [0, 1]) {
+  const zoneCount = Math.max(poolMeshes.length, lamps.poolsByZone.length, streakMeshes.length);
+  for (let zone = 0; zone < zoneCount; zone += 1) {
     const quads = lamps.poolsByZone[zone] ?? [];
     const mesh = poolMeshes[zone];
     if (!mesh || quads.length === 0) continue;
@@ -163,7 +172,7 @@ export function refreshLampDressing(lamps, poolMeshes, streakMeshes, signSources
     ...signSources,
     ...lamps.heads.map((h) => ({ x: h.x, z: h.z, color: '#c98a4a', len: 9, width: 1.3 })),
   ]);
-  for (const zone of [0, 1]) {
+  for (let zone = 0; zone < streakMeshes.length; zone += 1) {
     const mesh = streakMeshes[zone];
     if (!mesh) continue;
     mesh.geometry.dispose();
@@ -173,22 +182,21 @@ export function refreshLampDressing(lamps, poolMeshes, streakMeshes, signSources
   }
 }
 
-export function buildShops(texLoader, maxAniso) {
+export function buildShops(texLoader, maxAniso, map = worldMap()) {
   const group = new THREE.Group();
   const signTex = shopSignAtlas();
-  const signGeos = [[], []];
+  const signGeos = [];
   const brackets = [];
-  for (const s of SHOPS) shopSignGeos(s, signGeos, brackets);
-  // One sign mesh per power zone, so a blackout still takes a zone's trade
-  // names out with its lamps. Six materials became two.
-  const mats = signGeos.map((geos, zone) => {
+  for (const s of SHOPS) shopSignGeos(s, signGeos, brackets, map);
+  // One sign mesh per power district, so a blackout still takes a district's
+  // trade names out with its lamps — and its flicker is its own district's.
+  const mats = [];
+  for (const [zone, geos] of signGeos.entries()) {
+    if (!geos || geos.length === 0) continue;
     const mat = new THREE.MeshBasicMaterial({ map: signTex });
-    if (geos.length) {
-      const mesh = new THREE.Mesh(mergeGeometries(geos), mat);
-      group.add(mesh);
-    }
-    return { mat, zone, seed: zone * 2.6 + 3 };
-  });
+    group.add(new THREE.Mesh(mergeGeometries(geos), mat));
+    mats.push({ mat, zone, seed: zone * 2.6 + 3 });
+  }
   const plate = loadPBRMaps(texLoader, maxAniso, 'metalplates006', 'color', 9, 1, { normal: 'normalgl', metal: 'metalness' });
   const capMat = standardFromMaps(plate, { roughness: 0.62, metalness: 0.25, envMapIntensity: 0.9, color: 0x8b949f });
   const bracketMesh = new THREE.Mesh(mergeGeometries(brackets), capMat);
@@ -232,25 +240,28 @@ const MIRROR_GAIN = 3.0;       // the cube is already tone-mapped once; lift it 
 const WATER_TINT = 0x0a0e14;   // the water itself darkens the asphalt it covers
 const MIRROR_FLOOR = 0.12;     // a dead zone still holds a trace of skyglow
 
-export function buildPuddles() {
-  const geos = [[], []];
+export function buildPuddles(map = worldMap()) {
+  const geos = [];
   for (const [x, z, size, y] of PUDDLES) {
     const q = new THREE.PlaneGeometry(size, size * 0.7);
     q.rotateX(-Math.PI / 2);
     q.rotateY((x * 7 + z * 3) % 3);
     q.translate(x, y, z);
-    geos[zoneAt(z)].push(q);
+    (geos[districtOf(map, x, z)] ??= []).push(q);
   }
-  // One mesh per power zone, like the facades: a blackout has to kill the
-  // reflections in its own zone only, and reflectivity is the dimmer.
+  // One mesh per power district, like the facades: a blackout has to kill the
+  // reflections in its own district only, and reflectivity is the dimmer. Every
+  // district holds a material whether it holds water or not, so the frame loop
+  // can index them by district and the mirror can take every one.
   const edge = blobTexture();
   const group = new THREE.Group();
-  const mats = geos.map(() => new THREE.MeshBasicMaterial({
+  const mats = Array.from({ length: geos.length }, () => new THREE.MeshBasicMaterial({
     color: WATER_TINT, combine: THREE.AddOperation, reflectivity: MIRROR_GAIN,
     transparent: true, alphaMap: edge, depthWrite: false,
   }));
   for (const [zone, zoneGeos] of geos.entries()) {
-    if (zoneGeos.length) group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone]));
+    if (!zoneGeos || zoneGeos.length === 0) continue;
+    group.add(new THREE.Mesh(mergeGeometries(zoneGeos), mats[zone]));
   }
   return { group, mats };
 }
@@ -355,7 +366,7 @@ export function buildStars() {
   return points;
 }
 
-export function buildSteam() {
+export function buildSteam(map = worldMap()) {
   const group = new THREE.Group();
   const sprites = [];
   for (const v of VENTS) {
@@ -363,18 +374,21 @@ export function buildSteam() {
       map: getGlowTex(), color: 0xbccbe0, transparent: true, opacity: 0.2,
       depthWrite: false,
     }));
-    s.userData = v;
+    // Copy: the vent table is the sim's, and the district it stands in is this
+    // file's reading of the map, not a field the plan should carry.
+    s.userData = { ...v, zone: districtOf(map, v.x, v.z) };
     group.add(s);
     sprites.push(s);
   }
-  return { group, sprites, erupt: [0, 0] };
+  // One eruption level per power district: the hack names the district it hit
+  // and that district's wisps flare, not the other side's.
+  return { group, sprites, erupt: Array.from({ length: MAX_DISTRICTS }, () => 0) };
 }
 
 export function tickSteam(rig, elapsed, dt) {
-  for (let zi = 0; zi < 2; zi++) rig.erupt[zi] = Math.max(0, rig.erupt[zi] - dt * 0.8);
+  for (let zi = 0; zi < rig.erupt.length; zi++) rig.erupt[zi] = Math.max(0, rig.erupt[zi] - dt * 0.8);
   for (const s of rig.sprites) {
-    const zone = s.userData.z < 0 ? 0 : 1;
-    const e = rig.erupt[zone];
+    const e = rig.erupt[s.userData.zone];
     const prog = ((elapsed * (0.45 + e * 1.6) + s.userData.phase) % 2.2) / 2.2;
     s.position.set(s.userData.x, 0.4 + prog * (3.2 + e * 3.5), s.userData.z);
     const sc = (1.4 + prog * 3.0) * (1 + e * 0.7);

@@ -11,7 +11,7 @@ import { buildDispatchHud, updateDispatchHud } from '../ui/dispatch.js';
 import { buildDoorHud, updateDoorHud, fadeThroughDoor } from '../render/doorhud.js';
 import { buildProfiler, updateProfiler } from '../render/profiler.js';
 import { buildAim, updateAim } from '../render/aim.js';
-import { zoneAt, hackCooldownLeft } from '../sim/street.js';
+import { districtAt, hackCooldownLeft } from '../sim/street.js';
 import { focusParcel } from '../sim/decline.js';
 import { isBusted } from '../sim/wanted.js';
 import { STREET, doorEnds } from '../sim/interior.js';
@@ -130,13 +130,16 @@ function stackBottomLeft(els) {
 }
 
 function hackStatus(street, player, heroCar, dark) {
-  const zone = zoneAt(player.mode === 'drive' ? heroCar.z : player.z);
-  const left = hackCooldownLeft(street, zone);
-  if (dark[0] || dark[1]) {
-    const z = dark[0] ? 0 : 1;
-    const s = Math.max(0, street.zones[z].darkUntil - street.time);
-    return `BLACKOUT Z${z} ${s.toFixed(0)}s`;
+  const driving = player.mode === 'drive';
+  const zone = districtAt(street, driving ? heroCar.x : player.x, driving ? heroCar.z : player.z);
+  // Which district is out, however many the map runs; the first dark one names
+  // the countdown, as the two did before districts.
+  const out = dark.findIndex((d) => d);
+  if (out >= 0) {
+    const s = Math.max(0, street.zones[out].darkUntil - street.time);
+    return `BLACKOUT Z${out} ${s.toFixed(0)}s`;
   }
+  const left = hackCooldownLeft(street, zone);
   if (left > 0) return `recharge ${left.toFixed(0)}s`;
   return 'READY';
 }
