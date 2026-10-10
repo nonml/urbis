@@ -7,8 +7,9 @@ import { STAGE } from '../sim/zoning.js';
 import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
   TOOLS, ROAD_TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverJunction, hoverLot,
-  hoverPick, layDownTool, lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad,
-  roadOffer, roadPreview, toolOf, zoomCityView,
+  hoverPick, layDownTool, lotStatus, moveRoad, moveStroke, orbitCityView, paintLot, pressRoad,
+  pressStroke, releaseRoad, releaseStroke, roadOffer, roadPreview, strokePreview, toolOf,
+  zoomCityView,
 } from '../sim/cityview.js';
 import { ROAD_TYPES } from '../sim/map.js';
 import { TIERS, lockRefuse, milestoneOf } from '../sim/milestones.js';
@@ -364,6 +365,22 @@ function dragCard(view) {
   return `${swatch('road')}<b style="color:#fff">NEW ${name}</b><br>${line}${why}`;
 }
 
+// The held zone stroke (M5.T33): every empty lot it has crossed, what they cost
+// in total, or the one reason the city cannot pay for them. The numbers ride
+// `data-*` the way the demand bars keep theirs, so a check reads them without
+// parsing a rounded line.
+function strokeCard(view, city, card) {
+  const p = strokePreview(view, city);
+  const tool = toolOf(view);
+  card.dataset.lots = `${p.count}`;
+  card.dataset.cost = `${p.cost}`;
+  const line = p.count > 0
+    ? `◆ zone ${p.count} lot${p.count === 1 ? '' : 's'} · $${p.cost}`
+    : '· no empty lots crossed';
+  const why = p.reason ? `<br><span style="color:#e8977d">✕ ${p.reason}</span>` : '';
+  return `${swatch(tool.use)}<b style="color:#fff">${tool.name.toUpperCase()}</b><br>${line}${why}`;
+}
+
 // The road a road tool holds under its cursor (M5.T25, M5-10): what a click
 // offers — the change to the held type and its cost, the difference per metre
 // — or why there is nothing to change. The offer and its cost ride `data-*`
@@ -428,7 +445,8 @@ function problemAt({ problems, camera }, x, y) {
 
 // A press is a click if it barely moves and a drag — orbit or tilt — once it
 // travels. With the road tool held a press on a road node starts a road drag
-// (M5.T3); the right button or Esc sets the tool down (M5.T1).
+// (M5.T3); with a brush held it starts a zone stroke (M5.T33), and the stroke is
+// what the drag draws. The right button or Esc sets the tool down (M5.T1).
 function bindPointer(ui) {
   const { canvas, view, city, camera } = ui;
   window.addEventListener('contextmenu', (e) => {
@@ -450,9 +468,10 @@ function bindPointer(ui) {
     const problem = problemAt(ui, e.clientX, e.clientY);
     view.problem = problem >= 0 ? problem : null;
     view.problemAt = problem >= 0 ? { x: e.clientX, y: e.clientY } : null;
-    const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false, problem };
+    const press = { lastX: e.clientX, lastY: e.clientY, travel: 0, road: false, stroke: false, problem };
     const at = problem < 0 ? groundAt(ui, e.clientX, e.clientY) : null;
     if (toolOf(view)?.drag && at && pressRoad(view, at.x, at.z)) press.road = true;
+    if (!press.road && at && pressStroke(view, at.x, at.z)) press.stroke = true;
     ui.press = press;
   });
   window.addEventListener('keydown', (e) => {
@@ -472,12 +491,22 @@ function bindPointer(ui) {
       if (at) moveRoad(view, at.x, at.z);
       return;
     }
+    // A brush's stroke follows the cursor's ground point and never orbits: the
+    // drag is what zones the open land it crosses (M5.T33).
+    if (press.stroke) {
+      const at = groundAt(ui, e.clientX, e.clientY);
+      if (at) moveStroke(view, at.x, at.z);
+      return;
+    }
     if (press.travel > CLICK_SLOP) orbitCityView(view, -dx * ORBIT_PER_PX, dy * TILT_PER_PX);
   });
   window.addEventListener('pointerup', () => {
     const { press } = ui;
     if (press?.problem >= 0) { /* the reason card is already open */ }
     else if (press?.road) releaseRoad(view);
+    // A press that barely travelled is a click on the lot under the cursor, as
+    // it always was: only the drag draws the stroke (M5.T33).
+    else if (press?.stroke && press.travel > CLICK_SLOP) releaseStroke(view, city);
     else if (press && press.travel <= CLICK_SLOP) paintLot(view, city);
     ui.press = null;
   });
@@ -604,6 +633,7 @@ function showCard({ view, city, street, pointer, card, problems }) {
   card.dataset.lot = '';
   card.dataset.upgrade = '';
   card.dataset.cost = '';
+  card.dataset.lots = '';
   // A junction under a control tool's cursor is its own card (M5.T31).
   if (view.junction && pointer && toolOf(view)?.junction) {
     card.dataset.control = view.junction.control;
@@ -618,7 +648,7 @@ function showCard({ view, city, street, pointer, card, problems }) {
   card.dataset.control = '';
   card.dataset.cars = '';
   card.dataset.secs = '';
-  if (!pointer || (view.hover < 0 && !view.drag && !view.pick && !view.road && !view.junction)) {
+  if (!pointer || (view.hover < 0 && !view.drag && !view.stroke && !view.pick && !view.road && !view.junction)) {
     card.style.display = 'none';
     return;
   }
@@ -631,8 +661,9 @@ function showCard({ view, city, street, pointer, card, problems }) {
     card.innerHTML = roadCard(view, city);
   } else {
     card.innerHTML = view.drag ? dragCard(view)
-      : tool?.id === 'bulldoze' ? targetCard(view, city)
-        : readout(view, city, street, view.hover);
+      : view.stroke ? strokeCard(view, city, card)
+        : tool?.id === 'bulldoze' ? targetCard(view, city)
+          : readout(view, city, street, view.hover);
   }
   card.style.display = 'block';
   card.style.left = `${pointer.x + 16}px`;
