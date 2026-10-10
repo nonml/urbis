@@ -28,6 +28,12 @@
 // traffic, the overview and a check all read the one answer. What each control
 // costs the cars that cross it is counted per junction (junctionWait), which is
 // the mean wait the criterion's A/B weighs.
+//
+// M6.T7 (M6-4) adds the ALL-GREEN: one junction's lights jammed green on every
+// way at once, where the traffic in the crossing is the only thing that holds a
+// car back — so the box fills, the queue does not clear, and the commuters who
+// run over it are late. The jam's own state and rule live below, beside the
+// control they override; wanted.js reads it for a cruiser.
 // T29's tests place cars by hand, in the shape this module reads and writes.
 import { mulberry32 } from './rng.js';
 import { DAY_SECS, START_HOUR } from './clock.js';
@@ -75,6 +81,27 @@ export const STOP_LINE = 4.5;
 const SIGNAL_POLE_OUT = 4.2;
 const SIGNAL_BACK = 1.2;
 
+// M6.T7 (M6-4, docs/ROADMAP.md): the ALL-GREEN hack on a junction's lights.
+// One junction's lights run green on every way at once for ALL_GREEN_SECS: no
+// car is held by a light, and every car is held by the traffic it would cross.
+// Two cars that arrive in the crossing from the two ways each hold for the
+// other, so the box fills and stops, the queue behind it does not clear, the
+// commuters whose trips run over it arrive late, and the block's shops lose
+// the trade those commuters bring (economy.js readCommute reads the summary
+// this module publishes, and wanted.js drive() reads jamAt for a cruiser).
+export const ALL_GREEN_SECS = 120;
+// How far back from the junction the jam stands: the stop line, a car and its
+// gap. A car or a cruiser that reaches the queue stands with it until the
+// lights come back.
+export const JAM_REACH = STOP_LINE + CAR_LEN + GAP_MIN;
+// The box a jammed junction is: the carriageway both ways run through, and the
+// nose-in car standing at the stop line on its near edge — hypot(STOP_LINE,
+// LANE_OFF) with a metre on it. A car inside it holds every approach. M5-14's
+// yield reads the same node with the tighter CONFLICT_IN above, where a car
+// standing at its own line is waiting its turn and not a conflict; the jam is
+// not a rule of the road, it is the box filling.
+const JAM_IN = Math.hypot(STOP_LINE, LANE_OFF) + 1;
+
 // True while `axis` has green at sim time `t`. Two phases share the cycle:
 // phase 0 is the z ways, phase 1 the x ways, and the rest of each half is an
 // all-red clearance before the cross traffic is released.
@@ -82,6 +109,35 @@ export function signalGreen(axis, t) {
   const cycle = ((t % SIGNAL_CYCLE) + SIGNAL_CYCLE) % SIGNAL_CYCLE;
   const phase = Math.floor(cycle / SIGNAL_PHASE);
   return cycle % SIGNAL_PHASE < SIGNAL_GREEN && phase === (axis === 'x' ? 1 : 0);
+}
+
+// M6.T7: the ALL-GREEN hack, thrown at one junction by aim and key. The jam
+// runs on the sim's own clock, like every other deadline this module keeps, so
+// a save that holds the clock holds the jam. Returns the seconds it holds, or
+// 0 when `node` is not a junction a light runs at.
+export function hackSignals(state, node) {
+  if (!state.signals.has(node)) return 0;
+  state.greenUntil.set(node, state.time + ALL_GREEN_SECS);
+  return ALL_GREEN_SECS;
+}
+
+// Whether the junction's lights are jammed green right now: every way green at
+// once, which is the fault the hack puts into them.
+export function allGreen(state, node) {
+  return state.time < (state.greenUntil.get(node) ?? -Infinity);
+}
+
+// The jammed junction whose queue holds anything standing at (x, z) back, or
+// null when no light is jammed there. A car obeys it in waitsAt; a cruiser
+// answers it in wanted.js drive(). `state` is null outside a running sim.
+export function jamAt(state, x, z) {
+  if (!state) return null;
+  for (const [node, until] of state.greenUntil) {
+    if (until <= state.time) continue;
+    const at = state.byId.get(node);
+    if (at && Math.hypot(at.x - x, at.z - z) <= JAM_REACH) return node;
+  }
+  return null;
 }
 
 // One head per approach to every junction of two ways: on the right kerb
@@ -184,6 +240,12 @@ export function junctionWait(state, node) {
 
 // Whether the control the junction runs holds `c` back at its line this tick.
 function waitsAt(state, c, edge, far, line) {
+  // M6.T7: the lights jammed green (ALL-GREEN). Nothing is held by a light,
+  // and everything is held by the traffic in the crossing — a car waiting at
+  // its line, and a car that has entered the box, where it stands nose-in with
+  // whatever came the other way. Each holds the other, so the box fills and
+  // the queue does not clear until the lights come back.
+  if (allGreen(state, far)) return jammedBy(state, c, edge, far);
   // A car already past the line is in the junction and must clear it, not stop
   // dead in the crossing.
   if (c.s > line) return false;
@@ -221,6 +283,25 @@ function conflicts(state, c, edge, far) {
     const d = Math.hypot(o.x - at.x, o.z - at.z);
     if (d > CONFLICT_NEAR) continue;
     if (d <= CONFLICT_IN) return true;
+    if (o.turn || o.speed < CONFLICT_COMING) continue;
+    if (o.axis !== edge.axis) return true;
+  }
+  return false;
+}
+
+// M6.T7: the jam's own conflict rule. What holds a car back at a junction
+// whose lights are jammed green is the traffic in and coming into its box: a
+// car standing in it — nose-in at its own line, or already inside — and a car
+// coming down another way. Nothing is held by a light, so every way is green
+// at once and the box is the only thing that says who goes.
+function jammedBy(state, c, edge, far) {
+  const at = state.byId.get(far);
+  if (!at) return false;
+  for (const o of state.cars) {
+    if (o === c || o.route.length === 0) continue;
+    const d = Math.hypot(o.x - at.x, o.z - at.z);
+    if (d > CONFLICT_NEAR) continue;
+    if (d <= JAM_IN) return true;
     if (o.turn || o.speed < CONFLICT_COMING) continue;
     if (o.axis !== edge.axis) return true;
   }
@@ -613,6 +694,12 @@ function beginFlow(state, parcels) {
     version: state.map.version, count: parcels.length, jobs, queue, cursor: 0,
     match: new Map(), pairs: [], pending: [], load: new Map(),
     dest: [], destTotal: 0, by: {}, bucket: -1, stage: 'match',
+    // M6.T7: the residents whose trip runs over each junction, per district,
+    // and how many junctions are jammed right now (0 or more). Read live, so
+    // a jam the player throws lands on the hour's flow without re-laying it.
+    // A plain object per key, not a Map: a save holds the flow as it is, and
+    // the reach it carries has to come back with it.
+    jam: {}, jams: 0, late: null,
   };
 }
 
@@ -705,11 +792,74 @@ function reweight(state, f, parcels) {
   for (const [zone, d] of Object.entries(by)) {
     out[zone] = {
       residents: d.residents,
+      // M6.T7: the hour's own late share, and the jam's on top of it. The jam
+      // is added live whenever a junction's lights are jammed (tickJam).
+      baseLate: d.residents > 0 ? d.late / d.residents : 0,
       late: d.residents > 0 ? d.late / d.residents : 0,
       mins: d.residents > 0 ? d.len / d.residents / VMAX / 60 : 0,
     };
   }
   state.flowByDistrict = out;
+  f.jam = throughJunctions(state, f, parcels);
+  tickJam(state, f);
+}
+
+// M6.T7: the residents whose trip runs over each junction of the graph, per
+// district — the commuters a jammed light makes late. Counted when the flow is
+// laid, because the pairs and their routes are what it is read off; a road op
+// re-lays it and re-counts it.
+function throughJunctions(state, f, parcels) {
+  const by = {};
+  for (const p of f.pairs) {
+    if (p.route === 'dup' || !Array.isArray(p.route) || p.route.length === 0) continue;
+    const home = parcels[p.m.i];
+    if (!home || home.use !== 'res') continue;
+    const r = Math.min(residentsOf(home), p.m.take);
+    if (r <= 0) continue;
+    const zone = home.powerZone ?? 0;
+    for (const id of p.route) {
+      const edge = state.edgeById.get(id);
+      if (!edge) continue;
+      for (const node of [edge.a, edge.b]) {
+        if (!state.signals.has(node)) continue;
+        let at = by[node];
+        if (!at) by[node] = at = {};
+        at[zone] = (at[zone] ?? 0) + r;
+      }
+    }
+  }
+  return by;
+}
+
+// M6.T7: a jammed junction makes the commuters whose trips run over it late,
+// and their shops lose the trade they never bring. The flow's per-district
+// summary carries the hour's own late share and the jam's on top of it, which
+// is what economy.js readCommute reads every tick. Recomputed when the number
+// of jammed junctions moves, not on every tick: a jam is an event, and its
+// reach is the districts that drive it, never a district that does not.
+function tickJam(state, f) {
+  const out = state.flowByDistrict;
+  if (!f || f.stage !== 'ready' || !out) return;
+  let active = 0;
+  for (const until of state.greenUntil.values()) if (until > state.time) active++;
+  // Nothing to redo when these jams are already written on this summary: the
+  // summary itself is re-laid on the hour, and it starts at the hour's own.
+  if (active === f.jams && out === f.late) return;
+  f.jams = active;
+  f.late = out;
+  for (const d of Object.values(out)) d.late = d.baseLate;
+  if (active === 0) return;
+  const late = {};
+  for (const node of Object.keys(f.jam)) {
+    if (!allGreen(state, node)) continue;
+    for (const [zone, n] of Object.entries(f.jam[node])) {
+      late[zone] = (late[zone] ?? 0) + n;
+    }
+  }
+  for (const [zone, n] of Object.entries(late)) {
+    const d = out[zone];
+    if (d && d.residents > 0) d.late = Math.min(1, d.baseLate + n / d.residents);
+  }
 }
 
 // A few pairs a tick toward a ready flow. The match rebuilds on a version or
@@ -735,6 +885,9 @@ function tickFlow(state) {
   if (Math.floor(hourOf(state.time)) !== f.bucket) {
     f = state.flow = beginFlow(state, parcels);
   }
+  // M6.T7: the jam's share of the hour's late, over every tick — a junction
+  // jammed since the flow was laid is late now, not at the next hour.
+  tickJam(state, f);
 }
 
 // This hour's travellers on one edge, for the traffic overlay (M5.T21).
@@ -752,6 +905,9 @@ export function createTraffic(map, seed, count = 0) {
     flow: null, flowByDistrict: {},
     // What each junction has cost the cars that crossed it (M5.T31, M5-14).
     waits: new Map(),
+    // The junctions whose lights the ALL-GREEN hack has jammed (M6.T7, M6-4):
+    // node -> the sim time the jam ends.
+    greenUntil: new Map(),
     regional: null, ends: [],
   };
   indexes(state);
@@ -1293,13 +1449,18 @@ export function tick(state, dt) {
     const line = len - STOP_LINE;
     const hold = waitsAt(state, c, edge, far, line);
     if (hold) {
+      // The arrival curve eases the car onto the line; one already inside the
+      // box (M6.T7's jam, where it is held nose-in with the crossing traffic)
+      // is stopped dead where it stands, so nothing jumps a lane back.
       const clear = line - c.s;
-      target = Math.min(target, clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear));
+      target = Math.min(target,
+        clear > 0 ? Math.min(clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear)) : 0);
     }
     c.v = Math.max(0, Math.max(c.v - BRAKE * dt, Math.min(c.v + ACCEL * dt, target)));
+    const inBox = c.s > line;
     c.s += c.v * dt;
     if (hold) {
-      if (c.s > line) { c.s = line; c.v = 0; }
+      if (!inBox && c.s > line) { c.s = line; c.v = 0; }
       if (c.v < VMAX - CREEP) holdOn(c, far, dt);
     } else if (c.held && (c.held.node !== far || c.s > line)) {
       // The car has left this junction's line: its wait is what the junction

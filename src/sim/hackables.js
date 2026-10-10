@@ -8,6 +8,7 @@
 // Deterministic and pure (law 5): map data only, no RNG, no three.js, no DOM.
 // Aim (M6.T2) reads it through aimTarget(): nearest, in the view cone, in sight.
 import { STAGE, districtAt as areaAt, frontageRoad, projectOnSegment } from './map.js';
+import { blindStreet, BLIND_SECS, blindWays } from './patrol.js';
 import { ROAD_HALF_WIDTH, WALKWAY_WIDTH } from './world.js';
 
 // The aim range M6-1 names.
@@ -82,7 +83,8 @@ function junctionNodes(map) {
 }
 
 // A camera hangs on a building's wall facing the road it fronts, CAM_OUT off
-// the footprint.
+// the footprint, and watches that road's street (the way id the game names
+// streets by — M6.T12 cuts it).
 function cameraSpot(map, byId, b) {
   const road = frontageRoad(map, b, byId);
   if (!road) return null;
@@ -91,7 +93,7 @@ function cameraSpot(map, byId, b) {
   const dz = b.z - hit.z;
   const d = Math.hypot(dx, dz) || 1;
   const out = Math.max(0, road.gap - CAM_OUT);
-  return { x: hit.x + (dx / d) * out, z: hit.z + (dz / d) * out };
+  return { x: hit.x + (dx / d) * out, z: hit.z + (dz / d) * out, way: road.edge.way };
 }
 
 // The z a control box stands at: the area's middle z, then the nearest z on a
@@ -153,8 +155,12 @@ function buildPlaces(reg) {
   }
   for (const b of map.buildings ?? []) {
     const spot = cameraSpot(map, byId, b);
-    const district = spot ? areaAt(map, spot.x, spot.z)?.id ?? null : null;
-    if (spot) places.push(entry('camera', `camera:${b.id}`, spot.x, spot.z, b, undefined, district));
+    if (!spot) continue;
+    const district = areaAt(map, spot.x, spot.z)?.id ?? null;
+    const camera = entry('camera', `camera:${b.id}`, spot.x, spot.z, b, undefined, district);
+    // The street it watches, and the one its cut blinds (M6.T12).
+    camera.way = spot.way;
+    places.push(camera);
   }
   for (const area of areasOf(map)) {
     const spot = controlSpot(map, area);
@@ -347,4 +353,21 @@ export function hackableById(reg, id) {
 // Every registered thing of one kind, for M6-2's access counts.
 export function hackablesOfKind(reg, kind) {
   return reg.list.filter((e) => e.kind === kind);
+}
+
+// M6.T12 (M6-4): cut a camera out of the wall. The street it watches goes blind
+// for the police — patrol.js's canSee refuses for BLIND_SECS of the street sim's
+// own clock, and the sight comes back on its own. Reach is the one street, so a
+// second camera on it has nothing left to take: it refuses and says so with 0.
+export function hackCamera(reg, camera) {
+  if (!camera || camera.kind !== 'camera' || !camera.way || !reg.street) return 0;
+  if (blindWays().has(camera.way)) return 0;
+  blindStreet(camera.way, reg.street);
+  return BLIND_SECS;
+}
+
+// Is this camera down? Read off the wall (patrol.js), not off the entry, so every
+// registry on the map — main's, input's — tells the same story about one camera.
+export function cameraDown(camera) {
+  return !!camera?.way && blindWays().has(camera.way);
 }
