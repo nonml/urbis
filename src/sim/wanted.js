@@ -10,6 +10,7 @@
 // drive off. Busted is still two and a half seconds within reach of a unit.
 import { clampToBounds, heightAt } from './world.js';
 import { canSee, nextWaypoint, spawnNode, worldMap } from './patrol.js';
+import { bollardsAt, bollardPosts, liveTraffic } from './traffic.js';
 // The player's police stations are service parcels on the map (M5.T11), each
 // with its own catchment (M5.T13).
 import { SERVICES, servicesOf } from './ops.js';
@@ -42,6 +43,10 @@ const SEARCH_R0 = 8;
 const SEARCH_R_MAX = 30;
 const SEARCH_GROW = 1.4;
 const SEARCH_CIRCLE_RATE = 0.25;
+// A hack a unit stands within this of is one the player threw where they are:
+// the reach of the hack key itself (hackables.js HACK_RANGE). A unit watching
+// posts a hundred metres down a road is watching traffic kit, not a crime.
+const HACK_WATCH_RANGE = 40;
 // Units called in turn up this far from the suspect; units stood down drive
 // off and are gone once this far, or after this long.
 const SPAWN_DIST = 70;
@@ -214,6 +219,34 @@ export function forceSearch(w, x, z, yaw, time, age = 0) {
   w.search.r = searchRadius(age);
 }
 
+// M6.T8: police who see the posts going up raise the tier on cause `hack`,
+// tagged with the kind so dispatch names them (dispatch.js HACK_LINES) — the
+// blackout's own entry is wantedOnBlackout above; every other M6 hack reads
+// the posts here, because the applier has no wanted state to call. One set of
+// posts raises one tier, whichever unit watches, and the watching unit is the
+// suspect-watching rule (judgeSight's canSee), so a hack watched is a suspect
+// watched. The clock is the street sim's own, which traffic.js keeps the posts
+// on, and the one live street is the one liveTraffic() names.
+const WATCHED_POSTS = new Set();
+
+function watchBollards(w, hero, time, map) {
+  if (w.heat >= MAX_HEAT) return;
+  const traffic = liveTraffic();
+  if (!traffic) return;
+  for (const post of bollardPosts(traffic, traffic.time)) {
+    if (WATCHED_POSTS.has(post)) continue;
+    if (Math.hypot(hero.x - post.x, hero.z - post.z) > HACK_WATCH_RANGE) continue;
+    if (!onDuty(w).some((u) => canSee(u.x, u.z, post.x, post.z, false, map))) continue;
+    WATCHED_POSTS.add(post);
+    if (!w.contact) {
+      w.lkp = { x: hero.x, z: hero.z, yaw: w.lkp.yaw };
+      startSearch(w, hero.x, hero.z, time);
+    }
+    raise(w, 'hack', { x: hero.x, z: hero.z, yaw: w.lkp.yaw, inCar: hero.inCar }, time, map, 'bollards');
+    return;
+  }
+}
+
 function judgeSpeed(w, dt, hero, time, map) {
   const fast = hero.inCar && Math.abs(hero.car.speed) > SPEEDING;
   if (!fast || (w.heat > 0 && !w.contact)) {
@@ -268,7 +301,12 @@ function drive(map, u, gx, gz, cruise, dt) {
   const close = Math.hypot(gx - u.x, gz - u.z) <= CLOSE_IN;
   // Slow for the corner: a car does not take a junction at chase speed.
   const want = (close ? cruise * 0.4 : cruise) * (0.45 + 0.55 * Math.max(0, Math.cos(diff)));
-  u.speed += (want - u.speed) * Math.min(1, dt * 2);
+  // M6.T8: posts across a junction stop a cruiser the way they stop a car — it
+  // stands off them, brake lights on, until they retract.
+  const traffic = liveTraffic();
+  const held = !!traffic && bollardsAt(traffic, u.x, u.z) !== null;
+  u.speed += ((held ? 0 : want) - u.speed) * Math.min(1, dt * 2);
+  if (held) u.speed = Math.max(0, u.speed - 10 * dt);
   const inside = clampToBounds(
     map.district.drive, u.x + Math.sin(u.yaw) * u.speed * dt, u.z + Math.cos(u.yaw) * u.speed * dt
   );
@@ -314,6 +352,7 @@ function searchOn(w, dt, time, map) {
 // car whether or not they are in it (spikes and flats live on it); `body` is
 // whatever is moving them — the car, or the player on foot.
 export function tickWanted(w, dt, hero, time, map = worldMap()) {
+  watchBollards(w, hero, time, map);
   for (const u of w.pursuit) snap(u);
   snap(w.response.heli);
   tickObstacles(w, hero, dt, time);
