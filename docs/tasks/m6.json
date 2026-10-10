@@ -376,7 +376,8 @@
       "files": [
         "src/sim/zoning.js",
         "src/render/zoning.js",
-        "tests/accept/m6-crane.spec.js"
+        "tests/accept/m6-crane.spec.js",
+        "src/game/input.js"
       ],
       "needs": [
         "M6.T6",
