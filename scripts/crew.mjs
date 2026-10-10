@@ -422,8 +422,29 @@ function scopeFault(w) {
     && !ALWAYS_OWNED.some((re) => re.test(f)));
   if (stray.length) return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
   const dead = deadModules(w.dir);
-  if (!dead.length) return null;
-  return `These new files are imported by nothing in src/, so the running game never uses them: ${dead.join(', ')}. Wire each into the game where the player meets it (or say plainly that you cannot, and why).`;
+  if (dead.length) return `These new files are imported by nothing in src/, so the running game never uses them: ${dead.join(', ')}. Wire each into the game where the player meets it (or say plainly that you cannot, and why).`;
+  const unused = deadExports(w.dir);
+  if (!unused.length) return null;
+  return `These new functions are called nowhere in src/, only by tests, so the running game never runs them: ${unused.join(', ')}. Call each from the game where the player meets it (or say plainly that you cannot, and why).`;
+}
+
+// New exported functions nothing in src/ calls, not even their own file: work
+// only a test reaches (M6.T20's hackPermit, M6.T7's hackSignals).
+function deadExports(dir) {
+  let diff = '';
+  try { diff = sh('git', ['diff', 'main', '-U0', '--', 'src'], dir); } catch { return []; }
+  const names = [...diff.matchAll(/^\+export\s+(?:async\s+)?function\s+(\w+)/gm)].map((m) => m[1]);
+  if (!names.length) return [];
+  const texts = [];
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    const p = path.join(d, e.name);
+    if (e.isDirectory()) walk(p); else if (p.endsWith('.js')) texts.push(fs.readFileSync(p, 'utf8'));
+  } };
+  walk(path.join(dir, 'src'));
+  return names.filter((n) => {
+    const uses = texts.reduce((k, t) => k + (t.match(new RegExp(`\\b${n}\\b`, 'g'))?.length ?? 0), 0);
+    return uses <= 1;
+  });
 }
 
 // New src/ modules the game never imports: work only a test can reach (M6.T8's
