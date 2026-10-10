@@ -175,15 +175,16 @@
       "goal": "Story places move. A bulldozed arc place, door or pursuit home moves to the nearest building of the same use; the journal says so",
       "files": [
         "src/sim/anchors.js",
-        "src/sim/arc.js"
+        "src/sim/arc.js",
+        "tests/accept/m5-story-move.spec.js"
       ],
       "needs": [
         "M5.T5",
         "M4.T12"
       ],
       "commit": "M5.T7 (M5-2): story places move",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
-      "test": "tests/accept/m5-bulldoze.spec.js"
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Check first: write tests/accept/m5-story-move.spec.js and see it fail on main. Boot the built game (&gen=1&seed=7), press z, pick the bulldozer from the palette and click, with the real mouse, a building that holds an arc place, a door and a pursuit home in turn (find them through __game only to aim). After each: the story place now stands in the nearest other building of the same use, which still exists; the journal's DOM text says it moved; and walking there (or reading the arc's target through __game) points at the new building, never at the cleared lot. tests/accept/m5-bulldoze.spec.js does not cover this and stays as it is.",
+      "test": "tests/accept/m5-story-move.spec.js"
     },
     {
       "id": "M5.T8",
