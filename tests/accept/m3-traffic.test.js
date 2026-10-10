@@ -156,16 +156,49 @@ test('M3-6: after addRoad a car drives it within 60 game seconds', async () => {
     const state = createTraffic(map, seed, CARS);
     state.cam = camAt(map);
     const before = new Set(map.graph.edges.map((e) => e.id));
-    // A new street into the block: front an existing node, 90 m along one axis.
-    // addRoad cuts every crossing and replans the frontage (M3.T20), so a trip
-    // can end on it.
+    // A new street into the block. A street that joins two roads comes first,
+    // as a player laying a link across a block would: from a point along a road
+    // straight across to the first other road it meets. addRoad cuts both, so
+    // its junctions are on live roads, and replans the frontage (M3.T20), so a
+    // trip can end on it. Failing that, a 90 m street off a node. A dead-end
+    // spur off an arterial end out past the town (seed 22 found one 700 m from
+    // any traffic) asks a car to cross the whole town in a minute, which tests
+    // the grid, not the new road.
     const walk = map.district.walk;
+    const old = nodesOf(map);
+    const near = (p, e) => projectOnSegment(p.x, p.z, old.get(e.a), old.get(e.b)).dist < 1;
+    const inside = (p) => p.x >= walk.minX + 5 && p.x <= walk.maxX - 5
+      && p.z >= walk.minZ + 5 && p.z <= walk.maxZ - 5;
+    const reach = (s, ux, uz) => {
+      for (let d = 30; d <= 300; d += 5) {
+        const p = { x: s.x + ux * d, z: s.z + uz * d };
+        if (map.graph.edges.some((e) => near(p, e) && !near(s, e))) return d;
+      }
+      return 0;
+    };
+    const starts = [];
+    for (const e of map.graph.edges) {
+      const a = old.get(e.a);
+      const b = old.get(e.b);
+      const len = Math.hypot(b.x - a.x, b.z - a.z);
+      for (let d = 15; d <= len - 15; d += 10) {
+        const p = { x: a.x + (b.x - a.x) * d / len, z: a.z + (b.z - a.z) * d / len };
+        if (inside(p)) starts.push(p);
+      }
+    }
+    const tries = [
+      ...starts.map((s) => ({ s, joins: true })),
+      ...map.graph.nodes.map((s) => ({ s, joins: false })),
+    ];
     let laid = null;
-    for (const n of map.graph.nodes) {
-      for (const [dx, dz] of [[0, 90], [0, -90], [90, 0], [-90, 0]]) {
-        const end = { x: n.x + dx, z: n.z + dz };
-        if (end.x < walk.minX + 5 || end.x > walk.maxX - 5
-          || end.z < walk.minZ + 5 || end.z > walk.maxZ - 5) continue;
+    for (const { s, joins } of tries) {
+      if (laid) break;
+      for (const [ux, uz] of [[0, 1], [0, -1], [1, 0], [-1, 0]]) {
+        const d = joins ? reach(s, ux, uz) : 90;
+        if (!d) continue;
+        const n = { x: s.x, z: s.z };
+        const end = { x: s.x + ux * d, z: s.z + uz * d };
+        if (!inside(end)) continue;
         const version = map.version;
         addRoad(map, n, end);
         if (map.version === version) continue;
@@ -175,7 +208,6 @@ test('M3-6: after addRoad a car drives it within 60 game seconds', async () => {
           && projectOnSegment(by.get(e.b).x, by.get(e.b).z, n, end).dist < 0.6);
         break;
       }
-      if (laid) break;
     }
     expect(laid && laid.length, `seed ${seed}: a road can be laid into the district`).toBeTruthy();
     const by = nodesOf(map);

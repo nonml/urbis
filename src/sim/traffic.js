@@ -131,17 +131,21 @@ const FLOW_SEED = 0x51ed3501;
 // M3.T40: a road the player lays is driven within the minute (M3-6). For
 // FRESH_SECS after an addRoad, cars take trips over it: the ones nearest the new
 // road are re-tasked for it, and a car that finishes a trip drives it next
-// rather than waiting on a random trip to happen to choose it. FRESH_RUN is the
-// longest drive, in metres, a car is sent over a new road for. It is set by the
-// grid, which is coarse: its blocks run to 250 m, so even the closest car in
-// the fleet stands several blocks — 700-800 m of driving, near a minute at VMAX
-// once the lights are counted — from a street laid across the far side of the
-// district. A cap under that sends nobody, and a new road carries no traffic at
-// all. FRESH_CARS keeps it to a handful, so the streets keep their own traffic
-// and only the nearest few turn.
+// rather than waiting on a random trip to happen to choose it. The sweep sorts
+// by the drive ahead of each car, so it is the best-placed cars that turn; the
+// junction a road lands on is live — an op that cuts a road leaves its pieces
+// standing (M3.T40b) — so those are the cars at that junction, metres out.
+// FRESH_RUN only bounds how far one car may be sent: a street laid out along an
+// arterial, with its one junction on it, is reached by whichever car is coming
+// along that arterial, and a cap under that sends nobody at all. FRESH_CARS
+// keeps it to a handful, so the streets keep their own traffic and only the
+// nearest few turn. REPLAN_SECS is how often the window looks again: one pass
+// reads the fleet as it stood the instant before the road existed, and the car
+// that can reach it soonest may not have come within reach yet (M3.T40b).
 export const FRESH_SECS = 90;
 export const FRESH_RUN = 1200;
 const FRESH_CARS = 8;
+const REPLAN_SECS = 1;
 // A road op that takes ground away: cars standing on it re-task from a node
 // clear of it, so a removed road empties instead of keeping cars at the dead end
 // it left standing. Further than any lane's reach of the centre-line, so a car
@@ -233,7 +237,11 @@ function endsOf(state) {
 
 function readOps(state, oldBy, oldEdges) {
   state.fresh = [...state.edgeById.values()].filter((e) => !oldEdges.has(e.id));
-  if (state.fresh.length > 0) state.freshUntil = state.time + FRESH_SECS;
+  state.freshIds = new Set(state.fresh.map((e) => e.id));
+  if (state.fresh.length > 0) {
+    state.freshUntil = state.time + FRESH_SECS;
+    state.nextFresh = state.time;
+  }
   state.gone = [];
   for (const edge of oldEdges.values()) {
     if (state.edgeById.has(edge.id)) continue;
@@ -254,7 +262,12 @@ function readOps(state, oldBy, oldEdges) {
 // points: an op that cuts an edge leaves its pieces on that centre-line, and
 // only the road that is genuinely gone takes its ground with it.
 function survivesOn(state, a, b) {
-  const axis = Math.abs(a.x - b.x) < 1e-9 ? 'x' : 'z';
+  // `axis` names the coordinate that varies, as the graph does: a stretch whose
+  // z is constant runs along x. Reading a vertical stretch as 'x' would skip
+  // every north-south piece below, so a road cut down its length would be read
+  // as taken away and its nodes closed, severing the road laid across it from
+  // the junction it lands on.
+  const axis = Math.abs(a.z - b.z) < 1e-9 ? 'x' : 'z';
   const lo = axis === 'x' ? Math.min(a.x, b.x) : Math.min(a.z, b.z);
   const hi = axis === 'x' ? Math.max(a.x, b.x) : Math.max(a.z, b.z);
   const cross = axis === 'x' ? a.z : a.x;
@@ -522,7 +535,7 @@ export function createTraffic(map, seed, count = 0) {
     want: count, nextId: 1, rng: mulberry32(seed ^ TRIP_SEED), cam: null,
     flowRng: mulberry32(seed ^ FLOW_SEED),
     links: new Map(), spots: [], signals: new Set(),
-    fresh: [], freshUntil: -1, gone: [], closed: new Set(),
+    fresh: [], freshIds: new Set(), freshUntil: -1, nextFresh: 0, gone: [], closed: new Set(),
     flow: null, flowByDistrict: {},
     regional: null, ends: [],
   };
@@ -540,7 +553,7 @@ export function createTraffic(map, seed, count = 0) {
 function makeCar(state, outside = false) {
   const c = {
     id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null, stale: false,
-    axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
+    fresh: false, axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
   };
   c.outside = outside;
   // A car from outside (M4.T17) is placed on its own trip, or it is one more
@@ -919,29 +932,51 @@ function retaskStale(state) {
 // mid-lane, and stopping it there would jump it — and plans from that leg's far
 // node, which is where it is going anyway. Cars reach a street they are not
 // standing near the same way, over a fresh trip taken at their destination.
+//
+// The window looks again every REPLAN_SECS until it closes (M3.T40b): a car
+// standing at the junction the road lands on is claimed on the op tick and is
+// driving it seconds later, but a street whose one junction sits on an arterial
+// is reached by whichever car is coming along it, and the fleet reads very
+// differently a minute later. A car already on its way there is counted and left
+// alone, so the number diverted at once stays FRESH_CARS.
 function replanNear(state) {
-  if (state.fresh.length === 0) return;
+  if (state.fresh.length === 0 || state.time > state.freshUntil) return;
+  if (state.time < state.nextFresh) return;
+  state.nextFresh = state.time + REPLAN_SECS;
+  const spans = state.fresh.map((e) => ({ a: state.byId.get(e.a), b: state.byId.get(e.b) }));
   const plans = [];
+  let live = 0;
   for (const c of state.cars) {
     if (c.turn || c.route.length === 0) continue;
-    if (!state.edgeById.has(c.route[c.leg])) continue;
-    // The cost is what decides: the metres left on this leg plus the drive over
-    // the new road is how long before the car is on the street the player laid.
-    const over = freshRoute(state, edgeEnd(state, c), c.route[c.leg]);
+    const edge = state.edgeById.get(c.route[c.leg]);
+    if (!edge) continue;
+    if (c.route.slice(c.leg).some((id) => state.freshIds.has(id))) {
+      // Only a car this window diverted counts against FRESH_CARS: a random
+      // trip that happens to cross the new road is traffic, not a diversion,
+      // and counting it would fill the window's hands with cars it never sent.
+      if (c.fresh) live += 1;
+      continue;
+    }
+    c.fresh = false;
+    // A drive over the road is at least this far as the crow flies, so a car
+    // standing further off it than FRESH_RUN cannot be sent for it.
+    if (Math.min(...spans.map((g) => offSegment(c, g))) > FRESH_RUN) continue;
+    const over = freshRoute(state, edgeEnd(state, c), edge.id);
     if (!over) continue;
     // The trip runs on from the end of this leg, so its first edge has to leave
     // that node. One that is this leg again is a U-turn the lane swap cannot
     // carry, and splicing it in would put the car back where it came from.
-    if (over.route[0] === c.route[c.leg]) continue;
-    const left = lengthOf(state.byId, state.edgeById.get(c.route[c.leg])) - c.s;
+    if (over.route[0] === edge.id) continue;
+    const left = lengthOf(state.byId, edge) - c.s;
     const cost = left + routeLen(state, over.route);
     if (cost <= FRESH_RUN) plans.push({ c, over, cost });
   }
   if (plans.length === 0) return;
   plans.sort((p, q) => p.cost - q.cost);
-  for (const { c, over } of plans.slice(0, FRESH_CARS)) {
+  for (const { c, over } of plans.slice(0, Math.max(0, FRESH_CARS - live))) {
     c.route = [...c.route.slice(0, c.leg + 1), ...over.route];
     c.goal = over.far;
+    c.fresh = true;
   }
 }
 
@@ -953,7 +988,8 @@ function edgeEnd(state, c) {
 
 export function tick(state, dt) {
   state.time += dt;
-  if (indexes(state)) { revalidate(state); replanNear(state); }
+  if (indexes(state)) revalidate(state);
+  replanNear(state);
   tickFlow(state);
   const lanes = new Map();
   for (const c of state.cars) {
