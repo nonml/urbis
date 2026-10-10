@@ -23,6 +23,7 @@ import { hackFireAlarm } from '../sim/alarms.js';
 import { createHackables, syncHackables, aimTarget } from '../sim/hackables.js';
 import { cityKey, undoAct } from '../sim/cityview.js';
 import { hackCrane } from '../sim/zoning.js';
+import { hackBollards } from '../sim/traffic.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
 import { buildHackMenu } from '../ui/hackmenu.js';
@@ -136,6 +137,14 @@ export function bindInput(parts) {
     // registry entry stands over (hackables.js registers a crane per site).
     if (hack.id === 'crane_stop' || hack.id === 'crane_drop') {
       return entry ? hackCrane(city, entry, hack) : 'no site in reach';
+    }
+    // M6.T8: posts across the aimed junction. street.traffic is the state the
+    // frame loop ticks, so the posts run on the sim's own clock, and the tier a
+    // unit watching them raise is wanted.js's own reading of the posts. A node
+    // that is not a junction refuses and says so, so the menu never pretends.
+    if (hack.id === 'bollards') {
+      return hackBollards(street.traffic, entry?.ref?.id ?? null) === 0
+        ? 'no junction in reach' : null;
     }
     return 'not built yet';
   };

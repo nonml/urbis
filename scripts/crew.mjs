@@ -420,8 +420,29 @@ function scopeFault(w) {
   const prefixes = t.files.filter((f) => f.endsWith('/'));
   const stray = changedPaths(w.dir).filter((f) => !owned.has(f) && !prefixes.some((pre) => f.startsWith(pre))
     && !ALWAYS_OWNED.some((re) => re.test(f)));
-  if (!stray.length) return null;
-  return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
+  if (stray.length) return `You changed files this task does not own: ${stray.join(', ')}. Undo those changes; edit only ${t.files.join(', ')}.`;
+  const dead = deadModules(w.dir);
+  if (!dead.length) return null;
+  return `These new files are imported by nothing in src/, so the running game never uses them: ${dead.join(', ')}. Wire each into the game where the player meets it (or say plainly that you cannot, and why).`;
+}
+
+// New src/ modules the game never imports: work only a test can reach (M6.T8's
+// bollards, M6.T7's signals). A module counts once any other file in src/ names
+// it in an import.
+function deadModules(dir) {
+  const fresh = changedPaths(dir).filter((f) => /^src\/.+\.js$/.test(f) && fs.existsSync(path.join(dir, f))
+    && (() => { try { sh('git', ['cat-file', '-e', `main:${f}`], dir); return false; } catch { return true; } })());
+  if (!fresh.length) return [];
+  const all = [];
+  const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+    const p = path.join(d, e.name);
+    if (e.isDirectory()) walk(p); else if (p.endsWith('.js')) all.push(p);
+  } };
+  walk(path.join(dir, 'src'));
+  return fresh.filter((f) => {
+    const name = path.basename(f);
+    return !all.some((p) => !p.endsWith(f) && new RegExp(`from\\s+['"][^'"]*/${name.replace('.', '\\.')}['"]|import\\(\\s*['"][^'"]*/${name.replace('.', '\\.')}['"]`).test(fs.readFileSync(p, 'utf8')));
+  });
 }
 
 // A brief is a feature: a turn that leaves only shots and notes behind has not

@@ -201,6 +201,23 @@
       "test": "tests/accept/m6-bollards.spec.js"
     },
     {
+      "id": "M6.T8b",
+      "lane": "wire",
+      "needs": [
+        "M6.T8"
+      ],
+      "goal": "Draw the bollards in the game. M6.T8 (1f08755) built src/render/bollards.js (buildBollards, updateBollards) but nothing in src imports it: only tests/accept/m6-bollards.spec.js builds it, in a scene of its own, so in the running game cars stop dead at posts the player cannot see (docs/shots/m6-bollards-bollards.png shows none). Build the rig in the game's scene where the other street renderers are built (src/main.js) and update it every frame from the traffic sim's posted junctions, so the posts rise out of the road when the hack fires and sink when it ends.",
+      "files": [
+        "src/main.js",
+        "src/render/bollards.js",
+        "docs/shots/",
+        "tests/accept/m6-bollards-drawn.spec.js"
+      ],
+      "test": "tests/accept/m6-bollards-drawn.spec.js",
+      "commit": "M6.T8b (M6-4): the bollards are drawn in the game",
+      "notes": "Size S. Write tests/accept/m6-bollards-drawn.spec.js first and see it fail on main: boot the built game (&gen=1&seed=7), fire the bollards at a junction with the real H key (the hold menu, as m6-bollards.spec.js does), wait the rise, then use __game.pick at the junction's screen point (screenOf) and check it hits the bollard mesh; before the hack the same pick does not. Draws may rise by at most 1 (one instanced mesh). Retake docs/shots/m6-bollards-bollards.png with scripts/shot.mjs so the posts are plainly in frame, and look at it before you finish. Do not edit other tests."
+    },
+    {
       "id": "M6.T9",
       "lane": "hack-render",
       "goal": "Steam pipe. A street shut for 60 s with a steam column; its shops lose trade; cars and police reroute",

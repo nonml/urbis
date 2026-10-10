@@ -140,6 +140,89 @@ export function jamAt(state, x, z) {
   return null;
 }
 
+// M6.T8 (M6-4, docs/ROADMAP.md): the BOLLARDS hack on a junction. Posts rise
+// across it for BOLLARD_SECS on the sim's own clock: nothing crosses, a car
+// stops dead on them, the traffic routes round the junction (findRoute and the
+// re-route below), a chasing cruiser is stopped by them the same way
+// (wanted.js drive() reads bollardsAt), and the commuters whose trips run over
+// the junction are late (tickJam counts them with the jams).
+export const BOLLARD_SECS = 90;
+// state -> node -> the post: { node, x, z, at, until }. The state's own, the
+// way greenUntil is: one street sim per game, and two sims on one map (an A/B)
+// keep their own posts. The police read the live one through liveTraffic().
+const POSTED = new WeakMap();
+// The street the police drive through (patrol.js's worldMap is the map's own
+// analogue): set where the street sim is made, and read by wanted.js drive(),
+// which has the map but not the traffic state.
+let LIVE = null;
+export function liveTraffic() {
+  return LIVE;
+}
+
+function postsOf(state) {
+  let posts = POSTED.get(state);
+  if (!posts) POSTED.set(state, posts = new Map());
+  return posts;
+}
+
+// The posts still standing on `state` at its own time, expired ones dropped.
+export function bollardPosts(state, time) {
+  const posts = POSTED.get(state);
+  if (!posts) return [];
+  for (const [node, post] of posts) if (time >= post.until) posts.delete(node);
+  return [...posts.values()];
+}
+
+// The BOLLARDS hack, thrown at one junction by aim and key. Returns the
+// seconds the posts stand, or 0 when `node` is not a junction a light runs at.
+export function hackBollards(state, node) {
+  if (!state.signals.has(node)) return 0;
+  const at = state.byId.get(node);
+  if (!at) return 0;
+  postsOf(state).set(node, { node, x: at.x, z: at.z, at: state.time, until: state.time + BOLLARD_SECS });
+  return BOLLARD_SECS;
+}
+
+// Whether the posts stand at `node` right now. `state` is null outside a
+// running sim.
+export function bollardsUp(state, node) {
+  const post = POSTED.get(state)?.get(node);
+  return !!post && state.time < post.until;
+}
+
+// The bollarded junction holding anything standing at (x, z) back, or null when
+// no posts are up there: the same reach a jam's queue takes.
+export function bollardsAt(state, x, z) {
+  if (!state) return null;
+  for (const post of bollardPosts(state, state.time)) {
+    if (Math.hypot(post.x - x, post.z - z) <= JAM_REACH) return post.node;
+  }
+  return null;
+}
+
+// M6.T8: the traffic routes round the posts. A car whose remaining route runs
+// over a bollarded junction takes the way round from the node it is driving to
+// (replanNear's own splice, so no car jumps a lane); a car on the way in stops
+// dead at the line and stands there (waitsAt), which is the queue the task
+// names.
+function reroutePosts(state) {
+  const posts = POSTED.get(state);
+  if (!posts || posts.size === 0) return;
+  for (const c of state.cars) {
+    if (c.route.length === 0 || c.turn) continue;
+    const left = c.route.slice(c.leg).map((id) => state.edgeById.get(id));
+    if (!left.some((e) => e && (bollardsUp(state, e.a) || bollardsUp(state, e.b)))) continue;
+    const edge = left[0];
+    const from = c.dir > 0 ? edge.b : edge.a;
+    // The posts stand at the node it is driving to: it drives up to them and
+    // stops, like every car at a level crossing.
+    if (bollardsUp(state, from)) continue;
+    const round = c.goal === null || c.goal === undefined ? null : findRoute(state, from, c.goal);
+    if (!round || round.length === 0) continue;
+    c.route = [...c.route.slice(0, c.leg + 1), ...round];
+  }
+}
+
 // One head per approach to every junction of two ways: on the right kerb
 // SIGNAL_BACK short of the junction, facing back at the cars it stops. The sim
 // and the render pool derive from the same node test, so a light cannot exist
@@ -240,6 +323,10 @@ export function junctionWait(state, node) {
 
 // Whether the control the junction runs holds `c` back at its line this tick.
 function waitsAt(state, c, edge, far, line) {
+  // M6.T8: posts across the junction. Every way is shut: a car stops dead on
+  // them, nose at the line, and stands with the queue behind it until they
+  // retract.
+  if (bollardsUp(state, far)) return true;
   // M6.T7: the lights jammed green (ALL-GREEN). Nothing is held by a light,
   // and everything is held by the traffic in the crossing — a car waiting at
   // its line, and a car that has entered the box, where it stands nose-in with
@@ -831,17 +918,19 @@ function throughJunctions(state, f, parcels) {
   return by;
 }
 
-// M6.T7: a jammed junction makes the commuters whose trips run over it late,
-// and their shops lose the trade they never bring. The flow's per-district
-// summary carries the hour's own late share and the jam's on top of it, which
-// is what economy.js readCommute reads every tick. Recomputed when the number
-// of jammed junctions moves, not on every tick: a jam is an event, and its
-// reach is the districts that drive it, never a district that does not.
+// M6.T7/T8: a shut junction makes the commuters whose trips run over it late,
+// and their shops lose the trade they never bring — a jammed light and posts
+// across a junction alike. The flow's per-district summary carries the hour's
+// own late share and the shut's on top of it, which is what economy.js
+// readCommute reads every tick. Recomputed when the number of shut junctions
+// moves, not on every tick: a shut is an event, and its reach is the districts
+// that drive it, never a district that does not.
 function tickJam(state, f) {
   const out = state.flowByDistrict;
   if (!f || f.stage !== 'ready' || !out) return;
   let active = 0;
   for (const until of state.greenUntil.values()) if (until > state.time) active++;
+  active += bollardPosts(state, state.time).length;
   // Nothing to redo when these jams are already written on this summary: the
   // summary itself is re-laid on the hour, and it starts at the hour's own.
   if (active === f.jams && out === f.late) return;
@@ -851,7 +940,7 @@ function tickJam(state, f) {
   if (active === 0) return;
   const late = {};
   for (const node of Object.keys(f.jam)) {
-    if (!allGreen(state, node)) continue;
+    if (!allGreen(state, node) && !bollardsUp(state, node)) continue;
     for (const [zone, n] of Object.entries(f.jam[node])) {
       late[zone] = (late[zone] ?? 0) + n;
     }
@@ -916,6 +1005,8 @@ export function createTraffic(map, seed, count = 0) {
   // town, so nothing there asks for a far end that does not exist.
   const outside = state.regional ? Math.floor(count / OUTSIDE_DIVISOR) : 0;
   for (let i = 0; i < count; i++) state.cars.push(makeCar(state, i >= count - outside));
+  // The live street, for the police (wanted.js drive, liveTraffic).
+  LIVE = state;
   return state;
 }
 
@@ -1218,8 +1309,11 @@ function routeClosed(state, c) {
 // A* over the graph, cost the edge length, heuristic the grid's Manhattan gap.
 // Ground a road op has taken away is not on the way anywhere: the route stops at
 // its border, so a trip is never planned back over a road that is not there.
-function findRoute(state, from, to) {
+// M6.T8: nor through a bollarded junction — the posts shut it, so the way round
+// is the only way.
+export function findRoute(state, from, to) {
   if (state.closed.has(from) || state.closed.has(to)) return null;
+  if (bollardsUp(state, from) || bollardsUp(state, to)) return null;
   const goal = state.byId.get(to);
   const g = new Map([[from, 0]]);
   const came = new Map();
@@ -1234,6 +1328,7 @@ function findRoute(state, from, to) {
     closed.add(cur.id);
     for (const link of state.links.get(cur.id)) {
       if (state.closed.has(link.to)) continue;
+      if (bollardsUp(state, link.to)) continue;
       const ng = g.get(cur.id) + link.len;
       if (ng >= (g.get(link.to) ?? Infinity)) continue;
       g.set(link.to, ng);
@@ -1399,6 +1494,7 @@ export function tick(state, dt) {
   state.time += dt;
   if (indexes(state)) revalidate(state);
   replanNear(state);
+  reroutePosts(state);
   tickFlow(state);
   const lanes = new Map();
   for (const c of state.cars) {
