@@ -175,15 +175,16 @@
       "goal": "Story places move. A bulldozed arc place, door or pursuit home moves to the nearest building of the same use; the journal says so",
       "files": [
         "src/sim/anchors.js",
-        "src/sim/arc.js"
+        "src/sim/arc.js",
+        "tests/accept/m5-story-move.spec.js"
       ],
       "needs": [
         "M5.T5",
         "M4.T12"
       ],
       "commit": "M5.T7 (M5-2): story places move",
-      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
-      "test": "tests/accept/m5-bulldoze.spec.js"
+      "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-2: **Bulldoze:** on all five seeds the player clicks one row building, one tower and one grown lot; each is gone within 60 game seconds, its land is an empty lot that zones R and grows, the gap shows in the shot, draws stay at or under 175, and a saved game keeps it (checked by `tests/accept/m5-bulldoze.spec.js`; shot `docs/shots/m5-bulldoze-<seed>.png`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Check first: write tests/accept/m5-story-move.spec.js and see it fail on main. Boot the built game (&gen=1&seed=7), press z, pick the bulldozer from the palette and click, with the real mouse, a building that holds an arc place, a door and a pursuit home in turn (find them through __game only to aim). After each: the story place now stands in the nearest other building of the same use, which still exists; the journal's DOM text says it moved; and walking there (or reading the arc's target through __game) points at the new building, never at the cleared lot. tests/accept/m5-bulldoze.spec.js does not cover this and stays as it is.",
+      "test": "tests/accept/m5-story-move.spec.js"
     },
     {
       "id": "M5.T8",
@@ -745,6 +746,24 @@
       "test": "tests/accept/m5-newland.spec.js"
     },
     {
+      "id": "M5.T33b",
+      "lane": "build-ui",
+      "needs": [
+        "M5.T33",
+        "M5.T35"
+      ],
+      "goal": "Prove drag zoning. M5.T33 (98246a1) added drag zoning to src/sim/cityview.js and src/ui/cityview.js but landed on tests/accept/m5-newland.spec.js, which never drags a brush, so nothing shows it works. Write tests/accept/m5-drag-zone.spec.js and make it pass: boot the built game (&gen=1&seed=7), press z for the city view, pick the residential brush from the palette the way a player does, then with the real mouse (page.mouse.down, several page.mouse.move steps, page.mouse.up) drag across at least 3 empty lots. Check: before the release the city view shows the stroke's total cost on screen (DOM text) and it equals the sum of the lots' costs; after the release every lot the stroke crossed is zoned and no other lot changed; the treasury dropped by that total; one Ctrl+Z puts every one of those lots back and refunds the total. Fix whatever the spec finds.",
+      "files": [
+        "src/sim/cityview.js",
+        "src/ui/cityview.js",
+        "src/game/input.js",
+        "tests/accept/m5-drag-zone.spec.js"
+      ],
+      "test": "tests/accept/m5-drag-zone.spec.js",
+      "commit": "M5.T33b (M5-7): drag zoning, proven by a real drag",
+      "notes": "Size S. Read lot positions and states through __game (cityview.lots(), screenOf) only to aim the mouse and read results; the acts themselves are real mouse and key events. tests/accept/m5-t26.spec.js shows how to aim at a lot and press Ctrl+Z. Do not edit other tests."
+    },
+    {
       "id": "M5.T34",
       "lane": "build-ui",
       "goal": "Problem icons. One pooled icon layer in the city view (1 draw): every building held back shows its first cause, from `decline.js` and the services' reach; a click opens today's reason card; M12's causes join the same table; its check first",
@@ -828,7 +847,8 @@
         "M5.T6",
         "M5.T7",
         "M5.T8",
-        "M5.T9"
+        "M5.T9",
+        "M5.T33b"
       ],
       "commit": "M5.T36 (M5-13): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M5-13: The sweep of the city view and the street at every new road, bulldozed gap and service has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md. Your check: write tests/accept/m5-t36.spec.js first, with @playwright/test. It must fail on main before your change (run it once and see it fail) and pass after; it must reach the feature the way a player does (the key, the sim call the frame loop makes), not only call your new function, so code nothing calls cannot pass it.",

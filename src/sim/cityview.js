@@ -8,10 +8,15 @@
 // brush, which lot is under the cursor and what each lot is doing. Pure data
 // and pure maths (law 5). The camera and the lot outlines are
 // render/cityview.js; the pointer, the palette and the readout are
-// ui/cityview.js. What zoning does to a lot is sim/ops.js (zone).
+// ui/cityview.js. What zoning does to a lot is sim/ops.js (zone); what a
+// junction control does to the traffic is sim/traffic.js, whose own record on
+// the map the click writes (M5.T31).
 import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt, ROAD_TYPES, roadTypeOf } from './map.js';
+import {
+  JUNCTION_CONTROLS, junctionControl, junctionWait, setJunctionControl,
+} from './traffic.js';
 import {
   SERVICES, addRoad, bulldoze, placeService, removeRoad, undo, upgradeCost, upgradeRoad,
   zone as zoneOp,
@@ -132,6 +137,9 @@ function zoneTool(id, key, use, name, blurb) {
     use,
     name,
     blurb,
+    // A brush marks the lot tools a drag zones across (M5.T33): the road, the
+    // bulldozer, the services and the junction controls hold no stroke.
+    brush: true,
     // M3's own zone op (ops.js) is the act: it refuses non-lots, answers
     // whether the zoning changed and leaves the undo Ctrl+Z walks back
     // (M5.T26). A map that logs no op — the hand preset, which has no dirty
@@ -152,6 +160,88 @@ function zoneTool(id, key, use, name, blurb) {
       return moneyRefuse(city, TOOL_PRICE[id]);
     },
   };
+}
+
+// ---------------------------------------------------------------------------
+// The zone stroke (M5.T33). A brush is held and the mouse dragged: every empty
+// lot the stroke crosses is zoned on the release, for the brush's price each,
+// and the stroke is charged as one act, so Ctrl+Z takes the whole of it back in
+// one press (M5.T26). Its total cost is on the card before the release, the way
+// the road drag's length and cost are (roadPreview).
+const STROKE_SAMPLE = 4;   // metres between the ground samples along a stroke
+
+// Land a brush may paint in a stroke: an empty lot whose zoning would change
+// today. A lot already zoned for this use is not crossed twice, and a lot with a
+// building on it is not a zone brush's to move.
+const paintable = (p, use) => p.kind === 'lot' && p.stage === STAGE.EMPTY && p.zoned !== use;
+
+// The empty lots a stroke from `from` to `to` crosses, in the order the brush
+// meets them. A lot is one lot however many samples land inside it.
+export function strokeLots(city, from, to, use) {
+  const len = Math.hypot(to.x - from.x, to.z - from.z);
+  const steps = Math.max(1, Math.ceil(len / STROKE_SAMPLE));
+  const met = new Set();
+  const lots = [];
+  for (let i = 0; i <= steps; i++) {
+    const t = i / steps;
+    const x = from.x + (to.x - from.x) * t;
+    const z = from.z + (to.z - from.z) * t;
+    const hit = city.parcels.find((p) => paintable(p, use)
+      && Math.abs(x - p.x) <= p.w / 2 && Math.abs(z - p.z) <= p.d / 2);
+    if (hit && !met.has(hit)) {
+      met.add(hit);
+      lots.push(hit);
+    }
+  }
+  return lots;
+}
+
+// A press with a brush held starts a stroke on the ground under it. Any other
+// tool holds no stroke, and a drag is still the overview's orbit without one.
+export function pressStroke(view, x, z) {
+  if (view.mode !== 'city' || view.lift < 1) return false;
+  const tool = toolOf(view);
+  if (!tool?.brush) return false;
+  view.stroke = { from: { x, z }, to: { x, z }, use: tool.use };
+  return true;
+}
+
+// The stroke's free end, at wherever the cursor's ground point is now.
+export function moveStroke(view, x, z) {
+  if (view.stroke) view.stroke.to = { x, z };
+}
+
+// The stroke's live numbers for the card: the empty lots it crosses, what they
+// cost and the first reason the treasury cannot pay for them. The price is the
+// brush's own, so the card names the zoning the release paints.
+export function strokePreview(view, city) {
+  const s = view.stroke;
+  if (!s) return null;
+  const tool = toolOf(view);
+  const lots = strokeLots(city, s.from, s.to, s.use);
+  const cost = lots.length * tool.cost(city, null);
+  return { lots, count: lots.length, cost, reason: moneyRefuse(city, cost) };
+}
+
+// The release: every empty lot the stroke crossed is zoned, and the stroke is
+// charged once what its lots cost. A city that cannot pay for the whole stroke
+// has said so on the card, and lands none of it, as a click refuses the same way.
+export function releaseStroke(view, city) {
+  const preview = strokePreview(view, city);
+  view.stroke = null;
+  if (!preview || preview.reason || preview.count === 0) return false;
+  const { map } = WORLDS.get(view);
+  const tool = toolOf(view);
+  const version = map.version;
+  let painted = 0;
+  for (const at of preview.lots) {
+    const was = at.zoned;
+    tool.op(map, at);
+    if (at.zoned !== was) painted += 1;
+  }
+  if (!painted) return false;
+  chargeAct(view, city, priceOf(tool, map, null) * painted, version);
+  return true;
 }
 
 // The road drag (M5.T3) is the one tool that is not a lot brush: a press on a
@@ -215,6 +305,32 @@ export const BULLDOZE_TOOL = {
   },
 };
 
+// The junction controls (M5.T31, M5-14), named once: the palette's chips, the
+// cursor's card and the traffic's own answer all read these words. A city's
+// junctions are its own to run, so a control costs nothing.
+const CONTROL_TEXT = {
+  lights: { name: 'traffic lights', blurb: 'runs a two-phase light at a junction' },
+  stop: { name: 'stop sign', blurb: 'holds every car at the line' },
+  yield: { name: 'yield', blurb: 'holds a car only for traffic it would cross' },
+};
+
+// A junction control tool: a click on a junction sets it to the control this
+// tool holds (sim/traffic.js setJunctionControl), and does nothing where there
+// is no junction under the cursor.
+const junctionTool = (id) => ({
+  id,
+  use: id,
+  name: CONTROL_TEXT[id].name,
+  blurb: CONTROL_TEXT[id].blurb,
+  junction: true,
+  money: false,
+  cost: () => 0,
+  refuse: (city, at) => (at ? null : 'no junction under the cursor'),
+  preview: (at) => ({ kind: `junction to ${CONTROL_TEXT[id].name}`, use: id }),
+});
+
+export const JUNCTION_TOOLS = JUNCTION_CONTROLS.map(junctionTool);
+
 // A service tool (M5.T11): one per type in SERVICES, placing a finished
 // service on an empty lot. The catchment radius and the capacity live with the
 // service (sim/ops.js), not on the tool; the tool carries only what the click
@@ -269,6 +385,7 @@ export const TOOLS = {
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
   unzone: zoneTool('unzone', 'x', null, 'unzone', 'clears a lot back to open land'),
   ...Object.fromEntries(Object.keys(SERVICES).map((type) => [type, serviceTool(type)])),
+  ...Object.fromEntries(JUNCTION_TOOLS.map((tool) => [tool.id, tool])),
 };
 
 // The city view's overlays (M5.T20), in the order the O key cycles them. The
@@ -326,12 +443,15 @@ export function toolOf(view) {
 }
 
 // Right click or Esc: the brush is set down and stops painting until a key
-// picks one up again (M5.T1), and any road drag it was holding is dropped.
+// picks one up again (M5.T1), and any road drag or zone stroke it was holding
+// is dropped.
 export function layDownTool(view) {
   view.active = false;
   view.drag = null;
+  view.stroke = null;
   view.pick = null;
   view.road = null;
+  view.junction = null;
   view.confirm = null;
 }
 
@@ -368,8 +488,10 @@ export function createCityView(city, map = worldMap()) {
     shift: false,          // Shift held: a brush click paints a low cap (M5.T8)
     hover: -1,
     drag: null,            // the road drag's snapped ends, while one is held
+    stroke: null,          // the zone stroke's ends, while one is dragged (M5.T33)
     pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
     road: null,            // the road a road tool holds under its cursor (M5.T25)
+    junction: null,        // the junction a control tool holds (M5.T31)
     confirm: null,         // a road removal waiting on the page's ask (M5.T5)
     act: null,             // the last act, with its cost and its hour (M5.T26)
     level: city.parcels.map(levelOf),
@@ -393,8 +515,10 @@ export function toggleCityView(view, streetYaw) {
     view.mode = 'street';
     view.hover = -1;
     view.drag = null;
+    view.stroke = null;
     view.pick = null;
     view.road = null;
+    view.junction = null;
     view.confirm = null;
     return;
   }
@@ -430,8 +554,11 @@ export function cityKey(view, key, streetYaw) {
 export function chooseTool(view, tool) {
   view.brush = tool.use;
   view.active = true;
+  view.drag = null;
+  view.stroke = null;
   view.pick = null;
   view.road = null;
+  view.junction = null;
   view.confirm = null;
 }
 
@@ -464,6 +591,27 @@ export function hoverPick(view, city, target) {
   }
 }
 
+// The junction under the cursor (M5.T31): the node nearest the ground point
+// that two ways meet at, with the control it runs and what it has cost the cars
+// that crossed it. It is a control tool's own cursor — a zone brush, a road
+// drag and the bulldozer never hold one — so a junction cursor and a lot cursor
+// are never both live.
+const JUNCTION_PICK = 14;   // metres from the cursor to the node it may grab
+
+export function hoverJunction(view, city, at, traffic) {
+  hoverLot(view, -1);
+  hoverPick(view, city, null);
+  view.junction = null;
+  if (!at || !traffic || !toolOf(view)?.junction) return null;
+  if (view.mode !== 'city' || view.lift < 1) return null;
+  const hit = nodeAt(WORLDS.get(view).map, at.x, at.z);
+  if (!hit || hit.dist > JUNCTION_PICK) return null;
+  const control = junctionControl(traffic, hit.node.id);
+  if (control === null) return null;
+  view.junction = { id: hit.node.id, control, wait: junctionWait(traffic, hit.node.id) };
+  return view.junction;
+}
+
 // A click: the tool goes on the lot under the cursor, on the whole parcel or
 // road the cursor holds with the bulldozer, or — with a road tool held (M5.T25)
 // — on the road under it. Returns whether the world changed. A tool the player
@@ -474,8 +622,13 @@ export function hoverPick(view, city, target) {
 // tool costs and Ctrl+Z takes it back (M5.T26).
 export function paintLot(view, city, shift = view.shift) {
   if (view.mode !== 'city' || view.lift < 1) return false;
+  // A press starts a stroke (M5.T33) wherever a brush is held, and a press that
+  // barely travels is a click on the lot under it: the stroke is put down here,
+  // so a click never leaves a half-drawn one over the card.
+  view.stroke = null;
   const tool = toolOf(view);
   if (!tool) return false;
+  if (tool.junction) return setJunction(view, tool);
   if (tool.drag) return changeRoad(view, tool);
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
   if (tool.type) return buildService(view, city, tool);
@@ -487,6 +640,16 @@ export function paintLot(view, city, shift = view.shift) {
   const capped = shift ? capParcel(city, view.hover, tool.use === null ? STAGE.HIGH : STAGE.LOW) : false;
   if (laid) chargeAct(view, city, priceOf(tool, map, at), map.version - laid);
   return at.zoned !== was || capped;
+}
+
+// A click on a junction with a control tool held (M5.T31): the control is
+// written to the map's own record, where the traffic and the render both read
+// it, and the cars at that junction obey it from the next tick. Returns whether
+// the control changed.
+function setJunction(view, tool) {
+  const at = view.junction;
+  if (!at) return false;
+  return setJunctionControl(WORLDS.get(view).map, at.id, tool.use);
 }
 
 // A service is an op on the map (M5.T11): the map owns the version, the dirty
@@ -527,6 +690,7 @@ function adoptLots(view, city, map) {
   view.hover = -1;
   view.pick = null;
   view.road = null;   // the op renames the edges: nothing under the cursor now
+  view.junction = null;
 }
 
 // The map a view edits (M5.T5): the op runs on it, the picker reads its parcels.
