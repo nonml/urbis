@@ -153,20 +153,31 @@ function setHeat(w, heat, x, z, map) {
   }
 }
 
-function raise(w, cause, hero, time, map) {
+function raise(w, cause, hero, time, map, hack = null) {
   if (w.heat >= MAX_HEAT) return;
   setHeat(w, w.heat + 1, hero.x, hero.z, map);
-  emit(w, { type: `tier_up_${w.heat}`, cause, x: hero.x, z: hero.z, yaw: hero.yaw, inCar: hero.inCar, time });
+  emit(w, {
+    type: `tier_up_${w.heat}`, cause, hack, x: hero.x, z: hero.z, yaw: hero.yaw, inCar: hero.inCar, time,
+  });
 }
 
-// A blackout is reported where the tampering happened: the units respond to
-// that spot and search from it, unless they already have the suspect in sight.
+// M6.T6: the police see hacks. A hack thrown while a unit has eyes on it is a
+// witnessed crime — the tier rises on cause `hack`, tagged with the hack kind
+// so dispatch names what it watched (dispatch.js HACK_LINES) — and the sight is
+// the very rule the suspect is read by (judgeSight's canSee), so a hack watched
+// is a suspect watched. Watched or not, a blackout is a blackout on the grid:
+// nobody watching, it is reported as the tampering it is, as it always was.
+// Either way the units answer the spot unless they already have the suspect.
 export function wantedOnBlackout(w, x = w.lkp.x, z = w.lkp.z, time = 0, map = worldMap()) {
+  const seen = onDuty(w).some((u) => canSee(u.x, u.z, x, z, false, map));
   if (!w.contact) {
     w.lkp = { x, z, yaw: w.lkp.yaw };
     startSearch(w, x, z, time);
   }
-  raise(w, 'blackout', { x, z, yaw: w.lkp.yaw, inCar: false }, time, map);
+  // Watched, the crime is the hack itself and the radio names its kind;
+  // unwatched, it is the grid's own blackout, reported as it always was.
+  const kind = seen ? 'blackout' : null;
+  raise(w, seen ? 'hack' : 'blackout', { x, z, yaw: w.lkp.yaw, inCar: false }, time, map, kind);
   w.searchT = 0;
 }
 
