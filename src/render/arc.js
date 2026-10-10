@@ -5,7 +5,8 @@
 // atlas cell it shows, so a new sign is data (arc.json), not a new mesh.
 import * as THREE from 'three';
 import { heightAt } from '../sim/world.js';
-import { zoneAt } from '../sim/street.js';
+import { worldMap } from '../sim/patrol.js';
+import { districtOf } from './materials.js';
 
 // The story boards stack below the beam, and two of them do not fit under it in a square 1024.
 const ATLAS_W = 1024;
@@ -234,8 +235,8 @@ function placeSigns(rig, shown) {
 }
 
 // target: {x, z} or null. shown: the ids of the signs the arc has put up.
-// glows: each power zone's light, 0–1, the same the lamps read.
-export function updateArcMarker(rig, target, shown, time, night, glows) {
+// glows: each power district's light, 0–1, the same the lamps read.
+export function updateArcMarker(rig, target, shown, time, night, glows, map = worldMap()) {
   const moved = target?.x !== rig.target?.x || target?.z !== rig.target?.z;
   if (moved) placeMarker(rig, target);
   const key = shown.map((s) => s.id).join('|');
@@ -248,7 +249,10 @@ export function updateArcMarker(rig, target, shown, time, night, glows) {
   color.set(MARKER_HEX).multiplyScalar(pulse);
   for (let i = 0; i <= RING_SLOT; i++) rig.mesh.setColorAt(i, color);
   rig.signs.forEach((s, k) => {
-    const glow = glows[zoneAt(s.z)];
+    // The board is lit by the street it hangs on: its own power district, which
+    // on a map cut into more than two is not the half of town it happens to fall
+    // in.
+    const glow = glows[districtOf(map, s.x, s.z)];
     const lit = 1 + (NIGHT_LIT * glow + DARK_LIT * (1 - glow) - 1) * night;
     rig.mesh.setColorAt(FIRST_SIGN + k, color.setScalar(lit));
   });

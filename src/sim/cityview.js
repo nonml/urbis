@@ -16,6 +16,7 @@ import {
   SERVICES, addRoad, bulldoze, placeService, removeRoad, undo, upgradeCost, upgradeRoad,
   zone as zoneOp,
 } from './ops.js';
+import { lockRefuse, milestoneOf, populationOf } from './milestones.js';
 import { MAX_ROAD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
@@ -220,30 +221,43 @@ export const BULLDOZE_TOOL = {
 // needs — what it refuses and what it costs. No key: the palette picks it up.
 function serviceTool(type) {
   const def = SERVICES[type];
-  return {
+  const tool = {
     id: type,
     use: type,
     type,
     name: def.name,
     blurb: `builds a ${def.name} on an empty lot`,
     cost: () => def.cost,
-    refuse: (city, at) => {
-      if (!at) return 'no lot under the cursor';
-      if (at.kind === 'service') {
-        return at.type === type
-          ? `${def.name} already stands here`
-          : `${SERVICES[at.type]?.name ?? 'a service'} already stands here`;
-      }
-      if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not built over`;
-      if (at.stage !== STAGE.EMPTY) return 'bulldoze the building first';
-      return moneyRefuse(city, def.cost);
-    },
+    // Every reason this click will not act, in one line (M5-7 priced them and
+    // M5-12's tiers add one): a city that has not the people for a police
+    // station says so, and so does a treasury that cannot pay for it. A player
+    // refused both should not be told half of it.
+    refuse: (city, at) => both(siteRefuse(def, type, at) ?? moneyRefuse(city, def.cost),
+      lockRefuse(tool, populationOf(city))),
     preview: (at) => ({
       kind: `service ${type}`,
       box: at && { x: at.x, z: at.z, w: at.w, d: at.d },
     }),
   };
+  return tool;
 }
+
+// Why a service cannot stand where the cursor points, or null when the site is
+// clear and only the money and the tier stand in the way.
+function siteRefuse(def, type, at) {
+  if (!at) return 'no lot under the cursor';
+  if (at.kind === 'service') {
+    return at.type === type
+      ? `${def.name} already stands here`
+      : `${SERVICES[at.type]?.name ?? 'a service'} already stands here`;
+  }
+  if (at.kind !== 'lot') return `${at.kind} buildings are bulldozed, not built over`;
+  return at.stage !== STAGE.EMPTY ? 'bulldoze the building first' : null;
+}
+
+// The two reasons a tool refuses, as the one line the card shows: the tier the
+// city has not the people for (M5.T30) beside whatever else stands in the way.
+const both = (why, locked) => (why && locked ? `${why} · ${locked}` : why ?? locked);
 
 export const TOOLS = {
   road: ROAD_TOOL_STREET,
@@ -360,6 +374,10 @@ export function createCityView(city, map = worldMap()) {
     act: null,             // the last act, with its cost and its hour (M5.T26)
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
+    // The population tier the city stands on (M5.T30), and the tier note the
+    // screen is still saying: { tier, at }. Settled by the first tick.
+    tier: null,
+    unlock: null,
   };
   WORLDS.set(view, { city, map });
   return view;
@@ -631,13 +649,17 @@ function roadRefuse(map, from, to, axis, type = 'street') {
 
 // The drag's live numbers, or null when no drag is on. The price is the type's
 // own per metre (ROAD_TYPES), so the card names the same road the release lays.
+// A type the city has not the people for refuses here, in the tier's own words,
+// and the release lays nothing.
 export function roadPreview(view) {
   const d = view.drag;
   if (!d) return null;
+  const { map, city } = WORLDS.get(view);
   const type = d.type ?? 'street';
-  const reason = d.length < ROAD_MIN
+  const locked = lockRefuse(toolOf(view), populationOf(city));
+  const reason = locked ?? (d.length < ROAD_MIN
     ? `drag at least ${ROAD_MIN} m`
-    : roadRefuse(WORLDS.get(view).map, d.from, d.to, d.axis, type);
+    : roadRefuse(map, d.from, d.to, d.axis, type));
   return { ...d, cost: Math.round(d.length * ROAD_TYPES[type].cost), reason };
 }
 
@@ -702,11 +724,13 @@ export function roadOffer(view) {
 
 // A click on a road with a road tool held: the road changes to the held type in
 // place, for the difference in cost (M5-10). A click on open land is not a
-// drag's press, so it does nothing.
+// drag's press, so it does nothing. A type the city has not the people for
+// (M5.T30) refuses in the tier's own words.
 function changeRoad(view, tool) {
   const held = view.road;
   if (!held || held.kind !== 'road' || roadTypeOf(held.edge) === tool.type) return false;
   const { map, city } = WORLDS.get(view);
+  if (lockRefuse(tool, populationOf(city))) return false;
   const version = map.version;
   const laid = moved(map, () => upgradeRoad(map, held.edge, tool.type));
   if (!laid) return false;
@@ -741,6 +765,20 @@ export function tickCityView(view, city, dt, keys) {
     view.trend[i] = Math.sign(level - view.level[i]);
     view.level[i] = level;
   });
+  tickMilestones(view, city);
+}
+
+// The population tier the city stands on (M5.T30, M5-12), and the note the
+// screen says when the city climbs onto a higher one. The view settles its
+// opening tier on its first tick rather than announcing it: a city that opens
+// above a tier has already earned it, and the note is for what the city just
+// did. The tier is the city's own size, not a record — a city that empties
+// stands on the tier it is worth now, and the note comes again when it climbs
+// back.
+function tickMilestones(view, city) {
+  const tier = milestoneOf(city).tier;
+  if (view.tier !== null && tier > view.tier) view.unlock = { tier, at: city.time };
+  view.tier = tier;
 }
 
 // What a lot is doing, in the terms the readout shows (pillar 5): one of

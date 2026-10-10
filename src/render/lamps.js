@@ -1,7 +1,9 @@
 // Street lighting: the street_lamp_01 model on the kerb, instanced through the
-// model pool per zone, plus the light shaft and glare that make a lit street.
-// Zones (z<0 / z>=0) can go dark for the blackout hack — one material set per
-// zone, so a zone's lanterns and their light die together.
+// model pool, plus the light shaft and glare that make a lit street. Every
+// district on the map runs its own power (blackout hack), and a lantern, its
+// glare and its shaft are dimmed by the district they stand in (materials.js
+// districtOf) — one material set for the whole city, not one per district, so
+// a town cut into sixteen districts costs no more to draw than one cut in two.
 //
 // A road the player lays replans the map's furniture (M5.T4b), and rebuild()
 // re-seats every pool from the new plan: the lamps, cones, glows and signals of
@@ -9,17 +11,18 @@
 // with. One mesh per material at any count, never a mesh per lamp (law 4).
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { getGlowTex } from './signs.js';
 import { blink } from '../sim/street.js';
 import { worldMap } from '../sim/patrol.js';
 import { WORLD_FURNITURE } from '../sim/furniture.js';
 import { signalGreen, signalHeads } from '../sim/traffic.js';
 import { loadModelPool } from './models.js';
+import { MAX_DISTRICTS, districtOf, getGlowTex, zoneLit } from './materials.js';
 
 // Which street a fixture belongs to comes from the map's district; how it
 // stands on that street is this file's business.
 // Explicit per-lamp placement: pole base (x,z), head offset toward the road,
-// instance yaw, blackout zone. Main + east avenues share the z rhythm.
+// instance yaw. Main + east avenues share the z rhythm. The district itself is
+// read off the map where the pole stands, never written into the table.
 const POLE_X = 5.4;
 const ARM = 1.8;
 // A crossing's footway is narrower, so its poles stand closer to the kerb. The
@@ -42,7 +45,6 @@ function handLamps(district) {
         hx: ax + side * (POLE_X - ARM),
         hz: z,
         rotY: side > 0 ? 0 : Math.PI,
-        zone: z < 0 ? 0 : 1,
       }));
     }),
     ...[-2, 12, 26, 40].map((x) => ({
@@ -51,30 +53,28 @@ function handLamps(district) {
       hx: x,
       hz: SOUTH_Z - CROSS_HEAD_OUT,
       rotY: Math.PI / 2,
-      zone: 0,
     })),
-    { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0, zone: 0 },
-    { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI, zone: 0 },
+    { x: -8, z: -28.5, hx: -9.8, hz: -28.5, rotY: 0 },
+    { x: -24, z: -35.5, hx: -22.2, hz: -35.5, rotY: Math.PI },
     // West avenue (sparser rhythm — different mood, fewer fixtures)
     ...[-27, -9, 9, 27].flatMap((z, i) => {
       const side = i % 2 === 0 ? -1 : 1;
       return [{
         x: WEST_X + side * POLE_X, z,
         hx: WEST_X + side * (POLE_X - ARM), hz: z,
-        rotY: side > 0 ? 0 : Math.PI, zone: z < 0 ? 0 : 1,
+        rotY: side > 0 ? 0 : Math.PI,
       }];
     }),
     // North extension + cross street. The two on main keep their written head
     // offset rather than POLE_X - ARM, which is the same 3.6 m one ulp away.
-    { x: MAIN_X + POLE_X, z: 63, hx: MAIN_X + 3.6, hz: 63, rotY: 0, zone: 1 },
-    { x: MAIN_X - POLE_X, z: 81, hx: MAIN_X - 3.6, hz: 81, rotY: Math.PI, zone: 1 },
+    { x: MAIN_X + POLE_X, z: 63, hx: MAIN_X + 3.6, hz: 63, rotY: 0 },
+    { x: MAIN_X - POLE_X, z: 81, hx: MAIN_X - 3.6, hz: 81, rotY: Math.PI },
     {
       x: -20,
       z: PLAZA_Z - CROSS_POLE_OUT,
       hx: -20,
       hz: PLAZA_Z - CROSS_HEAD_OUT,
       rotY: Math.PI / 2,
-      zone: 1,
     },
     {
       x: 20,
@@ -82,7 +82,6 @@ function handLamps(district) {
       hx: 20,
       hz: PLAZA_Z + CROSS_HEAD_OUT,
       rotY: -Math.PI / 2,
-      zone: 1,
     },
   ];
 }
@@ -95,6 +94,9 @@ const LANTERN_EMIT = new THREE.Color(0xffd9a0);
 const GLOW_COLOR = 0xffc98a;
 const GLOW_SIZE = 3.2;
 const GLOW_OPACITY = 0.38;
+// The shaft's falloff, top to bottom: bright under the lantern, gone at the
+// road. Percentages are the canvas gradient's own stops.
+const SHAFT_STOPS = [[0, 0x90], [0.55, 0x40], [1, 0x00]];
 
 // Signals (M3.T31): a two-lamp head on every junction approach, built from the
 // sim's own placements so lights and the stopping rule cannot drift apart. Two
@@ -167,6 +169,33 @@ export function reportKit(fields) {
   };
 }
 
+// The shaft's fade as texels: the stops the canvas gradient this replaces ran
+// from top to bottom, over the texture's own 128 rows. An alphaMap needs one
+// channel, so a 2 kB buffer paints it instead of a document.
+function shaftTexels() {
+  const W = 4;
+  const H = 128;
+  const data = new Uint8Array(W * H * 4);
+  const greyAt = (t) => {
+    for (let i = 1; i < SHAFT_STOPS.length; i += 1) {
+      const [t1, v1] = SHAFT_STOPS[i];
+      if (t > t1) continue;
+      const [t0, v0] = SHAFT_STOPS[i - 1];
+      return Math.round(v0 + ((v1 - v0) * (t - t0)) / (t1 - t0));
+    }
+    return SHAFT_STOPS[SHAFT_STOPS.length - 1][1];
+  };
+  for (let row = 0; row < H; row += 1) {
+    const g = greyAt(row / H);
+    for (let col = 0; col < W; col += 1) {
+      const o = (row * W + col) * 4;
+      data[o] = data[o + 1] = data[o + 2] = g;
+      data[o + 3] = 255;
+    }
+  }
+  return data;
+}
+
 export function buildLamps(map = worldMap()) {
   const group = new THREE.Group();
   const dummy = new THREE.Object3D();
@@ -174,20 +203,9 @@ export function buildLamps(map = worldMap()) {
 
   // Shafts fade head-to-ground via a gradient alphaMap: light falloff, not a
   // solid pyramid. Same instanced mesh, +1 draw (VGA-082 partial). Static across
-  // rebuilds, so a road op never re-makes a canvas or a buffer.
-  const shaftTex = (() => {
-    const c = document.createElement('canvas');
-    c.width = 4;
-    c.height = 128;
-    const g = c.getContext('2d');
-    const grad = g.createLinearGradient(0, 0, 0, 128);
-    grad.addColorStop(0, '#909090');
-    grad.addColorStop(0.55, '#404040');
-    grad.addColorStop(1, '#000000');
-    g.fillStyle = grad;
-    g.fillRect(0, 0, 4, 128);
-    return new THREE.CanvasTexture(c);
-  })();
+  // rebuilds, so a road op never re-makes a texture or a buffer. The fade is
+  // data — 4 x 128 grey texels the shader reads exactly as it read the canvas.
+  const shaftTex = new THREE.DataTexture(shaftTexels(), 4, 128, THREE.RGBAFormat);
   const coneGeo = new THREE.ConeGeometry(1.5, LANTERN_Y, 20, 1, true);
   const coneMat = new THREE.MeshBasicMaterial({
     color: 0xffc98a, transparent: true, opacity: 0.05, alphaMap: shaftTex,
@@ -215,15 +233,16 @@ export function buildLamps(map = worldMap()) {
   const rig = {
     lamps: [],
     heads: [],
-    poolsByZone: [[], []],
-    lanternMats: [[], []],
+    // One light pool per district that has lamps, at the district's index: a
+    // blackout dims a district's own pools and no other's.
+    poolsByZone: [],
     cones: null,
     glows: null,
     signals: [],
     sigs: null,
     lenses: null,
   };
-  const zoneLight = [1, 1];
+  const zoneLight = Array.from({ length: MAX_DISTRICTS }, () => 1);
   let nightF = 1;
   const zero = new THREE.Matrix4().makeScale(0, 0, 0);
   const m4 = new THREE.Matrix4();
@@ -231,86 +250,84 @@ export function buildLamps(map = worldMap()) {
   const v3 = new THREE.Vector3();
   const s3 = new THREE.Vector3();
 
-  // The lantern model pools, one per power zone, with their headroom: the slot
-  // list is every slot currently seated, so a rebuild gives them back and seats
-  // the new plan. Only a plan wider than the pool loads a wider model.
-  const poolRig = [
-    { pool: null, slots: [], group: null },
-    { pool: null, slots: [], group: null },
-  ];
+  // One lantern model pool for the whole city, with its headroom: the slot list
+  // is every slot currently seated, so a rebuild gives them back and seats the
+  // new plan. Only a plan wider than the pool loads a wider model. The district
+  // a seated lamp stands in rides on the instance, so the glass and the bulb of
+  // this one pool are dimmed per district by the 16-entry uniforms materials.js
+  // wears — a city's second, third or sixteenth district costs what its first did.
+  const lanterns = { pool: null, slots: [], group: null, lit: [] };
   let poolBusy = 0;
   let poolAgain = false;
 
-  function needPerZone() {
-    const need = [0, 0];
-    for (const l of rig.lamps) need[l.zone] += 1;
-    return need;
-  }
-
-  function placeLanterns() {
-    for (const zone of [0, 1]) {
-      const st = poolRig[zone];
-      if (!st.pool) continue;
-      for (const i of st.slots) st.pool.free(i);
-      st.slots.length = 0;
-      rig.lanternMats[zone] = [];
-      for (const l of rig.lamps) {
-        if (l.zone !== zone) continue;
-        const i = st.pool.claim();
-        if (i < 0) break;         // a wider pool is already on its way
-        dummy.position.set(l.x, 0, l.z);
-        dummy.rotation.set(0, l.rotY, 0);
-        dummy.scale.set(1, 1, 1);
-        dummy.updateMatrix();
-        st.pool.set(i, dummy.matrix);
-        st.slots.push(i);
-      }
-      for (const mesh of st.pool.meshes) {
-        if (/glass|bulb/i.test(mesh.material.name ?? '')) rig.lanternMats[zone].push(mesh.material);
-      }
+  // The pool's lit parts (its glass and its bulb) carry the district per
+  // instance and wear the per-district uniforms; the pole and the housing never
+  // light, so they carry nothing.
+  function adoptLitParts(pool) {
+    lanterns.lit.length = 0;
+    for (const mesh of pool.meshes) {
+      if (!/glass|bulb/i.test(mesh.material.name ?? '')) continue;
+      mesh.geometry.setAttribute('zone', new THREE.InstancedBufferAttribute(
+        new Float32Array(pool.capacity), 1,
+      ).setUsage(THREE.DynamicDrawUsage));
+      lanterns.lit.push({
+        attr: mesh.geometry.attributes.zone, mat: zoneLit(mesh.material, 'lantern'),
+      });
     }
   }
 
-  function growLanterns() {
-    const need = needPerZone();
-    const wants = [0, 1].filter((z) => !poolRig[z].pool || poolRig[z].pool.capacity < need[z]);
-    if (wants.length === 0) {
-      placeLanterns();
+  function seatLanterns() {
+    const { pool } = lanterns;
+    if (!pool) return;
+    for (const i of lanterns.slots) pool.free(i);
+    lanterns.slots.length = 0;
+    for (const l of rig.lamps) {
+      const i = pool.claim();
+      if (i < 0) break;         // a wider pool is already on its way
+      dummy.position.set(l.x, 0, l.z);
+      dummy.rotation.set(0, l.rotY, 0);
+      dummy.scale.set(1, 1, 1);
+      dummy.updateMatrix();
+      pool.set(i, dummy.matrix);
+      for (const part of lanterns.lit) part.attr.setX(i, l.zone);
+      lanterns.slots.push(i);
+    }
+    for (const part of lanterns.lit) part.attr.needsUpdate = true;
+  }
+
+  // Seat the plan's lamps in the pool the frame already draws, loading a wider
+  // pool only when a plan has outgrown the one it has. One pool per model, so a
+  // plan of any size or any district count adds no mesh (law 4).
+  function syncLanterns() {
+    if (poolBusy > 0) { poolAgain = true; return; }
+    if (lanterns.pool && lanterns.pool.capacity >= rig.lamps.length) {
+      seatLanterns();
       return;
     }
     poolBusy += 1;
-    Promise.all(wants.map((z) => loadModelPool(LAMP_MODEL, need[z] + POOL_SLACK)
+    loadModelPool(LAMP_MODEL, rig.lamps.length + POOL_SLACK)
       .then((pool) => {
-        const st = poolRig[z];
-        if (st.group) {
-          group.remove(st.group);
-          for (const m of st.group.children) {
+        if (lanterns.group) {
+          group.remove(lanterns.group);
+          for (const m of lanterns.group.children) {
             m.geometry.dispose();
             m.material.dispose();
             m.dispose();
           }
+          lanterns.lit.length = 0;
         }
-        st.pool = pool;
-        st.slots = [];
-        st.group = pool.group;
+        lanterns.pool = pool;
+        lanterns.slots = [];
+        lanterns.group = pool.group;
+        adoptLitParts(pool);
         group.add(pool.group);
-      }))).catch(() => {}).finally(() => {
+      }).catch(() => {}).finally(() => {
       poolBusy -= 1;
       if (poolBusy > 0) return;
-      if (poolAgain) { poolAgain = false; growLanterns(); return; }
-      placeLanterns();
+      if (poolAgain) { poolAgain = false; syncLanterns(); return; }
+      seatLanterns();
       reportKit({ lamps: rig.lamps.length, models: ['street_lamp_01'] });
     });
-  }
-
-  function syncLanterns() {
-    if (poolBusy > 0) { poolAgain = true; return; }
-    const need = needPerZone();
-    if ([0, 1].every((z) => poolRig[z].pool && poolRig[z].pool.capacity >= need[z])) {
-      placeLanterns();
-      return;
-    }
-    growLanterns();
   }
 
   function buildCones() {
@@ -377,25 +394,32 @@ export function buildLamps(map = worldMap()) {
   // plan plus the lamps, boxes and junctions of every edge the player laid
   // (sim/furniture.js). Boot calls it once; main calls it whenever the map's
   // furniture is replanned.
+  //
+  // Each lamp is copied with the district it stands in, so the plan the map
+  // holds is never written to and a rebuild re-derives where every pole stands
+  // from the map's own districts.
   function rebuild(nextMap = worldMap()) {
-    rig.lamps = (nextMap.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(nextMap.district);
+    const plan = (nextMap.furniture ?? WORLD_FURNITURE)?.lamps ?? handLamps(nextMap.district);
+    rig.lamps = plan.map((l) => ({ ...l, zone: districtOf(nextMap, l.x, l.z) }));
     rig.heads.length = 0;
-    for (const zone of [0, 1]) rig.poolsByZone[zone].length = 0;
+    rig.poolsByZone.length = 0;
     for (const l of rig.lamps) {
       rig.heads.push(new THREE.Vector3(l.x, LANTERN_Y, l.z));
-      rig.poolsByZone[l.zone].push({ x: l.x, z: l.z, size: 11, color: '#b97c3a' });
+      (rig.poolsByZone[l.zone] ??= []).push({ x: l.x, z: l.z, size: 11, color: '#b97c3a' });
     }
     buildCones();
     buildSignals(nextMap);
     syncLanterns();
   }
 
-  // Per-fixture brightness: mid-phase zones sputter per lamp (seeded blink).
+  // Per-district brightness: mid-phase districts sputter per lamp (seeded
+  // blink). A district id past the uniforms is held at the last slot, the same
+  // way districtOf holds a fixture that stands past it.
   function setZoneLight(zone, v) {
-    zoneLight[zone] = v;
+    zoneLight[Math.min(zone, zoneLight.length - 1)] = v;
   }
   function tick(time) {
-    const { lamps, cones, glows, signals, lenses, lanternMats } = rig;
+    const { lamps, cones, glows, signals, lenses } = rig;
     lamps.forEach((l, i) => {
       const v = zoneLight[l.zone];
       const b = v >= 1 ? 1 : v <= 0 ? 0 : blink(time, i * 1.7 + l.zone);
@@ -411,11 +435,11 @@ export function buildLamps(map = worldMap()) {
       glows.setColorAt(i, glowLevel.setScalar(b > 0.02 ? GLOW_OPACITY * nightF * b : 0));
     });
     // The lantern glass and bulb carry the light: daylight dulls them, a
-    // blackout puts them out for their zone only.
-    for (const zone of [0, 1]) {
+    // blackout puts them out for their own district only.
+    for (let zone = 0; zone < zoneLight.length; zone += 1) {
       const b = zoneLight[zone] >= 1 ? 1 : zoneLight[zone] <= 0 ? 0 : blink(time, zone * 3.7);
       const lit = (0.15 + 0.85 * nightF) * b;
-      for (const mat of lanternMats[zone]) mat.emissiveIntensity = 1.5 * lit;
+      for (const { mat } of lanterns.lit) mat.userData.zoneEmissive.value[zone] = 1.5 * lit;
     }
     signals.forEach((h, i) => {
       const green = signalGreen(h.axis, time);
@@ -442,9 +466,12 @@ export function buildLamps(map = worldMap()) {
   rebuild(map);
   return {
     group,
+    // The plan as it was seated: each lamp with the district it stands in.
+    lamps: rig.lamps,
     heads: rig.heads,
     poolsByZone: rig.poolsByZone,
     get cones() { return rig.cones; },
+    get glows() { return rig.glows; },
     setZoneLight,
     setDaylight,
     tick,

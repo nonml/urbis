@@ -184,6 +184,49 @@ first slice is bigger than it wants to be, and it carries its own proof.
   replaces the placeholder oscillation. At that point growth has a cause the player can
   reach, and pillar 3 has something real to cascade into.
 
+## Population tiers — the milestones (M5.T30, M5-12)
+
+The city view is where the player shapes the district, so it is also where the
+district's size is read back. Every tool that is not part of a new city's
+opening hand waits on a population tier (`src/sim/milestones.js`), and the tiers
+are written here because the numbers are a design decision, not a constant:
+
+| Tier | People | What it opens |
+|---|---|---|
+| 1 — village | 50 | police station, clinic |
+| 2 — town | 250 | fire station, school, avenue, one-way |
+
+A new game opens with the roads, the zone brushes, the bulldozer, the substation
+and the park. A tool whose tier the city has not reached is dimmed in the
+palette and refuses with its own words — "fire station unlocks at 250 people" —
+and the city view's readout always carries the population and the next tier, so
+the player never has to guess what is missing. Reaching a tier says on screen
+what it unlocked.
+
+**What "population" is.** The people living in the city's homes: one per
+resident on a residential lot, the same count `people.js` holds a record per
+person for and the same number the title slot and the profiler read
+(`__game.census().residents`). It is deliberately not the district economy's
+`homes`, which adds the established towers' abstract base on top: the ladder
+should move when the player's zoning moves, and the base never does. The city
+view's readout is therefore the modelled residents, not the economy's total.
+
+**Why 50 and 250, measured.** On the five generated seeds the opening district
+holds **50, 62, 65, 66 and 176** residents on its lots — the lots arrive
+partly built, so no city opens empty. A scripted player who zones every free lot
+and does nothing else holds **60, 93, 168, 185 and 237** twenty game minutes
+later (M5.T30's check runs exactly that on all five seeds): the first tier must
+sit under the slowest of those, which puts it at 50, and the second above every
+opening population, which puts it at 250. The police station and the clinic are
+therefore already open on the busier opening districts — a city that starts with
+90 residents has already earned them — while the fire station, the school and
+the two wider road types are closed everywhere until the second tier.
+
+**The tier is the city's size, not a record.** A district whose lots empty falls
+back under the tier it stood on, and its locked tools refuse again until the
+market recovers; climbing back says so on screen. Nothing is banked, because the
+number the player reads is the number the tools are weighed against.
+
 ## What this deliberately does not do
 
 - **No pathfinding, traffic demand, or per-citizen residency.** That is the rest of

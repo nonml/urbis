@@ -11,6 +11,7 @@ import {
   roadOffer, roadPreview, toolOf, zoomCityView,
 } from '../sim/cityview.js';
 import { ROAD_TYPES } from '../sim/map.js';
+import { TIERS, lockRefuse, milestoneOf } from '../sim/milestones.js';
 import { paintOf } from '../render/cityview.js';
 import { buildProblems } from '../render/problems.js';
 
@@ -57,6 +58,17 @@ const ASK = [
   'display:none', 'text-align:center', 'font:12px/1.7 ui-monospace,Menlo,monospace',
   'color:#e4e1da', 'background:rgba(4,8,16,0.94)', 'border:1px solid rgba(208,86,63,0.6)',
   'padding:12px 16px', 'border-radius:6px', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
+].join(';');
+// The tier note (M5.T30, M5-12): the moment the city reaches a population tier,
+// the screen says what it unlocked. It holds for BANNER_SECS of game time, then
+// goes — long enough to read, short enough not to sit over the street.
+const BANNER_SECS = 20;
+const BANNER = [
+  'position:fixed', 'left:50%', 'top:14%', 'transform:translate(-50%,0)', 'z-index:6',
+  'display:none', 'text-align:center', 'font:12px/1.7 ui-monospace,Menlo,monospace',
+  'letter-spacing:0.05em', 'color:#e4e1da', 'background:rgba(4,8,16,0.82)',
+  'border:1px solid rgba(226,178,106,0.6)', 'padding:8px 14px', 'border-radius:6px',
+  'text-shadow:0 1px 2px rgba(0,0,0,0.8)', 'pointer-events:none',
 ].join(';');
 
 // The three road tools are one mark: a street, an avenue and a one-way all
@@ -125,6 +137,44 @@ function showDemand({ view, city, demand }) {
     fill.style.width = `${Math.round(v * DEMAND_WIDTH)}px`;
     value.textContent = `${Math.round(v * 100)}%`;
   }
+}
+
+// The milestone readout (M5.T30, M5-12): the people the city holds and the next
+// tier they unlock, painted every frame the overview is up, so a player always
+// knows where the city stands and what its size is worth. The numbers ride
+// `data-*` the way the demand bars keep theirs, so a check reads them without
+// parsing a rounded line.
+function showMilestone({ city, milestone }) {
+  const { people, tier, next } = milestoneOf(city);
+  milestone.el.dataset.pop = `${people}`;
+  milestone.el.dataset.tier = `${tier}`;
+  milestone.el.dataset.next = next ? `${next.people}` : '';
+  // One line, and short enough to stay one: the palette is already taller than
+  // a 540-pixel window, and what the next tier opens is on the dimmed rows
+  // above and in the tier note when it comes.
+  milestone.line.innerHTML = `<b style="color:#fff">POP ${people.toLocaleString('en-US')}</b>`
+    + ` <span style="opacity:0.65">· ${next
+      ? `next: ${next.id} at ${next.people} people`
+      : 'every tool unlocked'}</span>`;
+}
+
+function showBanner({ view, city, banner }) {
+  const unlock = view.unlock;
+  if (!unlock || !Number.isFinite(city.time - unlock.at) || city.time - unlock.at > BANNER_SECS) {
+    banner.style.display = 'none';
+    banner.dataset.tier = '';
+    return;
+  }
+  const tier = TIERS[unlock.tier];
+  if (!tier) {
+    banner.style.display = 'none';
+    banner.dataset.tier = '';
+    return;
+  }
+  banner.dataset.tier = `${unlock.tier}`;
+  banner.innerHTML = `<b style="color:#f2d8a8">TIER ${unlock.tier + 1} · ${tier.id.toUpperCase()}</b>`
+    + `<br>${tier.tools.map((id) => TOOLS[id].name).join(', ')} unlocked`;
+  banner.style.display = 'block';
 }
 
 // The city's books, in the page (M5.T18, M5-6): the treasury, what the last game
@@ -214,15 +264,19 @@ function showBooks(city, books) {
 
 // A tool row names what the tool does and what it costs before it is used;
 // hovering one says the same in the help line (M5-7's half that lives here). A
-// price per metre names its unit (ROAD_TOOLS), and a tool the treasury cannot
-// pay for says that instead of the number.
+// price per metre names its unit (ROAD_TOOLS). A tool the treasury cannot pay
+// says that instead of the number, and one the city has not the people for says
+// its tier as well (M5.T30): a locked tool's price is still worth knowing, and
+// its refusal is still worth reading.
 const PUT_DOWN = 'right click or Esc puts the tool down';
 
 function toolLine(tool, city) {
   const cost = tool.cost(city, null);
   const poor = affordTool(city, tool);
+  const locked = lockRefuse(tool, milestoneOf(city).people);
   return `${tool.name} — ${tool.blurb} · `
-    + (poor ?? `$${cost}${tool.unit ?? ''}`);
+    + (poor ?? `$${cost}${tool.unit ?? ''}`)
+    + (locked ? ` · ${locked}` : '');
 }
 
 function buildPalette(view, city) {
@@ -244,6 +298,7 @@ function buildPalette(view, city) {
     row.dataset.tool = tool.id;
     row.dataset.key = tool.key ?? '';
     row.dataset.cost = `${tool.cost(city, null)}`;
+    row.dataset.lock = '';
     row.style.cssText = 'cursor:pointer;padding:0 8px 0 6px;border-left:3px solid transparent;border-radius:2px';
     // The road tool has no key yet (the palette picks it up): no key badge.
     const key = tool.key ? `<b style="color:#fff">${tool.key.toUpperCase()}</b> &nbsp;` : '';
@@ -262,8 +317,21 @@ function buildPalette(view, city) {
   help.style.cssText = 'margin-top:3px;opacity:0.7;max-width:230px;white-space:normal';
   help.textContent = PUT_DOWN;
   panel.appendChild(help);
+  // The population and the next tier, at the foot of the palette: what the
+  // city holds and what its size is worth. The palette is bottom-anchored, so
+  // this line is the one part of it that is always on screen, however many
+  // tools the rows above it carry. It is a size smaller than the panel and
+  // wraps inside the palette's own width, so it costs one line rather than
+  // widening the panel over the overview and taking the player's clicks.
+  const milestone = { el: document.createElement('div'), line: document.createElement('span') };
+  milestone.el.id = 'milestone';
+  milestone.el.appendChild(milestone.line);
+  milestone.el.style.cssText = 'margin-top:4px;padding-top:4px;max-width:230px;'
+    + 'white-space:normal;font-size:11px;line-height:1.6;'
+    + 'border-top:1px solid rgba(255,255,255,0.14)';
+  panel.appendChild(milestone.el);
   document.body.appendChild(panel);
-  return { panel, rows, help, demand, books };
+  return { panel, rows, help, demand, books, milestone };
 }
 
 // What the held tool will do to the lot under the cursor (M5-7). A drag tool
@@ -289,19 +357,19 @@ function dragCard(view) {
 // The road a road tool holds under its cursor (M5.T25, M5-10): what a click
 // offers — the change to the held type and its cost, the difference per metre
 // — or why there is nothing to change. The offer and its cost ride `data-*`
-// the way the demand bars keep theirs (M5.T27).
-function roadCard(view) {
+// the way the demand bars keep theirs (M5.T27). A type the city has not the
+// people for keeps its price and adds its tier (M5.T30): what it costs is still
+// worth knowing while the city grows into it.
+function roadCard(view, city) {
   const tool = toolOf(view);
   const offer = roadOffer(view);
   const name = ROAD_TYPES[tool.type].name;
-  if (offer.same) {
-    return `${swatch('road')}<b style="color:#fff">${name.toUpperCase()}</b>`
-      + `<br>already a ${name} — nothing to change`;
-  }
+  const locked = lockRefuse(tool, milestoneOf(city).people);
   const cost = offer.cost < 0 ? `−$${Math.abs(Math.round(offer.cost)).toLocaleString('en-US')}`
     : `$${Math.round(offer.cost).toLocaleString('en-US')}`;
   return `${swatch('road')}<b style="color:#fff">${name.toUpperCase()}</b>`
-    + `<br>◆ change to ${name} · ${cost}`;
+    + `<br>${offer.same ? `already a ${name} — nothing to change` : `◆ change to ${name} · ${cost}`}`
+    + (locked ? `<br><span style="color:#e8977d">✕ ${locked}</span>` : '');
 }
 
 // The bulldozer's cursor (M5.T5): what is under it, what it costs, or why not.
@@ -457,10 +525,13 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
     row.style.background = on ? 'rgba(255,255,255,0.08)' : 'transparent';
     // A tool the treasury cannot pay for stands dimmed and says why, the same
     // words the card gives the cursor (M5-7): the money is never a surprise.
+    // A tool a tier gates (M5.T30) stands dimmed and says its tier too.
     const poor = affordTool(city, entry);
+    const locked = lockRefuse(entry, milestoneOf(city).people);
     row.dataset.afford = poor ? 'no' : 'yes';
+    row.dataset.lock = locked ?? '';
     row.title = toolLine(entry, city);
-    row.style.opacity = poor ? 0.45 : 1;
+    row.style.opacity = poor || locked ? 0.45 : 1;
   }
   const shown = hoverTool ?? tool;
   help.textContent = shown ? toolLine(shown, city) : PUT_DOWN;
@@ -508,7 +579,7 @@ function showCard({ view, city, street, pointer, card, problems }) {
     const offer = roadOffer(view);
     card.dataset.upgrade = offer.same ? '' : tool.type;
     card.dataset.cost = offer.same ? '' : `${offer.cost}`;
-    card.innerHTML = roadCard(view);
+    card.innerHTML = roadCard(view, city);
   } else {
     card.innerHTML = view.drag ? dragCard(view)
       : tool?.id === 'bulldoze' ? targetCard(view, city)
@@ -557,11 +628,17 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   const ui = {
     canvas, cam, camera, city, street, view, rig, card, ask,
     ...buildPalette(view, city),
+    // The tier note (M5.T30): built once, shown by the frame while a tier is
+    // still fresh, on the street as much as in the overview.
+    banner: document.createElement('div'),
     // The problem-icon layer (M5.T34) rides the city view's own group: built
     // once, framed each update from the sim's cause list.
     problems: buildProblems(city, { dark: (zone) => isDark(street, zone) }),
     pointer: null, press: null, parked: null, hoverTool: null,
   };
+  ui.banner.id = 'milestone-banner';
+  ui.banner.style.cssText = BANNER;
+  document.body.appendChild(ui.banner);
   rig.mesh.add(ui.problems.mesh);
   for (const { row, tool } of ui.rows) {
     row.addEventListener('pointerenter', () => { ui.hoverTool = tool; });
@@ -574,10 +651,12 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
     hover(ui);
     showPalette(ui);
     showDemand(ui);
+    showMilestone(ui);
     if (ui.books) showBooks(city, ui.books);
     ui.problems.frame(camera, view.lift);
     showCard(ui);
     showAsk(ui);
+    showBanner(ui);
   }
   return { update };
 }
