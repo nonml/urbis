@@ -8,11 +8,14 @@
 // brush, which lot is under the cursor and what each lot is doing. Pure data
 // and pure maths (law 5). The camera and the lot outlines are
 // render/cityview.js; the pointer, the palette and the readout are
-// ui/cityview.js. What zoning does to a lot is sim/zoning.js (zoneParcel).
+// ui/cityview.js. What zoning does to a lot is sim/ops.js (zone).
 import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt, ROAD_TYPES, roadTypeOf } from './map.js';
-import { SERVICES, addRoad, bulldoze, placeService, removeRoad, upgradeCost, upgradeRoad } from './ops.js';
+import {
+  SERVICES, addRoad, bulldoze, placeService, removeRoad, undo, upgradeCost, upgradeRoad,
+  zone as zoneOp,
+} from './ops.js';
 import { MAX_ROAD_GRADIENT } from './terrain.js';
 import { ROAD_HALF_WIDTH } from './world.js';
 
@@ -70,6 +73,57 @@ export function affordTool(city, tool) {
   return tool.money === false ? null : moneyRefuse(city, tool.cost(city, null));
 }
 
+// ---------------------------------------------------------------------------
+// The charge and the refund (M5.T26, M5-7). An act is charged what its tool
+// costs the moment it lands, and Ctrl+Z walks it back through M3's own undo
+// (ops.js) and refunds the charge in full while the act is still inside
+// UNDO_SECS of game time. The window is the mistake's, not the decision's: a
+// rezone ten seconds later is a plan, and it stands, charged.
+const UNDO_SECS = 10;
+
+// How many ops ran, which is 0 when the map did not move: an op that was
+// refused leaves the version where it was (ops.js), so the version's move is
+// both how a click knows an act happened and how much of the map's history the
+// act pushed (a road drag of an avenue is one act and two ops).
+function moved(map, op) {
+  const version = map.version;
+  op();
+  return map.version - version;
+}
+
+// What a tool charges the treasury: nothing for a tool the books do not meter
+// — a per-metre road, a per-height teardown — whose prices stay provisional.
+const priceOf = (tool, map, at) => (tool.money === false ? 0 : tool.cost(map, at));
+
+// Charge the city for an act and remember it as the one Ctrl+Z takes back: its
+// cost, its hour and the map version it started on.
+function chargeAct(view, city, cost, version) {
+  const books = city?.economy?.budget;
+  if (!books || !Number.isFinite(cost)) return;
+  if (cost > 0) books.money -= cost;
+  view.act = { at: books.time, cost, version };
+}
+
+// Ctrl+Z in the overview: the last act undone and its cost refunded in full.
+// Nothing to take back, or an act past the window, is nothing at all.
+export function undoAct(view, city) {
+  const act = view.act;
+  view.act = null;
+  const books = city?.economy?.budget;
+  if (!act || !books || books.time - act.at > UNDO_SECS) return false;
+  const { map } = WORLDS.get(view);
+  // Back to the version the act started on, and no further: the act's own ops,
+  // never a click the player made before it.
+  let took = false;
+  while (map.version > act.version) {
+    if (!undo(map)) break;
+    took = true;
+  }
+  if (!took) return false;
+  if (act.cost > 0) books.money += act.cost;
+  return true;
+}
+
 function zoneTool(id, key, use, name, blurb) {
   return {
     id,
@@ -77,10 +131,13 @@ function zoneTool(id, key, use, name, blurb) {
     use,
     name,
     blurb,
-    // zoneParcel is the op until M5.T17 brings M3's logged ops into the city
-    // view (M5.T19, M5.T26): it is the one that refuses non-lots and answers
-    // whether the zoning changed.
-    op: (map, at) => zoneParcel(map, map.parcels.indexOf(at), use),
+    // M3's own zone op (ops.js) is the act: it refuses non-lots, answers
+    // whether the zoning changed and leaves the undo Ctrl+Z walks back
+    // (M5.T26). A map that logs no op — the hand preset, which has no dirty
+    // tiles for one to mark and takes no other op either — is zoned in place,
+    // lot for lot, as it always was.
+    op: (map, at) => (map.dirty ? zoneOp(map, at, use)
+      : zoneParcel(map, map.parcels.indexOf(at), use)),
     cost: (map, at) => TOOL_PRICE[id],
     preview: (at) => ({
       kind: use === null ? 'unzone' : `zone ${use}`,
@@ -300,6 +357,7 @@ export function createCityView(city, map = worldMap()) {
     pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
     road: null,            // the road a road tool holds under its cursor (M5.T25)
     confirm: null,         // a road removal waiting on the page's ask (M5.T5)
+    act: null,             // the last act, with its cost and its hour (M5.T26)
     level: city.parcels.map(levelOf),
     trend: city.parcels.map(() => 0),
   };
@@ -394,7 +452,8 @@ export function hoverPick(view, city, target) {
 // put down acts nowhere. `shift` is the cap brush (M5.T8): a zone tool paints
 // the lot low-rise, the eraser lifts the cap back off. It lands even where the
 // zone itself is already set, so a lot the player has no reason to rezone can
-// still be capped.
+// still be capped. A click that ran an op is an act: it is charged what its
+// tool costs and Ctrl+Z takes it back (M5.T26).
 export function paintLot(view, city, shift = view.shift) {
   if (view.mode !== 'city' || view.lift < 1) return false;
   const tool = toolOf(view);
@@ -403,10 +462,13 @@ export function paintLot(view, city, shift = view.shift) {
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
   if (tool.type) return buildService(view, city, tool);
   if (view.hover < 0) return false;
+  const { map } = WORLDS.get(view);
   const at = city.parcels[view.hover];
-  const zoned = tool.refuse(city, at) ? false : tool.op(city, at);
+  const was = at.zoned;
+  const laid = tool.refuse(city, at) ? 0 : moved(map, () => tool.op(map, at));
   const capped = shift ? capParcel(city, view.hover, tool.use === null ? STAGE.HIGH : STAGE.LOW) : false;
-  return zoned || capped;
+  if (laid) chargeAct(view, city, priceOf(tool, map, at), map.version - laid);
+  return at.zoned !== was || capped;
 }
 
 // A service is an op on the map (M5.T11): the map owns the version, the dirty
@@ -416,9 +478,9 @@ function buildService(view, city, tool) {
   const { map } = WORLDS.get(view);
   const at = view.hover >= 0 ? city.parcels[view.hover] : null;
   if (tool.refuse(city, at)) return false;
-  const version = map.version;
-  placeService(map, at, tool.type);
-  return map.version !== version;
+  const laid = moved(map, () => placeService(map, at, tool.type));
+  if (laid) chargeAct(view, city, priceOf(tool, map, at), map.version - laid);
+  return laid > 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -476,9 +538,9 @@ function takeRoad(view, city, map, edge, confirmed) {
       return false;
     }
   }
-  const version = map.version;
-  removeRoad(map, edge);
-  if (map.version === version) return false;
+  const laid = moved(map, () => removeRoad(map, edge));
+  if (!laid) return false;
+  chargeAct(view, city, priceOf(BULLDOZE_TOOL, map, edge), map.version - laid);
   adoptLots(view, city, map);
   return true;
 }
@@ -489,9 +551,9 @@ function demolish(view, city, map) {
   const target = view.pick;
   if (!target) return false;
   if (target.kind === 'road') return takeRoad(view, city, map, target.edge, false);
-  const version = map.version;
-  bulldoze(map, target.parcel);
-  if (map.version === version) return false;
+  const laid = moved(map, () => bulldoze(map, target.parcel));
+  if (!laid) return false;
+  chargeAct(view, city, priceOf(BULLDOZE_TOOL, map, target.parcel), map.version - laid);
   adoptLots(view, city, map);
   return true;
 }
@@ -619,6 +681,7 @@ export function releaseRoad(view) {
       if (e.way === 'op' && !laid.includes(e)) upgradeRoad(map, e, preview.type);
     }
   }
+  chargeAct(view, city, priceOf(toolOf(view), map, null), version);
   adoptLots(view, city, map);
   return true;
 }
@@ -643,10 +706,12 @@ export function roadOffer(view) {
 function changeRoad(view, tool) {
   const held = view.road;
   if (!held || held.kind !== 'road' || roadTypeOf(held.edge) === tool.type) return false;
-  const { map } = WORLDS.get(view);
+  const { map, city } = WORLDS.get(view);
   const version = map.version;
-  upgradeRoad(map, held.edge, tool.type);
-  return map.version !== version;
+  const laid = moved(map, () => upgradeRoad(map, held.edge, tool.type));
+  if (!laid) return false;
+  chargeAct(view, city, priceOf(tool, map, held), version);
+  return true;
 }
 // WASD pans the overview, relative to the way it faces, the same axes the
 // player walks on. The pivot stays over the district floor.

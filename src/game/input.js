@@ -18,7 +18,7 @@
 
 import { toggleDay } from '../sim/clock.js';
 import { STREET } from '../sim/interior.js';
-import { cityKey } from '../sim/cityview.js';
+import { cityKey, undoAct } from '../sim/cityview.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
 import { PANEL_KEY } from '../ui/history.js';
@@ -139,6 +139,9 @@ export function bindInput(parts) {
     else if (action === 'radio' && driving) radio = cycleRadio(radio);
     else if (action === 'journal') toggleJournal(arcUI);
     else if (action === 'history') toggleHistory();
+    // Ctrl+Z in the overview (M5.T26, M5-7): the last act undone, its cost
+    // refunded, while the act is still inside ten game seconds.
+    else if (action === 'undo') undoAct(cityView, city);
     else if (action === 'choice1') arcChoose(arc, 1, street.time);
     else if (action === 'choice2') arcChoose(arc, 2, street.time);
     // The overview lifts off the street, never out of a shop or off a roof, and a
@@ -153,12 +156,21 @@ export function bindInput(parts) {
   window.addEventListener('keydown', (e) => {
     if (e.repeat || isTyping(e)) return;
     const k = e.key.toLowerCase();
-    const action = byKey.get(k);
+    // A keypress with Ctrl, Alt or the meta key held is the browser's or the
+    // page's, never a game action: without this, Ctrl+Z on the street would take
+    // the city view up as its own Z.
+    const modified = e.ctrlKey || e.metaKey || e.altKey;
+    // Ctrl+Z is the overview's undo (M5.T26). Like O and the history panel it
+    // answers to a key no binding names, and the modifier is what tells it apart
+    // from the overview's own Z — so the bound action is skipped for the press.
+    const undoKey = e.ctrlKey && k === 'z' && cityView.mode === 'city';
+    const action = modified ? null : byKey.get(k);
     // The city's history panel (M5.T32b) answers to a letter no binding names,
     // so the key sits beside the action it fires, the way O cycles the planner's
     // overlays from main.js. Only in the overview, like every city key. A
     // binding that ever claims the letter wins: the press is theirs then.
     if (!action && k === PANEL_KEY && cityView.mode === 'city') fire('history');
+    if (undoKey) fire('undo');
     fire(action);
   });
 
