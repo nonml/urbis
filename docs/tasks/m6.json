@@ -83,6 +83,26 @@
       "test": "tests/accept/m6-battery.test.js"
     },
     {
+      "id": "M6.T4b",
+      "lane": "battery",
+      "needs": [
+        "M6.T4",
+        "M6.T3"
+      ],
+      "goal": "The battery lives in the game, not the HUD. M6.T4 (94b5dc7) put the battery's logic in src/game/hud.js: module-level `battery`, spending HACKS.blackout's cost whenever street.lastHack changes (whatever hack fired), refusing by setting `street.zones[zone].coolUntil` every frame, and Q focus done by flicking setPaused on and off. Move it where it belongs: the battery is part of the game state main.js creates (so a new game starts with a full one); the hack fire path in src/game/input.js (onFire / fireHack, M6.T3) asks the battery first, spends the cost of the hack actually fired, and a hack it cannot pay refuses with the reason the menu and the status line show (no coolUntil trick); the HUD only draws the meter and the note. Q focus moves out of the HUD into src/game/loop.js as a time scale of 0.3 for up to 4 s while Q is held and the meter has charge (no pause flicker); M6.T22 builds the rest of focus on it.",
+      "files": [
+        "src/game/hud.js",
+        "src/game/input.js",
+        "src/main.js",
+        "src/game/loop.js",
+        "src/sim/battery.js",
+        "tests/accept/m6-battery-wired.spec.js"
+      ],
+      "test": "tests/accept/m6-battery-wired.spec.js",
+      "commit": "M6.T4b (M6-3): the battery lives in the game",
+      "notes": "Size M. Write tests/accept/m6-battery-wired.spec.js first and see it fail on main: boot the built game (&gen=1&seed=7); fire the blackout with the real H key and read the meter drop by the blackout's docs/HACKING.md cost; drain the meter (fire until refused) and check the next H refuses with a battery reason on screen and the district does not go dark; press N for a new game and check the meter is full again; hold Q and check the sim runs near 0.3x while isPaused() stays false the whole time. grep src/game/hud.js afterwards: no batterySpend, no coolUntil, no setPaused. tests/accept/m6-battery.test.js and tests/accept/m6-t3.spec.js must stay green; do not edit them."
+    },
+    {
       "id": "M6.T5",
       "lane": "hack-sim",
       "goal": "Control boxes. One per district on a street, placed by the map; breaking in is holding E for 3 s (tap E stays the door key), seen by walkers and police nearby; until then only the profiler and the blackout work there; `m6-access.spec.js` first",
@@ -434,7 +454,8 @@
         "M6.T4",
         "M5.T26",
         "M5.T35",
-        "M6.T3"
+        "M6.T3",
+        "M6.T4b"
       ],
       "commit": "M6.T22 (M6-3): focus",
       "notes": "Size S: at most 100 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M6-3: **Battery:** each hack spends its cost; one the battery cannot pay for does not fire and the HUD says why; the meter refills at the rate written in `docs/HACKING.md`; holding Q (Focus) slows the game to 0.3 times speed for up to 4 s and spends battery while held (checked by `tests/accept/m6-battery.test.js`) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",

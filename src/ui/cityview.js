@@ -8,10 +8,11 @@ import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
   TOOLS, ROAD_TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverJunction, hoverLot,
   hoverPick, layDownTool, lotStatus, moveRoad, moveStroke, orbitCityView, paintLot, pressRoad,
-  pressStroke, releaseRoad, releaseStroke, roadOffer, roadPreview, strokePreview, toolOf,
-  zoomCityView,
+  pressStroke, releaseRoad, releaseStroke, roadOffer, roadPreview, setCitySpeed, strokePreview,
+  toolOf, toggleCityPause, zoomCityView,
 } from '../sim/cityview.js';
 import { ROAD_TYPES } from '../sim/map.js';
+import { setSpeedSource } from '../game/loop.js';
 import { TIERS, lockRefuse, milestoneOf } from '../sim/milestones.js';
 import { paintOf } from '../render/cityview.js';
 import { buildProblems } from '../render/problems.js';
@@ -273,6 +274,54 @@ function showBooks(city, books) {
   }
 }
 
+// The overview's pace (M5.T35, M5-17): three buttons run 1, 2 or 4 fixed steps
+// a frame through M0's own speed (game/loop.js) and Space pauses and resumes.
+// The row names the pace the frame is on, so a held overview is never a
+// mystery: the sim has stopped and the key that stopped it starts it again.
+const SPEED_BUTTONS = [1, 2, 4];
+const SPEED_BUTTON = 'flex:1;padding:1px 0;font:11px/1.5 ui-monospace,Menlo,monospace;'
+  + 'letter-spacing:0.06em;color:#e4e1da;background:rgba(255,255,255,0.07);'
+  + 'border:1px solid rgba(255,255,255,0.22);border-radius:2px;cursor:pointer';
+
+function buildSpeed(view) {
+  const el = document.createElement('div');
+  el.id = 'speed';
+  el.style.cssText = 'margin:4px 0;display:flex;align-items:center;gap:4px';
+  const buttons = SPEED_BUTTONS.map((n) => {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.id = `speed-${n}`;
+    b.dataset.speed = `${n}`;
+    b.textContent = `${n}×`;
+    b.style.cssText = SPEED_BUTTON;
+    b.addEventListener('pointerdown', (e) => {
+      // The focus never lands on a button: Space stays the overview's own key.
+      e.preventDefault();
+      e.stopPropagation();
+      setCitySpeed(view, n);
+    });
+    el.appendChild(b);
+    return b;
+  });
+  const note = document.createElement('span');
+  note.id = 'speed-note';
+  note.style.cssText = 'opacity:0.7;letter-spacing:0.06em;white-space:nowrap';
+  el.appendChild(note);
+  return { el, buttons, note };
+}
+
+// Which button the frame is on, and whether Space has the sim held.
+function showSpeed({ view, speed }) {
+  const now = view.speed;
+  speed.el.dataset.speed = `${now}`;
+  SPEED_BUTTONS.forEach((n, i) => {
+    const on = n === now;
+    speed.buttons[i].dataset.on = on ? 'yes' : 'no';
+    speed.buttons[i].style.opacity = on ? 1 : 0.45;
+  });
+  speed.note.textContent = now === 0 ? 'PAUSED · space resumes' : 'space pauses';
+}
+
 // A tool row names what the tool does and what it costs before it is used;
 // hovering one says the same in the help line (M5-7's half that lives here). A
 // price per metre names its unit (ROAD_TOOLS). A tool the treasury cannot pay
@@ -297,6 +346,10 @@ function buildPalette(view, city) {
   const title = document.createElement('div');
   title.innerHTML = '<b style="color:#fff">CITY VIEW</b> <span style="opacity:0.6">· z · street</span>';
   panel.appendChild(title);
+  // The pace row sits under the title, above the books: the one line of the
+  // overview a player reaches for before anything else on it.
+  const speed = buildSpeed(view);
+  panel.appendChild(speed.el);
   const demand = buildDemand();
   // The books sit under the title and above the demand bars, so a tax moved a
   // point at a time is answered by the demand it prices, in the same panel.
@@ -342,7 +395,7 @@ function buildPalette(view, city) {
     + 'border-top:1px solid rgba(255,255,255,0.14)';
   panel.appendChild(milestone.el);
   document.body.appendChild(panel);
-  return { panel, rows, help, demand, books, milestone };
+  return { panel, rows, help, demand, books, milestone, speed };
 }
 
 // What the held tool will do to the lot under the cursor (M5-7). A drag tool
@@ -476,6 +529,14 @@ function bindPointer(ui) {
   });
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && view.mode === 'city') { view.problem = null; layDownTool(view); }
+    // Space holds the sim, and the same key starts it again (M5.T35). The pause
+    // is the frame's own pace 0 (game/loop.js), so nothing ticks — the overview's
+    // rise with it, which is why a pause taken mid-lift holds the camera where
+    // it is until the same key is pressed again.
+    if (e.key === ' ' && view.mode === 'city') {
+      e.preventDefault();
+      toggleCityPause(view);
+    }
   });
   window.addEventListener('pointermove', (e) => {
     ui.pointer = { x: e.clientX, y: e.clientY };
@@ -707,6 +768,10 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   });
   const ui = {
     canvas, cam, camera, city, street, view, rig, card, ask,
+    // The frame loop runs at the overview's own pace (M5.T35, M5-17): it reads
+    // this view's speed every frame, so the valley of the sim's own module graph
+    // stays out of game/loop.js and out of every Node test that imports it.
+    pace: setSpeedSource(() => view.speed),
     // The traffic the junction cursor reads its controls and its waits off
     // (M5.T31): the street's own, the same state the frame loop ticks.
     traffic: street.traffic,
@@ -733,6 +798,7 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
     if (view.mode !== 'city') view.problem = null;
     hover(ui);
     showPalette(ui);
+    showSpeed(ui);
     showDemand(ui);
     showMilestone(ui);
     if (ui.books) showBooks(city, ui.books);

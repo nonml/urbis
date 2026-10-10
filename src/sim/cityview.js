@@ -163,6 +163,29 @@ function zoneTool(id, key, use, name, blurb) {
 }
 
 // ---------------------------------------------------------------------------
+// The overview's pace (M5.T35, M5-17). Space pauses and resumes the overview,
+// and the palette's three buttons run 1, 2 or 4 fixed steps a frame through
+// M0's own speed (game/loop.js): the pace is the view's own number, so the
+// frame loop reads it through the ui that holds the view, the panel paints it
+// and the probe's state() shows the same one. 0 is the pause: no step runs, so
+// every clock and entity stands where it stood. Leaving the city view sets 1
+// (toggleCityView), so the street never inherits the pace left up there.
+export const CITY_SPEEDS = [1, 2, 4];
+const PAUSED = 0;
+const FASTEST = CITY_SPEEDS[CITY_SPEEDS.length - 1];
+
+// The pace the palette's buttons set, held to what the buttons can put back.
+export function setCitySpeed(view, speed) {
+  const n = Math.round(Number(speed));
+  view.speed = Number.isFinite(n) ? Math.min(FASTEST, Math.max(PAUSED, n)) : 1;
+  return view.speed;
+}
+
+// Space: the overview holds, and the same key starts it again.
+export function toggleCityPause(view) {
+  return setCitySpeed(view, view.speed === PAUSED ? 1 : PAUSED);
+}
+
 // The zone stroke (M5.T33). A brush is held and the mouse dragged: every empty
 // lot the stroke crosses is zoned on the release, for the brush's price each,
 // and the stroke is charged as one act, so Ctrl+Z takes the whole of it back in
@@ -483,6 +506,7 @@ export function createCityView(city, map = worldMap()) {
     tilt: TILT.start,
     reach: REACH.start,
     brush: 'res',
+    speed: 1,               // the pace of the frame loop: 0 paused, else 1/2/4
     overlay: 0,            // the overlay the O key cycles (M5.T20): OVERLAYS
     active: true,          // false once the player lays the tool down
     shift: false,          // Shift held: a brush click paints a low cap (M5.T8)
@@ -509,10 +533,12 @@ const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
 // Z. Going up starts a fresh overview over the lots, facing the way the street
 // camera faced, so the rise is one continuous move. Reversing mid-move keeps
-// the overview it had.
+// the overview it had. Coming back down sets the pace to 1 (M5.T35): the
+// street always runs at one, whatever pace the player left up there.
 export function toggleCityView(view, streetYaw) {
   if (view.mode === 'city') {
     view.mode = 'street';
+    setCitySpeed(view, 1);
     view.hover = -1;
     view.drag = null;
     view.stroke = null;
