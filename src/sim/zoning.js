@@ -41,6 +41,19 @@ const CRANE_DROPPED = 'load-dropped';
 REASONS[CRANE_STOPPED] = () => 'crane stopped';
 REASONS[CRANE_DROPPED] = () => 'load dropped, site shut';
 
+// M6.T20 (M6-4): the planning office's hacks. A district's office issues the
+// permits its lots build on; hacked, it fast-tracks one — the site works at
+// full pace for a minute, whatever the market would give it — or freezes one
+// — no work at all for two minutes. Both carry a cause of their own, read in
+// the lot note and the news the way the crane's are, because a permit held up
+// at the office is not a market giving up.
+export const PERMIT_FAST_SECS = 60;
+export const PERMIT_FREEZE_SECS = 120;
+const PERMIT_FAST = 'permit-fast';
+const PERMIT_FROZEN = 'permit-frozen';
+REASONS[PERMIT_FAST] = () => 'permit fast-tracked';
+REASONS[PERMIT_FROZEN] = () => 'permit frozen';
+
 // The shell stands this far inside the hoarding line on every side. It lives
 // here, not in render/zoning.js, because the interiors derive their door face
 // and room from the same building footprint the shell is drawn at.
@@ -293,9 +306,11 @@ export function createCity(seed, map = worldMap()) {
 // zone owns a lot's first floors it works at least at the pace of a market at
 // the bottom of the growth band: the order shows in any district, and a market
 // above the band still speeds it. Every other lot works at its demand's pace.
-function growthRate(p, demand) {
+// A permit the planning office has fast-tracked (M6.T20) works at full pace
+// whatever the market would give it.
+function growthRate(p, demand, full = false) {
   const wanted = p.painted && p.stage < STAGE.LOW ? Math.max(demand, GROW_AT) : demand;
-  const eager = Math.min(1, (wanted - GROW_AT) / (1 - GROW_AT));
+  const eager = full ? 1 : Math.min(1, (wanted - GROW_AT) / (1 - GROW_AT));
   return (p.pace * (SLOW_PACE + (1 - SLOW_PACE) * eager)) / STAGE_SECS[p.stage];
 }
 
@@ -303,7 +318,7 @@ function growthRate(p, demand) {
 // stage completes at 1 and carries the overshoot; a slump below 0 drops a stage
 // and lands at the top of the one beneath, the same height it just left. A
 // building empties before it sheds anything (vacate).
-function tickParcel(p, demand, dt, powered) {
+function tickParcel(p, demand, dt, powered, now) {
   const cap = capOf(p);
   const seeded = p.painted && p.stage < STAGE.LOW;
   const bar = seeded ? 0 : p.stage === STAGE.EMPTY ? BREAK_GROUND_AT : GROW_AT;
@@ -316,13 +331,17 @@ function tickParcel(p, demand, dt, powered) {
   if (!powered) return;
   if (lets) reoccupy(p, dt);
   if (grows) {
-    p.progress += dt * growthRate(p, demand);
+    // M6.T20: while the office's fast-track holds, the permit — not the
+    // market — sets the pace, and the lot note says so.
+    const fast = now < (p.permitFastUntil ?? 0);
+    p.progress += dt * growthRate(p, demand, fast);
     if (p.progress >= 1) {
       p.stage += 1;
       p.progress = p.stage >= cap ? 0 : p.progress - 1;
       // The order is fulfilled at the low block; the market owns the lot after.
       if (p.stage >= STAGE.LOW) p.painted = false;
     }
+    if (fast) p.why = PERMIT_FAST;
   } else if (slumps && vacate(p, dt)) {
     p.progress -= dt / DECLINE_SECS;
     if (p.progress < 0 && p.stage > STAGE.EMPTY) {
@@ -373,6 +392,23 @@ function craneHalt(p, now) {
   return false;
 }
 
+// A site whose permit the office has frozen does nothing at all: no work, no
+// demolition, no market. The lot keeps its stage and its crane; only the work
+// stops, and the cause on it names the hack. True while the countdown runs —
+// and the countdown is cleared on the way out, so the site that thaws carries
+// nothing over. The crane's own halt above is the same shape.
+function permitHalt(p, now) {
+  if (!p.permitFrozenUntil) return false;
+  if (now < p.permitFrozenUntil) {
+    p.building = p.stage >= STAGE.SITE && p.stage < capOf(p);
+    p.trend = TREND.STALLED;
+    p.why = PERMIT_FROZEN;
+    return true;
+  }
+  p.permitFrozenUntil = 0;
+  return false;
+}
+
 // The crane hacks, fired at the site the registry entry stands over
 // (hackables.js registers a crane for every lot breaking ground). Returns null
 // when the hack fired, or the reason it did not, the way the hack menu asks.
@@ -394,6 +430,40 @@ export function hackCrane(city, entry, hack) {
     p.progress = 0;
     p.stoppedUntil = city.time + CRANE_SHUT_SECS;
     p.dropped = true;
+    return null;
+  }
+  return 'not built yet';
+}
+
+// M6.T20: the planning office's hacks, fired at the office the registry
+// stands in a district (hackables.js registers one per district). The office
+// serves its own district: the permit it acts on is the site nearest it among
+// the lots on its power district — the lot breaking ground, the one waiting on
+// the paperwork — and no other, so the reach is the one lot. Returns null when
+// the hack fired, or the reason it did not, the way the hack menu asks.
+export function hackPermit(city, entry, hack) {
+  if (!entry || entry.kind !== 'planning') return 'no planning office in reach';
+  let target = null, near = Infinity;
+  for (const p of city.parcels) {
+    if (p.kind !== 'lot' || p.stage !== STAGE.SITE) continue;
+    if (entry.district !== null && p.powerZone !== entry.district) continue;
+    const d = Math.hypot(p.x - entry.x, p.z - entry.z);
+    if (d < near) { target = p; near = d; }
+  }
+  if (!target) return 'no permit waiting in that district';
+  if (hack?.id === 'permit_fast') {
+    // The permit is through: the site works at full pace until the minute runs
+    // out. A fast-track already running is not shortened by a second one, and
+    // one thrown at a frozen permit thaws it first.
+    target.permitFastUntil = Math.max(target.permitFastUntil ?? 0, city.time + PERMIT_FAST_SECS);
+    target.permitFrozenUntil = 0;
+    target.why = PERMIT_FAST;
+    return null;
+  }
+  if (hack?.id === 'permit_freeze') {
+    target.permitFrozenUntil = Math.max(target.permitFrozenUntil ?? 0, city.time + PERMIT_FREEZE_SECS);
+    target.permitFastUntil = 0;
+    target.why = PERMIT_FROZEN;
     return null;
   }
   return 'not built yet';
@@ -459,6 +529,9 @@ export function tickZoning(city, dt, street, hold = -1) {
     // M6.T18: a site under a crane hack waits — no work, no demolition, no
     // market — until the crane lifts or the shut ends.
     if (craneHalt(p, city.time)) return;
+    // M6.T20: a site whose permit the planning office has frozen waits the
+    // same way, until the office's two minutes run out.
+    if (permitHalt(p, city.time)) return;
     // The player's own building waits for them: while they stand inside it,
     // its decline (or ordered demolition) is deferred, so the space they are
     // in never disappears around them.
@@ -466,7 +539,7 @@ export function tickZoning(city, dt, street, hold = -1) {
     const powered = !isDark(street, p.powerZone);
     if (p.zoned !== null && p.use === p.zoned) {
       // A pinned market (capture probes, sim/decline.js) outranks the economy.
-      tickParcel(p, city.pins?.[p.use] ?? demandFor(city, p), dt, powered);
+      tickParcel(p, city.pins?.[p.use] ?? demandFor(city, p), dt, powered, city.time);
     } else if (powered) {
       // A demolition the player ordered stops in a blackout like any other work.
       clearLot(p, dt);
