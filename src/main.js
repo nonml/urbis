@@ -8,7 +8,7 @@ import { createFollowRig, CAM_PIVOT } from './game/camera.js';
 import { buildHud, updateHud, tickHud, applySpawn } from './game/hud.js';
 import * as THREE from 'three';
 import { createClock, tickClock } from './sim/clock.js';
-import { createStreet, tickStreet, hackBlackout, isDark, zoneAt } from './sim/street.js';
+import { createStreet, tickStreet, hackBlackout, isDark, districtAt } from './sim/street.js';
 import { createPlayer, tickPlayer } from './sim/player.js';
 import { clampToBounds } from './sim/world.js';
 import { worldMap } from './sim/patrol.js';
@@ -121,7 +121,9 @@ const HERO_BOX = { x: 0, z: 0, w: 2.6, d: 5.2, h: 1.7 };
 const WALK_BLOCKERS = [...CAM_BLOCKERS, HERO_BOX];
 const hudCtx = {
   city, street, dispatch, arc, interior, cam, camera, clock, wanted, mission, player, heroCar,
-  dark: [false, false],
+  // One truth per power district the street sim runs (its own map's areas, or
+  // the two halves it falls back to).
+  dark: street.zones.map(() => false),
 };
 
 // A capture holds the clock so the same seed, pose and hour reproduce: a shot
@@ -166,12 +168,16 @@ window.addEventListener('keydown', (e) => {
 function fireHack() {
   const driving = player.mode === 'drive';
   const px = driving ? heroCar.x : player.x, pz = driving ? heroCar.z : player.z;
-  const zone = zoneAt(pz);
+  // The district the player stands in, as the street sim reads it: the lights
+  // that go out are the ones it puts out, on any number of districts.
+  const zone = districtAt(street, px, pz);
   if (hackBlackout(street, zone) === 0) return;
   wantedOnBlackout(wanted, px, pz, street.time, map);
   firePulse(fx, px, pz);
+  // A district the hand substation table has no cabinet for still sparks at
+  // its lamps: the lights are the hack, the cabinet is the decoration.
   const sub = (map.anchors.substations ?? SUBSTATIONS).find((s) => s.zone === zone);
-  fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
+  if (sub) fireSparks(fx, sub.x, 1.6, sub.z, street.time, 0, 12);
   // Companion burst at the lamp head nearest the player — the visible one.
   let best = null, bestD = 1e9;
   for (const h of lamps.heads) {
@@ -286,8 +292,8 @@ function tickSim() {
     tickPlayer(player, input.footInput(), STEP, map); tickInterior(interior, player);
   }
   tickSteam(steam, clock.elapsed, STEP); tickHackFx(fx, STEP);
-  // DARK is sim truth about the two zones, so it settles on the step.
-  for (let z = 0; z < 2; z++) {
+  // DARK is sim truth about every power district, so it settles on the step.
+  for (let z = 0; z < street.zones.length; z++) {
     const dark = isDark(street, z);
     if (DARK[z] !== dark) {
       DARK[z] = dark;
@@ -297,12 +303,12 @@ function tickSim() {
   const hx = driving ? heroCar.x : player.x, hz = driving ? heroCar.z : player.z;
   const suspect = {
     x: hx, z: hz, yaw: driving ? heroCar.yaw : player.yaw, inCar: driving, car: heroCar,
-    body: driving ? heroCar : player, cover: isDark(street, zoneAt(hz)), night: clock.nightFactor,
+    body: driving ? heroCar : player, cover: isDark(street, districtAt(street, hx, hz)), night: clock.nightFactor,
   };
   if (!policeHold) lastWantedStatus = tickWanted(wanted, STEP, suspect, street.time, map);
   missionOnHeatZero(mission, wanted.heat, street.time);
   // A chase scares trade off the district it runs through (economy.js flee).
-  chaseIn(city.economy, zoneAt(hz), wanted.heat);
+  chaseIn(city.economy, districtAt(street, hx, hz), wanted.heat);
   tickDispatch(dispatch, drainEvents(wanted), street.time);
   if (lastWantedStatus === 'busted' && !mission.complete) {
     missionReset(mission); missionNote(mission, 'BUSTED — contract reset', street.time, 3);
