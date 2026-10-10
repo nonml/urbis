@@ -21,6 +21,13 @@
 // behind a leader, so a queue forms behind the line and clears on green.
 // signalGreen is pure in the axis and the clock, so sim and render read the
 // same state and the accept test can ask about any instant.
+//
+// M5.T31 (M5-14) hands the junction to the player: any junction may be set to
+// lights, a stop sign or a yield. The control is the city's own record on the
+// map, beside the roads it governs, so a road op never disturbs it and the
+// traffic, the overview and a check all read the one answer. What each control
+// costs the cars that cross it is counted per junction (junctionWait), which is
+// the mean wait the criterion's A/B weighs.
 // T29's tests place cars by hand, in the shape this module reads and writes.
 import { mulberry32 } from './rng.js';
 import { DAY_SECS, START_HOUR } from './clock.js';
@@ -120,6 +127,119 @@ function signalNodes(map) {
   const ids = new Set();
   for (const [id, set] of axes) if (set.size >= 2) ids.add(id);
   return ids;
+}
+
+// ---------------------------------------------------------------------------
+// The control a junction runs (M5.T31, M5-14). Every junction runs the
+// two-phase light above until the player sets it otherwise: a stop sign, which
+// holds every car at the line for STOP_HOLD however clear the way looks, or a
+// yield, which holds a car only for traffic it would cross.
+export const JUNCTION_CONTROLS = ['lights', 'stop', 'yield'];
+// The seconds a stop sign holds a car at its line. Two is the stand a driver
+// takes at a sign they can see clear: long enough to read it, short enough that
+// a queue behind it still moves.
+export const STOP_HOLD = 2;
+// A car held back by a junction is counted from the moment it is slowed at all,
+// so a car driving up to the line at its cruise pays nothing and one standing
+// in the queue pays all of it.
+const CREEP = 0.1;
+// How close to the line a car must be to be standing on it.
+const STAND_EPS = 0.05;
+
+// What the city's own record gives the junction `node`: lights while nothing
+// has been set against it, and whatever the player set it to after that.
+export function junctionControlOf(map, node) {
+  return map.junctions?.[node] ?? 'lights';
+}
+
+// A click on a junction sets the control the map's record carries. False when
+// the junction already runs that control, so a click reports whether the world
+// changed the way every other act does.
+export function setJunctionControl(map, node, control) {
+  if (!JUNCTION_CONTROLS.includes(control)) return false;
+  map.junctions ??= {};
+  if (map.junctions[node] === control) return false;
+  map.junctions[node] = control;
+  return true;
+}
+
+// What the junction `node` runs, or null when it is not a junction at all: the
+// nodes two ways meet at are the set the lights run at, which indexes() keeps in
+// step with the graph.
+export function junctionControl(state, node) {
+  if (!state.signals.has(node)) return null;
+  return junctionControlOf(state.map, node);
+}
+
+// What the junction has cost the cars that crossed it: the seconds cars have
+// been held back at its line and how many cars have stood there, so `mean` is
+// the average wait a car paid at that junction. The overview's card reads it
+// and the criterion's A/B weighs one control against another at one junction.
+export function junctionWait(state, node) {
+  const wait = state.waits.get(node);
+  const cars = wait?.cars ?? 0;
+  const secs = wait?.secs ?? 0;
+  return { cars, secs, mean: cars > 0 ? secs / cars : 0 };
+}
+
+// Whether the control the junction runs holds `c` back at its line this tick.
+function waitsAt(state, c, edge, far, line) {
+  // A car already past the line is in the junction and must clear it, not stop
+  // dead in the crossing.
+  if (c.s > line) return false;
+  const control = junctionControl(state, far);
+  if (control === null) return false;
+  if (control === 'lights') return !signalGreen(edge.axis, state.time);
+  if (control === 'yield') return conflicts(state, c, edge, far);
+  return holdsFor(state, c, far, line);
+}
+
+// A stop sign: the car is held onto the line and stands for STOP_HOLD before it
+// may go, however clear the way looks. The clock starts on the line rather than
+// where the car began to brake, so a car held behind a queue stands for the
+// sign's dwell when it reaches the line and not a moment sooner.
+function holdsFor(state, c, far, line) {
+  const at = c.stop;
+  if (at && at.node === far) return state.time < at.until;
+  if (line - c.s <= STAND_EPS) c.stop = { node: far, until: state.time + STOP_HOLD };
+  return true;
+}
+
+// A yield: the car holds only for traffic it would cross — a car inside the
+// junction, or one coming into it down another way. A car standing at its own
+// line is waiting its turn, not a conflict, so two yields never hold each other
+// for good.
+const CONFLICT_IN = 5;        // a car this close to the node is in the junction
+const CONFLICT_NEAR = 14;     // how far down another way a car counts as coming
+const CONFLICT_COMING = 0.5;  // m/s: above this a car is moving, not waiting
+
+function conflicts(state, c, edge, far) {
+  const at = state.byId.get(far);
+  if (!at) return false;
+  for (const o of state.cars) {
+    if (o === c || o.route.length === 0) continue;
+    const d = Math.hypot(o.x - at.x, o.z - at.z);
+    if (d > CONFLICT_NEAR) continue;
+    if (d <= CONFLICT_IN) return true;
+    if (o.turn || o.speed < CONFLICT_COMING) continue;
+    if (o.axis !== edge.axis) return true;
+  }
+  return false;
+}
+
+// What the junction is costing this car, kept on the car until it has crossed
+// the line: a control that holds one car back twice at one line is one wait.
+function holdOn(c, node, dt) {
+  c.held = { node, secs: (c.held?.node === node ? c.held.secs : 0) + dt };
+}
+
+// One car's wait at the junction's line, counted into what the junction has
+// cost the cars that crossed it.
+function noteWait(state, node, secs) {
+  const wait = state.waits.get(node) ?? { cars: 0, secs: 0 };
+  wait.cars += 1;
+  wait.secs += secs;
+  state.waits.set(node, wait);
 }
 
 // M3-6's appear/go allowance, with margin: the follow cam rides 4.5 m behind the
@@ -630,6 +750,8 @@ export function createTraffic(map, seed, count = 0) {
     links: new Map(), spots: [], signals: new Set(),
     fresh: [], freshIds: new Set(), freshUntil: -1, nextFresh: 0, gone: [], closed: new Set(),
     flow: null, flowByDistrict: {},
+    // What each junction has cost the cars that crossed it (M5.T31, M5-14).
+    waits: new Map(),
     regional: null, ends: [],
   };
   indexes(state);
@@ -642,11 +764,14 @@ export function createTraffic(map, seed, count = 0) {
 }
 
 // A car in the shape tick reads and writes, carrying the renderer's interim
-// `axis` and `speed` (M3.T32 moves the renderer onto yaw and v).
+// `axis` and `speed` (M3.T32 moves the renderer onto yaw and v). `stop` is the
+// stop sign the car is standing for and `held` the wait a junction's line is
+// costing it, both M5.T31's.
 function makeCar(state, outside = false) {
   const c = {
     id: 0, route: [], leg: 0, dir: 1, s: 0, v: 0, turn: null, goal: null, stale: false,
     fresh: false, axis: 'z', speed: 0, prev: {}, x: 0, y: 0, z: 0, yaw: 0,
+    stop: null, held: null,
   };
   c.outside = outside;
   // A car from outside (M4.T17) is placed on its own trip, or it is one more
@@ -1159,20 +1284,29 @@ export function tick(state, dt) {
       const clear = Math.max(0, leader.s - c.s - CAR_LEN - GAP_MIN);
       target = Math.min(target, clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear));
     }
-    // The stop line is a stationary leader at the junction. A car already past
-    // it is in the junction and must clear, not stop dead in the crossing; a
-    // car behind it eases onto the line and is held there while its axis is
-    // not green, so it cannot creep into the crossing.
+    // The stop line is a stationary leader at the junction, and the control the
+    // junction runs is what stops a car there (M5.T31). A car already past it is
+    // in the junction and must clear, not stop dead in the crossing; a car
+    // behind it eases onto the line and is held there, so it cannot creep into
+    // the crossing.
     const far = c.dir > 0 ? edge.b : edge.a;
     const line = len - STOP_LINE;
-    const hold = state.signals.has(far) && c.s <= line && !signalGreen(edge.axis, state.time);
+    const hold = waitsAt(state, c, edge, far, line);
     if (hold) {
       const clear = line - c.s;
       target = Math.min(target, clear * FOLLOW_GAIN, Math.sqrt(2 * BRAKE * clear));
     }
     c.v = Math.max(0, Math.max(c.v - BRAKE * dt, Math.min(c.v + ACCEL * dt, target)));
     c.s += c.v * dt;
-    if (hold && c.s > line) { c.s = line; c.v = 0; }
+    if (hold) {
+      if (c.s > line) { c.s = line; c.v = 0; }
+      if (c.v < VMAX - CREEP) holdOn(c, far, dt);
+    } else if (c.held && (c.held.node !== far || c.s > line)) {
+      // The car has left this junction's line: its wait is what the junction
+      // cost it, counted once however many times the control held it back.
+      if (c.held.node === far) noteWait(state, far, c.held.secs);
+      c.held = null;
+    }
     c.speed = c.v;
     c.axis = edge.axis;
     if (c.s < len) {

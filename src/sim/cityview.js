@@ -8,10 +8,15 @@
 // brush, which lot is under the cursor and what each lot is doing. Pure data
 // and pure maths (law 5). The camera and the lot outlines are
 // render/cityview.js; the pointer, the palette and the readout are
-// ui/cityview.js. What zoning does to a lot is sim/ops.js (zone).
+// ui/cityview.js. What zoning does to a lot is sim/ops.js (zone); what a
+// junction control does to the traffic is sim/traffic.js, whose own record on
+// the map the click writes (M5.T31).
 import { STAGE, builtHeight, capOf, capParcel, zoneParcel } from './zoning.js';
 import { worldMap } from './patrol.js';
 import { frontageRoad, nodeAt, ROAD_TYPES, roadTypeOf } from './map.js';
+import {
+  JUNCTION_CONTROLS, junctionControl, junctionWait, setJunctionControl,
+} from './traffic.js';
 import {
   SERVICES, addRoad, bulldoze, placeService, removeRoad, undo, upgradeCost, upgradeRoad,
   zone as zoneOp,
@@ -215,6 +220,32 @@ export const BULLDOZE_TOOL = {
   },
 };
 
+// The junction controls (M5.T31, M5-14), named once: the palette's chips, the
+// cursor's card and the traffic's own answer all read these words. A city's
+// junctions are its own to run, so a control costs nothing.
+const CONTROL_TEXT = {
+  lights: { name: 'traffic lights', blurb: 'runs a two-phase light at a junction' },
+  stop: { name: 'stop sign', blurb: 'holds every car at the line' },
+  yield: { name: 'yield', blurb: 'holds a car only for traffic it would cross' },
+};
+
+// A junction control tool: a click on a junction sets it to the control this
+// tool holds (sim/traffic.js setJunctionControl), and does nothing where there
+// is no junction under the cursor.
+const junctionTool = (id) => ({
+  id,
+  use: id,
+  name: CONTROL_TEXT[id].name,
+  blurb: CONTROL_TEXT[id].blurb,
+  junction: true,
+  money: false,
+  cost: () => 0,
+  refuse: (city, at) => (at ? null : 'no junction under the cursor'),
+  preview: (at) => ({ kind: `junction to ${CONTROL_TEXT[id].name}`, use: id }),
+});
+
+export const JUNCTION_TOOLS = JUNCTION_CONTROLS.map(junctionTool);
+
 // A service tool (M5.T11): one per type in SERVICES, placing a finished
 // service on an empty lot. The catchment radius and the capacity live with the
 // service (sim/ops.js), not on the tool; the tool carries only what the click
@@ -269,6 +300,7 @@ export const TOOLS = {
   ind: zoneTool('ind', 'i', 'ind', 'industrial', 'zones a lot for works'),
   unzone: zoneTool('unzone', 'x', null, 'unzone', 'clears a lot back to open land'),
   ...Object.fromEntries(Object.keys(SERVICES).map((type) => [type, serviceTool(type)])),
+  ...Object.fromEntries(JUNCTION_TOOLS.map((tool) => [tool.id, tool])),
 };
 
 // The city view's overlays (M5.T20), in the order the O key cycles them. The
@@ -332,6 +364,7 @@ export function layDownTool(view) {
   view.drag = null;
   view.pick = null;
   view.road = null;
+  view.junction = null;
   view.confirm = null;
 }
 
@@ -370,6 +403,7 @@ export function createCityView(city, map = worldMap()) {
     drag: null,            // the road drag's snapped ends, while one is held
     pick: null,            // the bulldoze cursor: a parcel or a road edge (M5.T5)
     road: null,            // the road a road tool holds under its cursor (M5.T25)
+    junction: null,        // the junction a control tool holds (M5.T31)
     confirm: null,         // a road removal waiting on the page's ask (M5.T5)
     act: null,             // the last act, with its cost and its hour (M5.T26)
     level: city.parcels.map(levelOf),
@@ -395,6 +429,7 @@ export function toggleCityView(view, streetYaw) {
     view.drag = null;
     view.pick = null;
     view.road = null;
+    view.junction = null;
     view.confirm = null;
     return;
   }
@@ -432,6 +467,7 @@ export function chooseTool(view, tool) {
   view.active = true;
   view.pick = null;
   view.road = null;
+  view.junction = null;
   view.confirm = null;
 }
 
@@ -464,6 +500,27 @@ export function hoverPick(view, city, target) {
   }
 }
 
+// The junction under the cursor (M5.T31): the node nearest the ground point
+// that two ways meet at, with the control it runs and what it has cost the cars
+// that crossed it. It is a control tool's own cursor — a zone brush, a road
+// drag and the bulldozer never hold one — so a junction cursor and a lot cursor
+// are never both live.
+const JUNCTION_PICK = 14;   // metres from the cursor to the node it may grab
+
+export function hoverJunction(view, city, at, traffic) {
+  hoverLot(view, -1);
+  hoverPick(view, city, null);
+  view.junction = null;
+  if (!at || !traffic || !toolOf(view)?.junction) return null;
+  if (view.mode !== 'city' || view.lift < 1) return null;
+  const hit = nodeAt(WORLDS.get(view).map, at.x, at.z);
+  if (!hit || hit.dist > JUNCTION_PICK) return null;
+  const control = junctionControl(traffic, hit.node.id);
+  if (control === null) return null;
+  view.junction = { id: hit.node.id, control, wait: junctionWait(traffic, hit.node.id) };
+  return view.junction;
+}
+
 // A click: the tool goes on the lot under the cursor, on the whole parcel or
 // road the cursor holds with the bulldozer, or — with a road tool held (M5.T25)
 // — on the road under it. Returns whether the world changed. A tool the player
@@ -476,6 +533,7 @@ export function paintLot(view, city, shift = view.shift) {
   if (view.mode !== 'city' || view.lift < 1) return false;
   const tool = toolOf(view);
   if (!tool) return false;
+  if (tool.junction) return setJunction(view, tool);
   if (tool.drag) return changeRoad(view, tool);
   if (tool === BULLDOZE_TOOL) return demolish(view, city, WORLDS.get(view).map);
   if (tool.type) return buildService(view, city, tool);
@@ -487,6 +545,16 @@ export function paintLot(view, city, shift = view.shift) {
   const capped = shift ? capParcel(city, view.hover, tool.use === null ? STAGE.HIGH : STAGE.LOW) : false;
   if (laid) chargeAct(view, city, priceOf(tool, map, at), map.version - laid);
   return at.zoned !== was || capped;
+}
+
+// A click on a junction with a control tool held (M5.T31): the control is
+// written to the map's own record, where the traffic and the render both read
+// it, and the cars at that junction obey it from the next tick. Returns whether
+// the control changed.
+function setJunction(view, tool) {
+  const at = view.junction;
+  if (!at) return false;
+  return setJunctionControl(WORLDS.get(view).map, at.id, tool.use);
 }
 
 // A service is an op on the map (M5.T11): the map owns the version, the dirty
@@ -527,6 +595,7 @@ function adoptLots(view, city, map) {
   view.hover = -1;
   view.pick = null;
   view.road = null;   // the op renames the edges: nothing under the cursor now
+  view.junction = null;
 }
 
 // The map a view edits (M5.T5): the op runs on it, the picker reads its parcels.

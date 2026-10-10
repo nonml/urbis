@@ -6,8 +6,8 @@ import { PROBLEM, describe } from '../sim/decline.js';
 import { STAGE } from '../sim/zoning.js';
 import { TAX_MAX, budgetReport, raiseTax } from '../sim/budget.js';
 import {
-  TOOLS, ROAD_TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverLot, hoverPick,
-  layDownTool, lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad,
+  TOOLS, ROAD_TOOLS, affordTool, chooseTool, confirmRoad, dismissRoad, hoverJunction, hoverLot,
+  hoverPick, layDownTool, lotStatus, moveRoad, orbitCityView, paintLot, pressRoad, releaseRoad,
   roadOffer, roadPreview, toolOf, zoomCityView,
 } from '../sim/cityview.js';
 import { ROAD_TYPES } from '../sim/map.js';
@@ -43,7 +43,12 @@ const PANEL = [
   'font:12px/1.7 ui-monospace,SFMono-Regular,Menlo,monospace', 'letter-spacing:0.04em',
   'color:#e4e1da', 'background:rgba(4,8,16,0.72)', 'border:1px solid rgba(255,255,255,0.16)',
   'padding:8px 10px', 'border-radius:6px', 'text-shadow:0 1px 2px rgba(0,0,0,0.8)',
-  'user-select:none',
+  'user-select:none', 'box-sizing:border-box',
+  // The palette is bottom-anchored and grows upward with the tools the city
+  // opens (M5.T30's tiers, M5.T31's junction controls), so it is capped at the
+  // frame the status lines leave it and scrolls inside that: whatever the rows
+  // above it, the rows and the line under them are the part always on screen.
+  'max-height:calc(100vh - 160px)', 'overflow-y:auto', 'overscroll-behavior:contain',
 ].join(';');
 const CARD = [
   'position:fixed', 'display:none', 'pointer-events:none', 'z-index:6',
@@ -74,10 +79,15 @@ const BANNER = [
 // The three road tools are one mark: a street, an avenue and a one-way all
 // paint the road's own swatch (M5.T25).
 const ROAD_USE = new Set(ROAD_TOOLS.map((tool) => tool.use));
+// The junction controls' own paint (M5.T31): a junction is neither a zone nor a
+// road, so the three controls wear the colours a planning map gives them.
+const JUNCTION_PAINT = { lights: '#c8a24a', stop: '#b0553b', yield: '#6b9651' };
+
+const paintOfUse = (use) => JUNCTION_PAINT[use] ?? paintOf(ROAD_USE.has(use) ? 'road' : use);
 
 function swatch(use) {
   return `<span style="display:inline-block;width:9px;height:9px;margin-right:6px;`
-    + `background:${paintOf(ROAD_USE.has(use) ? 'road' : use)};border-radius:2px"></span>`;
+    + `background:${paintOfUse(use)};border-radius:2px"></span>`;
 }
 
 // Demand bars (M5.T27): three rows — res, com, ind — for the district under the
@@ -492,12 +502,22 @@ function holdStreetRig(ui) {
   cam.dist = ui.parked.dist;
 }
 
-function hover({ view, city, pointer, rig, camera }) {
-  const nothing = () => { hoverLot(view, -1); hoverPick(view, city, null); };
+function hover({ view, city, pointer, rig, camera, traffic }) {
+  const nothing = () => {
+    hoverLot(view, -1);
+    hoverPick(view, city, null);
+    hoverJunction(view, city, null, null);
+  };
   if (view.mode !== 'city' || view.lift < 1 || !pointer) return nothing();
   // A road drag is not about a lot: no lot under its cursor to read out.
   if (view.drag) return nothing();
   const tool = toolOf(view);
+  // A junction control tool holds the junction under the cursor (M5.T31), and
+  // never a lot: the ground point it stands on names the node.
+  if (tool?.junction) {
+    const at = groundAt({ rig, camera }, pointer.x, pointer.y);
+    return hoverJunction(view, city, at, traffic);
+  }
   const x = (pointer.x / window.innerWidth) * 2 - 1;
   const y = -(pointer.y / window.innerHeight) * 2 + 1;
   // The bulldozer holds a whole parcel or a road (M5.T5); a brush holds a lot.
@@ -521,7 +541,7 @@ function showPalette({ view, city, panel, rows, help, hoverTool }) {
   const tool = toolOf(view);
   for (const { row, tool: entry } of rows) {
     const on = entry === tool;
-    row.style.borderLeftColor = on ? paintOf(entry.use) : 'transparent';
+    row.style.borderLeftColor = on ? paintOfUse(entry.use) : 'transparent';
     row.style.background = on ? 'rgba(255,255,255,0.08)' : 'transparent';
     // A tool the treasury cannot pay for stands dimmed and says why, the same
     // words the card gives the cursor (M5-7): the money is never a surprise.
@@ -553,6 +573,21 @@ function reasonCard(p, cause) {
     + '<br><span style="opacity:0.65">click elsewhere to close</span>';
 }
 
+// The junction a control tool holds under its cursor (M5.T31): what it runs
+// today, what a click would set it to, and what it has cost the cars that
+// crossed it — the seconds the A/B in tests/accept/m5-junctions.test.js weighs.
+// The numbers ride `data-*` the way the demand bars keep theirs, so a check
+// reads them without parsing a rounded line.
+function junctionCard(view) {
+  const tool = toolOf(view);
+  const { control, wait } = view.junction;
+  const { cars, mean } = wait;
+  return `${swatch(tool.use)}<b style="color:#fff">JUNCTION</b>`
+    + `<br>${TOOLS[control].name} · ${cars} car${cars === 1 ? '' : 's'} held`
+    + ` · ${mean.toFixed(1)} s mean wait`
+    + `<br><span style="opacity:0.75">◆ set ${tool.name}</span>`;
+}
+
 function showCard({ view, city, street, pointer, card, problems }) {
   if (view.problem != null && view.mode === 'city') {
     const cause = problems.causeOf(view.problem);
@@ -569,7 +604,21 @@ function showCard({ view, city, street, pointer, card, problems }) {
   card.dataset.lot = '';
   card.dataset.upgrade = '';
   card.dataset.cost = '';
-  if (!pointer || (view.hover < 0 && !view.drag && !view.pick && !view.road)) {
+  // A junction under a control tool's cursor is its own card (M5.T31).
+  if (view.junction && pointer && toolOf(view)?.junction) {
+    card.dataset.control = view.junction.control;
+    card.dataset.cars = `${view.junction.wait.cars}`;
+    card.dataset.secs = `${view.junction.wait.secs}`;
+    card.innerHTML = junctionCard(view);
+    card.style.display = 'block';
+    card.style.left = `${pointer.x + 16}px`;
+    card.style.top = `${pointer.y + 16}px`;
+    return;
+  }
+  card.dataset.control = '';
+  card.dataset.cars = '';
+  card.dataset.secs = '';
+  if (!pointer || (view.hover < 0 && !view.drag && !view.pick && !view.road && !view.junction)) {
     card.style.display = 'none';
     return;
   }
@@ -627,6 +676,9 @@ export function bindCityView({ canvas, cam, camera, city, street, view, rig }) {
   });
   const ui = {
     canvas, cam, camera, city, street, view, rig, card, ask,
+    // The traffic the junction cursor reads its controls and its waits off
+    // (M5.T31): the street's own, the same state the frame loop ticks.
+    traffic: street.traffic,
     ...buildPalette(view, city),
     // The tier note (M5.T30): built once, shown by the frame while a tier is
     // still fresh, on the street as much as in the overview.
