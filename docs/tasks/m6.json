@@ -490,6 +490,23 @@
       "test": "tests/accept/m6-permit.spec.js"
     },
     {
+      "id": "M6.T20w",
+      "lane": "wire",
+      "needs": [
+        "M6.T20",
+        "M6.T8b"
+      ],
+      "goal": "Wire the planning office. M6.T20 (2d00e9e) built hackPermit in src/sim/zoning.js (fast-track or freeze the office's nearest site) and the registry carries a PLANNING OFFICE per district with permit_fast and permit_freeze, but nothing in the game calls hackPermit. Make it a hack a player fires: aimed at a planning office, H fires the default (fast-track) and the hold menu offers both, through src/game/input.js's onFire, paying the battery.",
+      "files": [
+        "src/game/input.js",
+        "src/sim/zoning.js",
+        "tests/accept/m6-permit-wired.spec.js"
+      ],
+      "test": "tests/accept/m6-permit-wired.spec.js",
+      "commit": "M6.T20w (M6-4): the planning office fires from the key",
+      "notes": "Size S. Write tests/accept/m6-permit-wired.spec.js first and see it fail on main: boot the built game (&gen=1&seed=7), stand where a planning office is aimed (find it through __game only to place the player), press the real H key and check the office's nearest site's lot note says 'permit fast-tracked'; then hold H, pick the freeze row with ArrowDown and Enter, and check the note says 'permit frozen'. tests/accept/m6-permit.spec.js and tests/accept/m6-t3.spec.js stay green; do not edit them."
+    },
+    {
       "id": "M6.T21",
       "lane": "hack-render",
       "goal": "Reach. One Node test runs every hack's A/B and checks M4-5's rule: nothing outside its reach changes",
