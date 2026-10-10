@@ -8,6 +8,7 @@
 // whose way to the door is shortest. Pure sim (law 5).
 import { mulberry32 } from './rng.js';
 import { frontageRoad, projectOnSegment } from './map.js';
+import { alarmOn } from './alarms.js';
 import { ROAD_HALF_WIDTH, WALKWAY_WIDTH, heightAt } from './world.js';
 
 // The ground under a walker (M4.T10): the map's own field when it has one
@@ -252,6 +253,23 @@ function pivot(byId, w, edge, tdir) {
 
 const pathCost = (state, route) => route.reduce((n, id) => n + lengthOf(state.byId, state.edgeById.get(id)), 0);
 
+// A building whose fire alarm rings (M6.T19, alarms.js): the deadline is the
+// parcel's own, read here and never written, so a replay stays stable. A parcel
+// index is a city parcel's, and the map's list opens with those same lots, so
+// `hold` and `commute` read straight through it.
+function alarmed(state, index) {
+  const p = state.map?.parcels?.[index];
+  return !!p && alarmOn(p, state.time);
+}
+
+// The building empties: every walker it held is out on the pavement, strolling,
+// for as long as the alarm rings.
+function alarmEvac(state, w) {
+  if (!alarmed(state, w.hold)) return;
+  w.hold = null; w.commute = null; w.dest = null; w.out = true;
+  w.roamUntil = Math.max(w.roamUntil ?? 0, state.time + ROAM_SECS);
+}
+
 function pick(rng, arr) {
   return arr.length === 0 ? null : arr[Math.floor(rng() * arr.length)];
 }
@@ -299,6 +317,9 @@ export function tick(state, dt) {
   state.time += dt;
   if (indexes(state)) revalidate(state);
   for (const w of state.walkers) {
+    if (w.hold !== null && w.hold !== undefined) alarmEvac(state, w);
+  }
+  for (const w of state.walkers) {
     const v = w.v ?? w.speed ?? 0;
     if (w.hold !== null && w.hold !== undefined) continue;
     if (w.turn) { advanceTurn(w, dt); continue; }
@@ -310,7 +331,11 @@ export function tick(state, dt) {
     if (w.dest && w.dest.edge !== null && w.route[w.leg] === w.dest.edge) {
       const ds = Math.max(0, Math.min(len, w.dest.s));
       if ((w.tdir > 0 && w.s < ds && s >= ds) || (w.tdir < 0 && w.s > ds && s <= ds)) {
-        arriveDoor(state, w, edge, ds); continue;
+        // The shop is shut for as long as its alarm rings (M6.T19): nobody goes
+        // in, so the walker walks on past the door and stands its goal down
+        // rather than wait on a doorstep that will not open.
+        if (alarmed(state, w.commute)) { w.commute = null; w.dest = null; }
+        else { arriveDoor(state, w, edge, ds); continue; }
       }
     }
     if (s > len || s < 0) { arrive(state, w, edge, len, s, v); continue; }

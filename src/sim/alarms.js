@@ -53,3 +53,15 @@ export function raiseAlarm(parcels, parcel, at) {
   parcel.alarmUntil = at + secs;
   return secs;
 }
+
+// The FIRE ALARM hack (sim/hackables.js fire_alarm, reach 'building'), fired at
+// one registered building (M6.T19). Returns { secs, why }: the seconds it rings,
+// or why it did not take — a building whose alarm already rings is not a second
+// one, and nothing standing holds no alarm at all. The street reads the alarm
+// back through alarmOn: walkers.js empties the building onto the pavement and
+// shuts its door for as long as it rings.
+export function hackFireAlarm(parcels, parcel, at) {
+  const secs = raiseAlarm(parcels, parcel, at);
+  if (secs > 0) return { secs, why: null };
+  return { secs: 0, why: parcel && deadline(parcel) > at ? 'alarm already ringing' : 'no building to alarm' };
+}

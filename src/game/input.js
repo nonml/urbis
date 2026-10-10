@@ -19,6 +19,7 @@
 import { toggleDay } from '../sim/clock.js';
 import { STREET } from '../sim/interior.js';
 import { worldMap } from '../sim/patrol.js';
+import { hackFireAlarm } from '../sim/alarms.js';
 import { createHackables, syncHackables, aimTarget } from '../sim/hackables.js';
 import { cityKey, undoAct } from '../sim/cityview.js';
 import { arcChoose } from '../sim/arc.js';
@@ -118,9 +119,18 @@ export function bindInput(parts) {
   // in reach on foot. The profiler's effect is the aim panel itself, so its fire
   // has nothing to spend. A hack M6 has not built yet refuses and says why, so
   // the menu never pretends to work.
-  const onFire = (hack) => {
+  const onFire = (hack, entry) => {
     if (hack.id === 'blackout') { fireHack(); return null; }
     if (hack.id === 'profiler') return null;
+    // The fire alarm (M6.T19, alarms.js hackFireAlarm): the aimed building
+    // empties onto the pavement and its shop shuts for the alarm's life. The
+    // menu hands the thing it was opened on; a tap has none, so it reads the
+    // aim the frame holds.
+    if (hack.id === 'fire_alarm') {
+      const t = entry ?? aim()?.entry ?? null;
+      if (!t || t.kind !== 'building') return 'no building in reach';
+      return hackFireAlarm(worldMap().parcels, t.ref, street.time).why;
+    }
     return 'not built yet';
   };
   const hackMenu = buildHackMenu(onFire);
@@ -149,7 +159,7 @@ export function bindInput(parts) {
     // The thing's own hack fires, or it does not. When it does not, M6-2's rule
     // holds: the blackout works in every district, so the key never stops being
     // the blackout.
-    if (t && !onFire(t.entry.hacks[0])) return;
+    if (t && !onFire(t.entry.hacks[0], t.entry)) return;
     fireHack();
   }
 
