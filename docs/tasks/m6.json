@@ -296,6 +296,25 @@
       "test": "tests/accept/m6-camera.spec.js"
     },
     {
+      "id": "M6.T12w",
+      "lane": "battery",
+      "needs": [
+        "M6.T12",
+        "M6.T4b",
+        "M6.T7w"
+      ],
+      "goal": "Wire the camera hack. M6.T12 (0e8fee0) built hackCamera in src/sim/hackables.js and blindStreet in src/sim/patrol.js (cut a camera and the police are blind in that street for BLIND_SECS) but nothing in the game calls them. Make it a hack a player fires: aimed at a street camera, H (or the hold menu's row) calls it through src/game/input.js's onFire and pays the battery; the camera's street then hides the player from the police until it comes back.",
+      "files": [
+        "src/game/input.js",
+        "src/sim/hackables.js",
+        "src/sim/patrol.js",
+        "tests/accept/m6-camera-wired.spec.js"
+      ],
+      "test": "tests/accept/m6-camera-wired.spec.js",
+      "commit": "M6.T12w (M6-4): the camera hack fires from the key",
+      "notes": "Size S. Write tests/accept/m6-camera-wired.spec.js first and see it fail on main: boot the built game (&gen=1&seed=7), stand where a registered camera is aimed (find it through __game only to place the player), press the real H key, and check through __game that the camera is down, the battery dropped by the camera hack's docs/HACKING.md cost, and a police unit in that street cannot see the player (canSee false) while one in another street with sight still can. tests/accept/m6-camera.spec.js and tests/accept/m6-t3.spec.js stay green; do not edit them."
+    },
+    {
       "id": "M6.T13",
       "lane": "hack-render",
       "goal": "Street camera, the view. The view jumps into the camera; profile from there; jump to any camera in view; Esc returns",

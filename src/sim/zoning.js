@@ -29,6 +29,18 @@ import { REASONS, TREND, hasFloors, judge, reoccupy, vacate } from './decline.js
 export const NO_ROAD = 'no-road';
 REASONS[NO_ROAD] = () => 'no road';
 
+// M6.T18 (M6-4): the crane hacks. STOP CRANE parks a site — the jib stops
+// slewing and nothing is built — and DROP LOAD takes a stage off the lot: the
+// crane comes down with it and the site is shut for a minute. Both carry a
+// cause of their own, read in the lot note and the news the way the missing
+// road is, because a stalled crane is not a market giving up.
+export const CRANE_STOP_SECS = 30;
+export const CRANE_SHUT_SECS = 60;
+const CRANE_STOPPED = 'crane-stopped';
+const CRANE_DROPPED = 'load-dropped';
+REASONS[CRANE_STOPPED] = () => 'crane stopped';
+REASONS[CRANE_DROPPED] = () => 'load dropped, site shut';
+
 // The shell stands this far inside the hoarding line on every side. It lives
 // here, not in render/zoning.js, because the interiors derive their door face
 // and room from the same building footprint the shell is drawn at.
@@ -344,6 +356,49 @@ function clearLot(p, dt) {
   p.building = p.stage > STAGE.EMPTY;
 }
 
+// A site under a crane hack does nothing at all: no work, no demolition, no
+// market. The lot keeps its stage and its crane; only the work stops, and the
+// cause on it names the hack. True while the countdown runs — and the countdown
+// is cleared on the way out, so the site that reopens carries nothing over.
+function craneHalt(p, now) {
+  if (!p.stoppedUntil) return false;
+  if (now < p.stoppedUntil) {
+    p.building = p.stage >= STAGE.SITE && p.stage < capOf(p);
+    p.trend = TREND.STALLED;
+    p.why = p.dropped ? CRANE_DROPPED : CRANE_STOPPED;
+    return true;
+  }
+  p.stoppedUntil = 0;
+  p.dropped = false;
+  return false;
+}
+
+// The crane hacks, fired at the site the registry entry stands over
+// (hackables.js registers a crane for every lot breaking ground). Returns null
+// when the hack fired, or the reason it did not, the way the hack menu asks.
+export function hackCrane(city, entry, hack) {
+  const p = entry?.ref;
+  if (!p || p.kind !== 'lot' || city.parcels.indexOf(p) < 0) return 'no site in reach';
+  if (p.stage !== STAGE.SITE) return 'no crane on that lot';
+  if (hack.id === 'crane_stop') {
+    // A stop already running is not shortened by a second one.
+    p.stoppedUntil = Math.max(p.stoppedUntil ?? 0, city.time + CRANE_STOP_SECS);
+    p.dropped = false;
+    return null;
+  }
+  if (hack.id === 'crane_drop') {
+    // The load comes down on the lot: a stage off, back to bare land, and the
+    // site shut. The player's order on the lot stands, so it breaks ground
+    // again the moment the shut lifts.
+    p.stage = Math.max(STAGE.EMPTY, p.stage - 1);
+    p.progress = 0;
+    p.stoppedUntil = city.time + CRANE_SHUT_SECS;
+    p.dropped = true;
+    return null;
+  }
+  return 'not built yet';
+}
+
 // The player's hand on the city (city view, sim/cityview.js): zone lot `index`
 // for a use, or unzone it with null. Nothing moves here; the lot answers over
 // the ticks that follow. Returns whether the zoning changed.
@@ -401,6 +456,9 @@ export function tickZoning(city, dt, street, hold = -1) {
     // Only a lot grows or declines on its own. A row, tower or cap is a fixed
     // parcel the player edits (M3.T18), never one the market moves.
     if (p.kind !== 'lot') return;
+    // M6.T18: a site under a crane hack waits — no work, no demolition, no
+    // market — until the crane lifts or the shut ends.
+    if (craneHalt(p, city.time)) return;
     // The player's own building waits for them: while they stand inside it,
     // its decline (or ordered demolition) is deferred, so the space they are
     // in never disappears around them.

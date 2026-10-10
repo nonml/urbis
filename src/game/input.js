@@ -22,6 +22,7 @@ import { worldMap } from '../sim/patrol.js';
 import { hackFireAlarm } from '../sim/alarms.js';
 import { createHackables, syncHackables, aimTarget } from '../sim/hackables.js';
 import { cityKey, undoAct } from '../sim/cityview.js';
+import { hackCrane } from '../sim/zoning.js';
 import { arcChoose } from '../sim/arc.js';
 import { bindCityView } from '../ui/cityview.js';
 import { buildHackMenu } from '../ui/hackmenu.js';
@@ -131,6 +132,11 @@ export function bindInput(parts) {
       if (!t || t.kind !== 'building') return 'no building in reach';
       return hackFireAlarm(worldMap().parcels, t.ref, street.time).why;
     }
+    // M6.T18: the crane hacks are the zoning sim's own, thrown at the lot the
+    // registry entry stands over (hackables.js registers a crane per site).
+    if (hack.id === 'crane_stop' || hack.id === 'crane_drop') {
+      return entry ? hackCrane(city, entry, hack) : 'no site in reach';
+    }
     return 'not built yet';
   };
   const hackMenu = buildHackMenu(onFire);
@@ -158,7 +164,9 @@ export function bindInput(parts) {
     const t = aim();
     // The thing's own hack fires, or it does not. When it does not, M6-2's rule
     // holds: the blackout works in every district, so the key never stops being
-    // the blackout.
+    // holds: the blackout works in every district, so the key never stops being
+    // the blackout. The aimed entry rides with the hack, so one thrown at a
+    // site lands on that site (M6.T18).
     if (t && !onFire(t.entry.hacks[0], t.entry)) return;
     fireHack();
   }
