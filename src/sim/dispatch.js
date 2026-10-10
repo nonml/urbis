@@ -52,9 +52,34 @@ function fill(template, e, map) {
   return template.replace(/\{(\w+)\}/g, (_, k) => words[k] ?? '');
 }
 
+// M6.T6: the line the radio says for a hack the police watched, one per hack
+// kind (the ids in sim/hackables.js HACKS). dispatch.json's lines are keyed by
+// the events a chase produces; a witnessed hack is its own event, tagged with
+// the kind that did it, so its words live here beside the kinds' own table.
+const HACK_LINES = {
+  blackout: 'BLACKOUT on {street}. Power tampering, unit has eyes on the suspect.',
+  profiler: 'PROFILE on {street}. Phone out, pulling a name.',
+  signals: 'ALL-GREEN on {street}. The lights are jammed.',
+  bollards: 'BOLLARDS up across {street}.',
+  pipe_burst: 'BURST PIPE on {street}. The main is gone.',
+  hijack: 'HIJACK on {street}. One car taken.',
+  camera_cut: 'CUT CAMERA on {street}.',
+  camera_view: 'CAMERA VIEW on {street}.',
+  eavesdrop: 'EAVESDROP on {street}. Phone tapped.',
+  bank: 'BANK TRANSFER on {street}. Money is moving.',
+  crane_stop: 'STOP CRANE on {street}.',
+  crane_drop: 'DROP LOAD on {street}.',
+  fire_alarm: 'FIRE ALARM on {street}.',
+  bridge_raise: 'RAISE SPAN on {street}.',
+  permit_fast: 'FAST-TRACK on {street}.',
+  permit_freeze: 'FREEZE on {street}.',
+};
+
 function say(d, e, time) {
-  const options = CHATTER.lines[e.type];
-  const pick = options[Math.floor(d.rng() * options.length)];
+  const hack = HACK_LINES[e.hack];
+  const pick = hack
+    ? { by: 'dispatch', say: hack }
+    : CHATTER.lines[e.type][Math.floor(d.rng() * CHATTER.lines[e.type].length)];
   return { speaker: CHATTER.speakers[pick.by], text: fill(pick.say, e, d.map), kind: e.type, at: time };
 }
 
