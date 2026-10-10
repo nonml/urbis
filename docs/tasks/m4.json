@@ -242,18 +242,41 @@
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-1: On all five seeds: **at least 4 districts**, each its own power zone and economy district, of at least 3 kinds (towers, housing, works, suburb), with **at least 400 buildings** and at least 40 lots free to zone (checked by `tests/accept/m4-districts.test.js` (Node)) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md."
     },
     {
+      "id": "M4.T12r",
+      "lane": "render",
+      "needs": [],
+      "goal": "The lights follow any number of districts. Today the night lighting knows only two power zones, the z halves: src/render/lamps.js gives each lamp `zone: z < 0 ? 0 : 1` and keeps `poolsByZone: [[], []]` and `zoneLight = [1, 1]` (a lamp zone past 1 throws on boot); src/render/setdress.js keys signs, light pools, streaks and wet-road mirrors by `s.z < 0 ? 0 : 1` / zoneAt(z) and loops `for (const zone of [0, 1])`; src/main.js, src/game/hud.js, src/render/arc.js and src/audio/ambience.js read the blackout by the two halves too (grep zone). Make every one of them read the map's districts: a lamp, sign, pool or mirror belongs to `districtAt(map, x, z).id` (src/sim/map.js), and a blackout darkens exactly the district that is dark in the street sim (street.js isDark / zone state), for any count up to 16. Do it without adding a mesh per district: carry the district id per instance or per vertex and read a 16-entry uniform (as materials.js window lighting already does), so draws do not rise. On today's map (two districts) the game must look and behave exactly as now.",
+      "files": [
+        "src/render/lamps.js",
+        "src/render/setdress.js",
+        "src/render/arc.js",
+        "src/main.js",
+        "src/game/hud.js",
+        "src/audio/ambience.js",
+        "src/render/materials.js",
+        "tests/accept/m4-light-districts.test.js"
+      ],
+      "test": "tests/accept/m4-light-districts.test.js",
+      "commit": "M4.T12r (M4-1): the lights follow any number of districts",
+      "notes": "Size M, at most 300 changed lines outside the test. Write tests/accept/m4-light-districts.test.js first (Node, @playwright/test) and see it fail on main: build a 6-district test map the way tests/accept/m3-districts.test.js does (split the hand map's walk box into 6 named areas), build the lamps (and the set dressing if it builds in Node) for it, and check: nothing throws; every lamp's zone is districtAt of where it stands, and at least 4 different zones are used; darkening district 5 alone (the same call the game makes on a blackout) dims only lamps whose zone is 5. Draws must not rise (the gate's smoke reads them). Do not edit any other test."
+    },
+    {
       "id": "M4.T12a",
       "lane": "story",
       "needs": [
-        "M4.T5"
+        "M4.T5",
+        "M4.T12r"
       ],
-      "goal": "The town's districts are the generated cells. map.districts today is splitDistricts(district) in src/sim/map.js: two power halves, south and north, of the load-time district, so tests/accept/m4-districts.test.js reads 2 districts on every seed. The town already has its cells (map.cells, M4.T3/M4.T4/M4.T5: towers, housing, works, suburb). Make map.districts the cells: each with its id, name and kind, each its own power zone (every parcel's powerZone is the id of the district it stands in, so districtAt(map, p.x, p.z).id === p.powerZone), its own street zone and its own economy district (city.economy.districts one per district). Every module that names 'south' or 'north' as a zone (grep powerZone and the two names in src/sim) reads the map's districts instead. First write in .scratch/m4-t12a.md every place that assumes two zones, one line each; then change them.",
+      "goal": "The town's districts are the generated cells. map.districts today is splitDistricts(district) in src/sim/map.js: two power halves, south and north, of the load-time district. The town already has its cells (map.cells, M4.T3/M4.T4/M4.T5: towers, housing, works, suburb). Make map.districts the cells: each with its id, name and kind, each its own power zone (every parcel's powerZone is the id of the district it stands in, so districtAt(map, p.x, p.z).id === p.powerZone), its own street zone and its own economy district (city.economy.districts one per district). Every module that names 'south' or 'north' as a zone reads the map's districts instead. Your last try's notes are in .scratch/m4-t12a.md: start from them. M4.T12r (now on main) made the lights follow any number of districts, so the sim's lamp zones no longer have to stay as the halves.",
       "files": [
-        "src/sim/"
+        "src/sim/",
+        "tests/accept/m4-cells.test.js",
+        "tests/accept/m3-districts.test.js",
+        "tests/accept/m5-pollution.test.js"
       ],
-      "test": "tests/accept/m4-districts.test.js",
+      "test": "tests/accept/m4-cells.test.js",
       "commit": "M4.T12a (M4-1): the districts are the town's cells, each its own power and economy",
-      "notes": "Size L, at most 400 changed lines. Never edit tests/ or tests/golden/. These must stay green, run them before you finish: GATE_FULL=1 npx playwright test tests/accept/m4-districts.test.js tests/golden.test.js tests/map.test.js tests/accept/m3-districts.test.js tests/accept/m5-pollution.test.js tests/accept/m5-overlays.spec.js. If one of them asserts exactly two zones, stop and name it; do not work around it."
+      "notes": "Size L, at most 400 changed lines outside tests. Write tests/accept/m4-cells.test.js first (Node) and see it fail on main: on five seeds (7, 11, 22, 33, 73), map.districts are map.cells (same ids, names and kinds), at least 4; createStreet's zones and the economy's districts are one per district, named by the map; every parcel's powerZone is districtAt of where it stands. Do NOT check building counts or free lots: tests/accept/m4-districts.test.js is the milestone's close check (M4.T18), and its 400+ buildings and 40+ free lots come from M4.T15; it is not yours to pass. Director's ruling on the two tests you found: tests/accept/m3-districts.test.js (district 0 with no lots reads 0/0) and tests/accept/m5-pollution.test.js (its search for a home lot 'in the other power half') were written for two halves. You may edit them, only to read N districts: pick districts that hold lots, and 'another district' for 'the other half'. Keep what each one proves; do not loosen a number. Must stay green, run before you finish: GATE_FULL=1 npx playwright test tests/accept/m4-cells.test.js tests/golden.test.js tests/map.test.js tests/accept/m3-districts.test.js tests/accept/m5-pollution.test.js tests/accept/m5-overlays.spec.js tests/accept/m4-light-districts.test.js. If any other test asserts exactly two zones, stop and name it."
     },
     {
       "id": "M4.T12",
