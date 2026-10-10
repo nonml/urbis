@@ -82,12 +82,48 @@ export function shareStreet(ax, az, bx, bz, map = worldMap()) {
   return waysOf(map).some((w) => inStreet(w, ax, az) && inStreet(w, bx, bz));
 }
 
+// A street whose cameras are all cut is blind for this long, on the street
+// sim's own clock (hackables.js hackCamera cuts one).
+export const BLIND_SECS = 90;
+// The streets whose cameras are cut: way id -> { until, clock }. The clock is
+// the street sim the game runs, so a street sees again on its own: nothing has
+// to tick to say so, and no stale blind street outlives its cut.
+const BLIND = new Map();
+
+// The streets the police are blind in right now.
+export function blindWays() {
+  const blind = new Set();
+  for (const [way, cut] of BLIND) {
+    if (cut.clock.time < cut.until) blind.add(way);
+    else BLIND.delete(way);
+  }
+  return blind;
+}
+
+// The street `way` loses its cameras (M6.T12's cut): the police are blind in it
+// until the street sim's own clock runs the cut out.
+export function blindStreet(way, clock) {
+  BLIND.set(way, { until: clock.time + BLIND_SECS, clock });
+}
+
+// Standing in a street whose cameras are down. A street is the only thing that
+// gives sight past a close look, so taking one out takes both directions: nobody
+// can look down it, and nobody can look into it.
+function blindTo(x, z, map) {
+  const blind = blindWays();
+  if (blind.size === 0) return false;
+  return waysOf(map).some((w) => blind.has(w.id) && inStreet(w, x, z));
+}
+
 // Can an officer at (ax, az) see a suspect at (bx, bz)? `cover` is the suspect
 // standing in a blacked-out zone: then only a close look finds them.
+// M6.T12: a street whose cameras are cut is blind the same way — the street
+// gives no sight at all until the cut runs out.
 export function canSee(ax, az, bx, bz, cover, map = worldMap()) {
   const d = Math.hypot(bx - ax, bz - az);
   if (d <= CLOSE_SIGHT) return true;
   if (cover || d > STREET_SIGHT) return false;
+  if (blindTo(ax, az, map) || blindTo(bx, bz, map)) return false;
   return shareStreet(ax, az, bx, bz, map);
 }
 
