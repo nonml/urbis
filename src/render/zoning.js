@@ -55,7 +55,11 @@ const PAINT = {
   hoarding: 0x8f8c84, pad: 0x4d4a45, skip: 0xa8791e, plinth: 0x2a2d33,
   parapet: 0x1b1f27, plant: 0x3a3f47, netting: 0x8a9688,
   crane: 0xc49a2c, ballast: 0x6c6b66, cab: 0xd6d4cc, cable: 0x1a1a1a,
+  spoil: 0x6f6a5c,
 };
+// The load a stopped or dropping crane leaves: a heap of spoil as wide as this
+// share of the lot and this high.
+const SPOIL_SHARE = 0.3, SPOIL_H = 1.1;
 const KIT_PER_PARCEL = 17;
 
 function unitBox() {
@@ -160,7 +164,7 @@ function raiseCrane(rig, p, i, h) {
   }
 }
 
-function dressParcel(rig, p, i) {
+function dressParcel(rig, p, i, now) {
   // The parcel every piece this call draws belongs to: shells carry it on
   // their own attribute, the kit (hoarding, crane, skip, netting) reads it
   // here, so a pick on either names the same lot (M3-3).
@@ -186,7 +190,14 @@ function dressParcel(rig, p, i) {
   if (p.building) {
     const net = Math.min(h, NETTING_BAND);
     kitBox(rig, PAINT.netting, p.x, h - net, p.z, sw + 0.5, net + 0.8, sd + 0.5);
-    raiseCrane(rig, p, i, h);
+    // M6.T18: a stopped crane sets its load down on the pad and stands still —
+    // its jib stops slewing because the work does, and it hangs the load low.
+    raiseCrane(rig, p, i, p.stoppedUntil > now ? 0 : h);
+  }
+  // M6.T18: the load a hacked crane dropped lies on the lot the drop knocked
+  // back to bare land, until the minute is up and the site reopens.
+  if (p.dropped) {
+    kitBox(rig, PAINT.spoil, p.x, 0, p.z, p.w * SPOIL_SHARE, SPOIL_H, p.d * SPOIL_SHARE, 0.3);
   }
 }
 
@@ -249,7 +260,7 @@ export function buildZoning(city, kinds, footprints, map = worldMap()) {
   function update() {
     rig.kitCount = 0;
     for (const m of meshes) m.count = 0;
-    city.parcels.forEach((p, i) => dressParcel(rig, p, i));
+    city.parcels.forEach((p, i) => dressParcel(rig, p, i, city.time));
     kit.count = rig.kitCount;
     for (const m of meshes) {
       m.instanceMatrix.needsUpdate = true;
