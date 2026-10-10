@@ -13,7 +13,7 @@
 // the save's op log (M3.T38) replays.
 import {
   STAGE, STAGES, USES, USE_BY_KIND, BUILD_MARGIN, buildingParcel, edgesIn, frontageRoadOn,
-  graphBounds, markBridges, markDirty, parcelsIn, projectOnSegment,
+  graphBounds, markBridges, markDirty, parcelsIn, projectOnSegment, roadTypeOf, ROAD_TYPES,
 } from './map.js';
 import { regrade, reverseGround, waterBlocked } from './terrain.js';
 import { BUILD_LINE, ROW_DEPTH_MAX, planNewFrontage } from './layout.js';
@@ -80,19 +80,19 @@ function snapshot(p) {
   return copy;
 }
 
-// Apply one change as an edit: snapshot the parcel, bump the version, mark the
-// touched tiles and return the closure that puts all three back.
-function edit(map, p, change) {
+// Apply one change as an edit: snapshot the target, bump the version, mark the
+// tiles `box` names and return the closure that puts all three back.
+function edit(map, p, change, box = parcelBox(p)) {
   const before = snapshot(p);
   const version = map.version;
   change(p);
   map.version = version + 1;
-  markDirty(map, parcelBox(p));
+  markDirty(map, box);
   const reverse = () => {
     for (const key of Object.keys(p)) delete p[key];
     Object.assign(p, before);
     map.version = version;
-    markDirty(map, parcelBox(p));
+    markDirty(map, box);
   };
   history(map).push(reverse);
   return reverse;
@@ -380,7 +380,7 @@ function planRoad(map, from, to, axis) {
       fresh.push(piece);
     }
   }
-  const laid = { lanes: ROAD_LANES, kind: ROAD_KIND, axis, district: map.district?.id ?? null, way: 'op' };
+  const laid = { lanes: ROAD_LANES, oneWay: false, kind: ROAD_KIND, axis, district: map.district?.id ?? null, way: 'op' };
   for (let i = 1; i < chain.length; i++) {
     const piece = connect(laid, chain[i - 1], chain[i]);
     edges.push(piece);
@@ -732,6 +732,39 @@ export function removeRoad(map, ref) {
     const at = map.graph.edges.indexOf(edge);
     if (at >= 0) map.graph.edges.splice(at, 1);
   }, { flatsIn: [], flatsOut: [edge] });
+}
+
+// ---------------------------------------------------------------------------
+// Road types (M5.T24, M5-10): what changing the road on an edge to `type`
+// costs on top of the road standing there — the difference per metre, which is
+// what the tool charges for an upgrade in place (M5.T25).
+export function upgradeCost(map, ref, type) {
+  const def = ROAD_TYPES[type];
+  const edge = edgeOf(map, ref);
+  if (!def || !edge) return 0;
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const a = byId.get(edge.a);
+  const b = byId.get(edge.b);
+  if (!a || !b) return 0;
+  return Math.hypot(b.x - a.x, b.z - a.z) * (def.cost - ROAD_TYPES[roadTypeOf(edge)].cost);
+}
+
+// Change the road on an edge in place (M5-10): the edge keeps its id, its
+// nodes, its kind and its place in the graph, and takes the type's lanes and
+// one-way. An edit like any other, so its undo puts the road back and leaves
+// the same tiles dirty for the renderer to rebuild (M3.T27).
+export function upgradeRoad(map, ref, type) {
+  const edge = edgeOf(map, ref);
+  const def = ROAD_TYPES[type];
+  if (!edge || !def || roadTypeOf(edge) === type) return NOOP;
+  const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
+  const a = byId.get(edge.a);
+  const b = byId.get(edge.b);
+  if (!a || !b) return NOOP;
+  return edit(map, edge, (q) => {
+    q.lanes = def.lanes;
+    q.oneWay = def.oneWay;
+  }, roadBox(a, b));
 }
 
 // Undo the last op on a map. The handle an op returned does the same; this is

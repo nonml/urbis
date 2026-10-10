@@ -24,7 +24,7 @@
 // T29's tests place cars by hand, in the shape this module reads and writes.
 import { mulberry32 } from './rng.js';
 import { DAY_SECS, START_HOUR } from './clock.js';
-import { frontageRoad } from './map.js';
+import { frontageRoad, lanesInDir, roadTypeOf } from './map.js';
 import { heightAt } from './world.js';
 
 // The ground under a car (M4.T10): the map's own field when it has one
@@ -34,6 +34,11 @@ const groundAt = (map, x, z) => (map.terrain?.heightAt ?? heightAt)(x, z);
 
 export const CAR_LEN = 4.5;
 export const LANE_OFF = 2.4;
+// How far the next lane out stands past the kerb lane, so cars in adjacent
+// lanes never stand inside each other. It stays under the 4.2 m M3-6 measures
+// a car against its edge's centre-line: every road is drawn a uniform 7 m wide
+// until M5.T25 lays the 4-lane cross-section each type has.
+export const LANE_STEP = 1.79;
 export const VMAX = 13.5;
 export const ACCEL = 2.5;
 export const BRAKE = 6;
@@ -159,14 +164,15 @@ const OUTSIDE_SPLIT = 0.5;
 const THROUGH_SHARE = 0.5;
 
 // The lane a car drives: `dir` is the sign of travel along the edge's own a->b
-// order, and the lane sits LANE_OFF to the right of that travel. Right of
-// (ux, uz) is (uz, -ux), so the two directions sit 2 * LANE_OFF apart.
-export function lanePoint(map, edge, dir, s) {
+// order, and lane 0 sits LANE_OFF to the right of that travel, every lane past
+// it LANE_STEP further out. Right of (ux, uz) is (uz, -ux), so the two
+// directions sit 2 * LANE_OFF apart.
+export function lanePoint(map, edge, dir, s, lane = 0) {
   const byId = new Map(map.graph.nodes.map((n) => [n.id, n]));
-  return pointOn(byId, edge, dir, s);
+  return pointOn(byId, edge, dir, s, lane);
 }
 
-function pointOn(byId, edge, dir, s) {
+function pointOn(byId, edge, dir, s, lane = 0) {
   const from = byId.get(dir > 0 ? edge.a : edge.b);
   const to = byId.get(dir > 0 ? edge.b : edge.a);
   const dx = to.x - from.x;
@@ -174,11 +180,96 @@ function pointOn(byId, edge, dir, s) {
   const len = Math.hypot(dx, dz) || 1;
   const ux = dx / len;
   const uz = dz / len;
+  const off = LANE_OFF + lane * LANE_STEP;
   return {
-    x: from.x + ux * s + uz * LANE_OFF,
-    z: from.z + uz * s - ux * LANE_OFF,
+    x: from.x + ux * s + uz * off,
+    z: from.z + uz * s - ux * off,
     yaw: Math.atan2(ux, uz),
   };
+}
+
+// The lane a car holds on the edge it is driving, inside the lanes that road
+// runs its way: an edge cut back under it carries the car into a lane that is
+// left.
+function laneOf(c, edge) {
+  return Math.min(c.lane ?? 0, Math.max(0, lanesInDir(edge, c.dir) - 1));
+}
+
+// Where the cars of one lane of an edge stand relative to `from` along it:
+// `ahead` the nearest in front, `beside` the nearest either side. A car
+// changing lane counts in the lane it moves into, so a queue spreads evenly.
+function laneCars(state, c, edge, dir, lane, from = c.s) {
+  let ahead = Infinity;
+  let beside = Infinity;
+  for (const o of state.cars) {
+    if (o === c || o.route.length === 0) continue;
+    if (o.route[o.leg] !== edge.id || o.dir !== dir) continue;
+    if (laneOf(o, edge) !== lane) continue;
+    const d = o.s - from;
+    if (d > 0) { if (d < ahead) ahead = d; }
+    else if (-d < beside) beside = -d;
+  }
+  return { ahead, beside };
+}
+
+// The room ahead that makes a car take a lane other than the first: a queue
+// this close. Farther than that every car drives the kerb lane — lane 0, where
+// a one-lane direction's lane has always sat — so light traffic is unchanged.
+const LANE_CROWD = 2 * (CAR_LEN + GAP_MIN);
+
+// The lane a car takes onto an edge (M5.T24): the one with the most room ahead,
+// so a queue spreads across the lanes a road runs — what makes an avenue carry
+// more cars through a junction than a street (M5-10). One lane a way has
+// nothing to choose.
+function laneFor(state, edge, dir, c) {
+  const most = Math.max(0, lanesInDir(edge, dir) - 1);
+  if (most === 0) return 0;
+  const own = laneCars(state, c, edge, dir, 0, 0).ahead;
+  if (own > LANE_CROWD) return 0;
+  let best = 0;
+  let room = own;
+  for (let lane = 1; lane <= most; lane++) {
+    const far = laneCars(state, c, edge, dir, lane, 0).ahead;
+    if (far > room) { room = far; best = lane; }
+  }
+  return best;
+}
+
+// The lane a car holds this step, carried back into a lane the road still runs
+// by the interpolation a turn uses, so a cut-back never jumps sideways.
+function laneNow(state, c, edge) {
+  const lane = laneOf(c, edge);
+  if (lane !== c.lane && !c.turn) {
+    c.lane = lane;
+    c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, c.dir, c.s, lane), t: 0 };
+  }
+  return lane;
+}
+
+// A car a queue is holding moves out to the free lane beside it (M5.T24): the
+// queue spreads across the lanes the road runs instead of stacking in the one
+// nearest the centre-line, and the junction discharges it in as many files —
+// what makes an avenue carry more cars through a junction than a street
+// (M5-10). Only a car whose leader is a queue's length away moves, and only
+// into a lane with room beside it, so nobody is overtaken inside a car width.
+function spreadQueue(state, c, edge, lane) {
+  const most = Math.max(0, lanesInDir(edge, c.dir) - 1);
+  if (lane >= most) return lane;
+  // The lane with the most room ahead, the one it holds included, and only a
+  // lane clear beside the car can take it.
+  let best = lane;
+  let room = laneCars(state, c, edge, c.dir, lane).ahead;
+  for (let other = 0; other <= most; other++) {
+    if (other === lane) continue;
+    const { ahead, beside } = laneCars(state, c, edge, c.dir, other);
+    if (beside < CAR_LEN + GAP_MIN || ahead <= room) continue;
+    room = ahead;
+    best = other;
+  }
+  if (best === lane) return lane;
+  c.lane = best;
+  c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, c.dir, c.s, best), t: 0 };
+  return best;
 }
 
 function lengthOf(byId, edge) {
@@ -280,8 +371,10 @@ function linksOf(state) {
   const links = new Map(state.map.graph.nodes.map((n) => [n.id, []]));
   for (const e of state.map.graph.edges) {
     const len = lengthOf(state.byId, e);
-    links.get(e.a).push({ to: e.b, len, edge: e, dir: 1 });
-    links.get(e.b).push({ to: e.a, len, edge: e, dir: -1 });
+    // A one-way runs one way (M5.T24): the link the other direction would give
+    // does not exist, so no route is ever planned against it.
+    if (lanesInDir(e, 1) > 0) links.get(e.a).push({ to: e.b, len, edge: e, dir: 1 });
+    if (lanesInDir(e, -1) > 0) links.get(e.b).push({ to: e.a, len, edge: e, dir: -1 });
   }
   return links;
 }
@@ -580,19 +673,20 @@ function placeOutside(state, c, from, to) {
   if (!route || route.length === 0) return false;
   const edge = state.edgeById.get(route[0]);
   const dir = edge.a === from ? 1 : -1;
-  if (!clearAt(state, c, edge.id, dir, 0)) return false;
-  const at = pointOn(state.byId, edge, dir, 0);
+  const lane = laneFor(state, edge, dir, c);
+  if (!clearAt(state, c, edge, dir, 0, lane)) return false;
+  const at = pointOn(state.byId, edge, dir, 0, lane);
   if (!outOfView(state, at.x, at.z)) return false;
-  takeTrip(state, c, route, dir, 0, to, at);
+  takeTrip(state, c, route, dir, 0, to, lane);
   return true;
 }
 
 // A new trip: from a parcel's node (`from`; a random one when null) to another
-// parcel's, on an A* route, starting on the first edge's lane. A boot car (no
-// origin) starts part-way along that edge, so the fleet is spread over the
-// graph from the first frame instead of queued at a handful of junctions.
-// `allowInView` lets a boot car take a start the camera can see when no
-// out-of-view one comes up; only makeCar ever allows that.
+// parcel's, on an A* route, starting on the lane its first edge carries in the
+// direction it drives. A boot car (no origin) starts part-way along that edge,
+// so the fleet is spread over the graph from the first frame instead of queued
+// at a handful of junctions. `allowInView` lets a boot car take a start the
+// camera can see when no out-of-view one comes up.
 function assignTrip(state, c, from, allowInView) {
   for (let tries = 0; tries < TRIP_TRIES; tries++) {
     const origin = from ?? pick(state.rng, state.spots)?.node;
@@ -602,24 +696,29 @@ function assignTrip(state, c, from, allowInView) {
     if (!route) continue;
     const edge = state.edgeById.get(route[0]);
     const dir = edge.a === origin ? 1 : -1;
-    const s0 = from === null ? freeStart(state, c, edge, dir) : clearAt(state, c, edge.id, dir, 0) ? 0 : null;
+    const lane = laneFor(state, edge, dir, c);
+    const s0 = from === null ? freeStart(state, c, edge, dir, lane)
+      : clearAt(state, c, edge, dir, 0, lane) ? 0 : null;
     if (s0 === null) continue;
-    const p = pointOn(state.byId, edge, dir, s0);
+    const p = pointOn(state.byId, edge, dir, s0, lane);
     if (!allowInView && !outOfView(state, p.x, p.z)) continue;
-    takeTrip(state, c, route, dir, s0, to.node, p);
+    takeTrip(state, c, route, dir, s0, to.node, lane);
     return true;
   }
   return false;
 }
 
-// Put a car on a route at `s0` metres along its first edge, in the lane for the
-// direction it drives. Shared by the boot fleet, a re-tasked car and the spread
-// onto a new road, so all three place a car the one way.
-function takeTrip(state, c, route, dir, s0, goal, p) {
+// Put a car on a route at `s0` metres along its first edge, in `lane` — the one
+// with the most room ahead. Shared by the boot fleet, a re-tasked car and the
+// spread onto a new road, so all three place a car the one way.
+function takeTrip(state, c, route, dir, s0, goal, lane) {
+  const edge = state.edgeById.get(route[0]);
   c.id = state.nextId;
   state.nextId += 1;
   c.route = route; c.leg = 0; c.dir = dir; c.s = s0; c.v = 0; c.turn = null;
-  c.goal = goal; c.axis = state.edgeById.get(route[0]).axis; c.speed = 0;
+  c.goal = goal; c.axis = edge.axis; c.speed = 0;
+  c.lane = lane;
+  const p = pointOn(state.byId, edge, dir, s0, lane);
   Object.assign(c, p);
   c.y = groundAt(state.map, p.x, p.z);
   c.prev.x = p.x;
@@ -629,19 +728,20 @@ function takeTrip(state, c, route, dir, s0, goal, p) {
 // No other car within a car length and a gap of `s` on one lane: two cars at
 // the same spot hold each other at gap zero for good, so nothing is placed
 // there. `freeStart` searches a spread-out spot for a car with no origin.
-function clearAt(state, c, edgeId, dir, s) {
+function clearAt(state, c, edge, dir, s, lane) {
   for (const o of state.cars) {
     if (o === c || o.turn || o.route.length === 0) continue;
-    if (o.route[o.leg] === edgeId && o.dir === dir && Math.abs(o.s - s) < CAR_LEN + GAP_MIN) return false;
+    if (o.route[o.leg] === edge.id && o.dir === dir && laneOf(o, edge) === lane
+      && Math.abs(o.s - s) < CAR_LEN + GAP_MIN) return false;
   }
   return true;
 }
 
-function freeStart(state, c, edge, dir) {
+function freeStart(state, c, edge, dir, lane) {
   const span = lengthOf(state.byId, edge) * 0.9;
   for (let tries = 0; tries < 8; tries++) {
     const s = state.rng() * span;
-    if (clearAt(state, c, edge.id, dir, s)) return s;
+    if (clearAt(state, c, edge, dir, s, lane)) return s;
   }
   return null;
 }
@@ -651,8 +751,10 @@ function chainRoute(state, c, route, dest) {
   const edge = state.edgeById.get(route[0]);
   if (!edge) return false;
   const dir = edge.a === c.goal ? 1 : -1;
-  if (!clearAt(state, c, edge.id, dir, 0)) return false;
-  c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, dir, 0), t: 0 };
+  const lane = laneFor(state, edge, dir, c);
+  if (!clearAt(state, c, edge, dir, 0, lane)) return false;
+  c.lane = lane;
+  c.turn = { from: { x: c.x, z: c.z, yaw: c.yaw }, to: pointOn(state.byId, edge, dir, 0, lane), t: 0 };
   c.id = state.nextId;
   state.nextId += 1;
   c.route = route; c.leg = 0; c.dir = dir; c.s = 0;
@@ -698,7 +800,7 @@ function rollTrip(state, c) {
     if (!route) continue;
     const edge = state.edgeById.get(route[0]);
     const dir = edge.a === c.goal ? 1 : -1;
-    if (!clearAt(state, c, edge.id, dir, 0)) continue;
+    if (!clearAt(state, c, edge, dir, 0, laneFor(state, edge, dir, c))) continue;
     fallback = { route, node: to.node };
     break;
   }
@@ -872,10 +974,36 @@ function routeOf(came, to) {
 function revalidate(state) {
   for (const c of state.cars) {
     if (c.route.length === 0) continue;
-    if (c.route.every((id) => state.edgeById.has(id)) && !routeClosed(state, c)) continue;
-    if (c.turn) { c.stale = true; continue; }
-    retask(state, c);
+    if (!c.route.every((id) => state.edgeById.has(id)) || routeClosed(state, c)) {
+      if (c.turn) { c.stale = true; continue; }
+      retask(state, c);
+      continue;
+    }
+    // A road the car's route would run a one-way against (M5.T24): it finishes
+    // the edge it is on and takes its next trip at that edge's far end, so it
+    // never drives a one-way the wrong way for a second edge.
+    if (oneWayAgainst(state, c) && !c.turn) {
+      const here = state.edgeById.get(c.route[c.leg]);
+      c.route = c.route.slice(0, c.leg + 1);
+      if (here) c.goal = c.dir > 0 ? here.b : here.a;
+    }
   }
+}
+
+// Whether the edges a car has still to drive run a one-way against the one
+// direction it names: a car on such an edge already drives to its end and its
+// route stops there.
+function oneWayAgainst(state, c) {
+  const here = state.edgeById.get(c.route[c.leg]);
+  if (!here) return false;
+  let at = c.dir > 0 ? here.a : here.b;
+  for (let i = c.leg + 1; i < c.route.length; i++) {
+    const e = state.edgeById.get(c.route[i]);
+    if (!e) return false;
+    if (e.b === at && lanesInDir(e, -1) === 0) return true;
+    at = e.a === at ? e.b : e.a;
+  }
+  return false;
 }
 
 function retask(state, c) {
@@ -958,7 +1086,9 @@ export function tick(state, dt) {
   const lanes = new Map();
   for (const c of state.cars) {
     if (c.turn || c.route.length === 0) continue;
-    const key = `${c.route[c.leg]}|${c.dir}`;
+    const edge = state.edgeById.get(c.route[c.leg]);
+    if (!edge) continue;
+    const key = `${edge.id}|${c.dir}|${laneOf(c, edge)}`;
     if (!lanes.has(key)) lanes.set(key, []);
     lanes.get(key).push(c);
   }
@@ -978,8 +1108,12 @@ export function tick(state, dt) {
     const edge = state.edgeById.get(c.route[c.leg]);
     if (!edge) continue;
     const len = lengthOf(state.byId, edge);
-    const lane = lanes.get(`${edge.id}|${c.dir}`);
-    const leader = lane[lane.indexOf(c) + 1] ?? null;
+    const lane = laneNow(state, c, edge);
+    const file = lanes.get(`${edge.id}|${c.dir}|${lane}`);
+    const leader = file[file.indexOf(c) + 1] ?? null;
+    // A car a queue is holding moves out to the free lane beside it, so the
+    // queue spreads across the lanes the road runs (M5.T24).
+    const held = leader !== null && leader.s - c.s < CAR_LEN + GAP_MIN + 1;
     let target = VMAX;
     if (leader) {
       // Gap keeping: match speeds on the linear law, but always be able to
@@ -1006,7 +1140,10 @@ export function tick(state, dt) {
     c.speed = c.v;
     c.axis = edge.axis;
     if (c.s < len) {
-      Object.assign(c, pointOn(state.byId, edge, c.dir, c.s));
+      Object.assign(c, pointOn(state.byId, edge, c.dir, c.s, lane));
+      // The lane change is carried by the interpolation a turn uses, so it
+      // starts from the pose this step has just left the car in (M0-9).
+      if (held && !c.turn) spreadQueue(state, c, edge, lane);
       continue;
     }
     if (c.leg === c.route.length - 1) {
@@ -1014,7 +1151,7 @@ export function tick(state, dt) {
       // turn, so the car never stops dead and its draw slot never jumps. A
       // hand-placed car (want 0) holds at the node for good.
       c.s = len;
-      Object.assign(c, pointOn(state.byId, edge, c.dir, len));
+      Object.assign(c, pointOn(state.byId, edge, c.dir, len, lane));
       if (state.want > 0 && c.goal !== null) { if (!rollTrip(state, c)) c.v = 0; }
       else { c.v = 0; c.speed = 0; }
       continue;
@@ -1036,12 +1173,14 @@ function beginTurn(state, c, edge, len) {
   const node = c.dir > 0 ? edge.b : edge.a;
   const next = state.edgeById.get(c.route[c.leg + 1]);
   const dir = next.a === node ? 1 : -1;
-  const from = pointOn(state.byId, edge, c.dir, len);
-  const to = pointOn(state.byId, next, dir, 0);
+  const from = pointOn(state.byId, edge, c.dir, len, laneOf(c, edge));
+  const lane = laneFor(state, next, dir, c);
+  const to = pointOn(state.byId, next, dir, 0, lane);
   c.leg += 1;
   c.dir = dir;
   c.s = 0;
   c.axis = next.axis;
+  c.lane = lane;
   // The car reaches the lane's end in the step that crosses it; leaving the
   // pose at the overshoot point holds the drawn car for a frame (M0-9).
   Object.assign(c, from);

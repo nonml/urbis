@@ -89,6 +89,7 @@ function addChain(nodes, edges, district, way, kind, axis, points) {
       a: prev.id,
       b: next.id,
       lanes: way.lanes,
+      oneWay: false,
       kind,
       axis,
       district: district.id,
@@ -203,6 +204,36 @@ export function markBridges(graph, water) {
     if (a && b && crossesWater(a, b, water)) edge.kind = 'bridge';
   }
   return graph;
+}
+
+// ---------------------------------------------------------------------------
+// Road types (M5.T24, M5-10): a street is two lanes, one each way; an avenue
+// four, two each way; a one-way two lanes the same way. `lanes` is the total,
+// so a two-way road runs half of them each way and a one-way all of them one
+// way. The cost is per metre, so changing a road to another type in place costs
+// the difference (ops.js upgradeCost). The cross-section each type is drawn
+// with, and the tool that lays it, are M5.T25.
+export const ROAD_TYPES = {
+  street: { name: 'street', lanes: 2, oneWay: false, cost: 12 },
+  avenue: { name: 'avenue', lanes: 4, oneWay: false, cost: 26 },
+  oneway: { name: 'one-way', lanes: 2, oneWay: true, cost: 9 },
+};
+
+// The type an edge reads as: the one whose lanes and one-way it carries. A
+// hand-placed edge with no lanes field is a street.
+export function roadTypeOf(edge) {
+  const oneWay = Boolean(edge?.oneWay);
+  const lanes = edge?.lanes === 4 ? 4 : 2;
+  return Object.keys(ROAD_TYPES).find((id) => ROAD_TYPES[id].lanes === lanes
+    && ROAD_TYPES[id].oneWay === oneWay) ?? 'street';
+}
+
+// The lanes one direction runs on an edge: half of them on a two-way road, all
+// of them on a one-way, and none against one — traffic never plans a trip
+// against a one-way (traffic.js linksOf).
+export function lanesInDir(edge, dir) {
+  const type = ROAD_TYPES[roadTypeOf(edge)];
+  return type.oneWay ? (dir > 0 ? type.lanes : 0) : type.lanes / 2;
 }
 
 // Every avenue cut where a crossing meets it, every crossing cut where an
