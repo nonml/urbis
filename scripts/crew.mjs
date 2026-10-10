@@ -41,8 +41,9 @@ const { ensureServer, createClient, readServerRegistry, isServerRunning } = awai
 const ROOT = path.resolve(path.dirname(new URL(import.meta.url).pathname), '..');
 const STATE = path.join(ROOT, '..', '.urbis-crew.json');
 // CREW_TIERS overrides the ladder, e.g. an A/B of a challenger above the incumbent.
-const TIERS = (process.env.CREW_TIERS
-  ?? 'opencode-go/deepseek-v4.1-flash,opencode-go/glm-5.3-flash').split(',');
+// Step 5 alone by default: DeepSeek and GLM are on a weekly limit the board must
+// not spend, so a restart without CREW_TIERS never falls back onto them.
+const TIERS = (process.env.CREW_TIERS ?? 'opencode-go/step-5-preview-free').split(',');
 // DeepSeek does its best work at max effort; the operator found it capable there.
 // Muse Spark's thinking levels top out at xhigh, Step 5's at high.
 // ../.urbis-effort.json overrides one lane for an A/B, read on every send so it needs
