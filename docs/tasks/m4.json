@@ -375,6 +375,26 @@
       "test": "tests/accept/m4-outside.test.js"
     },
     {
+      "id": "M4.T19",
+      "lane": "look",
+      "needs": [
+        "M4.T12a"
+      ],
+      "goal": "Buildings that do not all look the same. Today every tower tiles one window texture (assets/facade_glass_night, FACADE_TILE in src/render/materials.js) and src/render/block.js's 'six facade architectures' differ only by tint, so the player sees the same window grid on every building. Give the city real facade systems, chosen by the district kind each building stands in (M4.T12a: towers, housing, works, suburb) and varied per building from the seed: (1) office curtain wall: tall glass bands with mullions; (2) residential block: punched windows in brick or render, with balconies on some; (3) works: sheds with high strip windows and roller doors, few windows; (4) older mid-rise: stone or brick with tall sash windows and a cornice; plus per-building variation in window width, floor height, spandrel band and a lit-window pattern that differs building to building (VGA-039: siblings, not clones). Grounded and modern (docs/visual-direction: never neon, never toy boxes).",
+      "files": [
+        "src/render/block.js",
+        "src/render/materials.js",
+        "src/render/buildings.js",
+        "tools/",
+        "public/assets/",
+        "docs/shots/",
+        "tests/accept/m4-facades.spec.js"
+      ],
+      "test": "tests/accept/m4-facades.spec.js",
+      "commit": "M4.T19 (M4-1): facade systems by district kind",
+      "notes": "Size L, at most 500 changed lines outside assets. Textures: CC0 only (ASSETS.md), or made by a script in tools/. Draws: at most +4 over today (instanced per facade system, as the towers are now). Write tests/accept/m4-facades.spec.js first and see it fail on main: boot the built game on seeds 7 and 22; in the city view (z) and at the street spawn, use __game.pick across a grid of screen points and read each hit building's facade system (tag it in userData.facade when you build it) — at least 3 different systems appear in each city view frame, and no two neighbouring buildings on one block share both system and window pattern. Take shots with scripts/shot.mjs: street spawn day and night, city view day, on seeds 7 and 22, into docs/shots/m4-facades-*.png, and look at every one before you finish: the frame must read as several kinds of building, not one grid in different tints."
+    },
+    {
       "id": "M4.T18",
       "lane": "city",
       "goal": "Close. Locality (M4-5) green; the district sweep, day and night, five seeds; one commit per defect",
@@ -399,7 +419,8 @@
         "M4.T8",
         "M4.T9",
         "M4.T9b",
-        "M4.T8c"
+        "M4.T8c",
+        "M4.T19"
       ],
       "commit": "M4.T18 (M4-5, M4-8): close",
       "notes": "Size M: at most 300 changed lines. If you must touch a file not listed, stop and say so. The criterion this serves: M4-5: **The act stays its size:** A/B, a blackout in one district: every district no resident commutes through or to is bit-identical; the others differ only in commute times and the trade those carry (checked by `tests/accept/m4-local.test.js` (Node)) The criterion this serves: M4-8: The sweep of every district on all five seeds, day and night, has 0 open defects (checked by the sweep) Every test file uses @playwright/test (test, expect), as the tests in tests/ do; a Node-only test simply never opens a page. The plan behind this task: docs/plan/TASKS.md and docs/ROADMAP.md.",
